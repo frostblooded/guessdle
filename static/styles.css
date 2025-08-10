@@ -1,0 +1,49 @@
+body {
+  display: block;
+}
+
+#guesses-container {
+  background-color: grey;
+  padding: 10px;
+  margin: 40px auto 0 auto;
+  border-radius: 40px;
+  display: grid;
+  grid-auto-flow: row;
+  width: 60%;
+  padding: 40px;
+}
+
+#guess-titles-row {
+  margin-bottom: 10px;
+}
+
+.guess-title {
+  display: inline-block;
+  background-color: darkslategray;
+  font-size: 1.3em;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.guess-row {
+  margin-bottom: 5px;
+}
+
+.guess-cell {
+  background-color: red;
+  font-size: 2em;
+}
+
+.cell {
+  display: inline-block;
+  border-radius: 10px;
+  color: white;
+  padding: 10px;
+  margin-left: 10px;
+  margin-right: 10px;
+  text-align: center;
+  align-content: center;
+}
