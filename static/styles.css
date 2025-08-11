@@ -4,7 +4,6 @@ body {
 
 #guesses-container {
   background-color: grey;
-  padding: 10px;
   margin: 40px auto 0 auto;
   border-radius: 40px;
   display: grid;
@@ -13,26 +12,46 @@ body {
   padding: 40px;
 }
 
-#guess-titles-row {
-  margin-bottom: 10px;
+.row {
+  margin: 0 10px 0 10px;
 }
 
-.guess-title {
+#new-guess-row {
+  display: grid;
+  grid-template-columns: 1fr 9fr;
+  margin-bottom: 20px;
+}
+
+#new-guess-row label {
+  align-content: center;
+  text-align: center;
+}
+
+#new-guess-input {
+  width: 100%;
+}
+
+#guess-results-titles-row {
+  margin-bottom: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.guess-result-title {
   display: inline-block;
   background-color: darkslategray;
   font-size: 1.3em;
 }
 
-.row {
+.guess-result-row {
+  margin-bottom: 5px;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
 }
 
-.guess-row {
-  margin-bottom: 5px;
-}
-
-.guess-cell {
+.guess-result-cell {
   background-color: red;
   font-size: 2em;
 }
@@ -42,8 +61,6 @@ body {
   border-radius: 10px;
   color: white;
   padding: 10px;
-  margin-left: 10px;
-  margin-right: 10px;
   text-align: center;
   align-content: center;
 }

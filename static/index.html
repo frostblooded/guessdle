@@ -3,20 +3,28 @@
   <head>
     <title>Guess The Cat</title>
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="libs/autoComplete/autoComplete.css" />
+    <script src="libs/autoComplete/autoComplete.js"></script>
+    <script src="script.js"></script>
+    <link rel="icon" type="image/x-icon" href="favicon.svg">
   </head>
   <body>
     <div id="guesses-container">
-      <div id="guess-titles-row" class="row">
-        <div class="guess-title cell">Name</div>
-        <div class="guess-title cell">Colors</div>
+      <div id="new-guess-row" class="row">
+        <label id="new-guess-label" for="new-guess-input">GUESS</label>
+        <input type="text" id="new-guess-input"/>
       </div>
-      <div class="guess-row row">
-        <div class="guess-cell cell">Cookie</div>
-        <div class="guess-cell cell">Black, White, Orange</div>
+      <div id="guess-results-titles-row" class="row">
+        <div class="guess-result-title cell">Name</div>
+        <div class="guess-result-title cell">Colors</div>
       </div>
-      <div class="guess-row row">
-        <div class="guess-cell cell">Ati</div>
-        <div class="guess-cell cell">Black, White, Orange</div>
+      <div class="guess-result-row row">
+        <div class="guess-result-cell cell">Cookie</div>
+        <div class="guess-result-cell cell">Black, White, Orange</div>
+      </div>
+      <div class="guess-result-row row">
+        <div class="guess-result-cell cell">Ati</div>
+        <div class="guess-result-cell cell">Black, White, Orange</div>
       </div>
     </div>
   </body>
