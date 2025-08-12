@@ -9,22 +9,18 @@
     <link rel="icon" type="image/x-icon" href="favicon.svg">
   </head>
   <body>
-    <div id="guesses-container">
+    <h1 id="page-title">GUESS THE CAT</h1>
+    <div id="game-container">
       <div id="new-guess-row" class="row">
-        <label id="new-guess-label" for="new-guess-input">GUESS</label>
         <input type="text" id="new-guess-input"/>
+      </div>
+      <div id="buttons-row" class="row">
+        <button id="reset-game-button">RESET</button>
       </div>
       <div id="guess-results-titles-row" class="row">
         <div class="guess-result-title cell">Name</div>
         <div class="guess-result-title cell">Colors</div>
-      </div>
-      <div class="guess-result-row row">
-        <div class="guess-result-cell cell">Cookie</div>
-        <div class="guess-result-cell cell">Black, White, Orange</div>
-      </div>
-      <div class="guess-result-row row">
-        <div class="guess-result-cell cell">Ati</div>
-        <div class="guess-result-cell cell">Black, White, Orange</div>
+        <div class="guess-result-title cell">Owners</div>
       </div>
     </div>
   </body>

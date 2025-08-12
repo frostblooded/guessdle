@@ -1,9 +1,57 @@
+const LOCAL_STORAGE_USED_GUESSES_STRING = "usedGuesses";
+const LOCAL_STORAGE_ANSWER_IDX_STRING = "answerIdX";
+
+const GUESS_DATA = [
+    {
+        name: "Ati",
+        colors: ["Black", "White", "Orange"],
+        owners: ["Niki"]
+    },
+    {
+        name: "Cookie",
+        colors: ["Black", "White", "Orange"],
+        owners: ["Niki"]
+    },
+    {
+        name: "Eddie",
+        colors: ["Orange"],
+        owners: ["Stefi", "Yasen"]
+    },
+    {
+        name: "Kiara",
+        colors: ["Black", "White", "Orange"],
+        owners: ["Antonio", "Tanya"],
+    },
+    {
+        name: "Murlin",
+        colors: ["Black"],
+        owners: ["Antonio", "Tanya"],
+    },
+    {
+        name: "Oreo",
+        colors: ["Black", "White"],
+        owners: ["Cveti", "Vili"],
+    },
+    {
+        name: "Puhche",
+        colors: ["Black", "White"],
+        owners: ["Cveti", "Vili"],
+    },
+    {
+        name: "Todorka",
+        colors: ["Black", "White"],
+        owners: ["Didi"],
+    },
+];
+
+const GUESS_DATA_NAMES = GUESS_DATA.map(item => item.name);
+
 window.onload = function() {
     new autoComplete({
         selector: "#new-guess-input",
         placeHolder: "Guess a cat...",
         data: {
-            src: ["Cookie", "Ati", "Oreo", "Puhche", "Eddie", "Todorka", "Kiara", "Murlin"],
+            src: GUESS_DATA_NAMES,
             filter: filterOutGuesses,
         },
         resultsList: {
@@ -19,15 +67,90 @@ window.onload = function() {
             }
         }
     });
+
+    loadInitialUsedGuessesElements();
+    initResetButton();
+    initAnswerIdx();
 }
 
-const LOCAL_STORAGE_USED_GUESSES_STRING = "usedGuesses";
+function initAnswerIdx() {
+    const answerIdx = getAnswerIdx();
+    if(answerIdx != null)
+        return;
+
+    setRandomAnswerIdx();
+}
+
+function initResetButton() {
+    let resetButton = document.querySelector("#reset-game-button");
+    resetButton.onclick = onResetButtonClick;
+}
+
+function onResetButtonClick() {
+    setRandomAnswerIdx();
+    clearUsedGuesses();
+
+    let guessResultRows = document.querySelectorAll(".guess-result-row");
+
+    for (let row of guessResultRows) {
+        row.remove();
+    }
+}
+
+function loadInitialUsedGuessesElements() {
+    const usedGuesses = getUsedGuesses();
+
+    for(const usedGuess of usedGuesses) {
+        addGuessResultElement(usedGuess);
+    }
+}
+
+function addGuessResultElement(name) {
+    let resultElement = document.createElement("div");
+    resultElement.setAttribute("class", "guess-result-row row");
+
+    const answerData = GUESS_DATA[getAnswerIdx()];
+    const resultData = GUESS_DATA.find(item => item.name === name);
+
+    for (const key in resultData) {
+        const val = resultData[key];
+        const answerVal = answerData[key];
+
+        let resultCell = document.createElement("div");
+        resultCell.setAttribute("class", "guess-result-cell cell");
+        resultCell.textContent = val;
+
+        if(typeof val === "string") {
+            if(val === answerVal) {
+                resultCell.classList.add("correct");
+            } else {
+                resultCell.classList.add("incorrect");
+            }
+        } else if(val instanceof Array) {
+            if(arraysAreSame(val, answerVal)) {
+                resultCell.classList.add("correct");
+            } else if(arraysHaveCommonElement(val, answerVal)) {
+                resultCell.classList.add("partially-correct");
+            } else {
+                resultCell.classList.add("incorrect");
+            }
+        } else {
+            console.error("Unsupported subelement type: ", typeof val);
+        }
+
+        resultElement.appendChild(resultCell);
+    }
+
+    let gameContainer = document.querySelector("#game-container");
+    gameContainer.appendChild(resultElement);
+}
 
 function handleSelection(event) {
     const newGuessInput = document.querySelector("#new-guess-input");
     const selectedValue = event.detail.selection.value;
     newGuessInput.value = "";
     addUsedGuess(selectedValue);
+    addGuessResultElement(selectedValue);
 }
 
 function handleResultsList(list, data) {
@@ -62,10 +185,45 @@ function addUsedGuess(guess) {
     localStorage.setItem(LOCAL_STORAGE_USED_GUESSES_STRING, JSON.stringify(usedGuesses));
 }
 
+function clearUsedGuesses() {
+    localStorage.removeItem(LOCAL_STORAGE_USED_GUESSES_STRING);
+}
+
 function getUsedGuesses() {
-    let retrievedValue = localStorage.getItem(LOCAL_STORAGE_USED_GUESSES_STRING);
+    return getLocalStorageObject(LOCAL_STORAGE_USED_GUESSES_STRING);
+}
+
+function setRandomAnswerIdx() {
+    const answerIdx = Math.floor(Math.random() * GUESS_DATA.length)
+    localStorage.setItem(LOCAL_STORAGE_ANSWER_IDX_STRING, JSON.stringify(answerIdx));
+
+    console.log("Answer chosen to be ", GUESS_DATA[answerIdx]);
+}
+
+function getAnswerIdx() {
+    return getLocalStorageObject(LOCAL_STORAGE_ANSWER_IDX_STRING);
+}
+
+function getLocalStorageObject(key) {
+    let retrievedValue = localStorage.getItem(key);
     if(retrievedValue === null)
         return null;
 
     return JSON.parse(retrievedValue);
+}
+
+function arraysHaveCommonElement(array1, array2) {
+    for (let el1 of array1) {
+        for (let el2 of array2) {
+            if (el1 === el2) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+function arraysAreSame(array1, array2) {
+    return array1.sort().join(',')=== array2.sort().join(',');
 }

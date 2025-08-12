@@ -1,8 +1,14 @@
 body {
   display: block;
+  font-family: 'Courier New', monospace;
 }
 
-#guesses-container {
+#page-title {
+  text-align: center;
+  font-size: 5em;
+}
+
+#game-container {
   background-color: grey;
   margin: 40px auto 0 auto;
   border-radius: 40px;
@@ -12,14 +18,26 @@ body {
   padding: 40px;
 }
 
+#reset-game-button {
+  width: 100%;
+  padding: 10px;
+}
+
 .row {
   margin: 0 10px 0 10px;
 }
 
-#new-guess-row {
-  display: grid;
-  grid-template-columns: 1fr 9fr;
+#buttons-row {
   margin-bottom: 20px;
+}
+
+#new-guess-row {
+  margin-bottom: 20px;
+}
+
+.autoComplete_wrapper {
+  display: inline-block;
+  width: 100%;
 }
 
 #new-guess-row label {
@@ -34,7 +52,7 @@ body {
 #guess-results-titles-row {
   margin-bottom: 10px;
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 }
 
@@ -47,13 +65,24 @@ body {
 .guess-result-row {
   margin-bottom: 5px;
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 }
 
 .guess-result-cell {
-  background-color: red;
   font-size: 2em;
+}
+
+.guess-result-cell.correct {
+  background-color: green;
+}
+
+.guess-result-cell.partially-correct {
+  background-color: orange;
+}
+
+.guess-result-cell.incorrect {
+  background-color: red;
 }
 
 .cell {
