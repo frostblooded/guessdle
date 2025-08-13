@@ -9,71 +9,83 @@ const APOLLO_FILTER_URL = "/?filter=".concat(APOLLO_FILTER);
 
 const ALL_GUESS_DATA = [
     {
+        photo: "photos/ati.jpg",
         name: "Ati",
         colors: ["Black", "White", "Orange"],
         owners: ["Niki"],
         filters: [UBISOFT_FILTER, APOLLO_FILTER],
     },
     {
+        photo: "photos/cookie.jpg",
         name: "Cookie",
         colors: ["Black", "White", "Orange"],
         owners: ["Niki"],
         filters: [UBISOFT_FILTER, APOLLO_FILTER],
     },
     {
+        photo: "photos/eddie.jpg",
         name: "Eddie",
-        colors: ["Orange"],
+        colors: ["Orange", "White"],
         owners: ["Stefi", "Yasen"],
         filters: [APOLLO_FILTER],
     },
     {
+        photo: "photos/jaro.jpg",
         name: "Jaro",
         colors: ["Black"],
         owners: ["Ico"],
         filters: [APOLLO_FILTER],
     },
     {
+        photo: "photos/jeffy.jpg",
         name: "Jeffy",
         colors: ["Black"],
         owners: ["Ico"],
         filters: [APOLLO_FILTER],
     },
     {
+        photo: "photos/kiara.jpg",
         name: "Kiara",
         colors: ["Black", "White", "Orange"],
         owners: ["Antonio", "Tanya"],
         filters: [APOLLO_FILTER],
     },
     {
+        photo: "photos/kimi.jpg",
         name: "Kimi",
         colors: ["Black", "White", "Orange"],
         owners: ["Bori"],
     },
     {
+        photo: "photos/mochi.jpg",
         name: "Mochi",
         colors: ["Orange", "White"],
         owners: ["Petya"],
         filters: [UBISOFT_FILTER],
     },
     {
+        photo: "photos/murlin.jpg",
         name: "Murlin",
         colors: ["Black"],
         owners: ["Antonio", "Tanya"],
         filters: [APOLLO_FILTER],
     },
     {
+        photo: "photos/oreo.jpg",
         name: "Oreo",
         colors: ["Black", "White"],
         owners: ["Cveti", "Vili"],
         filters: [UBISOFT_FILTER],
     },
     {
+        photo: "photos/puhche.jpg",
         name: "Puhche",
         colors: ["Black", "White"],
         owners: ["Cveti", "Vili"],
         filters: [UBISOFT_FILTER],
     },
     {
+        photo: "photos/todorka.jpg",
         name: "Todorka",
         colors: ["Black", "White"],
         owners: ["Didi"],
@@ -198,13 +210,20 @@ function addGuessResultElement(name) {
 
         const val = resultData[key];
         const formattedVal = getFormattedCellVal(val);
-        const answerVal = answerData[key];
 
         let resultCell = document.createElement("div");
         resultCell.setAttribute("class", "guess-result-cell cell");
 
-        resultCell.textContent = formattedVal;
-        addGuessResultCellClasses(val, answerVal, resultCell);
+        if (key === "photo") {
+            let image = document.createElement("img");
+            image.src = val;
+            resultCell.appendChild(image);
+        } else {
+            const answerVal = answerData[key];
+            resultCell.textContent = formattedVal;
+            addGuessResultCellClasses(val, answerVal, resultCell);
+        }
+
         resultElement.appendChild(resultCell);
     }
 

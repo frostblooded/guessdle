@@ -73,7 +73,7 @@ body {
 #guess-results-titles-row {
   margin-bottom: 10px;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 10px;
 }
 
@@ -86,7 +86,7 @@ body {
 .guess-result-row {
   margin-bottom: 5px;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 10px;
 }
 
@@ -113,4 +113,8 @@ body {
   padding: 10px;
   text-align: center;
   align-content: center;
+}
+
+.cell img {
+  width: 100%;
 }
