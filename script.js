@@ -1,36 +1,48 @@
 const LOCAL_STORAGE_USED_GUESSES_STRING = "usedGuesses";
 const LOCAL_STORAGE_ANSWER_IDX_STRING = "answerIdX";
 
-const GUESS_DATA = [
+const UBISOFT_FILTER = "ubisoft";
+const APOLLO_FILTER = "apollo";
+
+const UBISOFT_FILTER_URL = "/?filter=".concat(UBISOFT_FILTER);
+const APOLLO_FILTER_URL = "/?filter=".concat(APOLLO_FILTER);
+
+const ALL_GUESS_DATA = [
     {
         name: "Ati",
         colors: ["Black", "White", "Orange"],
-        owners: ["Niki"]
+        owners: ["Niki"],
+        filters: [UBISOFT_FILTER, APOLLO_FILTER],
     },
     {
         name: "Cookie",
         colors: ["Black", "White", "Orange"],
-        owners: ["Niki"]
+        owners: ["Niki"],
+        filters: [UBISOFT_FILTER, APOLLO_FILTER],
     },
     {
         name: "Eddie",
         colors: ["Orange"],
-        owners: ["Stefi", "Yasen"]
+        owners: ["Stefi", "Yasen"],
+        filters: [APOLLO_FILTER],
     },
     {
         name: "Jaro",
         colors: ["Black"],
-        owners: ["Ico"]
+        owners: ["Ico"],
+        filters: [APOLLO_FILTER],
     },
     {
         name: "Jeffy",
         colors: ["Black"],
-        owners: ["Ico"]
+        owners: ["Ico"],
+        filters: [APOLLO_FILTER],
     },
     {
         name: "Kiara",
         colors: ["Black", "White", "Orange"],
         owners: ["Antonio", "Tanya"],
+        filters: [APOLLO_FILTER],
     },
     {
         name: "Kimi",
@@ -41,28 +53,46 @@ const GUESS_DATA = [
         name: "Mochi",
         colors: ["Orange", "White"],
         owners: ["Petya"],
+        filters: [UBISOFT_FILTER],
     },
     {
         name: "Murlin",
         colors: ["Black"],
         owners: ["Antonio", "Tanya"],
+        filters: [APOLLO_FILTER],
     },
     {
         name: "Oreo",
         colors: ["Black", "White"],
         owners: ["Cveti", "Vili"],
+        filters: [UBISOFT_FILTER],
     },
     {
         name: "Puhche",
         colors: ["Black", "White"],
         owners: ["Cveti", "Vili"],
+        filters: [UBISOFT_FILTER],
     },
     {
         name: "Todorka",
         colors: ["Black", "White"],
         owners: ["Didi"],
+        filters: [APOLLO_FILTER],
     },
 ];
+
+const GUESS_DATA = (() => {
+    const filter = getCurrentFilter();
+    if(filter === null)
+        return ALL_GUESS_DATA;
+
+    return ALL_GUESS_DATA.filter((item) => {
+        if(!Object.hasOwn(item, "filters"))
+            return false;
+
+        return item.filters.includes(filter);
+    });
+})();
 
 const GUESS_DATA_NAMES = GUESS_DATA.map(item => item.name);
 
@@ -89,8 +119,13 @@ window.onload = function() {
     });
 
     loadInitialUsedGuessesElements();
-    initResetButton();
+    initButtons();
     initAnswerIdx();
+}
+
+function getCurrentFilter() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get("filter");
 }
 
 function initAnswerIdx() {
@@ -101,9 +136,32 @@ function initAnswerIdx() {
     setRandomAnswerIdx();
 }
 
-function initResetButton() {
+function initButtons() {
     let resetButton = document.querySelector("#reset-game-button");
     resetButton.onclick = onResetButtonClick;
+
+    const filter = getCurrentFilter();
+
+    let noFilterButton = document.querySelector("#no-filter-button");
+    noFilterButton.onclick = () => { window.location.href = "/"; };
+
+    if(filter === null) {
+        noFilterButton.classList.add("active");
+    }
+
+    let ubisoftFilterButton = document.querySelector("#ubisoft-filter-button");
+    ubisoftFilterButton.onclick = () => { window.location.href = UBISOFT_FILTER_URL; };
+
+    if(filter === UBISOFT_FILTER) {
+        ubisoftFilterButton.classList.add("active");
+    }
+
+    let apolloFilterButton = document.querySelector("#apollo-filter-button");
+    apolloFilterButton.onclick = () => { window.location.href = APOLLO_FILTER_URL; };
+
+    if(filter === APOLLO_FILTER) {
+        apolloFilterButton.classList.add("active");
+    }
 }
 
 function onResetButtonClick() {
@@ -135,45 +193,51 @@ function addGuessResultElement(name) {
     const resultData = GUESS_DATA.find(item => item.name === name);
 
     for (const key in resultData) {
+        if (key === "filters")
+            continue;
+
         const val = resultData[key];
+        const formattedVal = getFormattedCellVal(val);
         const answerVal = answerData[key];
 
         let resultCell = document.createElement("div");
         resultCell.setAttribute("class", "guess-result-cell cell");
 
-        let formattedVal = val;
-
-        if(val instanceof Array) {
-            formattedVal = val.join(", ");
-        }
-
         resultCell.textContent = formattedVal;
-
-        if(typeof val === "string") {
-            if(val === answerVal) {
-                resultCell.classList.add("correct");
-            } else {
-                resultCell.classList.add("incorrect");
-            }
-        } else if(val instanceof Array) {
-            if(arraysAreSame(val, answerVal)) {
-                resultCell.classList.add("correct");
-            } else if(arraysHaveCommonElement(val, answerVal)) {
-                resultCell.classList.add("partially-correct");
-            } else {
-                resultCell.classList.add("incorrect");
-            }
-        } else {
-            console.error("Unsupported subelement type: ", typeof val);
-        }
-
+        addGuessResultCellClasses(val, answerVal, resultCell);
         resultElement.appendChild(resultCell);
     }
 
     let guessResultsContainer = document.querySelector("#guess-results-container");
-
-    let gameContainer = document.querySelector("#game-container");
     guessResultsContainer.prepend(resultElement);
+}
+
+function getFormattedCellVal(val) {
+    if(val instanceof Array) {
+        return val.join(", ");
+    }
+
+    return val;
+}
+
+function addGuessResultCellClasses(val, answerVal, resultCell) {
+    if(typeof val === "string") {
+        if(val === answerVal) {
+            resultCell.classList.add("correct");
+        } else {
+            resultCell.classList.add("incorrect");
+        }
+    } else if(val instanceof Array) {
+        if(arraysAreSame(val, answerVal)) {
+            resultCell.classList.add("correct");
+        } else if(arraysHaveCommonElement(val, answerVal)) {
+            resultCell.classList.add("partially-correct");
+        } else {
+            resultCell.classList.add("incorrect");
+        }
+    } else {
+        console.error("Unsupported subelement type: ", typeof val);
+    }
 }
 
 function handleSelection(event) {
