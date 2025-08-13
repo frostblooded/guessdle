@@ -18,6 +18,12 @@ body {
   padding: 40px;
 }
 
+@media(max-width: 1000px) {
+  #game-container {
+    width: 90%;
+  }
+}
+
 #reset-game-button {
   width: 100%;
   padding: 10px;

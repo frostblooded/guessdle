@@ -18,9 +18,29 @@ const GUESS_DATA = [
         owners: ["Stefi", "Yasen"]
     },
     {
+        name: "Jaro",
+        colors: ["Black"],
+        owners: ["Ico"]
+    },
+    {
+        name: "Jeffy",
+        colors: ["Black"],
+        owners: ["Ico"]
+    },
+    {
         name: "Kiara",
         colors: ["Black", "White", "Orange"],
         owners: ["Antonio", "Tanya"],
+    },
+    {
+        name: "Kimi",
+        colors: ["Black", "White", "Orange"],
+        owners: ["Bori"],
+    },
+    {
+        name: "Mochi",
+        colors: ["Orange", "White"],
+        owners: ["Petya"],
     },
     {
         name: "Murlin",
@@ -99,6 +119,8 @@ function onResetButtonClick() {
 
 function loadInitialUsedGuessesElements() {
     const usedGuesses = getUsedGuesses();
+    if(usedGuesses === null)
+        return;
 
     for(const usedGuess of usedGuesses) {
         addGuessResultElement(usedGuess);
@@ -118,7 +140,14 @@ function addGuessResultElement(name) {
 
         let resultCell = document.createElement("div");
         resultCell.setAttribute("class", "guess-result-cell cell");
-        resultCell.textContent = val;
+
+        let formattedVal = val;
+
+        if(val instanceof Array) {
+            formattedVal = val.join(", ");
+        }
+
+        resultCell.textContent = formattedVal;
 
         if(typeof val === "string") {
             if(val === answerVal) {
@@ -141,8 +170,10 @@ function addGuessResultElement(name) {
         resultElement.appendChild(resultCell);
     }
 
+    let guessResultsContainer = document.querySelector("#guess-results-container");
+
     let gameContainer = document.querySelector("#game-container");
-    gameContainer.appendChild(resultElement);
+    guessResultsContainer.prepend(resultElement);
 }
 
 function handleSelection(event) {
