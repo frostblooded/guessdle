@@ -4,7 +4,7 @@ use actix_web::{App, HttpServer};
 async fn main() -> std::io::Result<()> {
     HttpServer::new(|| {
         App::new()
-            .service(actix_files::Files::new("/", "./static")
+            .service(actix_files::Files::new("/", "./")
                 .index_file("index.html")
                 .use_last_modified(true)
             )
