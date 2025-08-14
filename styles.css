@@ -12,8 +12,6 @@ body {
   background-color: grey;
   margin: 40px auto 0 auto;
   border-radius: 40px;
-  display: grid;
-  grid-auto-flow: row;
   width: 60%;
   padding: 40px;
 }
@@ -35,7 +33,8 @@ body {
 
 @media(max-width: 1000px) {
   #game-container {
-    width: 90%;
+    width: auto;
+    padding: 50px 0 50px 0;
   }
 }
 
@@ -70,28 +69,33 @@ body {
   width: 100%;
 }
 
-#guess-results-titles-row {
-  margin-bottom: 10px;
+#guess-results-titles-row, .guess-result-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: 1fr repeat(3, 2fr);
   gap: 10px;
 }
 
+#guess-results-titles-row {
+  margin-bottom: 10px;
+}
+
 .guess-result-title {
-  display: inline-block;
   background-color: darkslategray;
   font-size: 1.3em;
 }
 
 .guess-result-row {
   margin-bottom: 5px;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
 }
 
 .guess-result-cell {
   font-size: 2em;
+}
+
+@media(max-width: 1000px) {
+  .guess-result-cell {
+    font-size: 1em;
+  }
 }
 
 .guess-result-cell.correct {

@@ -1,5 +1,7 @@
-const LOCAL_STORAGE_USED_GUESSES_STRING = "usedGuesses";
-const LOCAL_STORAGE_ANSWER_IDX_STRING = "answerIdX";
+const FILTER = new URLSearchParams(window.location.search).get("filter");
+
+const LOCAL_STORAGE_USED_GUESSES_STRING = "usedGuesses_".concat(FILTER);
+const LOCAL_STORAGE_ANSWER_IDX_STRING = "answerIdX_".concat(FILTER);
 
 const UBISOFT_FILTER = "ubisoft";
 const APOLLO_FILTER = "apollo";
@@ -94,15 +96,14 @@ const ALL_GUESS_DATA = [
 ];
 
 const GUESS_DATA = (() => {
-    const filter = getCurrentFilter();
-    if(filter === null)
+    if(FILTER === null)
         return ALL_GUESS_DATA;
 
     return ALL_GUESS_DATA.filter((item) => {
         if(!Object.hasOwn(item, "filters"))
             return false;
 
-        return item.filters.includes(filter);
+        return item.filters.includes(FILTER);
     });
 })();
 
@@ -135,11 +136,6 @@ window.onload = function() {
     initAnswerIdx();
 }
 
-function getCurrentFilter() {
-    const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get("filter");
-}
-
 function initAnswerIdx() {
     const answerIdx = getAnswerIdx();
     if(answerIdx != null)
@@ -152,26 +148,24 @@ function initButtons() {
     let resetButton = document.querySelector("#reset-game-button");
     resetButton.onclick = onResetButtonClick;
 
-    const filter = getCurrentFilter();
-
     let noFilterButton = document.querySelector("#no-filter-button");
     noFilterButton.onclick = () => { window.location.href = "/"; };
 
-    if(filter === null) {
+    if(FILTER === null) {
         noFilterButton.classList.add("active");
     }
 
     let ubisoftFilterButton = document.querySelector("#ubisoft-filter-button");
     ubisoftFilterButton.onclick = () => { window.location.href = UBISOFT_FILTER_URL; };
 
-    if(filter === UBISOFT_FILTER) {
+    if(FILTER === UBISOFT_FILTER) {
         ubisoftFilterButton.classList.add("active");
     }
 
     let apolloFilterButton = document.querySelector("#apollo-filter-button");
     apolloFilterButton.onclick = () => { window.location.href = APOLLO_FILTER_URL; };
 
-    if(filter === APOLLO_FILTER) {
+    if(FILTER === APOLLO_FILTER) {
         apolloFilterButton.classList.add("active");
     }
 }
