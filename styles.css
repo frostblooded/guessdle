@@ -6,13 +6,26 @@ body {
   display: block;
   text-align: center;
   font-size: 5em;
-  margin: 40px 0 40px 0
+  margin: 40px 0 40px 0;
+}
+
+#victory-title {
+  display: block;
+  text-align: center;
+  margin: 40px 0 40px 0;
+  font-size: 4em;
+  color: green;
 }
 
 @media(max-width: 1000px) {
   #page-title {
     font-size: 3em;
     margin: 20px 0 20px 0;
+  }
+
+  #victory-title {
+    font-size: 2em;
+    margin: 10px 0 10px 0;
   }
 }
 

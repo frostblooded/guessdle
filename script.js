@@ -2,6 +2,7 @@ const FILTER = new URLSearchParams(window.location.search).get("filter");
 
 const LOCAL_STORAGE_USED_GUESSES_STRING = "usedGuesses_".concat(FILTER);
 const LOCAL_STORAGE_ANSWER_IDX_STRING = "answerIdX_".concat(FILTER);
+const LOCAL_STORAGE_VICTORY_STRING = "victory_".concat(FILTER);
 
 const UBISOFT_FILTER = "ubisoft";
 const APOLLO_FILTER = "apollo";
@@ -134,6 +135,13 @@ window.onload = function() {
     loadInitialUsedGuessesElements();
     initButtons();
     initAnswerIdx();
+    initVictoryTitle();
+}
+
+function initVictoryTitle() {
+    if(getIsVictory()) {
+        addVictoryTitle();
+    }
 }
 
 function initAnswerIdx() {
@@ -173,12 +181,15 @@ function initButtons() {
 function onResetButtonClick() {
     setRandomAnswerIdx();
     clearUsedGuesses();
+    clearIsVictory();
 
     let guessResultRows = document.querySelectorAll(".guess-result-row");
 
     for (let row of guessResultRows) {
         row.remove();
     }
+
+    document.querySelector("#victory-title").remove();
 }
 
 function loadInitialUsedGuessesElements() {
@@ -257,8 +268,29 @@ function handleSelection(event) {
     const newGuessInput = document.querySelector("#new-guess-input");
     const selectedValue = event.detail.selection.value;
     newGuessInput.value = "";
+
+    const selectedIndex = GUESS_DATA.findIndex(item => item.name === selectedValue);
+    const answerIndex = getAnswerIdx();
+    const isAnswer = selectedIndex === answerIndex;
+
+    if(isAnswer) {
+        setIsVictory();
+        addVictoryTitle(selectedValue);
+    }
+
     addUsedGuess(selectedValue);
     addGuessResultElement(selectedValue);
+}
+
+function addVictoryTitle() {
+    const answerName = GUESS_DATA[getAnswerIdx()].name;
+
+    let victoryTitle = document.createElement("span");
+    victoryTitle.id = "victory-title";
+    victoryTitle.innerHTML = "YOU DID IT! THE ANSWER IS: <span id='victory-answer-name'>".concat(answerName, "</span>");
+
+    let gameContainer = document.querySelector("#game-container");
+    gameContainer.parentNode.insertBefore(victoryTitle, gameContainer);
 }
 
 function handleResultsList(list, data) {
@@ -310,6 +342,18 @@ function setRandomAnswerIdx() {
 
 function getAnswerIdx() {
     return getLocalStorageObject(LOCAL_STORAGE_ANSWER_IDX_STRING);
+}
+
+function setIsVictory() {
+    localStorage.setItem(LOCAL_STORAGE_VICTORY_STRING, JSON.stringify(true));
+}
+
+function clearIsVictory() {
+    localStorage.removeItem(LOCAL_STORAGE_VICTORY_STRING);
+}
+
+function getIsVictory() {
+    return getLocalStorageObject(LOCAL_STORAGE_VICTORY_STRING);
 }
 
 function getLocalStorageObject(key) {
