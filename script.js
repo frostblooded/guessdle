@@ -25,7 +25,7 @@ const ALL_GUESS_DATA = [
     {
         photo: "photos/bela.jpg",
         name: "Bela",
-        colors: ["Black", "Blue", "White"],
+        colors: ["Blue", "White"],
         owners: ["Beti"],
     },
     {
@@ -57,20 +57,20 @@ const ALL_GUESS_DATA = [
     {
         photo: "photos/ilko.jpg",
         name: "Ilko",
-        colors: ["Black", "Blue", "White"],
+        colors: ["Blue", "White"],
         owners: ["Beti"],
     },
     {
         photo: "photos/jaro.jpg",
         name: "Jaro",
-        colors: ["Black"],
+        colors: ["Grey"],
         owners: ["Ico"],
         filters: [APOLLO_FILTER],
     },
     {
         photo: "photos/jeffy.jpg",
         name: "Jeffy",
-        colors: ["Black"],
+        colors: ["Grey"],
         owners: ["Ico"],
         filters: [APOLLO_FILTER],
     },
@@ -97,7 +97,7 @@ const ALL_GUESS_DATA = [
     {
         photo: "photos/murlin.jpg",
         name: "Murlin",
-        colors: ["Black"],
+        colors: ["Grey"],
         owners: ["Antonio", "Tanya"],
         filters: [APOLLO_FILTER],
     },
@@ -111,7 +111,7 @@ const ALL_GUESS_DATA = [
     {
         photo: "photos/patio.jpg",
         name: "Patio",
-        colors: ["Black", "Green", "Yellow"],
+        colors: ["Green", "Yellow"],
         owners: ["Beti"],
     },
     {
