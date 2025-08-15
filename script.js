@@ -110,8 +110,10 @@ const GUESS_DATA = (() => {
 
 const GUESS_DATA_NAMES = GUESS_DATA.map(item => item.name);
 
+let autoCompleteJs = null;
+
 window.onload = function() {
-    new autoComplete({
+    autoCompleteJs = new autoComplete({
         selector: "#new-guess-input",
         placeHolder: "Guess a cat...",
         data: {
@@ -127,7 +129,7 @@ window.onload = function() {
         },
         events: {
             input: {
-                selection: handleSelection,
+                selection: handleAutocompleteSelection,
             }
         }
     });
@@ -136,6 +138,18 @@ window.onload = function() {
     initButtons();
     initAnswerIdx();
     initVictoryTitle();
+    initNewGuessSubmit();
+}
+
+function initNewGuessSubmit() {
+    let newGuessInput = document.querySelector("#new-guess-input");
+
+    newGuessInput.onkeydown = event => {
+        // When enter is pressed
+        if(event.keyCode === 13) {
+            handleSubmitSelection();
+        }
+    };
 }
 
 function initVictoryTitle() {
@@ -176,6 +190,9 @@ function initButtons() {
     if(FILTER === APOLLO_FILTER) {
         apolloFilterButton.classList.add("active");
     }
+
+    let submitNewGuessButton = document.querySelector("#submit-new-guess-button");
+    submitNewGuessButton.onclick = () => { handleSubmitSelection(); };
 }
 
 function onResetButtonClick() {
@@ -189,7 +206,10 @@ function onResetButtonClick() {
         row.remove();
     }
 
-    document.querySelector("#victory-title").remove();
+    let victoryTitle = document.querySelector("#victory-title");
+    if(victoryTitle != null) {
+        victoryTitle.remove();
+    }
 }
 
 function loadInitialUsedGuessesElements() {
@@ -264,12 +284,28 @@ function addGuessResultCellClasses(val, answerVal, resultCell) {
     }
 }
 
-function handleSelection(event) {
+function handleAutocompleteSelection(event) {
     const newGuessInput = document.querySelector("#new-guess-input");
-    const selectedValue = event.detail.selection.value;
+    newGuessInput.value = event.detail.selection.value;
+}
+
+function handleSubmitSelection() {
+    const newGuessInput = document.querySelector("#new-guess-input");
+    let selectedValue = newGuessInput.value;
+
+    const selectedIndex = GUESS_DATA.findIndex(item => item.name.toLowerCase() === selectedValue.toLowerCase());
+    if(selectedIndex === -1) {
+        return;
+    }
+
+    // Close the autocomplete list
+    autoCompleteJs.close();
+
+    // Set the selection to the proper name in case the casing of the selection was different from the proper name
+    selectedValue = GUESS_DATA[selectedIndex].name;
+
     newGuessInput.value = "";
 
-    const selectedIndex = GUESS_DATA.findIndex(item => item.name === selectedValue);
     const answerIndex = getAnswerIdx();
     const isAnswer = selectedIndex === answerIndex;
 
@@ -336,8 +372,6 @@ function getUsedGuesses() {
 function setRandomAnswerIdx() {
     const answerIdx = Math.floor(Math.random() * GUESS_DATA.length)
     localStorage.setItem(LOCAL_STORAGE_ANSWER_IDX_STRING, JSON.stringify(answerIdx));
-
-    console.log("Answer chosen to be ", GUESS_DATA[answerIdx]);
 }
 
 function getAnswerIdx() {
