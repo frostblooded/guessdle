@@ -151,6 +151,15 @@ function initNewGuessSubmit() {
             handleSubmitSelection();
         }
     };
+
+    newGuessInput.addEventListener("open", event => {
+        // Hack to fix a bug on mobile where if you click on the autocomplete list item, the autocomplete list opens again immediately
+        const isValidGuess = GUESS_DATA.findIndex(item => item.name === newGuessInput.value) !== -1;
+
+        if(isValidGuess) {
+            autoCompleteJs.close();
+        }
+    });
 }
 
 function initVictoryTitle() {
