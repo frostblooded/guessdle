@@ -25,7 +25,7 @@ const ALL_GUESS_DATA = [
     {
         photo: "photos/bela.jpg",
         name: "Bela",
-        colors: ["Blue", "White"],
+        colors: ["Black", "Grey", "White"],
         owners: ["Beti"],
     },
     {
@@ -38,7 +38,7 @@ const ALL_GUESS_DATA = [
     {
         photo: "photos/dido.jpg",
         name: "Dido",
-        colors: ["Blue", "White"],
+        colors: ["Grey", "White"],
         owners: ["Beti"],
     },
     {
@@ -57,7 +57,7 @@ const ALL_GUESS_DATA = [
     {
         photo: "photos/ilko.jpg",
         name: "Ilko",
-        colors: ["Blue", "White"],
+        colors: ["Black", "Purple", "White"],
         owners: ["Beti"],
     },
     {
@@ -117,7 +117,7 @@ const ALL_GUESS_DATA = [
     {
         photo: "photos/pipi.jpg",
         name: "Pipi",
-        colors: ["Blue", "White"],
+        colors: ["Grey", "White"],
         owners: ["Beti"],
     },
     {
