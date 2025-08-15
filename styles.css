@@ -4,6 +4,8 @@ body {
 
 button {
   border-radius: 7px;
+  min-width: 70px;
+  padding: 10px;
 }
 
 #page-title {
@@ -48,23 +50,14 @@ button {
 
 #buttons-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 5px;
   margin-bottom: 10px;
-}
-
-#buttons-row button {
-  min-width: 70px;
 }
 
 #buttons-row button.active {
   background-color: forestgreen;
   color: white;
-}
-
-#reset-game-button {
-  width: 100%;
-  padding: 10px;
 }
 
 .row {

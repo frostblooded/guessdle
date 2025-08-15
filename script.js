@@ -1,8 +1,8 @@
 const FILTER = new URLSearchParams(window.location.search).get("filter");
 
 const LOCAL_STORAGE_USED_GUESSES_STRING = "usedGuesses_".concat(FILTER);
-const LOCAL_STORAGE_ANSWER_IDX_STRING = "answerIdX_".concat(FILTER);
 const LOCAL_STORAGE_VICTORY_STRING = "victory_".concat(FILTER);
+const LOCAL_LAST_PLAYED_STRING = "lastPlayed_".concat(FILTER);
 
 const UBISOFT_FILTER = "ubisoft";
 const APOLLO_FILTER = "apollo";
@@ -10,6 +10,9 @@ const APOLLO_FILTER = "apollo";
 const NO_FILTER_URL = ".";
 const UBISOFT_FILTER_URL = "?filter=".concat(UBISOFT_FILTER);
 const APOLLO_FILTER_URL = "?filter=".concat(APOLLO_FILTER);
+
+// If an answer is chosen, it can't be chosen again for this amount of days
+const ANSWER_SKIP_PERIOD = 5;
 
 const ALL_GUESS_DATA = [
     {
@@ -135,11 +138,28 @@ window.onload = function() {
         }
     });
 
+    Math.seedrandom(getCurrentDateString());
+    initGame();
     loadInitialUsedGuessesElements();
     initButtons();
-    initAnswerIdx();
     initVictoryTitle();
     initNewGuessSubmit();
+    setLastPlayed();
+}
+
+function initGame() {
+    const lastPlayed = getLastPlayed();
+    if(lastPlayed === null)
+        return;
+
+    const lastPlayedString = dateToString(lastPlayed);
+    const todayString = dateToString(new Date());
+
+    // If it's a new day, reset local storage
+    if(lastPlayedString !== todayString) {
+        clearIsVictory();
+        clearUsedGuesses();
+    }
 }
 
 function initNewGuessSubmit() {
@@ -152,7 +172,7 @@ function initNewGuessSubmit() {
         }
     };
 
-    newGuessInput.addEventListener("open", event => {
+    newGuessInput.addEventListener("open", _event => {
         // Hack to fix a bug on mobile where if you click on the autocomplete list item, the autocomplete list opens again immediately
         const isValidGuess = GUESS_DATA.findIndex(item => item.name === newGuessInput.value) !== -1;
 
@@ -168,18 +188,66 @@ function initVictoryTitle() {
     }
 }
 
-function initAnswerIdx() {
-    const answerIdx = getAnswerIdx();
-    if(answerIdx != null)
-        return;
+let cachedAnswerIdx = null;
 
-    setRandomAnswerIdx();
+function getAnswerIdx() {
+    if(cachedAnswerIdx === null) {
+        const today = new Date();
+        cachedAnswerIdx = generateAnswerIdx(today);
+    }
+
+    return cachedAnswerIdx;
+}
+
+function generateAnswerIdx() {
+    const today = new Date();
+
+    const START_DATE = new Date(2025, 7, 15);
+
+    if(today < START_DATE) {
+        console.log("Choose better start date");
+        return generateRandomAnswerIdx();
+    }
+
+    let dateAnswers = [];
+    let currentDate = START_DATE;
+    let currentDateIdx = 0;
+
+    while(currentDate <= today) {
+        let forbiddenAnswerIdxs = [];
+
+        for(let i = 1; i <= ANSWER_SKIP_PERIOD; i++) {
+            if(currentDateIdx - i < 0)
+                break;
+
+            forbiddenAnswerIdxs.push(dateAnswers[currentDateIdx - i]);
+        }
+
+        let potentialIdx = generateRandomAnswerIdx();
+
+        if(forbiddenAnswerIdxs.length > GUESS_DATA.length) {
+            console.error("Too big answer skip period!");
+            return potentialIdx;
+        }
+
+        while(forbiddenAnswerIdxs.includes(potentialIdx)) {
+            potentialIdx = (potentialIdx + 1) % GUESS_DATA.length;
+        }
+
+        dateAnswers.push(potentialIdx);
+        currentDateIdx++;
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    console.log(dateAnswers);
+    return dateAnswers[dateAnswers.length - 1];
+}
+
+function generateRandomAnswerIdx() {
+    return Math.floor(Math.random() * GUESS_DATA.length)
 }
 
 function initButtons() {
-    let resetButton = document.querySelector("#reset-game-button");
-    resetButton.onclick = onResetButtonClick;
-
     let noFilterButton = document.querySelector("#no-filter-button");
     noFilterButton.onclick = () => { window.location.href = NO_FILTER_URL; };
 
@@ -203,23 +271,6 @@ function initButtons() {
 
     let submitNewGuessButton = document.querySelector("#submit-new-guess-button");
     submitNewGuessButton.onclick = () => { handleSubmitSelection(); };
-}
-
-function onResetButtonClick() {
-    setRandomAnswerIdx();
-    clearUsedGuesses();
-    clearIsVictory();
-
-    let guessResultRows = document.querySelectorAll(".guess-result-row");
-
-    for (let row of guessResultRows) {
-        row.remove();
-    }
-
-    let victoryTitle = document.querySelector("#victory-title");
-    if(victoryTitle != null) {
-        victoryTitle.remove();
-    }
 }
 
 function loadInitialUsedGuessesElements() {
@@ -379,15 +430,6 @@ function getUsedGuesses() {
     return getLocalStorageObject(LOCAL_STORAGE_USED_GUESSES_STRING);
 }
 
-function setRandomAnswerIdx() {
-    const answerIdx = Math.floor(Math.random() * GUESS_DATA.length)
-    localStorage.setItem(LOCAL_STORAGE_ANSWER_IDX_STRING, JSON.stringify(answerIdx));
-}
-
-function getAnswerIdx() {
-    return getLocalStorageObject(LOCAL_STORAGE_ANSWER_IDX_STRING);
-}
-
 function setIsVictory() {
     localStorage.setItem(LOCAL_STORAGE_VICTORY_STRING, JSON.stringify(true));
 }
@@ -398,6 +440,15 @@ function clearIsVictory() {
 
 function getIsVictory() {
     return getLocalStorageObject(LOCAL_STORAGE_VICTORY_STRING);
+}
+
+function setLastPlayed() {
+    localStorage.setItem(LOCAL_LAST_PLAYED_STRING, JSON.stringify(getCurrentDateString()));
+}
+
+function getLastPlayed() {
+    const lastPlayedString = getLocalStorageObject(LOCAL_LAST_PLAYED_STRING);
+    return new Date(Date.parse(lastPlayedString));
 }
 
 function getLocalStorageObject(key) {
@@ -422,4 +473,19 @@ function arraysHaveCommonElement(array1, array2) {
 
 function arraysAreSame(array1, array2) {
     return array1.sort().join(',')=== array2.sort().join(',');
+}
+
+function getCurrentDate() {
+    return new Date();
+}
+
+function getCurrentDateString() {
+    return dateToString(getCurrentDate());
+}
+
+function dateToString(date) {
+    return 'Y-m-d'
+        .replace('Y', date.getFullYear())
+        .replace('m', date.getMonth() + 1)
+        .replace('d', date.getDate());
 }
