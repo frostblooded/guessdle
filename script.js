@@ -7,8 +7,9 @@ const LOCAL_STORAGE_VICTORY_STRING = "victory_".concat(FILTER);
 const UBISOFT_FILTER = "ubisoft";
 const APOLLO_FILTER = "apollo";
 
-const UBISOFT_FILTER_URL = "/?filter=".concat(UBISOFT_FILTER);
-const APOLLO_FILTER_URL = "/?filter=".concat(APOLLO_FILTER);
+const NO_FILTER_URL = ".";
+const UBISOFT_FILTER_URL = "?filter=".concat(UBISOFT_FILTER);
+const APOLLO_FILTER_URL = "?filter=".concat(APOLLO_FILTER);
 
 const ALL_GUESS_DATA = [
     {
@@ -171,7 +172,7 @@ function initButtons() {
     resetButton.onclick = onResetButtonClick;
 
     let noFilterButton = document.querySelector("#no-filter-button");
-    noFilterButton.onclick = () => { window.location.href = "/"; };
+    noFilterButton.onclick = () => { window.location.href = NO_FILTER_URL; };
 
     if(FILTER === null) {
         noFilterButton.classList.add("active");
