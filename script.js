@@ -18,16 +18,28 @@ const ALL_GUESS_DATA = [
     {
         photo: "photos/ati.jpg",
         name: "Ati",
-        colors: ["Black", "White", "Orange"],
+        colors: ["Black", "Orange", "White"],
         owners: ["Niki"],
         filters: [UBISOFT_FILTER, APOLLO_FILTER],
     },
     {
+        photo: "photos/bela.jpg",
+        name: "Bela",
+        colors: ["Black", "Blue", "White"],
+        owners: ["Beti"],
+    },
+    {
         photo: "photos/cookie.jpg",
         name: "Cookie",
-        colors: ["Black", "White", "Orange"],
+        colors: ["Black", "Orange", "White"],
         owners: ["Niki"],
         filters: [UBISOFT_FILTER, APOLLO_FILTER],
+    },
+    {
+        photo: "photos/dido.jpg",
+        name: "Dido",
+        colors: ["Blue", "White"],
+        owners: ["Beti"],
     },
     {
         photo: "photos/eddie.jpg",
@@ -35,6 +47,18 @@ const ALL_GUESS_DATA = [
         colors: ["Orange", "White"],
         owners: ["Stefi", "Yasen"],
         filters: [APOLLO_FILTER],
+    },
+    {
+        photo: "photos/eli.jpg",
+        name: "Eli",
+        colors: ["Black", "Blue", "White"],
+        owners: ["Beti"],
+    },
+    {
+        photo: "photos/ilko.jpg",
+        name: "Ilko",
+        colors: ["Black", "Blue", "White"],
+        owners: ["Beti"],
     },
     {
         photo: "photos/jaro.jpg",
@@ -53,14 +77,14 @@ const ALL_GUESS_DATA = [
     {
         photo: "photos/kiara.jpg",
         name: "Kiara",
-        colors: ["Black", "White", "Orange"],
+        colors: ["Black", "Orange", "White"],
         owners: ["Antonio", "Tanya"],
         filters: [APOLLO_FILTER],
     },
     {
         photo: "photos/kimi.jpg",
         name: "Kimi",
-        colors: ["Black", "White", "Orange"],
+        colors: ["Black", "Orange", "White"],
         owners: ["Bori"],
     },
     {
@@ -83,6 +107,18 @@ const ALL_GUESS_DATA = [
         colors: ["Black", "White"],
         owners: ["Cveti", "Vili"],
         filters: [UBISOFT_FILTER],
+    },
+    {
+        photo: "photos/patio.jpg",
+        name: "Patio",
+        colors: ["Black", "Green", "Yellow"],
+        owners: ["Beti"],
+    },
+    {
+        photo: "photos/pipi.jpg",
+        name: "Pipi",
+        colors: ["Blue", "White"],
+        owners: ["Beti"],
     },
     {
         photo: "photos/puhche.jpg",
@@ -119,7 +155,7 @@ let autoCompleteJs = null;
 window.onload = function() {
     autoCompleteJs = new autoComplete({
         selector: "#new-guess-input",
-        placeHolder: "Guess a cat...",
+        placeHolder: "Guess a pet...",
         data: {
             src: GUESS_DATA_NAMES,
             filter: filterOutGuesses,
