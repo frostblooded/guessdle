@@ -261,7 +261,7 @@ function generateAnswerIdx() {
 
         let potentialIdx = generateRandomAnswerIdx();
 
-        if(forbiddenAnswerIdxs.length > GUESS_DATA.length) {
+        if(forbiddenAnswerIdxs.length >= GUESS_DATA.length) {
             console.error("Too big answer skip period!");
             return potentialIdx;
         }
@@ -402,6 +402,12 @@ function handleSubmitSelection() {
     selectedValue = GUESS_DATA[selectedIndex].name;
 
     newGuessInput.value = "";
+
+    // Prevent a value from being submitted again
+    const usedGuesses = getUsedGuesses();
+    if(usedGuesses.includes(selectedValue)) {
+        return;
+    }
 
     const answerIndex = getAnswerIdx();
     const isAnswer = selectedIndex === answerIndex;
