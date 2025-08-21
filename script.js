@@ -405,7 +405,7 @@ function handleSubmitSelection() {
 
     // Prevent a value from being submitted again
     const usedGuesses = getUsedGuesses();
-    if(usedGuesses.includes(selectedValue)) {
+    if(usedGuesses !== null && usedGuesses.includes(selectedValue)) {
         return;
     }
 
