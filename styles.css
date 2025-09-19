@@ -48,18 +48,6 @@ button {
   }
 }
 
-#buttons-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 5px;
-  margin-bottom: 10px;
-}
-
-#buttons-row button.active {
-  background-color: forestgreen;
-  color: white;
-}
-
 .row {
   margin: 0 10px 0 10px;
 }

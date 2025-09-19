@@ -1,26 +1,16 @@
-const FILTER = new URLSearchParams(window.location.search).get("filter");
-
-const LOCAL_STORAGE_USED_GUESSES_STRING = "usedGuesses_".concat(FILTER);
-const LOCAL_STORAGE_VICTORY_STRING = "victory_".concat(FILTER);
-const LOCAL_LAST_PLAYED_STRING = "lastPlayed_".concat(FILTER);
-
-const UBISOFT_FILTER = "ubisoft";
-const APOLLO_FILTER = "apollo";
-
-const NO_FILTER_URL = ".";
-const UBISOFT_FILTER_URL = "?filter=".concat(UBISOFT_FILTER);
-const APOLLO_FILTER_URL = "?filter=".concat(APOLLO_FILTER);
+const LOCAL_STORAGE_USED_GUESSES_STRING = "usedGuesses";
+const LOCAL_STORAGE_VICTORY_STRING = "victory";
+const LOCAL_LAST_PLAYED_STRING = "lastPlayed";
 
 // If an answer is chosen, it can't be chosen again for this amount of days
 const ANSWER_SKIP_PERIOD = 5;
 
-const ALL_GUESS_DATA = [
+const GUESS_DATA = [
     {
         photo: "photos/ati.jpg",
         name: "Ati",
         colors: ["Black", "Orange", "White"],
         owners: ["Niki"],
-        filters: [UBISOFT_FILTER, APOLLO_FILTER],
     },
     {
         photo: "photos/bela.jpg",
@@ -33,7 +23,6 @@ const ALL_GUESS_DATA = [
         name: "Cookie",
         colors: ["Black", "Orange", "White"],
         owners: ["Niki"],
-        filters: [UBISOFT_FILTER, APOLLO_FILTER],
     },
     {
         photo: "photos/dido.jpg",
@@ -46,7 +35,6 @@ const ALL_GUESS_DATA = [
         name: "Eddie",
         colors: ["Orange", "White"],
         owners: ["Stefi", "Yasen"],
-        filters: [APOLLO_FILTER],
     },
     {
         photo: "photos/eli.jpg",
@@ -65,21 +53,18 @@ const ALL_GUESS_DATA = [
         name: "Jaro",
         colors: ["Grey"],
         owners: ["Ico"],
-        filters: [APOLLO_FILTER],
     },
     {
         photo: "photos/jeffy.jpg",
         name: "Jeffy",
         colors: ["Grey"],
         owners: ["Ico"],
-        filters: [APOLLO_FILTER],
     },
     {
         photo: "photos/kiara.jpg",
         name: "Kiara",
         colors: ["Black", "Orange", "White"],
         owners: ["Antonio", "Tanya"],
-        filters: [APOLLO_FILTER],
     },
     {
         photo: "photos/kimi.jpg",
@@ -92,21 +77,18 @@ const ALL_GUESS_DATA = [
         name: "Mochi",
         colors: ["Orange", "White"],
         owners: ["Petya"],
-        filters: [UBISOFT_FILTER],
     },
     {
         photo: "photos/murlin.jpg",
         name: "Murlin",
         colors: ["Grey"],
         owners: ["Antonio", "Tanya"],
-        filters: [APOLLO_FILTER],
     },
     {
         photo: "photos/oreo.jpg",
         name: "Oreo",
         colors: ["Black", "White"],
         owners: ["Cveti", "Vili"],
-        filters: [UBISOFT_FILTER],
     },
     {
         photo: "photos/patio.jpg",
@@ -125,28 +107,14 @@ const ALL_GUESS_DATA = [
         name: "Puhche",
         colors: ["Black", "White"],
         owners: ["Cveti", "Vili"],
-        filters: [UBISOFT_FILTER],
     },
     {
         photo: "photos/todorka.jpg",
         name: "Todorka",
         colors: ["Black", "White"],
         owners: ["Didi"],
-        filters: [APOLLO_FILTER],
     },
 ];
-
-const GUESS_DATA = (() => {
-    if(FILTER === null)
-        return ALL_GUESS_DATA;
-
-    return ALL_GUESS_DATA.filter((item) => {
-        if(!Object.hasOwn(item, "filters"))
-            return false;
-
-        return item.filters.includes(FILTER);
-    });
-})();
 
 const GUESS_DATA_NAMES = GUESS_DATA.map(item => item.name);
 
@@ -284,27 +252,6 @@ function generateRandomAnswerIdx() {
 }
 
 function initButtons() {
-    let noFilterButton = document.querySelector("#no-filter-button");
-    noFilterButton.onclick = () => { window.location.href = NO_FILTER_URL; };
-
-    if(FILTER === null) {
-        noFilterButton.classList.add("active");
-    }
-
-    let ubisoftFilterButton = document.querySelector("#ubisoft-filter-button");
-    ubisoftFilterButton.onclick = () => { window.location.href = UBISOFT_FILTER_URL; };
-
-    if(FILTER === UBISOFT_FILTER) {
-        ubisoftFilterButton.classList.add("active");
-    }
-
-    let apolloFilterButton = document.querySelector("#apollo-filter-button");
-    apolloFilterButton.onclick = () => { window.location.href = APOLLO_FILTER_URL; };
-
-    if(FILTER === APOLLO_FILTER) {
-        apolloFilterButton.classList.add("active");
-    }
-
     let submitNewGuessButton = document.querySelector("#submit-new-guess-button");
     submitNewGuessButton.onclick = () => { handleSubmitSelection(); };
 }
@@ -327,9 +274,6 @@ function addGuessResultElement(name) {
     const resultData = GUESS_DATA.find(item => item.name === name);
 
     for (const key in resultData) {
-        if (key === "filters")
-            continue;
-
         const val = resultData[key];
         const formattedVal = getFormattedCellVal(val);
 
