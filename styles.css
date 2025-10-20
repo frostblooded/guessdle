@@ -13,6 +13,11 @@ button {
   text-align: center;
   font-size: 5em;
   margin: 40px 0 40px 0;
+
+  @media(max-width: 1000px) {
+    font-size: 3em;
+    margin: 20px 0 20px 0;
+  }
 }
 
 #victory-title {
@@ -21,15 +26,8 @@ button {
   margin: 40px 0 40px 0;
   font-size: 4em;
   color: green;
-}
 
-@media(max-width: 1000px) {
-  #page-title {
-    font-size: 3em;
-    margin: 20px 0 20px 0;
-  }
-
-  #victory-title {
+  @media(max-width: 1000px) {
     font-size: 2em;
     margin: 10px 0 10px 0;
   }
@@ -39,10 +37,8 @@ button {
   margin: 0 auto 0 auto;
   width: 60%;
   padding: 0 40px 40px 40px;
-}
 
-@media(max-width: 1000px) {
-  #game-container {
+  @media(max-width: 1000px) {
     width: auto;
     padding: 0;
   }
@@ -50,10 +46,6 @@ button {
 
 .row {
   margin: 0 10px 0 10px;
-}
-
-#new-guess-row {
-  margin-bottom: 10px;
 }
 
 .autoComplete_wrapper {
@@ -65,11 +57,7 @@ button {
   display: grid;
   grid-template-columns: 4fr 1fr;
   gap: 10px;
-}
-
-#new-guess-row label {
-  align-content: center;
-  text-align: center;
+  margin-bottom: 10px;
 }
 
 #new-guess-input {
@@ -90,10 +78,8 @@ button {
   background-color: darkslategray;
   padding: 10px 0 10px 0;
   font-size: 1.3em;
-}
 
-@media(max-width: 1000px) {
-  .guess-result-title {
+  @media(max-width: 1000px) {
     font-size: 1em;
   }
 }
@@ -104,24 +90,22 @@ button {
 
 .guess-result-cell {
   font-size: 2em;
-}
 
-@media(max-width: 1000px) {
-  .guess-result-cell {
+  @media(max-width: 1000px) {
     font-size: 1em;
   }
-}
 
-.guess-result-cell.correct {
-  background-color: green;
-}
+  &.correct {
+    background-color: green;
+  }
 
-.guess-result-cell.partially-correct {
-  background-color: orange;
-}
+  &.partially-correct {
+    background-color: orange;
+  }
 
-.guess-result-cell.incorrect {
-  background-color: red;
+  &.incorrect {
+    background-color: red;
+  }
 }
 
 .cell {
@@ -131,10 +115,10 @@ button {
   text-align: center;
   align-content: center;
   min-width: 70px;
-}
 
-.cell img {
-  width: 100%;
-  display: block;
-  border-radius: 10px;
+  img {
+    width: 100%;
+    display: block;
+    border-radius: 10px;
+  }
 }
