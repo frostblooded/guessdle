@@ -109,6 +109,11 @@ const GUESS_DATA = [
         owners: ["Cveti", "Vili"],
     },
     {
+        photo: "photos/sunny.jpg",
+        name: "Sunny",
+        colors: ["Yellow", "Blue"],
+        owners: ["Beti"],
+    },    {
         photo: "photos/todorka.jpg",
         name: "Todorka",
         colors: ["Black", "White"],
