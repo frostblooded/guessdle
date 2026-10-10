@@ -1,0 +1,15 @@
+{
+  "name": "petdle",
+  "private": true,
+  "scripts": {
+    "start": "cargo run",
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}
