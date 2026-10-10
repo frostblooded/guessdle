@@ -8,3 +8,4 @@ Postponed improvements. Add items here only after asking the maintainer.
 - Bundle and minify with esbuild into a single file.
 - Emit to `dist/` and serve that, instead of in-place `script.js`. Touches `src/main.rs`.
 - Replace the hand-written `globals.d.ts` with `@types` packages matched to the vendored lib versions.
+- Add ESLint with `typescript-eslint`, enforcing explicit types (`@typescript-eslint/typedef`) and the early-return style (return on its own line, no braces).

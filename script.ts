@@ -131,7 +131,9 @@ const GUESS_DATA: Pet[] = [
   },
 ];
 
-const GUESS_DATA_NAMES: string[] = GUESS_DATA.map((item: Pet): string => item.name);
+const GUESS_DATA_NAMES: string[] = GUESS_DATA.map(
+  (item: Pet): string => item.name,
+);
 
 let autoCompleteJs: autoComplete | null = null;
 
@@ -172,7 +174,8 @@ function getNewGuessInput(): HTMLInputElement {
 
 function initGame(): void {
   const lastPlayed: Date = getLastPlayed();
-  if (lastPlayed === null) return;
+  if (lastPlayed === null)
+    return;
 
   const lastPlayedString: string = dateToString(lastPlayed);
   const todayString: string = dateToString(new Date());
@@ -197,7 +200,9 @@ function initNewGuessSubmit(): void {
   newGuessInput.addEventListener("open", (_event: Event): void => {
     // Hack to fix a bug on mobile where if you click on the autocomplete list item, the autocomplete list opens again immediately
     const isValidGuess: boolean =
-      GUESS_DATA.findIndex((item: Pet): boolean => item.name === newGuessInput.value) !== -1;
+      GUESS_DATA.findIndex(
+        (item: Pet): boolean => item.name === newGuessInput.value,
+      ) !== -1;
 
     if (isValidGuess) {
       autoCompleteJs?.close();
@@ -269,9 +274,8 @@ function generateRandomAnswerIdx(): number {
 }
 
 function initButtons(): void {
-  let submitNewGuessButton: HTMLButtonElement = document.querySelector<HTMLButtonElement>(
-    "#submit-new-guess-button",
-  )!;
+  let submitNewGuessButton: HTMLButtonElement =
+    document.querySelector<HTMLButtonElement>("#submit-new-guess-button")!;
   submitNewGuessButton.onclick = (): void => {
     handleSubmitSelection();
   };
@@ -279,7 +283,8 @@ function initButtons(): void {
 
 function loadInitialUsedGuessesElements(): void {
   const usedGuesses: string[] | null = getUsedGuesses();
-  if (usedGuesses === null) return;
+  if (usedGuesses === null)
+    return;
 
   for (const usedGuess of usedGuesses) {
     addGuessResultElement(usedGuess);
@@ -291,7 +296,9 @@ function addGuessResultElement(name: string): void {
   resultElement.setAttribute("class", "guess-result-row row");
 
   const answerData: Pet = GUESS_DATA[getAnswerIdx()]!;
-  const resultData: Pet = GUESS_DATA.find((item: Pet): boolean => item.name === name)!;
+  const resultData: Pet = GUESS_DATA.find(
+    (item: Pet): boolean => item.name === name,
+  )!;
 
   for (const key in resultData) {
     const attr = key as keyof Pet;
@@ -362,7 +369,8 @@ function handleSubmitSelection(): void {
   let selectedValue: string = newGuessInput.value;
 
   const selectedIndex: number = GUESS_DATA.findIndex(
-    (item: Pet): boolean => item.name.toLowerCase() === selectedValue.toLowerCase(),
+    (item: Pet): boolean =>
+      item.name.toLowerCase() === selectedValue.toLowerCase(),
   );
   if (selectedIndex === -1) {
     return;
@@ -421,7 +429,8 @@ function handleResultsList(list: HTMLElement, data: AutoCompleteResults): void {
 function filterOutGuesses(list: AutoCompleteItem[]): AutoCompleteItem[] {
   // Filter out already used guesses
   let usedGuesses: string[] | null = getUsedGuesses();
-  if (usedGuesses === null) return list;
+  if (usedGuesses === null)
+    return list;
 
   return list.filter((item: AutoCompleteItem): boolean => {
     return !usedGuesses.includes(item.value);
@@ -471,13 +480,16 @@ function setLastPlayed(): void {
 }
 
 function getLastPlayed(): Date {
-  const lastPlayedString: string | null = getLocalStorageObject<string>(LOCAL_LAST_PLAYED_STRING);
+  const lastPlayedString: string | null = getLocalStorageObject<string>(
+    LOCAL_LAST_PLAYED_STRING,
+  );
   return new Date(Date.parse(lastPlayedString ?? ""));
 }
 
 function getLocalStorageObject<T>(key: string): T | null {
   let retrievedValue: string | null = localStorage.getItem(key);
-  if (retrievedValue === null) return null;
+  if (retrievedValue === null)
+    return null;
 
   return JSON.parse(retrievedValue) as T;
 }
