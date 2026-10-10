@@ -1,9 +1,9 @@
-const LOCAL_STORAGE_USED_GUESSES_STRING = "usedGuesses";
-const LOCAL_STORAGE_VICTORY_STRING = "victory";
-const LOCAL_LAST_PLAYED_STRING = "lastPlayed";
+const LOCAL_STORAGE_USED_GUESSES_STRING: string = "usedGuesses";
+const LOCAL_STORAGE_VICTORY_STRING: string = "victory";
+const LOCAL_LAST_PLAYED_STRING: string = "lastPlayed";
 
 // If an answer is chosen, it can't be chosen again for this amount of days
-const ANSWER_SKIP_PERIOD = 5;
+const ANSWER_SKIP_PERIOD: number = 5;
 
 interface Pet {
   photo: string;
@@ -131,11 +131,11 @@ const GUESS_DATA: Pet[] = [
   },
 ];
 
-const GUESS_DATA_NAMES = GUESS_DATA.map((item) => item.name);
+const GUESS_DATA_NAMES: string[] = GUESS_DATA.map((item: Pet): string => item.name);
 
 let autoCompleteJs: autoComplete | null = null;
 
-window.onload = function () {
+window.onload = function (): void {
   autoCompleteJs = new autoComplete({
     selector: "#new-guess-input",
     placeHolder: "Guess a pet...",
@@ -170,12 +170,12 @@ function getNewGuessInput(): HTMLInputElement {
   return document.querySelector<HTMLInputElement>("#new-guess-input")!;
 }
 
-function initGame() {
-  const lastPlayed = getLastPlayed();
+function initGame(): void {
+  const lastPlayed: Date = getLastPlayed();
   if (lastPlayed === null) return;
 
-  const lastPlayedString = dateToString(lastPlayed);
-  const todayString = dateToString(new Date());
+  const lastPlayedString: string = dateToString(lastPlayed);
+  const todayString: string = dateToString(new Date());
 
   // If it's a new day, reset local storage
   if (lastPlayedString !== todayString) {
@@ -184,20 +184,20 @@ function initGame() {
   }
 }
 
-function initNewGuessSubmit() {
-  let newGuessInput = getNewGuessInput();
+function initNewGuessSubmit(): void {
+  let newGuessInput: HTMLInputElement = getNewGuessInput();
 
-  newGuessInput.onkeydown = (event) => {
+  newGuessInput.onkeydown = (event: KeyboardEvent): void => {
     // When enter is pressed
     if (event.keyCode === 13) {
       handleSubmitSelection();
     }
   };
 
-  newGuessInput.addEventListener("open", (_event) => {
+  newGuessInput.addEventListener("open", (_event: Event): void => {
     // Hack to fix a bug on mobile where if you click on the autocomplete list item, the autocomplete list opens again immediately
-    const isValidGuess =
-      GUESS_DATA.findIndex((item) => item.name === newGuessInput.value) !== -1;
+    const isValidGuess: boolean =
+      GUESS_DATA.findIndex((item: Pet): boolean => item.name === newGuessInput.value) !== -1;
 
     if (isValidGuess) {
       autoCompleteJs?.close();
@@ -205,7 +205,7 @@ function initNewGuessSubmit() {
   });
 }
 
-function initVictoryTitle() {
+function initVictoryTitle(): void {
   if (getIsVictory()) {
     addVictoryTitle();
   }
@@ -213,7 +213,7 @@ function initVictoryTitle() {
 
 let cachedAnswerIdx: number | null = null;
 
-function getAnswerIdx() {
+function getAnswerIdx(): number {
   if (cachedAnswerIdx === null) {
     cachedAnswerIdx = generateAnswerIdx();
   }
@@ -221,10 +221,10 @@ function getAnswerIdx() {
   return cachedAnswerIdx;
 }
 
-function generateAnswerIdx() {
-  const today = new Date();
+function generateAnswerIdx(): number {
+  const today: Date = new Date();
 
-  const START_DATE = new Date(2025, 7, 15);
+  const START_DATE: Date = new Date(2025, 7, 15);
 
   if (today < START_DATE) {
     console.log("Choose better start date");
@@ -232,19 +232,19 @@ function generateAnswerIdx() {
   }
 
   let dateAnswers: number[] = [];
-  let currentDate = START_DATE;
-  let currentDateIdx = 0;
+  let currentDate: Date = START_DATE;
+  let currentDateIdx: number = 0;
 
   while (currentDate <= today) {
     let forbiddenAnswerIdxs: number[] = [];
 
-    for (let i = 1; i <= ANSWER_SKIP_PERIOD; i++) {
+    for (let i: number = 1; i <= ANSWER_SKIP_PERIOD; i++) {
       if (currentDateIdx - i < 0) break;
 
-      forbiddenAnswerIdxs.push(dateAnswers[currentDateIdx - i]);
+      forbiddenAnswerIdxs.push(dateAnswers[currentDateIdx - i]!);
     }
 
-    let potentialIdx = generateRandomAnswerIdx();
+    let potentialIdx: number = generateRandomAnswerIdx();
 
     if (forbiddenAnswerIdxs.length >= GUESS_DATA.length) {
       console.error("Too big answer skip period!");
@@ -261,24 +261,24 @@ function generateAnswerIdx() {
   }
 
   console.log(dateAnswers);
-  return dateAnswers[dateAnswers.length - 1];
+  return dateAnswers[dateAnswers.length - 1]!;
 }
 
-function generateRandomAnswerIdx() {
+function generateRandomAnswerIdx(): number {
   return Math.floor(Math.random() * GUESS_DATA.length);
 }
 
-function initButtons() {
-  let submitNewGuessButton = document.querySelector<HTMLButtonElement>(
+function initButtons(): void {
+  let submitNewGuessButton: HTMLButtonElement = document.querySelector<HTMLButtonElement>(
     "#submit-new-guess-button",
   )!;
-  submitNewGuessButton.onclick = () => {
+  submitNewGuessButton.onclick = (): void => {
     handleSubmitSelection();
   };
 }
 
-function loadInitialUsedGuessesElements() {
-  const usedGuesses = getUsedGuesses();
+function loadInitialUsedGuessesElements(): void {
+  const usedGuesses: string[] | null = getUsedGuesses();
   if (usedGuesses === null) return;
 
   for (const usedGuess of usedGuesses) {
@@ -286,23 +286,23 @@ function loadInitialUsedGuessesElements() {
   }
 }
 
-function addGuessResultElement(name: string) {
-  let resultElement = document.createElement("div");
+function addGuessResultElement(name: string): void {
+  let resultElement: HTMLDivElement = document.createElement("div");
   resultElement.setAttribute("class", "guess-result-row row");
 
-  const answerData = GUESS_DATA[getAnswerIdx()];
-  const resultData = GUESS_DATA.find((item) => item.name === name)!;
+  const answerData: Pet = GUESS_DATA[getAnswerIdx()]!;
+  const resultData: Pet = GUESS_DATA.find((item: Pet): boolean => item.name === name)!;
 
   for (const key in resultData) {
     const attr = key as keyof Pet;
     const val: AttributeValue = resultData[attr];
-    const formattedVal = getFormattedCellVal(val);
+    const formattedVal: string = getFormattedCellVal(val);
 
-    let resultCell = document.createElement("div");
+    let resultCell: HTMLDivElement = document.createElement("div");
     resultCell.setAttribute("class", "guess-result-cell cell");
 
     if (key === "photo") {
-      let image = document.createElement("img");
+      let image: HTMLImageElement = document.createElement("img");
       image.src = val as string;
       resultCell.appendChild(image);
     } else {
@@ -314,7 +314,7 @@ function addGuessResultElement(name: string) {
     resultElement.appendChild(resultCell);
   }
 
-  let guessResultsContainer = document.querySelector(
+  let guessResultsContainer: Element = document.querySelector(
     "#guess-results-container",
   )!;
   guessResultsContainer.prepend(resultElement);
@@ -332,7 +332,7 @@ function addGuessResultCellClasses(
   val: AttributeValue,
   answerVal: AttributeValue,
   resultCell: HTMLElement,
-) {
+): void {
   if (typeof val === "string") {
     if (val === answerVal) {
       resultCell.classList.add("correct");
@@ -352,17 +352,17 @@ function addGuessResultCellClasses(
   }
 }
 
-function handleAutocompleteSelection(event: AutoCompleteSelectionEvent) {
-  const newGuessInput = getNewGuessInput();
+function handleAutocompleteSelection(event: AutoCompleteSelectionEvent): void {
+  const newGuessInput: HTMLInputElement = getNewGuessInput();
   newGuessInput.value = event.detail.selection.value;
 }
 
-function handleSubmitSelection() {
-  const newGuessInput = getNewGuessInput();
-  let selectedValue = newGuessInput.value;
+function handleSubmitSelection(): void {
+  const newGuessInput: HTMLInputElement = getNewGuessInput();
+  let selectedValue: string = newGuessInput.value;
 
-  const selectedIndex = GUESS_DATA.findIndex(
-    (item) => item.name.toLowerCase() === selectedValue.toLowerCase(),
+  const selectedIndex: number = GUESS_DATA.findIndex(
+    (item: Pet): boolean => item.name.toLowerCase() === selectedValue.toLowerCase(),
   );
   if (selectedIndex === -1) {
     return;
@@ -372,18 +372,18 @@ function handleSubmitSelection() {
   autoCompleteJs?.close();
 
   // Set the selection to the proper name in case the casing of the selection was different from the proper name
-  selectedValue = GUESS_DATA[selectedIndex].name;
+  selectedValue = GUESS_DATA[selectedIndex]!.name;
 
   newGuessInput.value = "";
 
   // Prevent a value from being submitted again
-  const usedGuesses = getUsedGuesses();
+  const usedGuesses: string[] | null = getUsedGuesses();
   if (usedGuesses !== null && usedGuesses.includes(selectedValue)) {
     return;
   }
 
-  const answerIndex = getAnswerIdx();
-  const isAnswer = selectedIndex === answerIndex;
+  const answerIndex: number = getAnswerIdx();
+  const isAnswer: boolean = selectedIndex === answerIndex;
 
   if (isAnswer) {
     setIsVictory();
@@ -394,10 +394,10 @@ function handleSubmitSelection() {
   addGuessResultElement(selectedValue);
 }
 
-function addVictoryTitle() {
-  const answerName = GUESS_DATA[getAnswerIdx()].name;
+function addVictoryTitle(): void {
+  const answerName: string = GUESS_DATA[getAnswerIdx()]!.name;
 
-  let victoryTitle = document.createElement("span");
+  let victoryTitle: HTMLSpanElement = document.createElement("span");
   victoryTitle.id = "victory-title";
   victoryTitle.innerHTML =
     "YOU DID IT! THE ANSWER IS: <span id='victory-answer-name'>".concat(
@@ -405,31 +405,31 @@ function addVictoryTitle() {
       "</span>",
     );
 
-  let gameContainer = document.querySelector("#game-container")!;
+  let gameContainer: Element = document.querySelector("#game-container")!;
   gameContainer.parentNode!.insertBefore(victoryTitle, gameContainer);
 }
 
-function handleResultsList(list: HTMLElement, data: AutoCompleteResults) {
+function handleResultsList(list: HTMLElement, data: AutoCompleteResults): void {
   if (!data.results.length) {
-    const message = document.createElement("div");
+    const message: HTMLDivElement = document.createElement("div");
     message.setAttribute("class", "no_result");
     message.innerHTML = `<span>Found No Results for "${data.query}"</span>`;
     list.prepend(message);
   }
 }
 
-function filterOutGuesses(list: AutoCompleteItem[]) {
+function filterOutGuesses(list: AutoCompleteItem[]): AutoCompleteItem[] {
   // Filter out already used guesses
-  let usedGuesses = getUsedGuesses();
+  let usedGuesses: string[] | null = getUsedGuesses();
   if (usedGuesses === null) return list;
 
-  return list.filter((item) => {
+  return list.filter((item: AutoCompleteItem): boolean => {
     return !usedGuesses.includes(item.value);
   });
 }
 
-function addUsedGuess(guess: string) {
-  let usedGuesses = getUsedGuesses();
+function addUsedGuess(guess: string): void {
+  let usedGuesses: string[] | null = getUsedGuesses();
 
   if (usedGuesses === null) {
     usedGuesses = [guess];
@@ -443,46 +443,46 @@ function addUsedGuess(guess: string) {
   );
 }
 
-function clearUsedGuesses() {
+function clearUsedGuesses(): void {
   localStorage.removeItem(LOCAL_STORAGE_USED_GUESSES_STRING);
 }
 
 function getUsedGuesses(): string[] | null {
-  return getLocalStorageObject(LOCAL_STORAGE_USED_GUESSES_STRING);
+  return getLocalStorageObject<string[]>(LOCAL_STORAGE_USED_GUESSES_STRING);
 }
 
-function setIsVictory() {
+function setIsVictory(): void {
   localStorage.setItem(LOCAL_STORAGE_VICTORY_STRING, JSON.stringify(true));
 }
 
-function clearIsVictory() {
+function clearIsVictory(): void {
   localStorage.removeItem(LOCAL_STORAGE_VICTORY_STRING);
 }
 
 function getIsVictory(): boolean | null {
-  return getLocalStorageObject(LOCAL_STORAGE_VICTORY_STRING);
+  return getLocalStorageObject<boolean>(LOCAL_STORAGE_VICTORY_STRING);
 }
 
-function setLastPlayed() {
+function setLastPlayed(): void {
   localStorage.setItem(
     LOCAL_LAST_PLAYED_STRING,
     JSON.stringify(getCurrentDateString()),
   );
 }
 
-function getLastPlayed() {
-  const lastPlayedString = getLocalStorageObject(LOCAL_LAST_PLAYED_STRING);
-  return new Date(Date.parse(lastPlayedString));
+function getLastPlayed(): Date {
+  const lastPlayedString: string | null = getLocalStorageObject<string>(LOCAL_LAST_PLAYED_STRING);
+  return new Date(Date.parse(lastPlayedString ?? ""));
 }
 
-function getLocalStorageObject(key: string): any {
-  let retrievedValue = localStorage.getItem(key);
+function getLocalStorageObject<T>(key: string): T | null {
+  let retrievedValue: string | null = localStorage.getItem(key);
   if (retrievedValue === null) return null;
 
-  return JSON.parse(retrievedValue);
+  return JSON.parse(retrievedValue) as T;
 }
 
-function arraysHaveCommonElement(array1: string[], array2: string[]) {
+function arraysHaveCommonElement(array1: string[], array2: string[]): boolean {
   for (let el1 of array1) {
     for (let el2 of array2) {
       if (el1 === el2) {
@@ -494,19 +494,19 @@ function arraysHaveCommonElement(array1: string[], array2: string[]) {
   return false;
 }
 
-function arraysAreSame(array1: string[], array2: string[]) {
+function arraysAreSame(array1: string[], array2: string[]): boolean {
   return array1.sort().join(",") === array2.sort().join(",");
 }
 
-function getCurrentDate() {
+function getCurrentDate(): Date {
   return new Date();
 }
 
-function getCurrentDateString() {
+function getCurrentDateString(): string {
   return dateToString(getCurrentDate());
 }
 
-function dateToString(date: Date) {
+function dateToString(date: Date): string {
   return "Y-m-d"
     .replace("Y", String(date.getFullYear()))
     .replace("m", String(date.getMonth() + 1))
