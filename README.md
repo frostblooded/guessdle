@@ -46,4 +46,3 @@ All rights reserved. See [`LICENSE`](LICENSE).
 - [`CONTEXT.md`](CONTEXT.md): domain terms
 - [`docs/adr/`](docs/adr): architecture decisions
 - [`CLAUDE.md`](CLAUDE.md): guidance for AI coding agents
-- [`TODO.md`](TODO.md): postponed ideas
