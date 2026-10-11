@@ -6,15 +6,15 @@ export default defineConfig({
   retries: process.env["CI"] ? 1 : 0,
   reporter: process.env["CI"] ? "github" : "list",
   use: {
-    baseURL: "http://localhost:8080",
+    baseURL: "http://127.0.0.1:8080",
     trace: "retain-on-failure",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: "cargo run",
+    command: "node server.mjs",
     cwd: "../..",
-    url: "http://localhost:8080",
+    url: "http://127.0.0.1:8080",
     reuseExistingServer: !process.env["CI"],
-    timeout: 300_000,
+    timeout: 30_000,
   },
 });

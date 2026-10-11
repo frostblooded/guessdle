@@ -2,7 +2,7 @@
   "name": "petdle",
   "private": true,
   "scripts": {
-    "start": "cargo run",
+    "start": "node server.mjs",
     "build": "tsc",
     "watch": "tsc --watch",
     "test:e2e": "tsc && tsc -p tests/e2e && playwright test -c tests/e2e",
