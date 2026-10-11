@@ -1,9 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2023",
-    "lib": [
-      "ES2023"
-    ],
+    "lib": ["ES2023"],
     "module": "nodenext",
     "moduleDetection": "legacy",
     "moduleResolution": "nodenext",
@@ -18,16 +16,8 @@
     "allowImportingTsExtensions": true,
     "erasableSyntaxOnly": true,
     "verbatimModuleSyntax": true,
-    "types": [
-      "node"
-    ]
+    "types": ["node"]
   },
-  "include": [
-    "tests/**/*.ts",
-    "answer-sequence.ts",
-    "game-state.ts"
-  ],
-  "exclude": [
-    "tests/e2e"
-  ]
+  "include": ["tests/**/*.ts", "answer-sequence.ts", "game-state.ts"],
+  "exclude": ["tests/e2e"]
 }

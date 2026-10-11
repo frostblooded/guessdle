@@ -28,12 +28,12 @@ const rows = (page: Page): Locator => page.locator(".guess-result-row");
 const suggestions = (page: Page): Locator => page.locator("[role=option]");
 const victory = (page: Page): Locator => page.locator("#victory-title");
 
-async function guess(page: Page, name: string): Promise<void> {
+async function submitGuess(page: Page, name: string): Promise<void> {
   await input(page).fill(name);
   await page.locator("#submit-new-guess-button").click();
 }
 
-async function open(page: Page, now: Date = DAY): Promise<void> {
+async function openOnDay(page: Page, now: Date = DAY): Promise<void> {
   await page.clock.install({ time: now });
   await page.goto("/");
 }
@@ -50,11 +50,11 @@ test.beforeAll(async ({ browser }) => {
 });
 
 test.beforeEach(async ({ page }) => {
-  await open(page);
+  await openOnDay(page);
 });
 
 test("a correct guess shows the victory banner with the answer", async ({ page }) => {
-  await guess(page, answerName);
+  await submitGuess(page, answerName);
 
   await expect(victory(page)).toContainText("YOU DID IT");
   await expect(page.locator("#victory-answer-name")).toHaveText(answerName);
@@ -63,7 +63,7 @@ test("a correct guess shows the victory banner with the answer", async ({ page }
 });
 
 test("a wrong guess adds a row with graded cells and no victory", async ({ page }) => {
-  await guess(page, wrongName);
+  await submitGuess(page, wrongName);
 
   await expect(rows(page)).toHaveCount(1);
   await expect(rows(page).first()).toContainText(wrongName);
@@ -76,8 +76,8 @@ test("a wrong guess adds a row with graded cells and no victory", async ({ page 
 });
 
 test("a repeated guess is ignored", async ({ page }) => {
-  await guess(page, wrongName);
-  await guess(page, wrongName);
+  await submitGuess(page, wrongName);
+  await submitGuess(page, wrongName);
 
   await expect(rows(page)).toHaveCount(1);
   await expect(input(page)).toHaveValue("");
@@ -104,7 +104,7 @@ test("an empty name does nothing", async ({ page }) => {
 });
 
 test("name matching ignores letter case", async ({ page }) => {
-  await guess(page, wrongName.toUpperCase());
+  await submitGuess(page, wrongName.toUpperCase());
 
   await expect(rows(page)).toHaveCount(1);
   await expect(rows(page).first()).toContainText(wrongName);
@@ -118,22 +118,24 @@ test("pressing Enter submits the guess", async ({ page }) => {
 });
 
 test("used guesses are removed from the autocomplete list", async ({ page }) => {
-  const prefix: string = wrongName.slice(0, 2);
+  const prefix: string = wrongName.slice(0, 2).toLowerCase();
+  const matching: string[] = names.filter((name) => name.toLowerCase().includes(prefix));
+  const remaining: number = matching.filter((name) => name !== wrongName).length;
+
   await input(page).pressSequentially(prefix);
-  await expect(suggestions(page).filter({ hasText: wrongName })).toHaveCount(1);
+  await expect(suggestions(page)).toHaveCount(matching.length);
 
   await input(page).fill(wrongName);
   await page.locator("#submit-new-guess-button").click();
   await input(page).pressSequentially(prefix);
 
-  // Other pets may share the prefix, so wait for the list to settle before asserting
-  await expect(page.locator("[role=listbox], .no_result").first()).toBeAttached();
+  await expect(suggestions(page)).toHaveCount(remaining);
   await expect(suggestions(page).filter({ hasText: wrongName })).toHaveCount(0);
 });
 
 test("guesses and victory survive a reload on the same day", async ({ page }) => {
-  await guess(page, wrongName);
-  await guess(page, answerName);
+  await submitGuess(page, wrongName);
+  await submitGuess(page, answerName);
 
   await page.reload();
 
@@ -145,8 +147,8 @@ test("guesses and victory survive a reload on the same day", async ({ page }) =>
 });
 
 test("the next day shows a fresh board with the new Daily Answer", async ({ page }) => {
-  await guess(page, wrongName);
-  await guess(page, answerName);
+  await submitGuess(page, wrongName);
+  await submitGuess(page, answerName);
   await expect(victory(page)).toBeVisible();
 
   await page.clock.setSystemTime(NEXT_DAY);
@@ -155,7 +157,7 @@ test("the next day shows a fresh board with the new Daily Answer", async ({ page
   await expect(rows(page)).toHaveCount(0);
   await expect(victory(page)).toHaveCount(0);
 
-  await guess(page, nextAnswerName);
+  await submitGuess(page, nextAnswerName);
 
   await expect(page.locator("#victory-answer-name")).toHaveText(nextAnswerName);
 });
