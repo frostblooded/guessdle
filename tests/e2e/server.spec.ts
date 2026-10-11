@@ -6,6 +6,7 @@ const SERVED = [
   ["/styles.css", "text/css"],
   ["/dist/script.js", "text/javascript"],
   ["/dist/script.css", "text/css"],
+  ["/dist/script.js.map", "application/json"],
   ["/favicon.ico", "image/x-icon"],
   ["/photos/ati.jpg", "image/jpeg"],
 ] as const;

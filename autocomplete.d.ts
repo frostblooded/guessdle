@@ -1,4 +1,4 @@
-// Typings for @tarekraafat/autocomplete.js (ships none) and its CSS import.
+// Typings for @tarekraafat/autocomplete.js, which ships none.
 
 declare module "@tarekraafat/autocomplete.js" {
   export interface AutoCompleteItem {
@@ -14,7 +14,7 @@ declare module "@tarekraafat/autocomplete.js" {
     detail: { selection: AutoCompleteItem };
   }
 
-  export interface AutoCompleteConfig {
+  interface AutoCompleteConfig {
     selector: string;
     placeHolder?: string;
     data: {
@@ -37,4 +37,5 @@ declare module "@tarekraafat/autocomplete.js" {
   }
 }
 
+// The CSS side-effect import in script.ts (bundled by esbuild)
 declare module "*.css";

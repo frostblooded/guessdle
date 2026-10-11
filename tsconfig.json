@@ -19,5 +19,5 @@
     "allowUnusedLabels": false,
     "types": []
   },
-  "files": ["globals.d.ts", "script.ts"]
+  "files": ["autocomplete.d.ts", "script.ts"]
 }

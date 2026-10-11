@@ -1,13 +1,7 @@
 // Pure Answer Sequence logic, see ADR 0002.
+import { dateToString } from "./date.ts";
 
 export const ANSWER_START_DATE: Date = new Date(2025, 7, 15);
-
-export function dateToString(date: Date): string {
-  return "Y-m-d"
-    .replace("Y", String(date.getFullYear()))
-    .replace("m", String(date.getMonth() + 1))
-    .replace("d", String(date.getDate()));
-}
 
 // Fixed seed: every day's answer is part of one stable sequence (ADR 0002)
 export function getAnswerSeed(): string {

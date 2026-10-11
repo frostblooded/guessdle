@@ -1,10 +1,10 @@
 import autoComplete from "@tarekraafat/autocomplete.js";
 import seedrandom from "seedrandom";
 import "@tarekraafat/autocomplete.js/dist/css/autoComplete.css";
-import { ANSWER_START_DATE, generateAnswerSequence, getAnswerSeed, getDayNumber } from "./answer-sequence.ts";
 import { type AttributeValue, correctnessClass, gradeCorrectness } from "./correctness.ts";
+import { computeAnswerIdx, type GuessResult, submitGuess } from "./game.ts";
 import { createGameState, type GameState } from "./game-state.ts";
-import { ANSWER_SKIP_PERIOD, GUESS_DATA, type Pet } from "./roster.ts";
+import { GUESS_DATA, type Pet } from "./roster.ts";
 import type { AutoCompleteItem, AutoCompleteResults, AutoCompleteSelectionEvent } from "@tarekraafat/autocomplete.js";
 
 const GUESS_DATA_NAMES: string[] = GUESS_DATA.map(
@@ -85,35 +85,8 @@ function initVictoryTitle(): void {
 let cachedAnswerIdx: number | null = null;
 
 function getAnswerIdx(): number {
-  if (cachedAnswerIdx === null) {
-    cachedAnswerIdx = generateAnswerIdx();
-  }
-
+  cachedAnswerIdx ??= computeAnswerIdx(GUESS_DATA.length, new Date(), (seed: string): (() => number) => seedrandom(seed));
   return cachedAnswerIdx;
-}
-
-function generateAnswerIdx(): number {
-  const today: Date = new Date();
-  const dayNumber: number = getDayNumber(ANSWER_START_DATE, today);
-
-  if (dayNumber < 0) {
-    console.log("Choose better start date");
-    return generateRandomAnswerIdx();
-  }
-
-  const answerSequence: number[] = generateAnswerSequence(
-    GUESS_DATA.length,
-    ANSWER_SKIP_PERIOD,
-    dayNumber + 1,
-    seedrandom(getAnswerSeed()),
-  );
-
-  console.log(answerSequence);
-  return answerSequence[answerSequence.length - 1]!;
-}
-
-function generateRandomAnswerIdx(): number {
-  return Math.floor(Math.random() * GUESS_DATA.length);
 }
 
 function initButtons(): void {
@@ -190,38 +163,23 @@ function handleAutocompleteSelection(event: AutoCompleteSelectionEvent): void {
 
 function handleSubmitSelection(): void {
   const newGuessInput: HTMLInputElement = getNewGuessInput();
-  let selectedValue: string = newGuessInput.value;
-
-  const selectedIndex: number = GUESS_DATA.findIndex(
-    (item: Pet): boolean =>
-      item.name.toLowerCase() === selectedValue.toLowerCase(),
+  const result: GuessResult = submitGuess(
+    gameState,
+    GUESS_DATA,
+    getAnswerIdx(),
+    newGuessInput.value,
   );
-  if (selectedIndex === -1) {
+  if (result.kind === "invalid")
     return;
-  }
 
-  // Close the autocomplete list
   autoCompleteJs?.close();
-
-  // Set the selection to the proper name in case the casing of the selection was different from the proper name
-  selectedValue = GUESS_DATA[selectedIndex]!.name;
-
   newGuessInput.value = "";
-
-  // Prevent a value from being submitted again
-  if (gameState.getUsedGuesses().includes(selectedValue))
+  if (result.kind === "duplicate")
     return;
 
-  const answerIndex: number = getAnswerIdx();
-  const isAnswer: boolean = selectedIndex === answerIndex;
-
-  if (isAnswer) {
-    gameState.setIsVictory();
+  if (result.isAnswer)
     addVictoryTitle();
-  }
-
-  gameState.addUsedGuess(selectedValue);
-  addGuessResultElement(selectedValue);
+  addGuessResultElement(result.name);
 }
 
 function addVictoryTitle(): void {

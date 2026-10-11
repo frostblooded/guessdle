@@ -1,4 +1,4 @@
-import { dateToString } from "./answer-sequence.ts";
+import { dateToString } from "./date.ts";
 
 // Game State: what the browser remembers about today.
 
