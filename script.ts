@@ -159,7 +159,6 @@ window.onload = function (): void {
     },
   });
 
-  Math.seedrandom(getCurrentDateString());
   initGame();
   loadInitialUsedGuessesElements();
   initButtons();
@@ -236,32 +235,29 @@ function generateAnswerIdx(): number {
     return generateRandomAnswerIdx();
   }
 
+  // Fixed seed: every day's answer is part of one stable sequence (ADR 0002)
+  Math.seedrandom(dateToString(START_DATE));
+
+  const skipPeriod: number = Math.min(
+    ANSWER_SKIP_PERIOD,
+    GUESS_DATA.length - 1,
+  );
   let dateAnswers: number[] = [];
   let currentDate: Date = START_DATE;
-  let currentDateIdx: number = 0;
 
   while (currentDate <= today) {
-    let forbiddenAnswerIdxs: number[] = [];
+    const forbiddenAnswerIdxs: number[] = dateAnswers.slice(
+      Math.max(0, dateAnswers.length - skipPeriod),
+    );
+    const allowedAnswerIdxs: number[] = GUESS_DATA.map(
+      (_pet: Pet, idx: number): number => idx,
+    ).filter((idx: number): boolean => !forbiddenAnswerIdxs.includes(idx));
 
-    for (let i: number = 1; i <= ANSWER_SKIP_PERIOD; i++) {
-      if (currentDateIdx - i < 0) break;
-
-      forbiddenAnswerIdxs.push(dateAnswers[currentDateIdx - i]!);
-    }
-
-    let potentialIdx: number = generateRandomAnswerIdx();
-
-    if (forbiddenAnswerIdxs.length >= GUESS_DATA.length) {
-      console.error("Too big answer skip period!");
-      return potentialIdx;
-    }
-
-    while (forbiddenAnswerIdxs.includes(potentialIdx)) {
-      potentialIdx = (potentialIdx + 1) % GUESS_DATA.length;
-    }
-
-    dateAnswers.push(potentialIdx);
-    currentDateIdx++;
+    dateAnswers.push(
+      allowedAnswerIdxs[
+        Math.floor(Math.random() * allowedAnswerIdxs.length)
+      ]!,
+    );
     currentDate.setDate(currentDate.getDate() + 1);
   }
 
