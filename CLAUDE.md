@@ -28,7 +28,8 @@ Scripts are in `package.json`.
 
 ## Agent skills
 
-- Filing, reading, or triaging issues → `docs/agents/issue-tracker.md`; labels → `docs/agents/triage-labels.md`.
+- Filing, reading (`gh issue view` needs `--json`), or triaging issues → `docs/agents/issue-tracker.md`; labels → `docs/agents/triage-labels.md`.
+- Commit and push straight to `master`; no branches or PRs needed.
 - Postponed ideas and todos live as GitHub issues (no `TODO.md`). Ask the maintainer before filing one.
 - Domain language or architecture decisions → `docs/agents/domain.md`.
 - Reviewing code → `CODING_STANDARDS.md`.
