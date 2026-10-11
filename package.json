@@ -5,12 +5,14 @@
     "start": "cargo run",
     "build": "tsc",
     "watch": "tsc --watch",
+    "test:e2e": "tsc && tsc -p tests/e2e && playwright test -c tests/e2e",
     "test": "tsc && tsc -p tsconfig.test.json && node --test \"tests/**/*.test.ts\""
   },
   "engines": {
     "node": ">=24"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
     "@types/node": "^26.6.5",
     "typescript": "7.0.2"
   }

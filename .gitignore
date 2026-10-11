@@ -5,3 +5,5 @@
 /answer-sequence.js
 /correctness.js
 /game-state.js
+/tests/test-results
+/tests/playwright-report
