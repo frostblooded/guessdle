@@ -11,6 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Scripts are in `package.json`.
 
 - `cargo run` / `npm start` must run from the repo root (the static dir is the relative path `./`).
+- `npm test` compiles, type-checks and runs unit tests (`tests/*.test.ts`). `npm run test:e2e` runs Playwright (`tests/e2e/`).
 - Golden fixture `tests/fixtures/answer-sequence.golden.json`: regenerate only deliberately (ADR 0002).
 - `npm run test:e2e` needs Chromium once: `npx playwright install chromium`.
 - Edits to `.ts` need `npx tsc` (or `npx tsc --watch`) before the browser refresh. HTML/CSS need only a refresh.
