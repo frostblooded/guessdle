@@ -1,12 +1,10 @@
-const LOCAL_STORAGE_USED_GUESSES_STRING: string = "usedGuesses";
-const LOCAL_STORAGE_VICTORY_STRING: string = "victory";
-const LOCAL_LAST_PLAYED_STRING: string = "lastPlayed";
-
 type AttributeValue = string | string[];
 
 const GUESS_DATA_NAMES: string[] = GUESS_DATA.map(
   (item: Pet): string => item.name,
 );
+
+const gameState: GameState = createGameState(localStorage, (): Date => new Date());
 
 let autoCompleteJs: autoComplete | null = null;
 
@@ -37,7 +35,7 @@ window.onload = function (): void {
   initButtons();
   initVictoryTitle();
   initNewGuessSubmit();
-  setLastPlayed();
+  gameState.setLastPlayed();
 };
 
 function getNewGuessInput(): HTMLInputElement {
@@ -45,18 +43,7 @@ function getNewGuessInput(): HTMLInputElement {
 }
 
 function initGame(): void {
-  const lastPlayed: Date = getLastPlayed();
-  if (lastPlayed === null)
-    return;
-
-  const lastPlayedString: string = dateToString(lastPlayed);
-  const todayString: string = dateToString(new Date());
-
-  // If it's a new day, reset local storage
-  if (lastPlayedString !== todayString) {
-    clearIsVictory();
-    clearUsedGuesses();
-  }
+  gameState.resetIfNewDay();
 }
 
 function initNewGuessSubmit(): void {
@@ -83,7 +70,7 @@ function initNewGuessSubmit(): void {
 }
 
 function initVictoryTitle(): void {
-  if (getIsVictory()) {
+  if (gameState.getIsVictory()) {
     addVictoryTitle();
   }
 }
@@ -131,10 +118,7 @@ function initButtons(): void {
 }
 
 function loadInitialUsedGuessesElements(): void {
-  const usedGuesses: string[] | null = getUsedGuesses();
-  if (usedGuesses === null)
-    return;
-
+  const usedGuesses: string[] = gameState.getUsedGuesses();
   for (const usedGuess of usedGuesses) {
     addGuessResultElement(usedGuess);
   }
@@ -218,8 +202,7 @@ function handleSubmitSelection(): void {
   newGuessInput.value = "";
 
   // Prevent a value from being submitted again
-  const usedGuesses: string[] | null = getUsedGuesses();
-  if (usedGuesses !== null && usedGuesses.includes(selectedValue)) {
+  if (gameState.getUsedGuesses().includes(selectedValue)) {
     return;
   }
 
@@ -227,11 +210,11 @@ function handleSubmitSelection(): void {
   const isAnswer: boolean = selectedIndex === answerIndex;
 
   if (isAnswer) {
-    setIsVictory();
+    gameState.setIsVictory();
     addVictoryTitle();
   }
 
-  addUsedGuess(selectedValue);
+  gameState.addUsedGuess(selectedValue);
   addGuessResultElement(selectedValue);
 }
 
@@ -261,76 +244,8 @@ function handleResultsList(list: HTMLElement, data: AutoCompleteResults): void {
 
 function filterOutGuesses(list: AutoCompleteItem[]): AutoCompleteItem[] {
   // Filter out already used guesses
-  let usedGuesses: string[] | null = getUsedGuesses();
-  if (usedGuesses === null)
-    return list;
-
+  const usedGuesses: string[] = gameState.getUsedGuesses();
   return list.filter((item: AutoCompleteItem): boolean => {
     return !usedGuesses.includes(item.value);
   });
-}
-
-function addUsedGuess(guess: string): void {
-  let usedGuesses: string[] | null = getUsedGuesses();
-
-  if (usedGuesses === null) {
-    usedGuesses = [guess];
-  } else {
-    usedGuesses.push(guess);
-  }
-
-  localStorage.setItem(
-    LOCAL_STORAGE_USED_GUESSES_STRING,
-    JSON.stringify(usedGuesses),
-  );
-}
-
-function clearUsedGuesses(): void {
-  localStorage.removeItem(LOCAL_STORAGE_USED_GUESSES_STRING);
-}
-
-function getUsedGuesses(): string[] | null {
-  return getLocalStorageObject<string[]>(LOCAL_STORAGE_USED_GUESSES_STRING);
-}
-
-function setIsVictory(): void {
-  localStorage.setItem(LOCAL_STORAGE_VICTORY_STRING, JSON.stringify(true));
-}
-
-function clearIsVictory(): void {
-  localStorage.removeItem(LOCAL_STORAGE_VICTORY_STRING);
-}
-
-function getIsVictory(): boolean | null {
-  return getLocalStorageObject<boolean>(LOCAL_STORAGE_VICTORY_STRING);
-}
-
-function setLastPlayed(): void {
-  localStorage.setItem(
-    LOCAL_LAST_PLAYED_STRING,
-    JSON.stringify(getCurrentDateString()),
-  );
-}
-
-function getLastPlayed(): Date {
-  const lastPlayedString: string | null = getLocalStorageObject<string>(
-    LOCAL_LAST_PLAYED_STRING,
-  );
-  return new Date(Date.parse(lastPlayedString ?? ""));
-}
-
-function getLocalStorageObject<T>(key: string): T | null {
-  let retrievedValue: string | null = localStorage.getItem(key);
-  if (retrievedValue === null)
-    return null;
-
-  return JSON.parse(retrievedValue) as T;
-}
-
-function getCurrentDate(): Date {
-  return new Date();
-}
-
-function getCurrentDateString(): string {
-  return dateToString(getCurrentDate());
 }
