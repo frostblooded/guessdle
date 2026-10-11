@@ -1,0 +1,47 @@
+// Global script (no modules). Pure grading of a guessed attribute.
+
+enum Correctness {
+  Incorrect,
+  PartiallyCorrect,
+  Correct,
+}
+
+const CORRECTNESS_CLASSES: Record<Correctness, string> = {
+  [Correctness.Incorrect]: "incorrect",
+  [Correctness.PartiallyCorrect]: "partially-correct",
+  [Correctness.Correct]: "correct",
+};
+
+function correctnessClass(correctness: Correctness): string {
+  return CORRECTNESS_CLASSES[correctness];
+}
+
+function gradeCorrectness(
+  guess: AttributeValue,
+  answer: AttributeValue,
+): Correctness {
+  if (typeof guess === "string")
+    return guess === answer ? Correctness.Correct : Correctness.Incorrect;
+
+  if (arraysAreSame(guess, answer as string[]))
+    return Correctness.Correct;
+  if (arraysHaveCommonElement(guess, answer as string[]))
+    return Correctness.PartiallyCorrect;
+  return Correctness.Incorrect;
+}
+
+function arraysHaveCommonElement(array1: string[], array2: string[]): boolean {
+  for (let el1 of array1) {
+    for (let el2 of array2) {
+      if (el1 === el2) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function arraysAreSame(array1: string[], array2: string[]): boolean {
+  return array1.sort().join(",") === array2.sort().join(",");
+}

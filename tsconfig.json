@@ -17,5 +17,5 @@
     "allowUnusedLabels": false,
     "types": []
   },
-  "files": ["globals.d.ts", "roster.ts", "answer-sequence.ts", "script.ts"]
+  "files": ["globals.d.ts", "roster.ts", "answer-sequence.ts", "correctness.ts", "script.ts"]
 }

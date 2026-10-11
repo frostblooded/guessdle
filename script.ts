@@ -189,23 +189,7 @@ function addGuessResultCellClasses(
   answerVal: AttributeValue,
   resultCell: HTMLElement,
 ): void {
-  if (typeof val === "string") {
-    if (val === answerVal) {
-      resultCell.classList.add("correct");
-    } else {
-      resultCell.classList.add("incorrect");
-    }
-  } else if (val instanceof Array) {
-    if (arraysAreSame(val, answerVal as string[])) {
-      resultCell.classList.add("correct");
-    } else if (arraysHaveCommonElement(val, answerVal as string[])) {
-      resultCell.classList.add("partially-correct");
-    } else {
-      resultCell.classList.add("incorrect");
-    }
-  } else {
-    console.error("Unsupported subelement type: ", typeof val);
-  }
+  resultCell.classList.add(correctnessClass(gradeCorrectness(val, answerVal)));
 }
 
 function handleAutocompleteSelection(event: AutoCompleteSelectionEvent): void {
@@ -341,22 +325,6 @@ function getLocalStorageObject<T>(key: string): T | null {
     return null;
 
   return JSON.parse(retrievedValue) as T;
-}
-
-function arraysHaveCommonElement(array1: string[], array2: string[]): boolean {
-  for (let el1 of array1) {
-    for (let el2 of array2) {
-      if (el1 === el2) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-function arraysAreSame(array1: string[], array2: string[]): boolean {
-  return array1.sort().join(",") === array2.sort().join(",");
 }
 
 function getCurrentDate(): Date {

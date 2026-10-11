@@ -9,9 +9,22 @@ const SCRIPT_PATHS: string[] = [
   "libs/seedrandom/seedrandom.js",
   "roster.js",
   "answer-sequence.js",
+  "correctness.js",
 ];
 
+export type AttributeValue = string | string[];
+
+// Mirrors the Correctness enum in correctness.ts
+export const Correctness = {
+  Incorrect: 0,
+  PartiallyCorrect: 1,
+  Correct: 2,
+} as const;
+export type CorrectnessValue = (typeof Correctness)[keyof typeof Correctness];
+
 export interface Game {
+  gradeCorrectness(guess: AttributeValue, answer: AttributeValue): CorrectnessValue;
+  correctnessClass(correctness: CorrectnessValue): string;
   rosterSize: number;
   skipPeriod: number;
   startDate: Date;
@@ -25,6 +38,9 @@ export interface Game {
     random: () => number,
   ): number[];
 }
+
+const copyValue = (value: AttributeValue): AttributeValue =>
+  typeof value === "string" ? value : [...value];
 
 // Runs the compiled global scripts in an isolated context. Needs `npx tsc` first.
 export function loadGame(): Game {
@@ -43,6 +59,8 @@ export function loadGame(): Game {
     "(seed) => new Math.seedrandom(seed)",
   );
 
+  const grade: Game["gradeCorrectness"] = evaluate("gradeCorrectness");
+
   return {
     rosterSize: evaluate<number>("GUESS_DATA.length"),
     skipPeriod: evaluate<number>("ANSWER_SKIP_PERIOD"),
@@ -50,6 +68,10 @@ export function loadGame(): Game {
     answerSeed: evaluate<string>("getAnswerSeed()"),
     seededRandom: makeRandom,
     getDayNumber: evaluate<Game["getDayNumber"]>("getDayNumber"),
+    // Copy inputs: the grader sorts arrays in place (#20)
+    gradeCorrectness: (guess, answer): CorrectnessValue =>
+      grade(copyValue(guess), copyValue(answer)),
+    correctnessClass: evaluate<Game["correctnessClass"]>("correctnessClass"),
     // Copy out of the vm realm so deepStrictEqual sees a plain Array
     generateAnswerSequence: (...args): number[] => Array.from(generate(...args)),
   };
