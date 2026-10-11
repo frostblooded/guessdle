@@ -21,7 +21,7 @@ npx tsc          # compile script.ts to script.js (or: npx tsc --watch)
 npm start
 ```
 
-Open <http://localhost:8080>. Run `npm start` from the repo root: it serves `./`.
+Open <http://127.0.0.1:8080>. Run `npm start` from the repo root: it serves `./`.
 
 After editing `script.ts`, recompile before refreshing. HTML and CSS edits need only a refresh.
 

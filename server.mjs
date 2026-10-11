@@ -1,4 +1,4 @@
-// Dev static file server: serves the repo root on localhost:8080.
+// Dev static file server: serves the repo root on 127.0.0.1:8080.
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, resolve, sep } from "node:path";
@@ -33,10 +33,8 @@ async function resolveFile(urlPath) {
 createServer(async (req, res) => {
   try {
     const file = await resolveFile(new URL(req.url, "http://localhost").pathname);
-    if (file === null) {
-      res.writeHead(403).end("Forbidden");
-      return;
-    }
+    if (file === null)
+      return res.writeHead(403).end("Forbidden");
     const body = await readFile(file);
     res.writeHead(200, { "Content-Type": TYPES[extname(file)] ?? "application/octet-stream" });
     res.end(body);
