@@ -43,5 +43,11 @@ function arraysHaveCommonElement(array1: string[], array2: string[]): boolean {
 }
 
 function arraysAreSame(array1: string[], array2: string[]): boolean {
-  return array1.sort().join(",") === array2.sort().join(",");
+  // Assumes neither array contains duplicate values (true for the roster).
+  // With duplicates, the result is not meaningful: ["a", "a", "b"] and
+  // ["a", "b", "b"] would compare as the same.
+  if (array1.length !== array2.length)
+    return false;
+
+  return array1.every((el) => array2.includes(el));
 }

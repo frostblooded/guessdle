@@ -75,6 +75,36 @@ describe("gradeCorrectness: multi-value attribute", () => {
   });
 });
 
+describe("gradeCorrectness: inputs are not mutated", () => {
+  const cases: [string, string[], string[], number][] = [
+    ["Correct", ["white", "black"], ["white", "black"], Correctness.Correct],
+    ["Correct (reordered)", ["white", "black"], ["black", "white"], Correctness.Correct],
+    ["PartiallyCorrect", ["white", "brown"], ["white", "black"], Correctness.PartiallyCorrect],
+    ["Incorrect", ["white", "tan"], ["brown", "black"], Correctness.Incorrect],
+  ];
+
+  for (const [name, guess, answer, expected] of cases) {
+    it(`leaves frozen unsorted arrays untouched: ${name}`, () => {
+      const guessCopy = [...guess];
+      const answerCopy = [...answer];
+      Object.freeze(guess);
+      Object.freeze(answer);
+      assert.equal(game.gradeCorrectness(guess, answer), expected);
+      assert.deepEqual(guess, guessCopy);
+      assert.deepEqual(answer, answerCopy);
+    });
+  }
+});
+
+describe("gradeCorrectness: edge cases in multi-value comparison", () => {
+  it("does not treat a comma inside a value as a separator", () => {
+    assert.equal(
+      game.gradeCorrectness(["a,b"], ["a", "b"]),
+      Correctness.Incorrect,
+    );
+  });
+});
+
 describe("correctnessClass", () => {
   it("maps each Correctness to its CSS class", () => {
     assert.equal(game.correctnessClass(Correctness.Correct), "correct");
