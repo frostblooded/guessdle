@@ -202,9 +202,8 @@ function handleSubmitSelection(): void {
   newGuessInput.value = "";
 
   // Prevent a value from being submitted again
-  if (gameState.getUsedGuesses().includes(selectedValue)) {
+  if (gameState.getUsedGuesses().includes(selectedValue))
     return;
-  }
 
   const answerIndex: number = getAnswerIdx();
   const isAnswer: boolean = selectedIndex === answerIndex;

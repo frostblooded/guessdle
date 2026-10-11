@@ -22,6 +22,7 @@ export interface CorrectnessEnum {
 }
 export type CorrectnessValue = number;
 
+// Mirrors game-state.ts (a global script, so it cannot be imported). Keep in sync.
 export interface StateStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;

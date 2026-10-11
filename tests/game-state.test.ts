@@ -160,3 +160,19 @@ describe("last played and the new-day reset", () => {
     assert.deepEqual(state.getUsedGuesses(), ["Milo"]);
   });
 });
+
+describe("storage keys", () => {
+  it("writes the keys returning players already have stored", () => {
+    state.addUsedGuess("Oreo");
+    state.setIsVictory();
+    state.setLastPlayed();
+    assert.deepEqual(
+      Object.fromEntries(storage.items),
+      {
+        usedGuesses: '["Oreo"]',
+        victory: "true",
+        lastPlayed: '"2025-10-6"',
+      },
+    );
+  });
+});
