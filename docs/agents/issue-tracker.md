@@ -5,8 +5,8 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 ## Conventions
 
 - **Create an issue**: `gh issue create --title "..." --body "..."`. Use a heredoc for multi-line bodies.
-- **Read an issue**: `gh issue view <number> --comments`, filtering comments by `jq` and also fetching labels.
-- **Pick the next ticket** (prefer this; bodies are large): `gh issue list --state open --label ready-for-agent --json number,title,labels,assignees`, then `gh issue view <number> --comments` for the chosen one only. Skip tickets with an assignee or an open `Blocked by` issue.
+- **Read an issue**: `gh issue view <number> --json title,body,labels,state,assignees,comments`. Plain `gh issue view` can print nothing; always use `--json`.
+- **Pick the next ticket** (prefer this; bodies are large): `gh issue list --state open --label ready-for-agent --json number,title,labels,assignees`, then `--json body` on each candidate to check its `Blocked by` section, and read the chosen one in full. Skip tickets with an assignee or an open `Blocked by` issue.
 - **List issues** (full bodies, expensive): `gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'` with appropriate `--label` and `--state` filters.
 - **Comment on an issue**: `gh issue comment <number> --body "..."`
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
@@ -32,7 +32,7 @@ Create a GitHub issue.
 
 ## When a skill says "fetch the relevant ticket"
 
-Run `gh issue view <number> --comments`.
+Run `gh issue view <number> --json title,body,labels,state,assignees,comments`.
 
 ## Wayfinding operations
 

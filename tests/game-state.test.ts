@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
-import { loadGame, type GameState, type StateStorage } from "./helpers/load-game.ts";
+import { loadGame } from "./helpers/load-game.ts";
 
 const game = loadGame();
 

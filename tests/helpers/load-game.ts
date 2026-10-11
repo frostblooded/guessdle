@@ -4,14 +4,12 @@ import vm from "node:vm";
 
 const ROOT: string = join(import.meta.dirname, "..", "..");
 
-// Load order mirrors the <script> tags in index.html, minus the DOM scripts.
+// Every local and vendored script in index.html except script.ts (DOM) and autoComplete (DOM).
 const SCRIPT_PATHS: string[] = [
-  "libs/seedrandom/seedrandom.js",
-  "roster.js",
-  "answer-sequence.js",
-  "game-state.js",
-  "correctness.js",
-];
+  ...readFileSync(join(ROOT, "index.html"), "utf8").matchAll(/<script src="([^"]+)"/g),
+]
+  .map((match: RegExpMatchArray): string => match[1]!)
+  .filter((src: string): boolean => src !== "script.js" && !src.startsWith("libs/autoComplete/"));
 
 export type AttributeValue = string | string[];
 
@@ -22,22 +20,7 @@ export interface CorrectnessEnum {
 }
 export type CorrectnessValue = number;
 
-// Mirrors game-state.ts (a global script, so it cannot be imported). Keep in sync.
-export interface StateStorage {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-  removeItem(key: string): void;
-}
-
-export interface GameState {
-  getUsedGuesses(): string[];
-  addUsedGuess(guess: string): void;
-  getIsVictory(): boolean;
-  setIsVictory(): void;
-  resetIfNewDay(): void;
-  setLastPlayed(): void;
-}
-
+// StateStorage and GameState are global types from game-state.ts (see tsconfig.test.json).
 export interface Game {
   createGameState(storage: StateStorage, now: () => Date): GameState;
   Correctness: CorrectnessEnum;

@@ -8,19 +8,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-- Run: `cargo run` (or `npm start`) — serves the repo root (`./`) on `0.0.0.0:8080`. Must be run from the repo root since the static dir is the relative path `./`.
-- Build: `cargo build`
-- Test: `npm test` — compiles, type-checks `tests/` (`tsconfig.test.json`) and runs them with `node --test`. Golden fixture: `tests/fixtures/answer-sequence.golden.json`; regenerate only deliberately (ADR 0002).
-- Install: `npm install` (once). Compile: `npx tsc`, or `npx tsc --watch` next to `cargo run`.
-- Edits to `script.ts` need a recompile to `script.js` before the browser refresh. HTML/CSS need only a refresh.
+- `cargo run` / `npm start` serves the repo root; run it from the repo root (the static dir is the relative path `./`).
+- `npm test`: golden fixture `tests/fixtures/answer-sequence.golden.json`; regenerate only deliberately (ADR 0002).
+- Edits to `.ts` need `npx tsc` (or `npx tsc --watch`) before the browser refresh. HTML/CSS need only a refresh.
 
 ## Architecture
 
-- `src/main.rs`: only serves static files from the working directory (`index.html` as index). All game logic is client-side.
-- Local scripts (each compiled beside itself) are global scripts loaded in the order of the `<script>` tags in `index.html`. `answer-sequence.ts` (`generateAnswerSequence`, `getDayNumber`), `game-state.ts` and `correctness.ts` (`gradeCorrectness`, `correctnessClass`) are pure and tested by loading the compiled `.js` in `node:vm` (`tests/helpers/load-game.ts`). `script.ts` holds the DOM and state logic. `globals.d.ts` types the vendored libs. Stays a global script: no ES modules.
+- `src/main.rs` only serves static files. All game logic is client-side.
+- Local scripts are global scripts (no ES modules), compiled beside themselves and loaded in the order of the `<script>` tags in `index.html`. The pure ones (`answer-sequence`, `game-state`, `correctness`) are unit-tested by loading the compiled `.js` in `node:vm` (`tests/helpers/load-game.ts`, ADR 0003). `script.ts` holds the DOM logic. `globals.d.ts` types the vendored libs.
   - `GUESS_DATA` (in `roster.ts`) is the pet roster (`photo`, `name`, `colors[]`, `owners[]`). Adding a pet = add photo to `photos/` and an entry here; the `Pet` interface makes a missing or misspelled attribute a compile error. The key order of each entry drives table column order in `addGuessResultElement` (iterates `for key in resultData`), and must match the column headers in `index.html`. Adding a new field needs a header in `index.html` and handling in `gradeCorrectness` (supports only strings and arrays).
   - Daily answer is deterministic with no backend: `generateAnswerIdx` seeds `Math.seedrandom` with `ANSWER_START_DATE` (2025-08-15), not today, then `generateAnswerSequence` replays every day from the start date to today, drawing each day's answer uniformly from the roster minus the previous `ANSWER_SKIP_PERIOD` answers (ADR 0002). Consequence: changing `GUESS_DATA` (order or length), `ANSWER_START_DATE`, or the skip logic changes the answers for all days, including today's.
-  - Game State lives in `game-state.ts` (`createGameState(storage, now)`, storage injected, unit-tested with an in-memory storage). `script.ts` passes `localStorage` (keys `usedGuesses`, `victory`, `lastPlayed`). `resetIfNewDay` clears guesses and victory when `lastPlayed` is missing or another day.
+  - `createGameState(storage, now)` (`game-state.ts`) owns the `localStorage` state; a missing or other-day `lastPlayed` clears guesses and victory.
   - Autocomplete uses vendored `libs/autoComplete`; RNG uses vendored `libs/seedrandom`. Both are loaded via plain `<script>` tags, no modules.
 - Cell result classes: `correct` / `partially-correct` (arrays sharing an element) / `incorrect`, styled in `styles.css`.
 
