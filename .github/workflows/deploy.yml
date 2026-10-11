@@ -24,7 +24,7 @@ jobs:
       - name: Assemble deploy folder
         run: |
           mkdir _site
-          cp index.html roster.js answer-sequence.js script.js styles.css favicon.ico _site/
+          cp index.html roster.js answer-sequence.js correctness.js script.js styles.css favicon.ico _site/
           cp -r libs photos _site/
       - uses: actions/upload-pages-artifact@v3
         with:
