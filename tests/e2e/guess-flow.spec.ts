@@ -161,3 +161,31 @@ test("the next day shows a fresh board with the new Daily Answer", async ({ page
 
   await expect(page.locator("#victory-answer-name")).toHaveText(nextAnswerName);
 });
+
+test.describe("before the start date", () => {
+  const BEFORE_START = new Date(2025, 7, 14, 12);
+
+  async function openWithRandom(page: Page, value: number): Promise<void> {
+    await page.addInitScript(`Math.random = () => ${value};`);
+    await openOnDay(page, BEFORE_START);
+  }
+
+  test("the Daily Answer falls back to a random pet", async ({ page }) => {
+    await openWithRandom(page, 0);
+    await submitGuess(page, names[0]!);
+    await expect(page.locator("#victory-answer-name")).toHaveText(names[0]!);
+
+    await page.evaluate("localStorage.clear()");
+    await openWithRandom(page, 0.999);
+    await submitGuess(page, names.at(-1)!);
+    await expect(page.locator("#victory-answer-name")).toHaveText(names.at(-1)!);
+  });
+
+  test("a wrong guess still adds a graded row", async ({ page }) => {
+    await openWithRandom(page, 0);
+    await submitGuess(page, names[1]!);
+
+    await expect(rows(page)).toHaveCount(1);
+    await expect(victory(page)).toHaveCount(0);
+  });
+});
