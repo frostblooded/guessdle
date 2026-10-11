@@ -5,9 +5,9 @@
   "scripts": {
     "start": "node server.mjs",
     "build": "esbuild script.ts --bundle --sourcemap --target=es2020 --loader:.svg=file --outdir=dist",
-    "watch": "esbuild script.ts --bundle --sourcemap --target=es2020 --loader:.svg=file --outdir=dist --watch",
-    "test:e2e": "npm run build && tsc && tsc -p tests/e2e && playwright test -c tests/e2e",
-    "test": "tsc && tsc -p tsconfig.test.json && node --test \"tests/**/*.test.ts\"",
+    "watch": "npm run build -- --watch",
+    "test:e2e": "npm run build && npm run typecheck && tsc -p tests/e2e && playwright test -c tests/e2e",
+    "test": "npm run typecheck && tsc -p tsconfig.test.json && node --test \"tests/**/*.test.ts\"",
     "typecheck": "tsc"
   },
   "engines": {
