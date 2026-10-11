@@ -19,13 +19,13 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Compile TypeScript
-        run: npx tsc
+      - name: Bundle
+        run: npm run build
       - name: Assemble deploy folder
         run: |
           mkdir _site
-          cp index.html 404.html roster.js answer-sequence.js game-state.js correctness.js script.js styles.css favicon.ico _site/
-          cp -r libs photos _site/
+          cp index.html 404.html styles.css favicon.ico _site/
+          cp -r dist photos _site/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

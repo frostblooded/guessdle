@@ -1,4 +1,4 @@
-# Unit tests load the compiled global scripts in node:vm
+# Superseded by ADR 0004. Unit tests load the compiled global scripts in node:vm
 
 Petdle's front-end is plain global scripts (no ES modules, no bundler). The pure logic lives in `answer-sequence`, `correctness` and `game-state`. Unit tests compile with `tsc`, then load each compiled `.js` into an isolated `node:vm` context (`tests/helpers/load-game.ts`) with `random` and `Storage` injected. The tests read the globals the script defines, exactly as the browser would. Playwright e2e tests cover the DOM flow against the real server.
 

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { GUESS_DATA } from "../../roster.ts";
 
 interface Golden {
   answers: number[];
@@ -18,10 +19,7 @@ const DAY_NUMBER = 3;
 const DAY = new Date(2025, 7, 15 + DAY_NUMBER, 12);
 const NEXT_DAY = new Date(2025, 7, 15 + DAY_NUMBER + 1, 12);
 
-let names: string[];
-let answerName: string;
-let nextAnswerName: string;
-let wrongName: string;
+const names: string[] = GUESS_DATA.map((pet) => pet.name);
 
 const input = (page: Page): Locator => page.locator("#new-guess-input");
 const rows = (page: Page): Locator => page.locator(".guess-result-row");
@@ -38,16 +36,9 @@ async function openOnDay(page: Page, now: Date = DAY): Promise<void> {
   await page.goto("/");
 }
 
-test.beforeAll(async ({ browser }) => {
-  const page: Page = await browser.newPage();
-  await page.goto("/");
-  names = (await page.evaluate("GUESS_DATA.map((pet) => pet.name)")) as string[];
-  await page.close();
-
-  answerName = names[GOLDEN.answers[DAY_NUMBER]!]!;
-  nextAnswerName = names[GOLDEN.answers[DAY_NUMBER + 1]!]!;
-  wrongName = names.find((name) => name !== answerName && name !== nextAnswerName)!;
-});
+const answerName: string = names[GOLDEN.answers[DAY_NUMBER]!]!;
+const nextAnswerName: string = names[GOLDEN.answers[DAY_NUMBER + 1]!]!;
+const wrongName: string = names.find((name) => name !== answerName && name !== nextAnswerName)!;
 
 test.beforeEach(async ({ page }) => {
   await openOnDay(page);

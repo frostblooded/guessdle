@@ -4,11 +4,10 @@ const SERVED = [
   ["/", "text/html"],
   ["/index.html", "text/html"],
   ["/styles.css", "text/css"],
-  ["/script.js", "text/javascript"],
+  ["/dist/script.js", "text/javascript"],
+  ["/dist/script.css", "text/css"],
   ["/favicon.ico", "image/x-icon"],
   ["/photos/ati.jpg", "image/jpeg"],
-  ["/libs/autoComplete/autoComplete.js", "text/javascript"],
-  ["/libs/autoComplete/images/search.svg", "image/svg+xml"],
 ] as const;
 
 const NOT_SERVED = [
@@ -18,6 +17,9 @@ const NOT_SERVED = [
   "/package.json",
   "/server.mjs",
   "/script.ts",
+  "/roster.ts",
+  "/dist/",
+  "/dist/../package.json",
   "/tests/e2e/server.spec.ts",
   "/docs/adr/0001-typescript-built-in-ci.md",
   "/.git/config",

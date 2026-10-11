@@ -2,11 +2,14 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { loadGame } from "./helpers/load-game.ts";
-
+import seedrandom from "seedrandom";
 // Node reads TZ lazily, so set it before any Date is built. The DST test
-// checks that it took effect rather than trusting it.
+// checks that it took effect rather than trusting it. Dynamic imports, since
+// static ones run first and ANSWER_START_DATE is built at import time.
 process.env["TZ"] = "America/New_York";
+const { ANSWER_START_DATE, generateAnswerSequence, getAnswerSeed, getDayNumber } =
+  await import("../answer-sequence.ts");
+const { ANSWER_SKIP_PERIOD, GUESS_DATA } = await import("../roster.ts");
 
 interface Golden {
   seed: string;
@@ -22,8 +25,6 @@ const golden: Golden = JSON.parse(
   ),
 );
 
-const game = loadGame();
-
 // A day repeating an answer from inside the Skip Period of an earlier day.
 function findSkipPeriodViolation(
   answers: number[],
@@ -38,12 +39,12 @@ function findSkipPeriodViolation(
   return null;
 }
 
-function sequence(days: number, seed: string = game.answerSeed): number[] {
-  return game.generateAnswerSequence(
-    game.rosterSize,
-    game.skipPeriod,
+function sequence(days: number, seed: string = getAnswerSeed()): number[] {
+  return generateAnswerSequence(
+    GUESS_DATA.length,
+    ANSWER_SKIP_PERIOD,
     days,
-    game.seededRandom(seed),
+    seedrandom(seed),
   );
 }
 
@@ -57,9 +58,9 @@ describe("Answer Sequence golden fixture", () => {
   it("uses the roster length, Skip Period and seed the fixture records", () => {
     assert.deepEqual(
       {
-        seed: game.answerSeed,
-        rosterLength: game.rosterSize,
-        skipPeriod: game.skipPeriod,
+        seed: getAnswerSeed(),
+        rosterLength: GUESS_DATA.length,
+        skipPeriod: ANSWER_SKIP_PERIOD,
       },
       {
         seed: golden.seed,
@@ -79,15 +80,15 @@ describe("generateAnswerSequence", () => {
   it("holds the Skip Period across 2000 consecutive days", () => {
     const answers = sequence(2000, "skip-period");
     assert.equal(answers.length, 2000);
-    assert.equal(findSkipPeriodViolation(answers, game.skipPeriod), null);
+    assert.equal(findSkipPeriodViolation(answers, ANSWER_SKIP_PERIOD), null);
   });
 
   it("holds the Skip Period on a small roster", () => {
-    const answers = game.generateAnswerSequence(
+    const answers = generateAnswerSequence(
       4,
       3,
       1500,
-      game.seededRandom("small"),
+      seedrandom("small"),
     );
     assert.equal(findSkipPeriodViolation(answers, 3), null);
     assert.deepEqual([...new Set(answers)].sort(), [0, 1, 2, 3]);
@@ -95,7 +96,7 @@ describe("generateAnswerSequence", () => {
 
   it("only returns valid roster indices", () => {
     for (const idx of sequence(1000, "indices"))
-      assert.ok(Number.isInteger(idx) && idx >= 0 && idx < game.rosterSize);
+      assert.ok(Number.isInteger(idx) && idx >= 0 && idx < GUESS_DATA.length);
   });
 
   it("gives the same answers on every computation", () => {
@@ -108,11 +109,11 @@ describe("generateAnswerSequence", () => {
 
   it("clamps the Skip Period when the roster is no larger than it", () => {
     for (const rosterSize of [2, 3, 5]) {
-      const answers = game.generateAnswerSequence(
+      const answers = generateAnswerSequence(
         rosterSize,
         5,
         200,
-        game.seededRandom("clamp"),
+        seedrandom("clamp"),
       );
       assert.equal(answers.length, 200);
       assert.equal(
@@ -124,20 +125,20 @@ describe("generateAnswerSequence", () => {
   });
 
   it("returns the only pet every day for a roster of one", () => {
-    const answers = game.generateAnswerSequence(
+    const answers = generateAnswerSequence(
       1,
       5,
       10,
-      game.seededRandom("one"),
+      seedrandom("one"),
     );
     assert.deepEqual(answers, new Array(10).fill(0));
   });
 
   it("returns an empty sequence for no days, negative days or an empty roster", () => {
-    const random = game.seededRandom("empty");
-    assert.deepEqual(game.generateAnswerSequence(19, 5, 0, random), []);
-    assert.deepEqual(game.generateAnswerSequence(19, 5, -3, random), []);
-    assert.deepEqual(game.generateAnswerSequence(0, 5, 10, random), []);
+    const random = seedrandom("empty");
+    assert.deepEqual(generateAnswerSequence(19, 5, 0, random), []);
+    assert.deepEqual(generateAnswerSequence(19, 5, -3, random), []);
+    assert.deepEqual(generateAnswerSequence(0, 5, 10, random), []);
   });
 
   it("returns the day 0 answer alone for one day", () => {
@@ -151,32 +152,32 @@ describe("getDayNumber", () => {
     new Date(2025, 6, 1).getTimezoneOffset();
 
   it("is 0 on the start date, however late in the day", () => {
-    assert.equal(game.getDayNumber(game.startDate, game.startDate), 0);
+    assert.equal(getDayNumber(ANSWER_START_DATE, ANSWER_START_DATE), 0);
     assert.equal(
-      game.getDayNumber(game.startDate, new Date(2025, 7, 15, 23, 59, 59)),
+      getDayNumber(ANSWER_START_DATE, new Date(2025, 7, 15, 23, 59, 59)),
       0,
     );
   });
 
   it("is 1 the day after the start date, even a minute past midnight", () => {
-    assert.equal(game.getDayNumber(game.startDate, new Date(2025, 7, 16)), 1);
+    assert.equal(getDayNumber(ANSWER_START_DATE, new Date(2025, 7, 16)), 1);
     assert.equal(
-      game.getDayNumber(game.startDate, new Date(2025, 7, 16, 0, 1)),
+      getDayNumber(ANSWER_START_DATE, new Date(2025, 7, 16, 0, 1)),
       1,
     );
   });
 
   it("is negative before the start date", () => {
-    assert.equal(game.getDayNumber(game.startDate, new Date(2025, 7, 14)), -1);
+    assert.equal(getDayNumber(ANSWER_START_DATE, new Date(2025, 7, 14)), -1);
     assert.equal(
-      game.getDayNumber(game.startDate, new Date(2025, 7, 14, 23, 59)),
+      getDayNumber(ANSWER_START_DATE, new Date(2025, 7, 14, 23, 59)),
       -1,
     );
   });
 
   it("counts across month and year boundaries", () => {
-    assert.equal(game.getDayNumber(game.startDate, new Date(2025, 8, 1)), 17);
-    assert.equal(game.getDayNumber(game.startDate, new Date(2026, 7, 15)), 365);
+    assert.equal(getDayNumber(ANSWER_START_DATE, new Date(2025, 8, 1)), 17);
+    assert.equal(getDayNumber(ANSWER_START_DATE, new Date(2026, 7, 15)), 365);
   });
 
   it("counts one per calendar day across DST changes", (t) => {
@@ -184,13 +185,13 @@ describe("getDayNumber", () => {
       return t.skip("TZ override had no effect on this platform");
 
     const springStart = new Date(2025, 2, 8); // day before US spring-forward
-    assert.equal(game.getDayNumber(springStart, new Date(2025, 2, 9)), 1); // 23h day
-    assert.equal(game.getDayNumber(springStart, new Date(2025, 2, 10)), 2);
-    assert.equal(game.getDayNumber(springStart, new Date(2025, 2, 9, 23, 59)), 1);
+    assert.equal(getDayNumber(springStart, new Date(2025, 2, 9)), 1); // 23h day
+    assert.equal(getDayNumber(springStart, new Date(2025, 2, 10)), 2);
+    assert.equal(getDayNumber(springStart, new Date(2025, 2, 9, 23, 59)), 1);
 
     const fallStart = new Date(2025, 10, 1); // day before US fall-back
-    assert.equal(game.getDayNumber(fallStart, new Date(2025, 10, 2)), 1); // 25h day
-    assert.equal(game.getDayNumber(fallStart, new Date(2025, 10, 3)), 2);
-    assert.equal(game.getDayNumber(fallStart, new Date(2025, 10, 2, 23, 59)), 1);
+    assert.equal(getDayNumber(fallStart, new Date(2025, 10, 2)), 1); // 25h day
+    assert.equal(getDayNumber(fallStart, new Date(2025, 10, 3)), 2);
+    assert.equal(getDayNumber(fallStart, new Date(2025, 10, 2, 23, 59)), 1);
   });
 });

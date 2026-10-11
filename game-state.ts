@@ -1,17 +1,19 @@
-// Global script (no modules). Game State: what the browser remembers about today.
+import { dateToString } from "./answer-sequence.ts";
+
+// Game State: what the browser remembers about today.
 
 const LOCAL_STORAGE_USED_GUESSES_STRING: string = "usedGuesses";
 const LOCAL_STORAGE_VICTORY_STRING: string = "victory";
 const LOCAL_LAST_PLAYED_STRING: string = "lastPlayed";
 
 // The part of the browser Storage that Game State uses
-interface StateStorage {
+export interface StateStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
 }
 
-interface GameState {
+export interface GameState {
   getUsedGuesses(): string[];
   addUsedGuess(guess: string): void;
   getIsVictory(): boolean;
@@ -34,7 +36,7 @@ function readJson(storage: StateStorage, key: string): unknown {
   }
 }
 
-function createGameState(storage: StateStorage, now: () => Date): GameState {
+export function createGameState(storage: StateStorage, now: () => Date): GameState {
   const getUsedGuesses = (): string[] => {
     const value: unknown = readJson(storage, LOCAL_STORAGE_USED_GUESSES_STRING);
     if (!Array.isArray(value))

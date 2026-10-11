@@ -1,4 +1,4 @@
-# TypeScript is compiled in CI; compiled JS is not committed
+# TypeScript is built in CI; build output is not committed (bundler: see ADR 0004)
 
 The front-end is written in TypeScript (`script.ts`, strict mode). `tsc` emits `script.js` beside it, and `script.js` is gitignored. GitHub Pages deploys through a GitHub Actions workflow that compiles, assembles the static files and publishes them. Pages source must be set to "GitHub Actions".
 

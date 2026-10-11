@@ -1,8 +1,8 @@
-// Global script (no modules). Pure Answer Sequence logic, see ADR 0002.
+// Pure Answer Sequence logic, see ADR 0002.
 
-const ANSWER_START_DATE: Date = new Date(2025, 7, 15);
+export const ANSWER_START_DATE: Date = new Date(2025, 7, 15);
 
-function dateToString(date: Date): string {
+export function dateToString(date: Date): string {
   return "Y-m-d"
     .replace("Y", String(date.getFullYear()))
     .replace("m", String(date.getMonth() + 1))
@@ -10,7 +10,7 @@ function dateToString(date: Date): string {
 }
 
 // Fixed seed: every day's answer is part of one stable sequence (ADR 0002)
-function getAnswerSeed(): string {
+export function getAnswerSeed(): string {
   return dateToString(ANSWER_START_DATE);
 }
 
@@ -20,13 +20,13 @@ function toUtcDay(date: Date): number {
 
 // Whole local calendar days from start to today. Built from calendar fields,
 // so a DST change cannot shift it.
-function getDayNumber(start: Date, today: Date): number {
+export function getDayNumber(start: Date, today: Date): number {
   return Math.round((toUtcDay(today) - toUtcDay(start)) / 86400000);
 }
 
 // Roster index of the Daily Answer for each of the `days` days from day 0.
 // Each draw excludes the previous `skipPeriod` answers (clamped to roster size - 1).
-function generateAnswerSequence(
+export function generateAnswerSequence(
   rosterSize: number,
   skipPeriod: number,
   days: number,

@@ -1,4 +1,11 @@
-type AttributeValue = string | string[];
+import autoComplete from "@tarekraafat/autocomplete.js";
+import seedrandom from "seedrandom";
+import "@tarekraafat/autocomplete.js/dist/css/autoComplete.css";
+import { ANSWER_START_DATE, generateAnswerSequence, getAnswerSeed, getDayNumber } from "./answer-sequence.ts";
+import { type AttributeValue, correctnessClass, gradeCorrectness } from "./correctness.ts";
+import { createGameState, type GameState } from "./game-state.ts";
+import { ANSWER_SKIP_PERIOD, GUESS_DATA, type Pet } from "./roster.ts";
+import type { AutoCompleteItem, AutoCompleteResults, AutoCompleteSelectionEvent } from "@tarekraafat/autocomplete.js";
 
 const GUESS_DATA_NAMES: string[] = GUESS_DATA.map(
   (item: Pet): string => item.name,
@@ -98,7 +105,7 @@ function generateAnswerIdx(): number {
     GUESS_DATA.length,
     ANSWER_SKIP_PERIOD,
     dayNumber + 1,
-    new Math.seedrandom(getAnswerSeed()),
+    seedrandom(getAnswerSeed()),
   );
 
   console.log(answerSequence);

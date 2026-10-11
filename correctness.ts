@@ -1,10 +1,13 @@
-// Global script (no modules). Pure grading of a guessed attribute.
+// Pure grading of a guessed attribute.
 
-enum Correctness {
-  Incorrect,
-  PartiallyCorrect,
-  Correct,
-}
+export type AttributeValue = string | string[];
+
+export const Correctness = {
+  Incorrect: 0,
+  PartiallyCorrect: 1,
+  Correct: 2,
+} as const;
+export type Correctness = (typeof Correctness)[keyof typeof Correctness];
 
 const CORRECTNESS_CLASSES: Record<Correctness, string> = {
   [Correctness.Incorrect]: "incorrect",
@@ -12,11 +15,11 @@ const CORRECTNESS_CLASSES: Record<Correctness, string> = {
   [Correctness.Correct]: "correct",
 };
 
-function correctnessClass(correctness: Correctness): string {
+export function correctnessClass(correctness: Correctness): string {
   return CORRECTNESS_CLASSES[correctness];
 }
 
-function gradeCorrectness(
+export function gradeCorrectness(
   guess: AttributeValue,
   answer: AttributeValue,
 ): Correctness {

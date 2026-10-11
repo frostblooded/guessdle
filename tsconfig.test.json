@@ -3,7 +3,7 @@
     "target": "ES2023",
     "lib": ["ES2023"],
     "module": "nodenext",
-    "moduleDetection": "legacy",
+    
     "moduleResolution": "nodenext",
     "noEmit": true,
     "strict": true,
@@ -18,6 +18,6 @@
     "verbatimModuleSyntax": true,
     "types": ["node"]
   },
-  "include": ["tests/**/*.ts", "answer-sequence.ts", "game-state.ts"],
+  "include": ["tests/**/*.ts"],
   "exclude": ["tests/e2e"]
 }

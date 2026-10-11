@@ -1,14 +1,14 @@
 // If an answer is chosen, it can't be chosen again for this amount of days
-const ANSWER_SKIP_PERIOD: number = 5;
+export const ANSWER_SKIP_PERIOD: number = 5;
 
-interface Pet {
+export interface Pet {
   photo: string;
   name: string;
   colors: string[];
   owners: string[];
 }
 
-const GUESS_DATA: Pet[] = [
+export const GUESS_DATA: Pet[] = [
   {
     photo: "photos/ati.jpg",
     name: "Ati",

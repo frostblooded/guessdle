@@ -1,12 +1,14 @@
 {
   "name": "petdle",
   "private": true,
+  "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "build": "tsc",
-    "watch": "tsc --watch",
-    "test:e2e": "tsc && tsc -p tests/e2e && playwright test -c tests/e2e",
-    "test": "tsc && tsc -p tsconfig.test.json && node --test \"tests/**/*.test.ts\""
+    "build": "esbuild script.ts --bundle --sourcemap --target=es2020 --loader:.svg=file --outdir=dist",
+    "watch": "esbuild script.ts --bundle --sourcemap --target=es2020 --loader:.svg=file --outdir=dist --watch",
+    "test:e2e": "npm run build && tsc && tsc -p tests/e2e && playwright test -c tests/e2e",
+    "test": "tsc && tsc -p tsconfig.test.json && node --test \"tests/**/*.test.ts\"",
+    "typecheck": "tsc"
   },
   "engines": {
     "node": ">=24"
@@ -14,6 +16,12 @@
   "devDependencies": {
     "@playwright/test": "^1.64.0",
     "@types/node": "^26.6.5",
+    "@types/seedrandom": "^3.0.8",
+    "esbuild": "^0.28.2",
     "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "@tarekraafat/autocomplete.js": "^10.2.10",
+    "seedrandom": "^3.0.5"
   }
 }

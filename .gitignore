@@ -1,8 +1,4 @@
 /node_modules
-/script.js
-/roster.js
-/answer-sequence.js
-/correctness.js
-/game-state.js
+/dist
 /tests/test-results
 /tests/playwright-report

@@ -6,7 +6,7 @@ import { extname, join, relative, resolve, sep } from "node:path";
 const ROOT = resolve(import.meta.dirname);
 const PORT = process.env.PORT ?? 8080;
 
-const ALLOWED = /^\/(index\.html|styles\.css|favicon\.ico|[\w-]+\.js|(libs|photos)\/.+)$/;
+const ALLOWED = /^\/(index\.html|styles\.css|favicon\.ico|(dist|photos)\/.+)$/;
 
 const TYPES = {
   ".html": "text/html; charset=utf-8",

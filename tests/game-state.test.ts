@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
-import { loadGame } from "./helpers/load-game.ts";
-
-const game = loadGame();
+import {
+  createGameState,
+  type GameState,
+  type StateStorage,
+} from "../game-state.ts";
 
 class MemoryStorage implements StateStorage {
   readonly items: Map<string, string> = new Map();
@@ -31,7 +33,7 @@ let state: GameState;
 beforeEach(() => {
   storage = new MemoryStorage();
   today = MONDAY;
-  state = game.createGameState(storage, () => today);
+  state = createGameState(storage, () => today);
 });
 
 describe("used guesses", () => {
@@ -47,7 +49,7 @@ describe("used guesses", () => {
 
   it("survives a new instance over the same storage", () => {
     state.addUsedGuess("Oreo");
-    const reloaded = game.createGameState(storage, () => today);
+    const reloaded = createGameState(storage, () => today);
     assert.deepEqual(reloaded.getUsedGuesses(), ["Oreo"]);
   });
 
@@ -77,7 +79,7 @@ describe("victory", () => {
   it("is true after setIsVictory and survives a new instance", () => {
     state.setIsVictory();
     assert.equal(state.getIsVictory(), true);
-    assert.equal(game.createGameState(storage, () => today).getIsVictory(), true);
+    assert.equal(createGameState(storage, () => today).getIsVictory(), true);
   });
 
   it("reads corrupt JSON as false", () => {

@@ -5,6 +5,7 @@
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "strict": true,
     "noImplicitReturns": true,
     "noUncheckedIndexedAccess": true,
