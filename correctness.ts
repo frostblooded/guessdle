@@ -33,9 +33,8 @@ function gradeCorrectness(
 function arraysHaveCommonElement(array1: string[], array2: string[]): boolean {
   for (let el1 of array1) {
     for (let el2 of array2) {
-      if (el1 === el2) {
+      if (el1 === el2)
         return true;
-      }
     }
   }
 

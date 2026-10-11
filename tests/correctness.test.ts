@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { Correctness, loadGame } from "./helpers/load-game.ts";
+import { loadGame } from "./helpers/load-game.ts";
 
 const game = loadGame();
+const Correctness = game.Correctness;
 
 describe("gradeCorrectness: single-value attribute", () => {
   it("is Correct when the names match", () => {

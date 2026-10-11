@@ -14,15 +14,15 @@ const SCRIPT_PATHS: string[] = [
 
 export type AttributeValue = string | string[];
 
-// Mirrors the Correctness enum in correctness.ts
-export const Correctness = {
-  Incorrect: 0,
-  PartiallyCorrect: 1,
-  Correct: 2,
-} as const;
-export type CorrectnessValue = (typeof Correctness)[keyof typeof Correctness];
+export interface CorrectnessEnum {
+  Incorrect: number;
+  PartiallyCorrect: number;
+  Correct: number;
+}
+export type CorrectnessValue = number;
 
 export interface Game {
+  Correctness: CorrectnessEnum;
   gradeCorrectness(guess: AttributeValue, answer: AttributeValue): CorrectnessValue;
   correctnessClass(correctness: CorrectnessValue): string;
   rosterSize: number;
@@ -69,6 +69,7 @@ export function loadGame(): Game {
     seededRandom: makeRandom,
     getDayNumber: evaluate<Game["getDayNumber"]>("getDayNumber"),
     // Copy inputs: the grader sorts arrays in place (#20)
+    Correctness: { ...evaluate<CorrectnessEnum>("Correctness") },
     gradeCorrectness: (guess, answer): CorrectnessValue =>
       grade(copyValue(guess), copyValue(answer)),
     correctnessClass: evaluate<Game["correctnessClass"]>("correctnessClass"),
