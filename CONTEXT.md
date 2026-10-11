@@ -24,3 +24,12 @@ The number of most recent daily answers that cannot be chosen again, including a
 
 **Attribute**:
 A compared property of a pet, such as colors or owners. A guess is graded per attribute as correct, partially correct, or incorrect.
+
+**Correctness**:
+How well one attribute of a guess matches the Daily Answer: correct, partially correct, or incorrect. Partially correct applies only to attributes holding several values that share at least one.
+
+**Game State**:
+What the player's browser remembers about today: the Guesses made, whether they won, and the day last played. It resets on a new calendar day.
+
+**Day Number**:
+Whole calendar days since the game's start date. The start date itself is day 0. Each Day Number maps to exactly one Daily Answer.
