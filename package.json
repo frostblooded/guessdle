@@ -4,12 +4,14 @@
   "scripts": {
     "start": "cargo run",
     "build": "tsc",
-    "watch": "tsc --watch"
+    "watch": "tsc --watch",
+    "test": "tsc && tsc -p tsconfig.test.json && node --test \"tests/**/*.test.ts\""
   },
   "engines": {
     "node": ">=24"
   },
   "devDependencies": {
+    "@types/node": "^26.6.5",
     "typescript": "7.0.2"
   }
 }

@@ -24,14 +24,26 @@ jobs:
       - name: Assemble deploy folder
         run: |
           mkdir _site
-          cp index.html script.js styles.css favicon.ico _site/
+          cp index.html roster.js answer-sequence.js script.js styles.css favicon.ico _site/
           cp -r libs photos _site/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
 
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Compile, type-check and run unit tests
+        run: npm test
+
   deploy:
-    needs: build
+    needs: [build, unit]
     if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:

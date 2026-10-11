@@ -2,134 +2,7 @@ const LOCAL_STORAGE_USED_GUESSES_STRING: string = "usedGuesses";
 const LOCAL_STORAGE_VICTORY_STRING: string = "victory";
 const LOCAL_LAST_PLAYED_STRING: string = "lastPlayed";
 
-// If an answer is chosen, it can't be chosen again for this amount of days
-const ANSWER_SKIP_PERIOD: number = 5;
-
-interface Pet {
-  photo: string;
-  name: string;
-  colors: string[];
-  owners: string[];
-}
-
 type AttributeValue = string | string[];
-
-const GUESS_DATA: Pet[] = [
-  {
-    photo: "photos/ati.jpg",
-    name: "Ati",
-    colors: ["Black", "Orange", "White"],
-    owners: ["Niki"],
-  },
-  {
-    photo: "photos/bela.jpg",
-    name: "Bela",
-    colors: ["Black", "Grey", "White"],
-    owners: ["Beti"],
-  },
-  {
-    photo: "photos/cookie.jpg",
-    name: "Cookie",
-    colors: ["Black", "Orange", "White"],
-    owners: ["Niki"],
-  },
-  {
-    photo: "photos/dido.jpg",
-    name: "Dido",
-    colors: ["Grey", "White"],
-    owners: ["Beti"],
-  },
-  {
-    photo: "photos/eddie.jpg",
-    name: "Eddie",
-    colors: ["Orange", "White"],
-    owners: ["Stefi", "Yasen"],
-  },
-  {
-    photo: "photos/eli.jpg",
-    name: "Eli",
-    colors: ["Black", "Blue", "White"],
-    owners: ["Beti"],
-  },
-  {
-    photo: "photos/ilko.jpg",
-    name: "Ilko",
-    colors: ["Black", "Purple", "White"],
-    owners: ["Beti"],
-  },
-  {
-    photo: "photos/jaro.jpg",
-    name: "Jaro",
-    colors: ["Grey"],
-    owners: ["Ico"],
-  },
-  {
-    photo: "photos/jeffy.jpg",
-    name: "Jeffy",
-    colors: ["Grey"],
-    owners: ["Ico"],
-  },
-  {
-    photo: "photos/kiara.jpg",
-    name: "Kiara",
-    colors: ["Black", "Orange", "White"],
-    owners: ["Antonio", "Tanya"],
-  },
-  {
-    photo: "photos/kimi.jpg",
-    name: "Kimi",
-    colors: ["Black", "Orange", "White"],
-    owners: ["Bori"],
-  },
-  {
-    photo: "photos/mochi.jpg",
-    name: "Mochi",
-    colors: ["Orange", "White"],
-    owners: ["Petya"],
-  },
-  {
-    photo: "photos/murlin.jpg",
-    name: "Murlin",
-    colors: ["Grey"],
-    owners: ["Antonio", "Tanya"],
-  },
-  {
-    photo: "photos/oreo.jpg",
-    name: "Oreo",
-    colors: ["Black", "White"],
-    owners: ["Cveti", "Vili"],
-  },
-  {
-    photo: "photos/patio.jpg",
-    name: "Patio",
-    colors: ["Green", "Yellow"],
-    owners: ["Beti"],
-  },
-  {
-    photo: "photos/pipi.jpg",
-    name: "Pipi",
-    colors: ["Grey", "White"],
-    owners: ["Beti"],
-  },
-  {
-    photo: "photos/puhche.jpg",
-    name: "Puhche",
-    colors: ["Black", "White"],
-    owners: ["Cveti", "Vili"],
-  },
-  {
-    photo: "photos/sunny.jpg",
-    name: "Sunny",
-    colors: ["Yellow", "Blue"],
-    owners: ["Beti"],
-  },
-  {
-    photo: "photos/todorka.jpg",
-    name: "Todorka",
-    colors: ["Black", "White"],
-    owners: ["Didi"],
-  },
-];
 
 const GUESS_DATA_NAMES: string[] = GUESS_DATA.map(
   (item: Pet): string => item.name,
@@ -227,42 +100,22 @@ function getAnswerIdx(): number {
 
 function generateAnswerIdx(): number {
   const today: Date = new Date();
+  const dayNumber: number = getDayNumber(ANSWER_START_DATE, today);
 
-  const START_DATE: Date = new Date(2025, 7, 15);
-
-  if (today < START_DATE) {
+  if (dayNumber < 0) {
     console.log("Choose better start date");
     return generateRandomAnswerIdx();
   }
 
-  // Fixed seed: every day's answer is part of one stable sequence (ADR 0002)
-  Math.seedrandom(dateToString(START_DATE));
-
-  const skipPeriod: number = Math.min(
+  const answerSequence: number[] = generateAnswerSequence(
+    GUESS_DATA.length,
     ANSWER_SKIP_PERIOD,
-    GUESS_DATA.length - 1,
+    dayNumber + 1,
+    new Math.seedrandom(getAnswerSeed()),
   );
-  let dateAnswers: number[] = [];
-  let currentDate: Date = START_DATE;
 
-  while (currentDate <= today) {
-    const forbiddenAnswerIdxs: number[] = dateAnswers.slice(
-      Math.max(0, dateAnswers.length - skipPeriod),
-    );
-    const allowedAnswerIdxs: number[] = GUESS_DATA.map(
-      (_pet: Pet, idx: number): number => idx,
-    ).filter((idx: number): boolean => !forbiddenAnswerIdxs.includes(idx));
-
-    dateAnswers.push(
-      allowedAnswerIdxs[
-        Math.floor(Math.random() * allowedAnswerIdxs.length)
-      ]!,
-    );
-    currentDate.setDate(currentDate.getDate() + 1);
-  }
-
-  console.log(dateAnswers);
-  return dateAnswers[dateAnswers.length - 1]!;
+  console.log(answerSequence);
+  return answerSequence[answerSequence.length - 1]!;
 }
 
 function generateRandomAnswerIdx(): number {
@@ -512,11 +365,4 @@ function getCurrentDate(): Date {
 
 function getCurrentDateString(): string {
   return dateToString(getCurrentDate());
-}
-
-function dateToString(date: Date): string {
-  return "Y-m-d"
-    .replace("Y", String(date.getFullYear()))
-    .replace("m", String(date.getMonth() + 1))
-    .replace("d", String(date.getDate()));
 }

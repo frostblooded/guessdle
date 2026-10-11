@@ -1,3 +1,5 @@
 /target
 /node_modules
 /script.js
+/roster.js
+/answer-sequence.js

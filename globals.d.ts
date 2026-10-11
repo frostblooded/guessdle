@@ -36,5 +36,5 @@ declare class autoComplete {
 }
 
 interface Math {
-  seedrandom(seed?: string): void;
+  seedrandom: new (seed?: string) => () => number;
 }
