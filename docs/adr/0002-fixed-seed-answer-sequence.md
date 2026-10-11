@@ -15,4 +15,4 @@ Previously the seed was today's date string. Every day then replayed a different
 - Changing `START_DATE`, the seed, the roster (order or length) or the Skip Period rewrites every Daily Answer, past and future. Adding or removing a pet has always done this; a future change could freeze past answers.
 - On the day this shipped, every player's answer changed. Guesses and victory saved in `localStorage` for that day were graded against the old answer. No migration was done.
 - The Skip Period is clamped to `roster size - 1`, so a tiny roster weakens the rule instead of failing.
-- No automated test guards the sequence yet.
+- A golden fixture of the first 60 answers guards the sequence (ADR 0003). Regenerate it only deliberately.
