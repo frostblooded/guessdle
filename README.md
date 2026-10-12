@@ -20,6 +20,7 @@ A Wordle-style daily guessing game. Guess the pet of the day from a fixed roster
 ```sh
 npm install
 npm run build    # bundle to dist/ (or: npm run watch)
+npm run build:prod # minified, no sourcemaps (deploy)
 npm start
 ```
 
