@@ -11,6 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Scripts are in `package.json`.
 
 - `npm start` must run from the repo root (the static dir is the relative path `./`). Run `npm run build` first: `index.html` loads `dist/`.
+- `npm run lint` runs ESLint (CI runs it too).
 - `npm run format` runs Prettier; `npm run format:check` is the CI check. A `PostToolUse` hook (`.claude/hooks/prettier.mjs`) formats files after Edit/Write.
 - `npm test` type-checks and runs unit tests (`tests/*.test.ts`). `npm run test:e2e` runs Playwright (`tests/e2e/`).
 - Golden fixture `tests/fixtures/answer-sequence.golden.json`: regenerate only deliberately (ADR 0002).
