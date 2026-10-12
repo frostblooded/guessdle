@@ -21,8 +21,8 @@ describe("build output is wired through the page and the deploy", () => {
   it("deploy.yml builds and copies dist", () => {
     const deploy: string = read(".github/workflows/deploy.yml");
     assert.ok(
-      deploy.includes("npm run build"),
-      "deploy.yml does not run the build",
+      deploy.includes("npm run build:prod"),
+      "deploy.yml does not run the minified build",
     );
     assert.match(deploy, /cp -r dist\b/);
   });

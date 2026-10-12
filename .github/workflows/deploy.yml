@@ -20,7 +20,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Bundle
-        run: npm run build
+        run: npm run build:prod
       - name: Assemble deploy folder
         run: |
           mkdir _site
