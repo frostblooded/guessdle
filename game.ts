@@ -45,11 +45,15 @@ export function submitGuess(
   const guessIdx: number = roster.findIndex(
     (pet: Pet): boolean => pet.name.toLowerCase() === input.toLowerCase(),
   );
-  if (guessIdx === -1) return { kind: "invalid" };
+  if (guessIdx === -1) {
+    return { kind: "invalid" };
+  }
 
   // Use the proper name in case the casing of the input was different
   const name: string = roster[guessIdx]!.name;
-  if (state.getUsedGuesses().includes(name)) return { kind: "duplicate" };
+  if (state.getUsedGuesses().includes(name)) {
+    return { kind: "duplicate" };
+  }
 
   const isAnswer: boolean = guessIdx === answerIdx;
   if (isAnswer) {

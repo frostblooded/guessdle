@@ -23,20 +23,22 @@ export function gradeCorrectness(
   guess: AttributeValue,
   answer: AttributeValue,
 ): Correctness {
-  if (typeof guess === "string")
+  if (typeof guess === "string") {
     return guess === answer ? Correctness.Correct : Correctness.Incorrect;
+  }
 
   if (arraysAreSame(guess, answer as string[])) {
     return Correctness.Correct;
   }
-  if (arraysHaveCommonElement(guess, answer as string[]))
+  if (arraysHaveCommonElement(guess, answer as string[])) {
     return Correctness.PartiallyCorrect;
+  }
   return Correctness.Incorrect;
 }
 
 function arraysHaveCommonElement(array1: string[], array2: string[]): boolean {
-  for (let el1 of array1) {
-    for (let el2 of array2) {
+  for (const el1 of array1) {
+    for (const el2 of array2) {
       if (el1 === el2) {
         return true;
       }

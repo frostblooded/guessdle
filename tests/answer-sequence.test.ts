@@ -36,8 +36,9 @@ function findSkipPeriodViolation(
 ): string | null {
   for (let day = 0; day < answers.length; day++) {
     for (let back = 1; back <= skipPeriod && back <= day; back++) {
-      if (answers[day] === answers[day - back])
+      if (answers[day] === answers[day - back]) {
         return `day ${day} repeats the answer of day ${day - back}`;
+      }
     }
   }
   return null;
@@ -94,8 +95,9 @@ describe("generateAnswerSequence", () => {
   });
 
   it("only returns valid roster indices", () => {
-    for (const idx of sequence(1000, "indices"))
+    for (const idx of sequence(1000, "indices")) {
       assert.ok(Number.isInteger(idx) && idx >= 0 && idx < GUESS_DATA.length);
+    }
   });
 
   it("gives the same answers on every computation", () => {
@@ -175,8 +177,9 @@ describe("getDayNumber", () => {
   });
 
   it("counts one per calendar day across DST changes", (t) => {
-    if (!dstAvailable)
+    if (!dstAvailable) {
       return t.skip("TZ override had no effect on this platform");
+    }
 
     const springStart = new Date(2025, 2, 8); // day before US spring-forward
     assert.equal(getDayNumber(springStart, new Date(2025, 2, 9)), 1); // 23h day

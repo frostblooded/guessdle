@@ -1,6 +1,6 @@
 # Coding standards
 
-Read during review. Judgement calls only; tooling covers the rest.
+Read during review. Judgement calls only; tooling covers the rest (`npm run lint` enforces braces and explicit parameter and member types).
 
 ## Braces
 

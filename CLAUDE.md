@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-"Petdle": a Wordle-style daily guessing game where players guess a pet from a fixed roster. Static front-end (`index.html`, `script.ts`, `styles.css`) served by a tiny Node server (`server.mjs`). Strict TypeScript, ES modules bundled by esbuild into `dist/` (gitignored, ADR 0001); `tsc` only type-checks (Node 24, see `.nvmrc`). No linter; Prettier formats. Libs come from npm (`seedrandom`, `@tarekraafat/autocomplete.js`).
+"Petdle": a Wordle-style daily guessing game where players guess a pet from a fixed roster. Static front-end (`index.html`, `script.ts`, `styles.css`) served by a tiny Node server (`server.mjs`). Strict TypeScript, ES modules bundled by esbuild into `dist/` (gitignored, ADR 0001); `tsc` only type-checks (Node 24, see `.nvmrc`). ESLint (`npm run lint`, typescript-eslint) lints; Prettier formats. `typescript` is pinned `~6.0` because typescript-eslint does not support 7 yet. Libs come from npm (`seedrandom`, `@tarekraafat/autocomplete.js`).
 
 ## Commands
 

@@ -10,18 +10,22 @@
     "test": "npm run typecheck && tsc -p tsconfig.test.json && node --test \"tests/**/*.test.ts\"",
     "typecheck": "tsc",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "lint": "eslint ."
   },
   "engines": {
     "node": ">=24"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.64.0",
     "@types/node": "^26.6.5",
     "@types/seedrandom": "^3.0.8",
     "esbuild": "^0.28.2",
+    "eslint": "^10.12.0",
     "prettier": "^3.9.10",
-    "typescript": "7.0.2"
+    "typescript": "~6.0",
+    "typescript-eslint": "^8.71.2"
   },
   "dependencies": {
     "@tarekraafat/autocomplete.js": "^10.2.10",

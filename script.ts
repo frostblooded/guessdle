@@ -65,7 +65,7 @@ function initGame(): void {
 }
 
 function initNewGuessSubmit(): void {
-  let newGuessInput: HTMLInputElement = getNewGuessInput();
+  const newGuessInput: HTMLInputElement = getNewGuessInput();
 
   newGuessInput.onkeydown = (event: KeyboardEvent): void => {
     // When enter is pressed
@@ -105,7 +105,7 @@ function getAnswerIdx(): number {
 }
 
 function initButtons(): void {
-  let submitNewGuessButton: HTMLButtonElement =
+  const submitNewGuessButton: HTMLButtonElement =
     document.querySelector<HTMLButtonElement>("#submit-new-guess-button")!;
   submitNewGuessButton.onclick = (): void => {
     handleSubmitSelection();
@@ -120,7 +120,7 @@ function loadInitialUsedGuessesElements(): void {
 }
 
 function addGuessResultElement(name: string): void {
-  let resultElement: HTMLDivElement = document.createElement("div");
+  const resultElement: HTMLDivElement = document.createElement("div");
   resultElement.setAttribute("class", "guess-result-row row");
 
   const answerData: Pet = GUESS_DATA[getAnswerIdx()]!;
@@ -133,11 +133,11 @@ function addGuessResultElement(name: string): void {
     const val: AttributeValue = resultData[attr];
     const formattedVal: string = getFormattedCellVal(val);
 
-    let resultCell: HTMLDivElement = document.createElement("div");
+    const resultCell: HTMLDivElement = document.createElement("div");
     resultCell.setAttribute("class", "guess-result-cell cell");
 
     if (key === "photo") {
-      let image: HTMLImageElement = document.createElement("img");
+      const image: HTMLImageElement = document.createElement("img");
       image.src = val as string;
       resultCell.appendChild(image);
     } else {
@@ -149,7 +149,7 @@ function addGuessResultElement(name: string): void {
     resultElement.appendChild(resultCell);
   }
 
-  let guessResultsContainer: Element = document.querySelector(
+  const guessResultsContainer: Element = document.querySelector(
     "#guess-results-container",
   )!;
   guessResultsContainer.prepend(resultElement);
@@ -203,7 +203,7 @@ function handleSubmitSelection(): void {
 function addVictoryTitle(): void {
   const answerName: string = GUESS_DATA[getAnswerIdx()]!.name;
 
-  let victoryTitle: HTMLSpanElement = document.createElement("span");
+  const victoryTitle: HTMLSpanElement = document.createElement("span");
   victoryTitle.id = "victory-title";
   victoryTitle.innerHTML =
     "YOU DID IT! THE ANSWER IS: <span id='victory-answer-name'>".concat(
@@ -211,7 +211,7 @@ function addVictoryTitle(): void {
       "</span>",
     );
 
-  let gameContainer: Element = document.querySelector("#game-container")!;
+  const gameContainer: Element = document.querySelector("#game-container")!;
   gameContainer.parentNode!.insertBefore(victoryTitle, gameContainer);
 }
 
