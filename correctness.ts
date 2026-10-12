@@ -26,7 +26,9 @@ export function gradeCorrectness(
   if (typeof guess === "string")
     return guess === answer ? Correctness.Correct : Correctness.Incorrect;
 
-  if (arraysAreSame(guess, answer as string[])) return Correctness.Correct;
+  if (arraysAreSame(guess, answer as string[])) {
+    return Correctness.Correct;
+  }
   if (arraysHaveCommonElement(guess, answer as string[]))
     return Correctness.PartiallyCorrect;
   return Correctness.Incorrect;
@@ -48,7 +50,9 @@ function arraysAreSame(array1: string[], array2: string[]): boolean {
   // Assumes neither array contains duplicate values (true for the roster).
   // With duplicates, the result is not meaningful: ["a", "a", "b"] and
   // ["a", "b", "b"] would compare as the same.
-  if (array1.length !== array2.length) return false;
+  if (array1.length !== array2.length) {
+    return false;
+  }
 
   return array1.every((el) => array2.includes(el));
 }

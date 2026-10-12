@@ -17,7 +17,9 @@ export function computeAnswerIdx(
   fallbackRandom: () => number = Math.random,
 ): number {
   const dayNumber: number = getDayNumber(ANSWER_START_DATE, now);
-  if (dayNumber < 0) return Math.floor(fallbackRandom() * rosterSize);
+  if (dayNumber < 0) {
+    return Math.floor(fallbackRandom() * rosterSize);
+  }
 
   const answerSequence: number[] = generateAnswerSequence(
     rosterSize,
@@ -50,7 +52,9 @@ export function submitGuess(
   if (state.getUsedGuesses().includes(name)) return { kind: "duplicate" };
 
   const isAnswer: boolean = guessIdx === answerIdx;
-  if (isAnswer) state.setIsVictory();
+  if (isAnswer) {
+    state.setIsVictory();
+  }
   state.addUsedGuess(name);
   return { kind: "accepted", name, isAnswer };
 }

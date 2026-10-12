@@ -2,15 +2,15 @@
 
 Read during review. Judgement calls only; tooling covers the rest.
 
-## Early return
+## Braces
 
-A guard clause returns early because of an error or a missing precondition the function needs. Write it on one line, no braces (Prettier normalizes to this layout):
+Always brace `if`/`else`/loop bodies, including guard clauses (an early return for an error or missing precondition). Prettier does not add braces, so write them:
 
 ```ts
-if (usedGuesses === null) return list;
+if (usedGuesses === null) {
+  return list;
+}
 ```
-
-A return that is part of the function's normal logic (a found-match return inside a search loop, the result of a branch) is not a guard clause. Keep braces there.
 
 ## Indentation
 

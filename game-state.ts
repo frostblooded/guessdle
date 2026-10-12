@@ -26,7 +26,9 @@ export interface GameState {
 // Corrupt JSON or a value of the wrong shape reads as missing
 function readJson(storage: StateStorage, key: string): unknown {
   const raw: string | null = storage.getItem(key);
-  if (raw === null) return null;
+  if (raw === null) {
+    return null;
+  }
 
   try {
     return JSON.parse(raw);
@@ -41,7 +43,9 @@ export function createGameState(
 ): GameState {
   const getUsedGuesses = (): string[] => {
     const value: unknown = readJson(storage, LOCAL_STORAGE_USED_GUESSES_STRING);
-    if (!Array.isArray(value)) return [];
+    if (!Array.isArray(value)) {
+      return [];
+    }
 
     return value.filter(
       (item: unknown): item is string => typeof item === "string",
@@ -68,7 +72,9 @@ export function createGameState(
 
     resetIfNewDay(): void {
       const lastPlayed: unknown = readJson(storage, LOCAL_LAST_PLAYED_STRING);
-      if (lastPlayed === dateToString(now())) return;
+      if (lastPlayed === dateToString(now())) {
+        return;
+      }
 
       storage.removeItem(LOCAL_STORAGE_VICTORY_STRING);
       storage.removeItem(LOCAL_STORAGE_USED_GUESSES_STRING);

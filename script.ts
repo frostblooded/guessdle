@@ -184,13 +184,19 @@ function handleSubmitSelection(): void {
     getAnswerIdx(),
     newGuessInput.value,
   );
-  if (result.kind === "invalid") return;
+  if (result.kind === "invalid") {
+    return;
+  }
 
   autoCompleteJs?.close();
   newGuessInput.value = "";
-  if (result.kind === "duplicate") return;
+  if (result.kind === "duplicate") {
+    return;
+  }
 
-  if (result.isAnswer) addVictoryTitle();
+  if (result.isAnswer) {
+    addVictoryTitle();
+  }
   addGuessResultElement(result.name);
 }
 
