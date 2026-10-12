@@ -4,7 +4,7 @@ Read during review. Judgement calls only; tooling covers the rest.
 
 ## Early return
 
-A guard clause returns early because of an error or a missing precondition the function needs. Write it on one line, no braces (Prettier enforces this layout):
+A guard clause returns early because of an error or a missing precondition the function needs. Write it on one line, no braces (Prettier normalizes to this layout):
 
 ```ts
 if (usedGuesses === null) return list;
