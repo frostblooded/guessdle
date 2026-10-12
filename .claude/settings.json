@@ -1,5 +1,18 @@
 {
   "permissions": {
     "allow": ["Bash(npx tsc)"]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/prettier.mjs"
+          }
+        ]
+      }
+    ]
   }
 }
