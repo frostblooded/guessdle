@@ -38,13 +38,17 @@ async function openOnDay(page: Page, now: Date = DAY): Promise<void> {
 
 const answerName: string = names[GOLDEN.answers[DAY_NUMBER]!]!;
 const nextAnswerName: string = names[GOLDEN.answers[DAY_NUMBER + 1]!]!;
-const wrongName: string = names.find((name) => name !== answerName && name !== nextAnswerName)!;
+const wrongName: string = names.find(
+  (name) => name !== answerName && name !== nextAnswerName,
+)!;
 
 test.beforeEach(async ({ page }) => {
   await openOnDay(page);
 });
 
-test("a correct guess shows the victory banner with the answer", async ({ page }) => {
+test("a correct guess shows the victory banner with the answer", async ({
+  page,
+}) => {
   await submitGuess(page, answerName);
 
   await expect(victory(page)).toContainText("YOU DID IT");
@@ -53,16 +57,22 @@ test("a correct guess shows the victory banner with the answer", async ({ page }
   await expect(rows(page).first().locator(".cell.incorrect")).toHaveCount(0);
 });
 
-test("a wrong guess adds a row with graded cells and no victory", async ({ page }) => {
+test("a wrong guess adds a row with graded cells and no victory", async ({
+  page,
+}) => {
   await submitGuess(page, wrongName);
 
   await expect(rows(page)).toHaveCount(1);
   await expect(rows(page).first()).toContainText(wrongName);
   // Name, colors and owners cells are graded; the photo cell is not
   await expect(
-    rows(page).first().locator(".cell.correct, .cell.partially-correct, .cell.incorrect"),
+    rows(page)
+      .first()
+      .locator(".cell.correct, .cell.partially-correct, .cell.incorrect"),
   ).toHaveCount(3);
-  await expect(rows(page).first().locator(".cell.incorrect").first()).toBeVisible();
+  await expect(
+    rows(page).first().locator(".cell.incorrect").first(),
+  ).toBeVisible();
   await expect(victory(page)).toHaveCount(0);
 });
 
@@ -74,10 +84,14 @@ test("a repeated guess is ignored", async ({ page }) => {
   await expect(input(page)).toHaveValue("");
 });
 
-test("an unknown name does nothing and the list says no results", async ({ page }) => {
+test("an unknown name does nothing and the list says no results", async ({
+  page,
+}) => {
   await input(page).fill("Nobody");
 
-  await expect(page.locator(".no_result")).toHaveText('Found No Results for "Nobody"');
+  await expect(page.locator(".no_result")).toHaveText(
+    'Found No Results for "Nobody"',
+  );
 
   await page.locator("#submit-new-guess-button").click();
 
@@ -108,10 +122,16 @@ test("pressing Enter submits the guess", async ({ page }) => {
   await expect(rows(page)).toHaveCount(1);
 });
 
-test("used guesses are removed from the autocomplete list", async ({ page }) => {
+test("used guesses are removed from the autocomplete list", async ({
+  page,
+}) => {
   const prefix: string = wrongName.slice(0, 2).toLowerCase();
-  const matching: string[] = names.filter((name) => name.toLowerCase().includes(prefix));
-  const remaining: number = matching.filter((name) => name !== wrongName).length;
+  const matching: string[] = names.filter((name) =>
+    name.toLowerCase().includes(prefix),
+  );
+  const remaining: number = matching.filter(
+    (name) => name !== wrongName,
+  ).length;
 
   await input(page).pressSequentially(prefix);
   await expect(suggestions(page)).toHaveCount(matching.length);
@@ -124,7 +144,9 @@ test("used guesses are removed from the autocomplete list", async ({ page }) => 
   await expect(suggestions(page).filter({ hasText: wrongName })).toHaveCount(0);
 });
 
-test("guesses and victory survive a reload on the same day", async ({ page }) => {
+test("guesses and victory survive a reload on the same day", async ({
+  page,
+}) => {
   await submitGuess(page, wrongName);
   await submitGuess(page, answerName);
 
@@ -137,7 +159,9 @@ test("guesses and victory survive a reload on the same day", async ({ page }) =>
   await expect(rows(page).last()).toContainText(wrongName);
 });
 
-test("the next day shows a fresh board with the new Daily Answer", async ({ page }) => {
+test("the next day shows a fresh board with the new Daily Answer", async ({
+  page,
+}) => {
   await submitGuess(page, wrongName);
   await submitGuess(page, answerName);
   await expect(victory(page)).toBeVisible();
@@ -169,7 +193,9 @@ test.describe("before the start date", () => {
     await page.evaluate("localStorage.clear()");
     await openWithRandom(page, 0.999);
     await submitGuess(page, names.at(-1)!);
-    await expect(page.locator("#victory-answer-name")).toHaveText(names.at(-1)!);
+    await expect(page.locator("#victory-answer-name")).toHaveText(
+      names.at(-1)!,
+    );
   });
 
   test("a wrong guess still adds a graded row", async ({ page }) => {

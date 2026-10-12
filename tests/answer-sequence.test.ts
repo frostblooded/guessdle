@@ -7,8 +7,12 @@ import seedrandom from "seedrandom";
 // checks that it took effect rather than trusting it. Dynamic imports, since
 // static ones run first and ANSWER_START_DATE is built at import time.
 process.env["TZ"] = "America/New_York";
-const { ANSWER_START_DATE, generateAnswerSequence, getAnswerSeed, getDayNumber } =
-  await import("../answer-sequence.ts");
+const {
+  ANSWER_START_DATE,
+  generateAnswerSequence,
+  getAnswerSeed,
+  getDayNumber,
+} = await import("../answer-sequence.ts");
 const { ANSWER_SKIP_PERIOD, GUESS_DATA } = await import("../roster.ts");
 
 interface Golden {
@@ -84,12 +88,7 @@ describe("generateAnswerSequence", () => {
   });
 
   it("holds the Skip Period on a small roster", () => {
-    const answers = generateAnswerSequence(
-      4,
-      3,
-      1500,
-      seedrandom("small"),
-    );
+    const answers = generateAnswerSequence(4, 3, 1500, seedrandom("small"));
     assert.equal(findSkipPeriodViolation(answers, 3), null);
     assert.deepEqual([...new Set(answers)].sort(), [0, 1, 2, 3]);
   });
@@ -125,12 +124,7 @@ describe("generateAnswerSequence", () => {
   });
 
   it("returns the only pet every day for a roster of one", () => {
-    const answers = generateAnswerSequence(
-      1,
-      5,
-      10,
-      seedrandom("one"),
-    );
+    const answers = generateAnswerSequence(1, 5, 10, seedrandom("one"));
     assert.deepEqual(answers, new Array(10).fill(0));
   });
 

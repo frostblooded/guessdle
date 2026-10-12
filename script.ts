@@ -1,17 +1,28 @@
 import autoComplete from "@tarekraafat/autocomplete.js";
 import seedrandom from "seedrandom";
 import "@tarekraafat/autocomplete.js/dist/css/autoComplete.css";
-import { type AttributeValue, correctnessClass, gradeCorrectness } from "./correctness.ts";
+import {
+  type AttributeValue,
+  correctnessClass,
+  gradeCorrectness,
+} from "./correctness.ts";
 import { computeAnswerIdx, type GuessResult, submitGuess } from "./game.ts";
 import { createGameState, type GameState } from "./game-state.ts";
 import { GUESS_DATA, type Pet } from "./roster.ts";
-import type { AutoCompleteItem, AutoCompleteResults, AutoCompleteSelectionEvent } from "@tarekraafat/autocomplete.js";
+import type {
+  AutoCompleteItem,
+  AutoCompleteResults,
+  AutoCompleteSelectionEvent,
+} from "@tarekraafat/autocomplete.js";
 
 const GUESS_DATA_NAMES: string[] = GUESS_DATA.map(
   (item: Pet): string => item.name,
 );
 
-const gameState: GameState = createGameState(localStorage, (): Date => new Date());
+const gameState: GameState = createGameState(
+  localStorage,
+  (): Date => new Date(),
+);
 
 let autoCompleteJs: autoComplete | null = null;
 
@@ -85,7 +96,11 @@ function initVictoryTitle(): void {
 let cachedAnswerIdx: number | null = null;
 
 function getAnswerIdx(): number {
-  cachedAnswerIdx ??= computeAnswerIdx(GUESS_DATA.length, new Date(), (seed: string): (() => number) => seedrandom(seed));
+  cachedAnswerIdx ??= computeAnswerIdx(
+    GUESS_DATA.length,
+    new Date(),
+    (seed: string): (() => number) => seedrandom(seed),
+  );
   return cachedAnswerIdx;
 }
 
@@ -169,16 +184,13 @@ function handleSubmitSelection(): void {
     getAnswerIdx(),
     newGuessInput.value,
   );
-  if (result.kind === "invalid")
-    return;
+  if (result.kind === "invalid") return;
 
   autoCompleteJs?.close();
   newGuessInput.value = "";
-  if (result.kind === "duplicate")
-    return;
+  if (result.kind === "duplicate") return;
 
-  if (result.isAnswer)
-    addVictoryTitle();
+  if (result.isAnswer) addVictoryTitle();
   addGuessResultElement(result.name);
 }
 

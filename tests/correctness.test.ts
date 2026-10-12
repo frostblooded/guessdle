@@ -79,8 +79,18 @@ describe("gradeCorrectness: multi-value attribute", () => {
 describe("gradeCorrectness: inputs are not mutated", () => {
   const cases: [string, string[], string[], number][] = [
     ["Correct", ["white", "black"], ["white", "black"], Correctness.Correct],
-    ["Correct (reordered)", ["white", "black"], ["black", "white"], Correctness.Correct],
-    ["PartiallyCorrect", ["white", "brown"], ["white", "black"], Correctness.PartiallyCorrect],
+    [
+      "Correct (reordered)",
+      ["white", "black"],
+      ["black", "white"],
+      Correctness.Correct,
+    ],
+    [
+      "PartiallyCorrect",
+      ["white", "brown"],
+      ["white", "black"],
+      Correctness.PartiallyCorrect,
+    ],
     ["Incorrect", ["white", "tan"], ["brown", "black"], Correctness.Incorrect],
   ];
 
@@ -99,10 +109,7 @@ describe("gradeCorrectness: inputs are not mutated", () => {
 
 describe("gradeCorrectness: edge cases in multi-value comparison", () => {
   it("does not treat a comma inside a value as a separator", () => {
-    assert.equal(
-      gradeCorrectness(["a,b"], ["a", "b"]),
-      Correctness.Incorrect,
-    );
+    assert.equal(gradeCorrectness(["a,b"], ["a", "b"]), Correctness.Incorrect);
   });
 });
 

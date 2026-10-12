@@ -5,27 +5,48 @@ import { beforeEach, describe, it } from "node:test";
 import seedrandom from "seedrandom";
 import { ANSWER_START_DATE } from "../answer-sequence.ts";
 import { computeAnswerIdx, submitGuess } from "../game.ts";
-import { createGameState, type GameState, type StateStorage } from "../game-state.ts";
+import {
+  createGameState,
+  type GameState,
+  type StateStorage,
+} from "../game-state.ts";
 import { GUESS_DATA } from "../roster.ts";
 
 const golden: { answers: number[] } = JSON.parse(
-  readFileSync(join(import.meta.dirname, "fixtures", "answer-sequence.golden.json"), "utf8"),
+  readFileSync(
+    join(import.meta.dirname, "fixtures", "answer-sequence.golden.json"),
+    "utf8",
+  ),
 );
 const makeRandom = (seed: string): (() => number) => seedrandom(seed);
 const dayAfterStart = (days: number): Date =>
-  new Date(ANSWER_START_DATE.getFullYear(), ANSWER_START_DATE.getMonth(), ANSWER_START_DATE.getDate() + days, 12);
+  new Date(
+    ANSWER_START_DATE.getFullYear(),
+    ANSWER_START_DATE.getMonth(),
+    ANSWER_START_DATE.getDate() + days,
+    12,
+  );
 
 describe("computeAnswerIdx", () => {
   for (const day of [0, 1, 7, 30]) {
     it(`matches the golden Daily Answer for day ${day}`, () => {
-      assert.equal(computeAnswerIdx(GUESS_DATA.length, dayAfterStart(day), makeRandom), golden.answers[day]);
+      assert.equal(
+        computeAnswerIdx(GUESS_DATA.length, dayAfterStart(day), makeRandom),
+        golden.answers[day],
+      );
     });
   }
 
   it("falls back to a random pet before the start date", () => {
     const before: Date = dayAfterStart(-1);
-    assert.equal(computeAnswerIdx(10, before, makeRandom, () => 0), 0);
-    assert.equal(computeAnswerIdx(10, before, makeRandom, () => 0.99), 9);
+    assert.equal(
+      computeAnswerIdx(10, before, makeRandom, () => 0),
+      0,
+    );
+    assert.equal(
+      computeAnswerIdx(10, before, makeRandom, () => 0.99),
+      9,
+    );
   });
 });
 
@@ -52,19 +73,31 @@ describe("submitGuess", () => {
   });
 
   it("rejects a name not in the roster without recording anything", () => {
-    assert.deepEqual(submitGuess(state, GUESS_DATA, 0, "Not A Pet"), { kind: "invalid" });
-    assert.deepEqual(submitGuess(state, GUESS_DATA, 0, ""), { kind: "invalid" });
+    assert.deepEqual(submitGuess(state, GUESS_DATA, 0, "Not A Pet"), {
+      kind: "invalid",
+    });
+    assert.deepEqual(submitGuess(state, GUESS_DATA, 0, ""), {
+      kind: "invalid",
+    });
     assert.deepEqual(state.getUsedGuesses(), []);
   });
 
   it("records a wrong guess without victory", () => {
-    assert.deepEqual(submitGuess(state, GUESS_DATA, 1, first), { kind: "accepted", name: first, isAnswer: false });
+    assert.deepEqual(submitGuess(state, GUESS_DATA, 1, first), {
+      kind: "accepted",
+      name: first,
+      isAnswer: false,
+    });
     assert.deepEqual(state.getUsedGuesses(), [first]);
     assert.equal(state.getIsVictory(), false);
   });
 
   it("records the right guess as victory", () => {
-    assert.deepEqual(submitGuess(state, GUESS_DATA, 0, first), { kind: "accepted", name: first, isAnswer: true });
+    assert.deepEqual(submitGuess(state, GUESS_DATA, 0, first), {
+      kind: "accepted",
+      name: first,
+      isAnswer: true,
+    });
     assert.equal(state.getIsVictory(), true);
   });
 
@@ -79,7 +112,9 @@ describe("submitGuess", () => {
 
   it("rejects a repeat guess, even in another case, and records it once", () => {
     submitGuess(state, GUESS_DATA, 1, first);
-    assert.deepEqual(submitGuess(state, GUESS_DATA, 1, first.toLowerCase()), { kind: "duplicate" });
+    assert.deepEqual(submitGuess(state, GUESS_DATA, 1, first.toLowerCase()), {
+      kind: "duplicate",
+    });
     assert.deepEqual(state.getUsedGuesses(), [first]);
   });
 

@@ -17,8 +17,7 @@ export function computeAnswerIdx(
   fallbackRandom: () => number = Math.random,
 ): number {
   const dayNumber: number = getDayNumber(ANSWER_START_DATE, now);
-  if (dayNumber < 0)
-    return Math.floor(fallbackRandom() * rosterSize);
+  if (dayNumber < 0) return Math.floor(fallbackRandom() * rosterSize);
 
   const answerSequence: number[] = generateAnswerSequence(
     rosterSize,
@@ -44,17 +43,14 @@ export function submitGuess(
   const guessIdx: number = roster.findIndex(
     (pet: Pet): boolean => pet.name.toLowerCase() === input.toLowerCase(),
   );
-  if (guessIdx === -1)
-    return { kind: "invalid" };
+  if (guessIdx === -1) return { kind: "invalid" };
 
   // Use the proper name in case the casing of the input was different
   const name: string = roster[guessIdx]!.name;
-  if (state.getUsedGuesses().includes(name))
-    return { kind: "duplicate" };
+  if (state.getUsedGuesses().includes(name)) return { kind: "duplicate" };
 
   const isAnswer: boolean = guessIdx === answerIdx;
-  if (isAnswer)
-    state.setIsVictory();
+  if (isAnswer) state.setIsVictory();
   state.addUsedGuess(name);
   return { kind: "accepted", name, isAnswer };
 }

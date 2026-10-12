@@ -27,8 +27,7 @@ export function generateAnswerSequence(
   random: () => number,
 ): number[] {
   const answers: number[] = [];
-  if (rosterSize < 1)
-    return answers;
+  if (rosterSize < 1) return answers;
 
   const clampedSkipPeriod: number = Math.min(skipPeriod, rosterSize - 1);
 
@@ -38,8 +37,7 @@ export function generateAnswerSequence(
     );
     const allowedIdxs: number[] = [];
     for (let idx: number = 0; idx < rosterSize; idx++) {
-      if (!forbiddenIdxs.includes(idx))
-        allowedIdxs.push(idx);
+      if (!forbiddenIdxs.includes(idx)) allowedIdxs.push(idx);
     }
 
     answers.push(allowedIdxs[Math.floor(random() * allowedIdxs.length)]!);

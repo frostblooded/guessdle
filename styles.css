@@ -1,5 +1,5 @@
 body {
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
 }
 
 button {
@@ -14,7 +14,7 @@ button {
   font-size: 5em;
   margin: 40px 0 40px 0;
 
-  @media(max-width: 1000px) {
+  @media (max-width: 1000px) {
     font-size: 3em;
     margin: 20px 0 20px 0;
   }
@@ -27,7 +27,7 @@ button {
   font-size: 4em;
   color: green;
 
-  @media(max-width: 1000px) {
+  @media (max-width: 1000px) {
     font-size: 2em;
     margin: 10px 0 10px 0;
   }
@@ -38,7 +38,7 @@ button {
   width: 60%;
   padding: 0 40px 40px 40px;
 
-  @media(max-width: 1000px) {
+  @media (max-width: 1000px) {
     width: auto;
     padding: 0;
   }
@@ -68,7 +68,8 @@ button {
   margin-bottom: 10px;
 }
 
-#guess-results-titles-row, .guess-result-row {
+#guess-results-titles-row,
+.guess-result-row {
   display: grid;
   grid-template-columns: 1fr repeat(3, 2fr);
   gap: 5px;
@@ -79,7 +80,7 @@ button {
   padding: 10px 0 10px 0;
   font-size: 1.3em;
 
-  @media(max-width: 1000px) {
+  @media (max-width: 1000px) {
     font-size: 1em;
   }
 }
@@ -91,7 +92,7 @@ button {
 .guess-result-cell {
   font-size: 2em;
 
-  @media(max-width: 1000px) {
+  @media (max-width: 1000px) {
     font-size: 1em;
   }
 

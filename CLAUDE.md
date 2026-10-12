@@ -4,13 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-"Petdle": a Wordle-style daily guessing game where players guess a pet from a fixed roster. Static front-end (`index.html`, `script.ts`, `styles.css`) served by a tiny Node server (`server.mjs`). Strict TypeScript, ES modules bundled by esbuild into `dist/` (gitignored, ADR 0001); `tsc` only type-checks (Node 24, see `.nvmrc`). No linter. Libs come from npm (`seedrandom`, `@tarekraafat/autocomplete.js`).
+"Petdle": a Wordle-style daily guessing game where players guess a pet from a fixed roster. Static front-end (`index.html`, `script.ts`, `styles.css`) served by a tiny Node server (`server.mjs`). Strict TypeScript, ES modules bundled by esbuild into `dist/` (gitignored, ADR 0001); `tsc` only type-checks (Node 24, see `.nvmrc`). No linter; Prettier formats. Libs come from npm (`seedrandom`, `@tarekraafat/autocomplete.js`).
 
 ## Commands
 
 Scripts are in `package.json`.
 
 - `npm start` must run from the repo root (the static dir is the relative path `./`). Run `npm run build` first: `index.html` loads `dist/`.
+- `npm run format` runs Prettier; `npm run format:check` is the CI check.
 - `npm test` type-checks and runs unit tests (`tests/*.test.ts`). `npm run test:e2e` runs Playwright (`tests/e2e/`).
 - Golden fixture `tests/fixtures/answer-sequence.golden.json`: regenerate only deliberately (ADR 0002).
 - `npm run test:e2e` needs Chromium once: `npx playwright install chromium`.

@@ -21,7 +21,9 @@ const TYPES = {
 // Absolute path of the file a URL may read, or null if the page may not load it
 function allowedFile(urlPath) {
   try {
-    const file = resolve(join(ROOT, urlPath === "/" ? "index.html" : decodeURIComponent(urlPath)));
+    const file = resolve(
+      join(ROOT, urlPath === "/" ? "index.html" : decodeURIComponent(urlPath)),
+    );
     // Test the resolved path, so an encoded "..%2f" cannot escape the allowlist
     const path = "/" + relative(ROOT, file).split(sep).join("/");
     return ALLOWED.test(path) ? file : null;
@@ -38,6 +40,8 @@ createServer(async (req, res) => {
       .writeHead(404, { "Content-Type": TYPES[".html"] })
       .end(await readFile(join(ROOT, "404.html")));
 
-  res.writeHead(200, { "Content-Type": TYPES[extname(file)] ?? "application/octet-stream" });
+  res.writeHead(200, {
+    "Content-Type": TYPES[extname(file)] ?? "application/octet-stream",
+  });
   res.end(body);
 }).listen(PORT, "127.0.0.1");
