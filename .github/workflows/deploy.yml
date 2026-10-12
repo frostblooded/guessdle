@@ -30,6 +30,13 @@ jobs:
         with:
           path: _site
 
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build --target dev .
+      - run: docker build --target prod .
+
   unit:
     runs-on: ubuntu-latest
     steps:

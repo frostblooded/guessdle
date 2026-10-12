@@ -1,0 +1,8 @@
+.git
+.claude
+.idea
+node_modules
+dist
+test-results
+tests/test-results
+tests/playwright-report

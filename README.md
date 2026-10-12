@@ -28,6 +28,16 @@ Open <http://127.0.0.1:8080> (set `PORT` to change it). Run `npm start` from the
 
 After editing a `.ts` file, rebuild before refreshing (`npm run typecheck` runs `tsc`). HTML and CSS edits need only a refresh.
 
+## Docker
+
+```sh
+docker compose up --watch  # dev: live rebuild, http://localhost:8080
+docker build -t petdle .   # prod image (nginx, non-root)
+docker run -p 8080:8080 petdle
+```
+
+`server.mjs` binds all interfaces (needed inside the container), so `npm start` is reachable from your LAN too.
+
 ## Adding a pet
 
 1. Add the photo to `photos/`.

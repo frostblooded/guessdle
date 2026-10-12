@@ -44,4 +44,4 @@ createServer(async (req, res) => {
     "Content-Type": TYPES[extname(file)] ?? "application/octet-stream",
   });
   res.end(body);
-}).listen(PORT, "127.0.0.1");
+}).listen(PORT, "0.0.0.0");
