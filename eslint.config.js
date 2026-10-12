@@ -2,10 +2,11 @@ import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  // shortcut: .mjs (server, hook) is plain JS outside tsc; lint it if it grows.
-  { ignores: ["dist/", "node_modules/", "test-results/", "**/*.mjs"] },
+  { ignores: ["dist/", "node_modules/", "test-results/"] },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
+  // shortcut: no `globals` package; Node globals in .mjs would trip no-undef, so it is off there.
+  { files: ["**/*.mjs"], rules: { "no-undef": "off" } },
   {
     files: ["**/*.ts"],
     rules: {

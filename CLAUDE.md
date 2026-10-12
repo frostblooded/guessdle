@@ -11,13 +11,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Scripts are in `package.json`.
 
 - `npm start` must run from the repo root (the static dir is the relative path `./`). Run `npm run build` first: `index.html` loads `dist/`.
-- `npm run build:prod` = minified, no sourcemaps; CI deploy uses it (issue #6).
-- `npm run lint` runs ESLint (CI runs it too).
-- `npm run format` runs Prettier; `npm run format:check` is the CI check. A `PostToolUse` hook (`.claude/hooks/prettier.mjs`) formats files after Edit/Write.
-- `npm test` type-checks and runs unit tests (`tests/*.test.ts`). `npm run test:e2e` runs Playwright (`tests/e2e/`).
+- A `PostToolUse` hook (`.claude/hooks/prettier.mjs`) runs `eslint --fix` then Prettier on edited `.ts`/`.mjs` files; lint errors it cannot fix come back as hook feedback.
+- Deploy uses `npm run build:prod` (minified, no sourcemaps; issue #6).
 - Golden fixture `tests/fixtures/answer-sequence.golden.json`: regenerate only deliberately (ADR 0002).
 - `npm run test:e2e` needs Chromium once: `npx playwright install chromium`.
-- Edits to `.ts` need `npm run build` (or `npm run watch`) before the browser refresh. `npm run typecheck` runs `tsc`. HTML/CSS need only a refresh.
+- Edits to `.ts` need `npm run build` (or `npm run watch`) before the browser refresh. HTML/CSS need only a refresh.
 
 ## Architecture
 
@@ -33,6 +31,6 @@ Scripts are in `package.json`.
 
 - Filing, reading (`gh issue view` needs `--json`), or triaging issues → `docs/agents/issue-tracker.md`; labels → `docs/agents/triage-labels.md`.
 - Commit and push straight to `master`; no branches or PRs needed.
-- Postponed ideas and todos live as GitHub issues (no `TODO.md`). Ask the maintainer before filing one.
+- Postponed ideas and todos live as GitHub issues (no `TODO.md`). Ask the maintainer before filing one; the body rules are in `docs/agents/issue-tracker.md`.
 - Domain language or architecture decisions → `docs/agents/domain.md`.
 - Reviewing code → `CODING_STANDARDS.md`.
