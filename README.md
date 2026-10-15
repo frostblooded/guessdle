@@ -38,6 +38,16 @@ docker run -p 8080:8080 petdle
 
 `server.mjs` binds all interfaces (needed inside the container), so `npm start` is reachable from your LAN too.
 
+### Home server
+
+One-time: create a Cloudflare Tunnel (Zero Trust dashboard), point its public hostname at `http://web:8080`, then `cp .env.example .env` and paste the tunnel token. After that, on the server:
+
+```sh
+./start.sh  # git pull, then docker compose up -d --build
+```
+
+`--build` rebuilds the image from the pulled source before starting, so the container runs the new code. Without it compose reuses the old image. `-d` runs detached; containers restart on reboot (`unless-stopped`).
+
 ## Adding a pet
 
 1. Add the photo to `photos/`.
