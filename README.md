@@ -40,7 +40,7 @@ docker run -p 8080:8080 petdle
 
 ### Home server
 
-The server's existing Cloudflare Tunnel should point at `http://localhost:8080`. On the server:
+The server's existing Cloudflare Tunnel (service `http://guessdle-server:8080`) must share a Docker network with the container; see `compose.prod.yaml`. On the server:
 
 ```sh
 ./start.sh  # git pull, then docker compose up -d --build

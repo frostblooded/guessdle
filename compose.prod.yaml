@@ -1,10 +1,16 @@
-# Prod on the home server: ./start.sh. The host's cloudflared tunnel points at http://localhost:8080.
+# Prod on the home server: ./start.sh. The host's cloudflared tunnel points at http://guessdle-server:8080.
 services:
   web:
     build:
       context: .
       target: prod
-    ports:
-      - "127.0.0.1:8080:8080"
     container_name: guessdle-server
+    networks:
+      - tunnel
     restart: unless-stopped
+
+# Network shared with cloudflared (created by the immich stack, so immich must be up first)
+networks:
+  tunnel:
+    name: immich_default
+    external: true
