@@ -40,13 +40,13 @@ docker run -p 8080:8080 petdle
 
 ### Home server
 
-One-time: create a Cloudflare Tunnel (Zero Trust dashboard), point its public hostname at `http://web:8080`, then `cp .env.example .env` and paste the tunnel token. After that, on the server:
+The server's existing Cloudflare Tunnel should point at `http://localhost:8080`. On the server:
 
 ```sh
 ./start.sh  # git pull, then docker compose up -d --build
 ```
 
-`--build` rebuilds the image from the pulled source before starting, so the container runs the new code. Without it compose reuses the old image. `-d` runs detached; containers restart on reboot (`unless-stopped`).
+`--build` rebuilds the image from the pulled source before starting, so the container runs the new code. Without it compose reuses the old image. `-d` runs detached; the container restarts on reboot (`unless-stopped`).
 
 ## Adding a pet
 

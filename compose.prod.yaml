@@ -1,17 +1,9 @@
-# Prod on the home server: ./start.sh. Needs .env with TUNNEL_TOKEN (see .env.example).
+# Prod on the home server: ./start.sh. The host's cloudflared tunnel points at http://localhost:8080.
 services:
   web:
     build:
       context: .
       target: prod
-    restart: unless-stopped
-
-  # Cloudflare Tunnel; in the dashboard point the public hostname at http://web:8080
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    command: tunnel --no-autoupdate run
-    environment:
-      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN in .env}
-    depends_on:
-      - web
+    ports:
+      - "127.0.0.1:8080:8080"
     restart: unless-stopped
