@@ -10,6 +10,25 @@
   </head>
   <body>
     <span id="page-title">PETDLE</span>
+    <button id="help-button" aria-label="How to play">?</button>
+    <dialog id="help-dialog">
+      <h2>How to play</h2>
+      <p>Guess the pet of the day. Each guess shows how close you are:</p>
+      <div class="help-example row">
+        <div class="cell guess-result-cell correct">Rex</div>
+        <div class="cell guess-result-cell incorrect">Rex</div>
+      </div>
+      <p><b>Green</b>: exact match. <b>Red</b>: no match.</p>
+      <div class="help-example row">
+        <div class="cell guess-result-cell partially-correct">Brown, White</div>
+      </div>
+      <p>
+        <b>Orange</b>: a list (colors, owners) where some, but not all, items
+        match.
+      </p>
+      <p>A new pet appears every day.</p>
+      <form method="dialog"><button>CLOSE</button></form>
+    </dialog>
     <div id="game-container">
       <div id="new-guess-row" class="row">
         <input type="text" id="new-guess-input" />

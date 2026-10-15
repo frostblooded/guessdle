@@ -206,3 +206,16 @@ test.describe("before the start date", () => {
     await expect(victory(page)).toHaveCount(0);
   });
 });
+
+test("help button opens and closes the how-to-play popup", async ({ page }) => {
+  await openOnDay(page);
+  const dialog: Locator = page.locator("#help-dialog");
+  await expect(dialog).toBeHidden();
+  await page.locator("#help-button").click();
+  await expect(dialog).toBeVisible();
+  await expect(
+    dialog.locator(".correct, .partially-correct, .incorrect"),
+  ).toHaveCount(3);
+  await dialog.getByRole("button", { name: "CLOSE" }).click();
+  await expect(dialog).toBeHidden();
+});

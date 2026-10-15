@@ -110,6 +110,9 @@ function initButtons(): void {
   submitNewGuessButton.onclick = (): void => {
     handleSubmitSelection();
   };
+  document.querySelector<HTMLButtonElement>("#help-button")!.onclick =
+    (): void =>
+      document.querySelector<HTMLDialogElement>("#help-dialog")!.showModal();
 }
 
 function loadInitialUsedGuessesElements(): void {
