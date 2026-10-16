@@ -9,6 +9,12 @@ import {
 import { computeAnswerIdx, type GuessResult, submitGuess } from "./game.ts";
 import { createGameState, type GameState } from "./game-state.ts";
 import { GUESS_DATA, type Pet } from "./roster.ts";
+import {
+  nextThemeMode,
+  readThemeMode,
+  type ThemeMode,
+  writeThemeMode,
+} from "./theme.ts";
 import type {
   AutoCompleteItem,
   AutoCompleteResults,
@@ -104,7 +110,37 @@ function getAnswerIdx(): number {
   return cachedAnswerIdx;
 }
 
+const THEME_ICONS: Record<ThemeMode, string> = {
+  auto: "🖥",
+  light: "☀",
+  dark: "🌙",
+};
+
+function applyThemeMode(mode: ThemeMode): void {
+  if (mode === "auto") {
+    delete document.documentElement.dataset["theme"];
+  } else {
+    document.documentElement.dataset["theme"] = mode;
+  }
+  const button: HTMLButtonElement =
+    document.querySelector<HTMLButtonElement>("#theme-button")!;
+  button.textContent = THEME_ICONS[mode];
+  button.setAttribute("aria-label", `Theme: ${mode}. Click to change.`);
+}
+
+function initThemeButton(): void {
+  let mode: ThemeMode = readThemeMode(localStorage);
+  applyThemeMode(mode);
+  document.querySelector<HTMLButtonElement>("#theme-button")!.onclick =
+    (): void => {
+      mode = nextThemeMode(mode);
+      writeThemeMode(localStorage, mode);
+      applyThemeMode(mode);
+    };
+}
+
 function initButtons(): void {
+  initThemeButton();
   const submitNewGuessButton: HTMLButtonElement =
     document.querySelector<HTMLButtonElement>("#submit-new-guess-button")!;
   submitNewGuessButton.onclick = (): void => {

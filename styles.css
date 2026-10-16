@@ -1,8 +1,60 @@
+:root {
+  color-scheme: light;
+  --bg: #ffffff;
+  --text: #000000;
+  --surface: #ffffff;
+  --surface-text: #212121;
+  --title-bg: #2f4f4f;
+  --victory: #006400;
+  --correct: #1b7a1b;
+  --partial: #b35c00;
+  --incorrect: #c62828;
+  --accent: #c62828;
+  --border: #767676;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #121212;
+    --text: #e8e8e8;
+    --surface: #1e1e1e;
+    --surface-text: #e8e8e8;
+    --title-bg: #2b3a3a;
+    --victory: #6fdc6f;
+    --correct: #2e6b2e;
+    --partial: #8a5200;
+    --incorrect: #9b2c2c;
+    --accent: #ff8a8a;
+    --border: #8a8a8a;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #121212;
+  --text: #e8e8e8;
+  --surface: #1e1e1e;
+  --surface-text: #e8e8e8;
+  --title-bg: #2b3a3a;
+  --victory: #6fdc6f;
+  --correct: #2e6b2e;
+  --partial: #8a5200;
+  --incorrect: #9b2c2c;
+  --accent: #ff8a8a;
+  --border: #8a8a8a;
+}
+
 body {
   font-family: "Courier New", monospace;
+  background-color: var(--bg);
+  color: var(--text);
 }
 
 button {
+  background-color: var(--surface);
+  color: var(--surface-text);
+  border: 1px solid var(--border);
   border-radius: 7px;
   min-width: 70px;
   padding: 10px;
@@ -25,7 +77,7 @@ button {
   text-align: center;
   margin: 40px 0 40px 0;
   font-size: 4em;
-  color: green;
+  color: var(--victory);
 
   @media (max-width: 1000px) {
     font-size: 2em;
@@ -76,7 +128,7 @@ button {
 }
 
 .guess-result-title {
-  background-color: darkslategray;
+  background-color: var(--title-bg);
   padding: 10px 0 10px 0;
   font-size: 1.3em;
 
@@ -97,15 +149,15 @@ button {
   }
 
   &.correct {
-    background-color: green;
+    background-color: var(--correct);
   }
 
   &.partially-correct {
-    background-color: orange;
+    background-color: var(--partial);
   }
 
   &.incorrect {
-    background-color: red;
+    background-color: var(--incorrect);
   }
 }
 
@@ -124,6 +176,17 @@ button {
   }
 }
 
+#theme-button {
+  position: absolute;
+  top: 10px;
+  right: 60px;
+  min-width: 0;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
+}
+
 #help-button {
   position: absolute;
   top: 10px;
@@ -138,6 +201,8 @@ button {
 
 #help-dialog {
   max-width: 400px;
+  background-color: var(--surface);
+  color: var(--surface-text);
 
   .help-example {
     display: flex;
@@ -149,4 +214,29 @@ button {
       font-size: 1em;
     }
   }
+}
+
+/* Override autoComplete.css (loaded later); the body prefix wins on specificity */
+body .autoComplete_wrapper > input {
+  background-color: var(--surface);
+  color: var(--surface-text);
+  border-color: var(--accent);
+}
+
+body .autoComplete_wrapper > input::placeholder {
+  color: var(--surface-text);
+  opacity: 0.7;
+}
+
+body .autoComplete_wrapper > ul {
+  background-color: var(--surface);
+}
+
+body .autoComplete_wrapper > ul > li {
+  background-color: var(--surface);
+  color: var(--surface-text);
+}
+
+body .autoComplete_wrapper > ul > li mark {
+  color: var(--accent);
 }

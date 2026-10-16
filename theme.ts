@@ -1,0 +1,27 @@
+// Theme: the player's light/dark preference, remembered across days.
+
+export type ThemeMode = "auto" | "light" | "dark";
+
+export const THEME_STORAGE_KEY: string = "theme";
+
+const CYCLE: readonly ThemeMode[] = ["auto", "light", "dark"];
+
+// The part of the browser Storage that Theme uses
+export interface ThemeStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+}
+
+// Missing or unknown stored value reads as auto
+export function readThemeMode(storage: ThemeStorage): ThemeMode {
+  const raw: string | null = storage.getItem(THEME_STORAGE_KEY);
+  return CYCLE.find((mode: ThemeMode): boolean => mode === raw) ?? "auto";
+}
+
+export function writeThemeMode(storage: ThemeStorage, mode: ThemeMode): void {
+  storage.setItem(THEME_STORAGE_KEY, mode);
+}
+
+export function nextThemeMode(mode: ThemeMode): ThemeMode {
+  return CYCLE[(CYCLE.indexOf(mode) + 1) % CYCLE.length]!;
+}

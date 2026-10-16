@@ -1,0 +1,147 @@
+import { expect, test, type Locator, type Page } from "@playwright/test";
+
+const WCAG_AA = 4.5;
+
+// Contrast ratio of an element's text color on its own background color
+async function contrast(locator: Locator): Promise<number> {
+  return locator.evaluate((el: Element): number => {
+    const channels = (css: string): number[] =>
+      css
+        .match(/[\d.]+/g)!
+        .slice(0, 3)
+        .map(Number);
+    const luminance = ([r, g, b]: number[]): number => {
+      const [lr, lg, lb] = [r, g, b].map((v) => {
+        const c = v! / 255;
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * lr! + 0.7152 * lg! + 0.0722 * lb!;
+    };
+    const style = getComputedStyle(el);
+    const a = luminance(channels(style.color));
+    const b = luminance(channels(style.backgroundColor));
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  });
+}
+
+const background = (page: Page): Promise<string> =>
+  page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+
+const themeButton = (page: Page): Locator => page.locator("#theme-button");
+
+const LIGHT_BG = "rgb(255, 255, 255)";
+
+test.describe("dark OS preference, auto mode", () => {
+  test.use({ colorScheme: "dark" });
+
+  test("page is dark and everything is readable", async ({ page }) => {
+    await page.goto("/");
+    expect(await background(page)).not.toBe(LIGHT_BG);
+    await expect(themeButton(page)).toHaveAttribute(
+      "aria-label",
+      "Theme: auto. Click to change.",
+    );
+
+    await page.locator("#new-guess-input").fill("a");
+    const option = page.locator("[role=option]").first();
+    await expect(option).toBeVisible();
+
+    const checks: Record<string, Locator> = {
+      body: page.locator("body"),
+      input: page.locator("#new-guess-input"),
+      "autocomplete item": option,
+      "column title": page.locator(".guess-result-title").first(),
+      "correct cell": page.locator(".help-example .correct").first(),
+      "partial cell": page.locator(".help-example .partially-correct"),
+      "incorrect cell": page.locator(".help-example .incorrect"),
+      "submit button": page.locator("#submit-new-guess-button"),
+    };
+    for (const [name, locator] of Object.entries(checks)) {
+      expect(await contrast(locator), name).toBeGreaterThanOrEqual(WCAG_AA);
+    }
+  });
+
+  test("explicit light overrides the OS", async ({ page }) => {
+    await page.goto("/");
+    await themeButton(page).click();
+    await expect(themeButton(page)).toHaveAttribute(
+      "aria-label",
+      "Theme: light. Click to change.",
+    );
+    expect(await background(page)).toBe(LIGHT_BG);
+  });
+});
+
+test.describe("light OS preference", () => {
+  test.use({ colorScheme: "light" });
+
+  test("page is light and everything is readable", async ({ page }) => {
+    await page.goto("/");
+    expect(await background(page)).toBe(LIGHT_BG);
+    await page.locator("#new-guess-input").fill("a");
+    await expect(page.locator("[role=option]").first()).toBeVisible();
+    for (const selector of [
+      "body",
+      "#new-guess-input",
+      "[role=option]",
+      ".guess-result-title",
+      ".help-example .correct",
+      ".help-example .partially-correct",
+      ".help-example .incorrect",
+    ]) {
+      expect(
+        await contrast(page.locator(selector).first()),
+        selector,
+      ).toBeGreaterThanOrEqual(WCAG_AA);
+    }
+  });
+
+  test("button cycles auto, light, dark, auto", async ({ page }) => {
+    await page.goto("/");
+    const modes: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      modes.push(
+        (await themeButton(page).getAttribute("aria-label"))!.split(".")[0]!,
+      );
+      await themeButton(page).click();
+    }
+    expect(modes).toEqual([
+      "Theme: auto",
+      "Theme: light",
+      "Theme: dark",
+      "Theme: auto",
+    ]);
+  });
+
+  test("stored dark applies before the bundle runs and survives reload", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await themeButton(page).click();
+    await themeButton(page).click();
+    expect(await background(page)).not.toBe(LIGHT_BG);
+    await page.reload();
+    expect(await background(page)).not.toBe(LIGHT_BG);
+    await expect(themeButton(page)).toHaveAttribute(
+      "aria-label",
+      "Theme: dark. Click to change.",
+    );
+  });
+
+  test("inline script sets data-theme without the bundle", async ({ page }) => {
+    await page.route("**/dist/script.js", (route) => route.abort());
+    await page.addInitScript(() => localStorage.setItem("theme", "dark"));
+    await page.goto("/");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  });
+
+  test("garbage stored value falls back to auto", async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem("theme", "purple"));
+    await page.goto("/");
+    await expect(page.locator("html")).not.toHaveAttribute("data-theme");
+    await expect(themeButton(page)).toHaveAttribute(
+      "aria-label",
+      "Theme: auto. Click to change.",
+    );
+  });
+});
