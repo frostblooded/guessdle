@@ -52,8 +52,8 @@ test.describe("dark OS preference, auto mode", () => {
       "autocomplete item": option,
       "column title": page.locator(".guess-result-title").first(),
       "correct cell": page.locator(".help-example .correct").first(),
-      "partial cell": page.locator(".help-example .partially-correct"),
-      "incorrect cell": page.locator(".help-example .incorrect"),
+      "partial cell": page.locator(".help-example .partially-correct").first(),
+      "incorrect cell": page.locator(".help-example .incorrect").first(),
       "submit button": page.locator("#submit-new-guess-button"),
     };
     for (const [name, locator] of Object.entries(checks)) {

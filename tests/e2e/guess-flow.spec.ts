@@ -215,7 +215,39 @@ test("help button opens and closes the how-to-play popup", async ({ page }) => {
   await expect(dialog).toBeVisible();
   await expect(
     dialog.locator(".correct, .partially-correct, .incorrect"),
-  ).toHaveCount(3);
+  ).toHaveCount(6);
   await dialog.getByRole("button", { name: "CLOSE" }).click();
   await expect(dialog).toBeHidden();
+});
+
+test("help popup examples use real roster pets and fit a phone screen", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  await openOnDay(page);
+  await page.locator("#help-button").click();
+  const dialog: Locator = page.locator("#help-dialog");
+
+  const shown: string[] = await dialog
+    .locator(".help-example .guess-result-cell:nth-child(2)")
+    .allTextContents();
+  for (const name of [...shown, "Eddie"]) {
+    expect(names, name).toContain(name);
+  }
+  const photos: Locator = dialog.locator(".help-example img");
+  await expect(photos).toHaveCount(2);
+  for (const img of await photos.all()) {
+    await expect(img).toBeVisible();
+    expect(
+      await img.evaluate((el: HTMLImageElement) => el.naturalWidth),
+    ).toBeGreaterThan(0);
+  }
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  const box = (await dialog.boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(375);
 });

@@ -200,12 +200,14 @@ button {
 }
 
 #help-dialog {
-  max-width: 400px;
+  box-sizing: border-box;
+  max-width: min(400px, calc(100% - 2em));
   background-color: var(--surface);
   color: var(--surface-text);
 
   .help-example {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr repeat(3, 2fr);
     gap: 5px;
     margin: 0;
 
