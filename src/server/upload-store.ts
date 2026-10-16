@@ -39,17 +39,26 @@ const unlinkQuiet = (path: string): Promise<void> =>
     }
   });
 
-// Deletes the file and frees its quota; a URL that is not one of ours is ignored
+// Deletes the file and frees its quota unless a cover or entry photo still uses it
+// (a URL that is not one of ours is ignored)
 export async function removeUpload(
   pool: pg.Pool,
   dir: string,
   url: string | null | undefined,
 ): Promise<void> {
   const name = URL_RE.exec(url ?? "")?.[1];
-  if (name) {
+  if (name && !(await isReferenced(pool, url!))) {
     await unlinkQuiet(join(dir, name));
     await pool.query("delete from uploads where name = $1", [name]);
   }
+}
+
+async function isReferenced(pool: pg.Pool, url: string): Promise<boolean> {
+  const { rowCount } = await pool.query(
+    "select 1 from games where cover_url = $1 union all select 1 from entries where photo_url = $1",
+    [url],
+  );
+  return rowCount! > 0;
 }
 
 // URLs still used by content: game covers and entry photos (soft-deleted entries stay, they can be restored)
@@ -88,15 +97,20 @@ export async function sweepUploads(
   return removed;
 }
 
-// True when the URL is a file this pipeline stored (a user may only attach those)
+// True when the URL is a file this pipeline stored for one of `owners` (a user may only attach their own)
 export async function isStoredUpload(
   pool: pg.Pool,
   url: string,
+  owners: readonly (number | null)[],
 ): Promise<boolean> {
   const name = URL_RE.exec(url)?.[1];
   return (
     name !== undefined &&
-    (await pool.query("select 1 from uploads where name = $1", [name]))
-      .rowCount === 1
+    (
+      await pool.query(
+        "select 1 from uploads where name = $1 and user_id = any($2)",
+        [name, owners.filter((o) => o !== null)],
+      )
+    ).rowCount === 1
   );
 }

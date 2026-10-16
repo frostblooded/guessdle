@@ -104,6 +104,20 @@ describe("upload hygiene", () => {
     assert.equal((await readdir(dir)).length, 2);
   });
 
+  it("refuses a full user before decoding the body", async () => {
+    const cookie = await login("full@x.test");
+    await upload(cookie);
+    await upload(cookie);
+    await db.pool.query("update uploads set bytes = $1", [uploadQuotaBytes]);
+    // Garbage would be a 422 if it reached the image decoder
+    const res = await fetch(`${url}/api/uploads?kind=photo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream", Cookie: cookie },
+      body: new Uint8Array([1, 2, 3]),
+    });
+    assert.equal(res.status, 403);
+  });
+
   it("counts quota per user", async () => {
     const a = await login("qa@x.test");
     const b = await login("qb@x.test");

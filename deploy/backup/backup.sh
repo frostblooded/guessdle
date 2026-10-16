@@ -17,18 +17,23 @@ backup_uploads() {
 }
 
 if err=$(pg_dump -Fc -f "$dir/daily/$name.part" 2>&1) && mv "$dir/daily/$name.part" "$dir/daily/$name"; then
-  # A failed image copy is a failed backup: record it, keep the good dump
-  if ! err=$(backup_uploads 2>&1); then
+  # A failed image copy is a failed backup, but the dump's weekly copy and prune still run
+  uploads_err=
+  if ! uploads_err=$(backup_uploads 2>&1); then
     rm -f "$dir/uploads/petdle-$today.tar.part"
-    "$here/status.sh" lastDump fail "$name" "uploads: $err"
-    echo "backup: FAILED uploads $name: $err" >&2
-    exit 1
+    [ -n "$uploads_err" ] || uploads_err="tar failed"
+  else
+    "$here/prune.sh" "$dir/uploads" 14 tar
   fi
-  "$here/prune.sh" "$dir/uploads" 14 tar
   # Weekly = the Sunday dump
   [ "$(date -u -d "$today" +%u)" = 7 ] && cp "$dir/daily/$name" "$dir/weekly/$name"
   "$here/prune.sh" "$dir/daily" 14
   "$here/prune.sh" "$dir/weekly" 8
+  if [ -n "$uploads_err" ]; then
+    "$here/status.sh" lastDump fail "$name" "uploads: $uploads_err"
+    echo "backup: FAILED uploads $name: $uploads_err" >&2
+    exit 1
+  fi
   "$here/status.sh" lastDump ok "$name"
   echo "backup: ok $name"
 else

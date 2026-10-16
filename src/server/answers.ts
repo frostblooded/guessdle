@@ -282,8 +282,9 @@ export function clearOverride(
   });
 }
 
-// After an entry is soft-deleted: future overrides pointing at it are cleared and every
-// stored day from there on that pointed at it is re-drawn over the `ids` that remain.
+// After an entry is soft-deleted: overrides after today pointing at it are cleared and every
+// stored day after today that pointed at it is re-drawn over the `ids` that remain.
+// Today and the past keep their answer (players saw it; the soft-deleted row still resolves).
 export function releaseEntry(
   pool: pg.Pool,
   game: GameRow,
@@ -295,7 +296,7 @@ export function releaseEntry(
   return locked(pool, game, async (client) => {
     const cleared = await client.query<{ day: string }>(
       `update daily_answers set source = 'generated'
-       where game_id = $1 and entry_id = $2 and day >= $3 and source = 'override'
+       where game_id = $1 and entry_id = $2 and day > $3 and source = 'override'
        returning to_char(day, 'YYYY-MM-DD') as day`,
       [game.id, entryId, today],
     );

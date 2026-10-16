@@ -156,6 +156,7 @@ export async function parseEntryInput(
   pool: pg.Pool,
   body: Record<string, unknown>,
   current: string,
+  owners: readonly (number | null)[],
 ): Promise<EntryInput | undefined> {
   const { name, photo, values } = body;
   const out: EntryInput = {};
@@ -174,7 +175,7 @@ export async function parseEntryInput(
       typeof photo !== "string" ||
       (photo !== "" &&
         photo !== current &&
-        !(await isStoredUpload(pool, photo)))
+        !(await isStoredUpload(pool, photo, owners)))
     ) {
       return undefined;
     }

@@ -238,6 +238,36 @@ describe("game entries", () => {
     assert.equal((await request("DELETE", `${E}/${a}`, ann)).status, 404);
   });
 
+  it("soft delete keeps today's answer (override or generated) as players saw it", async () => {
+    for (const n of ["A", "B", "C"]) {
+      await add({ name: n });
+    }
+    const a = (await one("A")).id;
+    const game = (
+      await db.pool.query("select id from games where slug = 'ann-game'")
+    ).rows[0].id;
+    await db.pool.query(
+      `insert into daily_answers (game_id, day, entry_id, source) values
+         ($1, '2026-10-16', $2, 'override'),
+         ($1, '2026-10-17', $2, 'generated')`,
+      [game, a],
+    );
+    await request("DELETE", `${E}/${a}`, ann);
+    const rows = (
+      await db.pool.query(
+        `select to_char(day, 'YYYY-MM-DD') as day, entry_id::int, source
+         from daily_answers where game_id = $1 order by day`,
+        [game],
+      )
+    ).rows;
+    assert.deepEqual(rows[0], {
+      day: "2026-10-16",
+      entry_id: a,
+      source: "override",
+    });
+    assert.notEqual(rows[1]!.entry_id, a);
+  });
+
   it("dropping below two active entries makes the game a 404 for players", async () => {
     await add({ name: "A" });
     await add({ name: "B" });

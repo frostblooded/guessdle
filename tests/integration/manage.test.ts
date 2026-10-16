@@ -336,6 +336,45 @@ describe("creating and editing a game", () => {
       assert.equal(existsSync(join(uploads, cover.slice(9))), true);
     });
 
+    it("refuses another user's upload as a cover or an entry photo", async () => {
+      await login("bob@example.test");
+      const theirs = await upload("bob@example.test");
+      const cover = await patch(ann, { coverUrl: theirs });
+      assert.deepEqual([cover.status, cover.body.error], [400, "invalid"]);
+      const photo = await request("POST", "/api/games/ann-game/entries", ann, {
+        name: "Rex",
+        photo: theirs,
+      });
+      assert.equal(photo.status, 400);
+      assert.equal(existsSync(join(uploads, theirs.slice(9))), true);
+    });
+
+    it("lets an admin attach the game owner's or their own upload, not a third party's", async () => {
+      await login("bob@example.test");
+      const owners = await upload("ann@example.test");
+      const admins = await upload("root@example.test");
+      const third = await upload("bob@example.test");
+      assert.equal((await patch(root, { coverUrl: owners })).status, 200);
+      assert.equal((await patch(root, { coverUrl: admins })).status, 200);
+      assert.equal((await patch(root, { coverUrl: third })).status, 400);
+    });
+
+    it("keeps a file that another cover or photo still uses", async () => {
+      const shared = await upload("ann@example.test");
+      await patch(ann, { coverUrl: shared });
+      await request("POST", "/api/games/ann-game/entries", ann, {
+        name: "Rex",
+        photo: shared,
+      });
+      assert.equal((await patch(ann, { coverUrl: "" })).status, 200);
+      assert.equal(existsSync(join(uploads, shared.slice(9))), true);
+      const left = await db.pool.query(
+        "select 1 from uploads where name = $1",
+        [shared.slice(9)],
+      );
+      assert.equal(left.rowCount, 1);
+    });
+
     it("an edit of text or image sends approved and rejected games to pending", async () => {
       await setStatus("ann-game", "approved");
       await patch(ann, { skipPeriod: 1 });

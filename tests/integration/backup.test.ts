@@ -156,6 +156,9 @@ describe("backup sidecar scripts (real Postgres, real sidecar image)", () => {
     assert.equal(status()["lastDump"]?.["ok"], false);
     assert.match(String(status()["lastDump"]?.["error"]), /uploads/);
     assert.ok(!ls("uploads").some((n) => n.includes("2026-02-01")));
+    // 2026-02-01 is a Sunday: the good dump still gets its weekly copy
+    assert.ok(ls("daily").includes("petdle-2026-02-01.dump"));
+    assert.ok(ls("weekly").includes("petdle-2026-02-01.dump"));
     run("rm -f /tmp/up/bad.webp");
   });
 

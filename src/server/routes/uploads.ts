@@ -45,10 +45,28 @@ export function uploadRoutes(
       next(err);
     }
   };
+  // A user already at the cap is refused before the body is read or re-encoded
+  const quotaFull = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const user = (await requestUser(pool, req, now()))!;
+      if ((await usedBytes(pool, user.id)) >= quotaBytes) {
+        res.status(403).json({ error: "quota_exceeded" });
+      } else {
+        next();
+      }
+    } catch (err) {
+      next(err);
+    }
+  };
   app.post(
     "/api/uploads",
     needUser,
     rateLimit(pool, now, limit),
+    quotaFull,
     express.raw({ type: "application/octet-stream", limit: MAX_UPLOAD_BYTES }),
     // A body over the cap fails in the parser; name it for the client
     (err: unknown, _req: Request, res: Response, next: NextFunction): void => {
@@ -73,6 +91,7 @@ export function uploadRoutes(
         );
         // needUser ran, so the session lookup is cached and non-null
         const user = (await requestUser(pool, req, now()))!;
+        // The exact check: the pre-check above only stops users already full
         if ((await usedBytes(pool, user.id)) + webp.length > quotaBytes) {
           res.status(403).json({ error: "quota_exceeded" });
           return;

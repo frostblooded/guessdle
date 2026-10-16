@@ -23,9 +23,9 @@ export function shellRoutes(
   { pool, now }: AppContext,
   shellDir: string,
 ): void {
-  // The slug is not a path here (the shell is read from a fixed file)
+  // The slug is not a path here (the shell is read from a fixed file). Express has already decoded it once; decoding again threw on e.g. /g/%25zz
   app.get(/^\/g\/([^/]+)$/, async (req: Request, res) => {
-    const slug = decodeURIComponent(String(paramOf(req, "0")));
+    const slug = String(paramOf(req, "0"));
     const game = await findGame(pool, slug);
     const roster = game && (await loadRoster(pool, game));
     const user =

@@ -155,6 +155,14 @@ describe("game shell with link-preview meta", () => {
     assert.equal((await page(`/g/${SLUG}`)).status, 404);
   });
 
+  it("answers 404 for an encoded percent sign in the slug (no double decode)", async () => {
+    for (const path of ["/g/%25zz", "/g/%25", "/g/%25E0%25A4%25A"]) {
+      const { status, html } = await page(path);
+      assert.equal(status, 404, path);
+      assert.match(html, /Game not found/);
+    }
+  });
+
   it("serves a draft to its owner and an admin as noindex, not to a stranger", async () => {
     const owner = await login("owner@example.com");
     await makeGame("draft", 0, {}, "owner@example.com");

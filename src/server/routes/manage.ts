@@ -46,6 +46,12 @@ export const DEFAULT_WRITE_LIMIT: RateLimit = { max: 60, windowMs: 60_000 };
 const MAX_NAME = 60;
 const MAX_DESCRIPTION = 500;
 
+// A non-empty string of at most max chars once trimmed; undefined otherwise
+const nameIn = (v: unknown, max: number): string | undefined =>
+  typeof v === "string" && v.trim() !== "" && v.trim().length <= max
+    ? v.trim()
+    : undefined;
+
 const invalid = (res: Response, error = "invalid", status = 400): void => {
   res.status(status).json({ error });
 };
@@ -125,15 +131,11 @@ export function manageRoutes(
       return;
     }
     const { name, slug } = bodyOf(req);
-    if (
-      typeof name !== "string" ||
-      name.trim() === "" ||
-      name.trim().length > MAX_NAME
-    ) {
+    const title = nameIn(name, MAX_NAME);
+    if (title === undefined) {
       invalid(res);
       return;
     }
-    const title = name.trim();
     if (slug !== undefined) {
       const error = typeof slug === "string" ? slugError(slug) : "invalid";
       if (error) {
@@ -174,11 +176,7 @@ export function manageRoutes(
   const typeOf = (v: unknown): AttributeType | undefined =>
     v === "text" || v === "list" ? v : undefined;
   const nameOf = (v: unknown): string | undefined =>
-    typeof v === "string" &&
-    v.trim() !== "" &&
-    v.trim().length <= MAX_ATTRIBUTE_NAME
-      ? v.trim()
-      : undefined;
+    nameIn(v, MAX_ATTRIBUTE_NAME);
   const idOf = (req: Request): number => {
     const raw = String(req.params["id"]);
     return /^\d{1,15}$/.test(raw) ? Number(raw) : -1;
@@ -247,7 +245,7 @@ export function manageRoutes(
     not_found: [404, "not_found"],
   } as const;
   // Creates (no :id) or changes an entry, then answers with the entry list
-  const entryRoute = manageRoute(async ({ game }, _user, req, res) => {
+  const entryRoute = manageRoute(async ({ game }, user, req, res) => {
     const raw = req.params["id"];
     const id = raw === undefined ? undefined : idOf(req);
     const current =
@@ -258,6 +256,7 @@ export function manageRoutes(
       pool,
       bodyOf(req),
       current?.photo ?? "",
+      [user.id, game.ownerId],
     );
     if (!input || (id === undefined && !input.name)) {
       invalid(res);
@@ -344,7 +343,7 @@ export function manageRoutes(
     "/api/games/:slug",
     writes,
     json,
-    manageRoute(async (loaded, _user, req, res) => {
+    manageRoute(async (loaded, user, req, res) => {
       const { game, roster } = loaded;
       const body = bodyOf(req);
       if (body["slug"] !== undefined && body["slug"] !== game.slug) {
@@ -354,15 +353,12 @@ export function manageRoutes(
       const patch: GamePatch = {};
       const { name, description, skipPeriod, coverUrl } = body;
       if (name !== undefined) {
-        if (
-          typeof name !== "string" ||
-          name.trim() === "" ||
-          name.trim().length > MAX_NAME
-        ) {
+        const title = nameIn(name, MAX_NAME);
+        if (title === undefined) {
           invalid(res);
           return;
         }
-        patch.name = name.trim();
+        patch.name = title;
       }
       if (description !== undefined) {
         if (
@@ -394,7 +390,7 @@ export function manageRoutes(
           typeof coverUrl !== "string" ||
           (coverUrl !== "" &&
             coverUrl !== game.coverUrl &&
-            !(await isStoredUpload(pool, coverUrl)))
+            !(await isStoredUpload(pool, coverUrl, [user.id, game.ownerId])))
         ) {
           invalid(res);
           return;
