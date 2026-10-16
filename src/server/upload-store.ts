@@ -1,12 +1,7 @@
-// Upload bookkeeping (spec #66): per-user byte quota, delete on replace/remove, nightly sweep.
-import { readdir, stat, unlink } from "node:fs/promises";
-import { join } from "node:path";
+// Upload quota rows (spec #66); references, deletion and the sweep live in upload-refs.ts.
 import type pg from "pg";
 
 export const DEFAULT_UPLOAD_QUOTA_BYTES = 200 * 1024 * 1024;
-// Unreferenced files younger than this may belong to an editor session in progress
-export const SWEEP_GRACE_MS = 24 * 3600 * 1000;
-const URL_RE = /^\/uploads\/([0-9a-f]{32}\.webp)$/;
 
 export async function usedBytes(
   pool: pg.Pool,
@@ -29,88 +24,5 @@ export async function recordUpload(
   await pool.query(
     "insert into uploads (name, user_id, bytes, created_at) values ($1, $2, $3, $4)",
     [url.slice("/uploads/".length), userId, bytes, now],
-  );
-}
-
-const unlinkQuiet = (path: string): Promise<void> =>
-  unlink(path).catch((e: NodeJS.ErrnoException) => {
-    if (e.code !== "ENOENT") {
-      throw e;
-    }
-  });
-
-// Deletes the file and frees its quota unless a cover or entry photo still uses it
-// (a URL that is not one of ours is ignored)
-export async function removeUpload(
-  pool: pg.Pool,
-  dir: string,
-  url: string | null | undefined,
-): Promise<void> {
-  const name = URL_RE.exec(url ?? "")?.[1];
-  if (name && !(await isReferenced(pool, url!))) {
-    await unlinkQuiet(join(dir, name));
-    await pool.query("delete from uploads where name = $1", [name]);
-  }
-}
-
-async function isReferenced(pool: pg.Pool, url: string): Promise<boolean> {
-  const { rowCount } = await pool.query(
-    "select 1 from games where cover_url = $1 union all select 1 from entries where photo_url = $1",
-    [url],
-  );
-  return rowCount! > 0;
-}
-
-// URLs still used by content: game covers and entry photos (soft-deleted entries stay, they can be restored)
-async function referencedUrls(pool: pg.Pool): Promise<Set<string>> {
-  const { rows } = await pool.query<{ url: string }>(
-    "select cover_url as url from games union select photo_url from entries",
-  );
-  return new Set(rows.map((r) => r.url));
-}
-
-// Deletes unreferenced files older than the grace period, and quota rows whose file is gone.
-// Returns the file names removed.
-export async function sweepUploads(
-  pool: pg.Pool,
-  dir: string,
-  now: Date,
-): Promise<string[]> {
-  const keep = await referencedUrls(pool);
-  const names = await readdir(dir).catch(() => [] as string[]);
-  const removed: string[] = [];
-  for (const name of names) {
-    const url = `/uploads/${name}`;
-    if (!URL_RE.test(url) || keep.has(url)) {
-      continue;
-    }
-    const { mtimeMs } = await stat(join(dir, name));
-    if (now.getTime() - mtimeMs >= SWEEP_GRACE_MS) {
-      await removeUpload(pool, dir, url);
-      removed.push(name);
-    }
-  }
-  await pool.query(
-    "delete from uploads where created_at < $1 and not (name = any($2))",
-    [new Date(now.getTime() - SWEEP_GRACE_MS), names],
-  );
-  return removed;
-}
-
-// True when the URL is a file this pipeline stored for one of `owners` (a user may only attach their own)
-export async function isStoredUpload(
-  pool: pg.Pool,
-  url: string,
-  owners: readonly (number | null)[],
-): Promise<boolean> {
-  const name = URL_RE.exec(url)?.[1];
-  return (
-    name !== undefined &&
-    (
-      await pool.query(
-        "select 1 from uploads where name = $1 and user_id = any($2)",
-        [name, owners.filter((o) => o !== null)],
-      )
-    ).rowCount === 1
   );
 }

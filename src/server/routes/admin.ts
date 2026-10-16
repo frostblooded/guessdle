@@ -1,16 +1,11 @@
 // Admin-only backup status and user management (spec #38).
 import express from "express";
 import type { Express, Request, Response } from "express";
-import {
-  deleteGame,
-  listAllGames,
-  listQueue,
-  MAX_REASON,
-} from "../approval.ts";
+import { listAllGames, listQueue, MAX_REASON } from "../approval.ts";
 import { gameLifecycle, type MoveResult } from "../lifecycle.ts";
 import { readBackupStatus } from "../backup.ts";
 import { findGame, type GameRow } from "../games.ts";
-import { removeUpload } from "../upload-store.ts";
+import { uploadRefs } from "../upload-refs.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
 import { deleteUser, listUsers, setAdmin } from "../users.ts";
 import { bodyOf, paramOf, queryOf, type AppContext } from "./context.ts";
@@ -30,6 +25,7 @@ export function adminRoutes(
   uploadsDir: string,
 ): void {
   const { pool, now } = ctx;
+  const refs = uploadRefs(pool, uploadsDir);
   const adminRoute =
     (handler: (admin: AdminCtx) => Promise<void>) =>
     async (req: Request, res: Response): Promise<void> => {
@@ -110,9 +106,7 @@ export function adminRoutes(
   app.delete(
     "/api/admin/games/:slug",
     gameRoute(async (game) => {
-      for (const url of await deleteGame(pool, game)) {
-        await removeUpload(pool, uploadsDir, url);
-      }
+      await refs.dropGame(game);
       return "ok";
     }),
   );
@@ -124,15 +118,12 @@ export function adminRoutes(
         res.status(400).json({ error: "invalid" });
         return;
       }
-      const { result, urls } = await deleteUser(pool, actor.id, Number(id));
+      const result = await deleteUser(refs, actor.id, Number(id));
       if (result !== "ok") {
         res
           .status(result === "self" ? 409 : 404)
           .json({ error: result === "self" ? "self_deletion" : result });
         return;
-      }
-      for (const url of urls) {
-        await removeUpload(pool, uploadsDir, url);
       }
       res.json({ ok: true });
     }),

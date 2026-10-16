@@ -10,10 +10,10 @@ import {
   storeWebp,
 } from "../images.ts";
 import { rateLimit, type RateLimit } from "../rate-limit.ts";
+import { uploadRefs } from "../upload-refs.ts";
 import {
   DEFAULT_UPLOAD_QUOTA_BYTES,
   recordUpload,
-  removeUpload,
   usedBytes,
 } from "../upload-store.ts";
 import { queryOf, type AppContext } from "./context.ts";
@@ -100,7 +100,7 @@ export function uploadRoutes(
         try {
           await recordUpload(pool, user.id, url, webp.length, now());
         } catch (err) {
-          await removeUpload(pool, uploadsDir, url);
+          await uploadRefs(pool, uploadsDir).release([url]);
           throw err;
         }
         res.json({ url });

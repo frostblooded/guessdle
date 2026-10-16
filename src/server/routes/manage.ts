@@ -2,7 +2,6 @@
 import express from "express";
 import type { Express, Request, Response } from "express";
 import { slugBase, slugError } from "../../game/slug.ts";
-import { deleteGame } from "../approval.ts";
 import { gameLifecycle, type Move } from "../lifecycle.ts";
 import {
   MAX_NAME,
@@ -24,10 +23,9 @@ import {
   skipOf,
   updateGame,
   type AttributeEdit,
-  type GameRow,
 } from "../games.ts";
 import { rateLimit, type RateLimit } from "../rate-limit.ts";
-import { isStoredUpload, removeUpload } from "../upload-store.ts";
+import { uploadRefs } from "../upload-refs.ts";
 import {
   bodyOf,
   canManage,
@@ -55,16 +53,7 @@ export function manageRoutes(
   const bigJson = express.json({ limit: "64kb" });
   const writes = rateLimit(pool, now, limit);
   const lifecycle = gameLifecycle(pool, ctx.mail);
-  // A cover or photo is the caller's own upload or the one already set
-  const uploadOk = async (
-    url: string,
-    current: string,
-    user: SessionUser,
-    game: GameRow,
-  ): Promise<boolean> =>
-    url === "" ||
-    url === current ||
-    (await isStoredUpload(pool, url, [user.id, game.ownerId]));
+  const refs = uploadRefs(pool, uploadsDir);
 
   const needUser = async (
     req: Request,
@@ -251,7 +240,12 @@ export function manageRoutes(
       !input ||
       (id === undefined && !input.name) ||
       (input.photo !== undefined &&
-        !(await uploadOk(input.photo, current?.photo ?? "", user, game)))
+        !(await refs.mayAttach(
+          input.photo,
+          current?.photo ?? "",
+          user.id,
+          game.ownerId,
+        )))
     ) {
       invalid(res);
       return;
@@ -266,7 +260,7 @@ export function manageRoutes(
       invalid(res, ENTRY_FAILURES[out][1], ENTRY_FAILURES[out][0]);
       return;
     }
-    await removeUpload(pool, uploadsDir, out.replacedPhoto);
+    await refs.release([out.replacedPhoto]);
     res.json(await listEntries(pool, game));
   });
   app.get(
@@ -325,9 +319,7 @@ export function manageRoutes(
     "/api/games/:slug",
     writes,
     manageRoute(async ({ game }, _user, _req, res) => {
-      for (const url of await deleteGame(pool, game)) {
-        await removeUpload(pool, uploadsDir, url);
-      }
+      await refs.dropGame(game);
       res.json({ ok: true });
     }),
   );
@@ -350,7 +342,12 @@ export function manageRoutes(
       if (
         !patch ||
         (patch.coverUrl !== undefined &&
-          !(await uploadOk(patch.coverUrl, game.coverUrl, user, game)))
+          !(await refs.mayAttach(
+            patch.coverUrl,
+            game.coverUrl,
+            user.id,
+            game.ownerId,
+          )))
       ) {
         invalid(res);
         return;
@@ -370,7 +367,7 @@ export function manageRoutes(
           ctx.random,
         );
       }
-      await removeUpload(pool, uploadsDir, replaced);
+      await refs.release([replaced]);
       const fresh = await loadGame(ctx, req, res);
       if (fresh) {
         res.json(detailsOf(fresh));

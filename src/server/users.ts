@@ -1,5 +1,6 @@
 // Admin user management: list users, promote and demote with lock-out guards.
 import type pg from "pg";
+import type { UploadRefs } from "./upload-refs.ts";
 
 export interface AdminUser {
   id: number;
@@ -66,26 +67,14 @@ export async function setAdmin(
   }
 }
 
-// Deletes the user (their games, state and upload rows cascade). Returns the upload URLs to unlink:
-// every file they own plus the covers and photos of their games.
+// Deletes the user (their games, state and uploads go with them, see upload-refs.ts)
 export async function deleteUser(
-  pool: pg.Pool,
+  refs: UploadRefs,
   actorId: number,
   targetId: number,
-): Promise<{ result: "ok" | "not_found" | "self"; urls: string[] }> {
+): Promise<"ok" | "not_found" | "self"> {
   if (actorId === targetId) {
-    return { result: "self", urls: [] };
+    return "self";
   }
-  const { rows } = await pool.query<{ url: string }>(
-    `select '/uploads/' || name as url from uploads where user_id = $1
-     union select cover_url from games where owner_id = $1
-     union select e.photo_url from entries e join games g on g.id = e.game_id where g.owner_id = $1`,
-    [targetId],
-  );
-  const { rowCount } = await pool.query("delete from users where id = $1", [
-    targetId,
-  ]);
-  return rowCount === 1
-    ? { result: "ok", urls: rows.map((r) => r.url) }
-    : { result: "not_found", urls: [] };
+  return (await refs.dropUser(targetId)) ? "ok" : "not_found";
 }

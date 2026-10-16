@@ -1,6 +1,5 @@
-// The admin queue, game list and game delete (spec #66); status moves live in lifecycle.ts.
+// The admin queue, game list (spec #66); status moves live in lifecycle.ts.
 import type pg from "pg";
-import type { GameRow } from "./games.ts";
 
 type Q = Pick<pg.Pool, "query">;
 export const MAX_REASON = 500;
@@ -56,14 +55,4 @@ export async function listAllGames(
     [search],
   );
   return rows;
-}
-
-// Deletes the game (everything under it cascades); returns the upload URLs the caller should remove
-export async function deleteGame(q: Q, game: GameRow): Promise<string[]> {
-  const { rows } = await q.query<{ url: string }>(
-    "select photo_url as url from entries where game_id = $1 and photo_url <> ''",
-    [game.id],
-  );
-  await q.query("delete from games where id = $1", [game.id]);
-  return [...rows.map((r) => r.url), ...(game.coverUrl ? [game.coverUrl] : [])];
 }

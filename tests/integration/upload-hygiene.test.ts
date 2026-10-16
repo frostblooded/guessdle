@@ -9,11 +9,8 @@ import sharp from "sharp";
 import { createApp } from "../../src/server/app.ts";
 import { MIGRATIONS_DIR } from "../../src/server/main.ts";
 import { migrate } from "../../src/server/migrate.ts";
-import {
-  removeUpload,
-  sweepUploads,
-  usedBytes,
-} from "../../src/server/upload-store.ts";
+import { uploadRefs } from "../../src/server/upload-refs.ts";
+import { usedBytes } from "../../src/server/upload-store.ts";
 import { startDb } from "./postgres.ts";
 import type { TestDb } from "./postgres.ts";
 
@@ -130,7 +127,7 @@ describe("upload hygiene", () => {
     const cookie = await login("free@x.test");
     const first = await upload(cookie);
     await upload(cookie);
-    await removeUpload(db.pool, dir, first.body.url);
+    await uploadRefs(db.pool, dir).release([first.body.url]);
     assert.equal((await readdir(dir)).length, 1);
     assert.equal(
       await usedBytes(db.pool, await userId("free@x.test")),
@@ -141,9 +138,11 @@ describe("upload hygiene", () => {
 
   it("removing a missing file or a foreign URL is harmless", async () => {
     const gone = `/uploads/${"a".repeat(32)}.webp`;
-    await removeUpload(db.pool, dir, gone);
-    await removeUpload(db.pool, dir, "/uploads/../../etc/passwd");
-    await removeUpload(db.pool, dir, null);
+    await uploadRefs(db.pool, dir).release([
+      gone,
+      "/uploads/../../etc/passwd",
+      null,
+    ]);
   });
 
   it("rate limits uploads per user with 429 and a Retry-After", async () => {
@@ -166,7 +165,7 @@ describe("upload hygiene", () => {
     const now = new Date();
     const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 3600_000);
     await utimes(join(dir, old.slice(9)), twoDaysAgo, twoDaysAgo);
-    const removed = await sweepUploads(db.pool, dir, now);
+    const removed = await uploadRefs(db.pool, dir).sweep(now);
     assert.deepEqual(removed, [old.slice(9)]);
     assert.deepEqual(await readdir(dir), [fresh.slice(9)]);
     assert.equal(
@@ -194,7 +193,7 @@ describe("upload hygiene", () => {
     for (const u of [cover, photo, orphan]) {
       await utimes(join(dir, u.slice(9)), old, old);
     }
-    assert.deepEqual(await sweepUploads(db.pool, dir, new Date()), [
+    assert.deepEqual(await uploadRefs(db.pool, dir).sweep(new Date()), [
       orphan.slice(9),
     ]);
     assert.deepEqual(
@@ -215,7 +214,7 @@ describe("upload hygiene", () => {
     await writeFile(stray, "x");
     const old = new Date(Date.now() - 3 * 24 * 3600_000);
     await utimes(stray, old, old);
-    assert.deepEqual(await sweepUploads(db.pool, dir, new Date()), []);
+    assert.deepEqual(await uploadRefs(db.pool, dir).sweep(new Date()), []);
     assert.deepEqual(await readdir(dir), ["notes.txt"]);
     assert.equal(await usedBytes(db.pool, await userId("vanish@x.test")), 0);
   });
