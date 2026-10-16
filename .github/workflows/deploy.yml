@@ -2,7 +2,7 @@ name: Build and deploy
 
 on:
   push:
-    branches: [master]
+    branches: [master, staging]
   pull_request:
   workflow_dispatch:
 
@@ -93,3 +93,15 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  deploy-home:
+    needs: [build, unit, e2e]
+    if: github.ref == 'refs/heads/staging' && github.event_name != 'pull_request'
+    runs-on: [self-hosted, home]
+    concurrency:
+      group: deploy-home
+      cancel-in-progress: false
+    steps:
+      # Runs in the server's existing clone, not the runner workspace: start.sh does git pull --ff-only.
+      - run: ./start.sh
+        working-directory: ${{ vars.DEPLOY_DIR }}
