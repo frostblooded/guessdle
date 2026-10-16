@@ -57,7 +57,7 @@ Warning: changing `GUESS_DATA` (order or length), `START_DATE`, or the skip logi
 
 ## Deployment
 
-GitHub Actions (`.github/workflows`) bundles the TypeScript and deploys the static files to GitHub Pages on push to `master`.
+GitHub Actions (`.github/workflows`) deploys the game to the home server on push to `prod`. GitHub Pages (push to `master`) only serves `redirect.html`, which sends visitors to the home server (ADR 0005).
 
 ## License
 

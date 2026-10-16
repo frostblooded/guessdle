@@ -12,7 +12,7 @@ Scripts are in `package.json`.
 
 - `npm start` must run from the repo root (the static dir is the relative path `./`). Run `npm run build` first: `index.html` loads `dist/`.
 - A `PostToolUse` hook (`.claude/hooks/prettier.mjs`) runs `eslint --fix` then Prettier on edited `.ts`/`.mjs` files; lint errors it cannot fix come back as hook feedback.
-- Deploy uses `npm run build:prod` (minified, no sourcemaps; issue #6).
+- Deploy uses `npm run build:prod` (minified, no sourcemaps; issue #6). GitHub Pages serves only `redirect.html` (ADR 0005); the game deploys to the home server from `prod`.
 - Golden fixture `tests/fixtures/answer-sequence.golden.json`: regenerate only deliberately (ADR 0002).
 - `npm run test:e2e` needs Chromium once: `npx playwright install chromium`.
 - Edits to `.ts` need `npm run build` (or `npm run watch`) before the browser refresh. HTML/CSS need only a refresh.

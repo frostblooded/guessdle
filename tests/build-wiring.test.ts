@@ -18,13 +18,18 @@ describe("build output is wired through the page and the deploy", () => {
     });
   }
 
-  it("deploy.yml builds and copies dist", () => {
+  it("Pages serves redirect.html as index and 404, all to one URL", () => {
     const deploy: string = read(".github/workflows/deploy.yml");
-    assert.ok(
-      deploy.includes("npm run build:prod"),
-      "deploy.yml does not run the minified build",
-    );
-    assert.match(deploy, /cp -r dist\b/);
+    assert.match(deploy, /cp redirect\.html _site\/index\.html/);
+    assert.match(deploy, /cp redirect\.html _site\/404\.html/);
+    const redirect: string = read("redirect.html");
+    const urls: string[] = [
+      ...redirect.matchAll(/https:\/\/guessdle\.niki\.casa\//g),
+    ].map((m) => m[0]);
+    assert.equal(urls.length, 3, "meta refresh, location.replace, link");
+    assert.match(redirect, /http-equiv="refresh"[^>]*url=https:/);
+    assert.match(redirect, /location\.replace\("https:/);
+    assert.match(redirect, /<a href="https:/);
   });
 
   it("dist is gitignored", () => {
