@@ -7,6 +7,7 @@ import {
   type AccountFetch,
   type AccountUser,
 } from "./account.ts";
+import { initAdmin } from "./admin.ts";
 import { correctnessClass } from "./game/correctness.ts";
 import { findPetId, type GradedAttribute } from "./game/game.ts";
 import { mergeLocalGame } from "./game/merge.ts";
@@ -40,6 +41,7 @@ const anonymousPlay: Play = createPlay({
 // Signed-in players use the server-stored game instead
 let play: Play = anonymousPlay;
 
+let setAdmin: (admin: boolean) => void = () => {};
 let autoCompleteJs: autoComplete | null = null;
 
 window.onload = function (): void {
@@ -65,6 +67,7 @@ window.onload = function (): void {
   });
 
   initButtons();
+  setAdmin = initAdmin();
   initNewGuessSubmit();
   void start();
 };
@@ -152,6 +155,7 @@ function showAccount(user: AccountUser | null): void {
   name.hidden = user === null;
   document.querySelector<HTMLElement>("#login-link")!.hidden = user !== null;
   document.querySelector<HTMLElement>("#logout-button")!.hidden = user === null;
+  setAdmin(user?.admin === true);
 }
 
 // Signing out also forgets the local game, so the next person starts clean

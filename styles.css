@@ -289,3 +289,14 @@ body .autoComplete_wrapper > ul > li mark {
   margin: 0 0 10px;
   text-align: center;
 }
+
+#admin-dialog {
+  box-sizing: border-box;
+  max-width: min(640px, calc(100% - 2em));
+  background-color: var(--surface);
+  color: var(--surface-text);
+
+  td {
+    padding: 4px 8px;
+  }
+}

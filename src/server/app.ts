@@ -5,7 +5,16 @@ import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import type pg from "pg";
 import { gradeIds } from "../game/game.ts";
 import { GUESS_DATA, type Pet } from "../game/roster.ts";
-import { dayNumber, ensureAnswer, todayIn } from "./answers.ts";
+import {
+  ANSWER_START,
+  clearOverride,
+  dateOfDay,
+  dayNumber,
+  ensureAnswer,
+  peekDays,
+  setOverride,
+  todayIn,
+} from "./answers.ts";
 import {
   changeGame,
   readGame,
@@ -150,6 +159,124 @@ export function createApp({
       },
     );
   }
+
+  // Admin-only answer management (spec #38): peek, override, clear
+  const MAX_RANGE_DAYS = 366;
+  const isDate = (value: unknown): value is string =>
+    typeof value === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+    !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) &&
+    dateOfDay(dayNumber(value)) === value;
+  const petIds = roster.map((pet) => pet.id);
+  const adminRoute =
+    (
+      handler: (ctx: {
+        req: Request;
+        res: Response;
+        today: string;
+        todayN: number;
+      }) => Promise<void>,
+    ) =>
+    async (req: Request, res: Response): Promise<void> => {
+      res.set("Cache-Control", "no-store");
+      const user = await userForSession(pool, sessionToken(req), now());
+      if (!user) {
+        res.status(401).json({ error: "unauthorized" });
+        return;
+      }
+      if (!user.admin) {
+        res.status(403).json({ error: "forbidden" });
+        return;
+      }
+      const today = todayIn(now(), timeZone);
+      await handler({ req, res, today, todayN: dayNumber(today) });
+    };
+  // A date the admin may name: valid, not before the start, within a year ahead
+  const adminDate = (value: unknown, todayN: number): value is string =>
+    isDate(value) &&
+    value >= ANSWER_START &&
+    dayNumber(value) <= todayN + MAX_RANGE_DAYS;
+
+  app.get(
+    "/api/admin/answers",
+    adminRoute(async ({ req, res, today, todayN }) => {
+      const query = req.query as Record<string, unknown>;
+      const rawFrom = query["from"] ?? today;
+      const rawTo = query["to"] ?? dateOfDay(todayN + 6);
+      // A start before Day Number 0 is clamped to it
+      const from =
+        isDate(rawFrom) && rawFrom < ANSWER_START ? ANSWER_START : rawFrom;
+      if (
+        !isDate(from) ||
+        !adminDate(rawTo, todayN) ||
+        rawTo < from ||
+        dayNumber(rawTo) - dayNumber(from) >= MAX_RANGE_DAYS
+      ) {
+        res.status(400).json({ error: "invalid" });
+        return;
+      }
+      const days = await peekDays(pool, petIds, from, rawTo, random);
+      res.json({
+        today,
+        from,
+        to: rawTo,
+        days: days.map((row) => {
+          const pet = roster.find((p) => p.id === row.petId);
+          return {
+            date: row.date,
+            petId: row.petId,
+            name: pet?.name ?? null,
+            source: row.source,
+            today: row.date === today,
+            locked: row.date < today,
+            missing: pet === undefined,
+            previous: row.previous,
+          };
+        }),
+      });
+    }),
+  );
+  app.put(
+    "/api/admin/answers/:date",
+    express.json({ limit: "1kb" }),
+    adminRoute(async ({ req, res, today, todayN }) => {
+      const date = req.params["date"];
+      const petId = (req.body as { petId?: unknown } | undefined)?.petId;
+      if (
+        !adminDate(date, todayN) ||
+        typeof petId !== "string" ||
+        !petIds.includes(petId)
+      ) {
+        res.status(400).json({ error: "invalid" });
+        return;
+      }
+      if (date < today) {
+        res.status(409).json({ error: "past_day" });
+        return;
+      }
+      await setOverride(pool, petIds, date, petId, random);
+      res.json({ ok: true });
+    }),
+  );
+  app.delete(
+    "/api/admin/answers/:date",
+    adminRoute(async ({ req, res, today, todayN }) => {
+      const date = req.params["date"];
+      if (!adminDate(date, todayN)) {
+        res.status(400).json({ error: "invalid" });
+        return;
+      }
+      if (date < today) {
+        res.status(409).json({ error: "past_day" });
+        return;
+      }
+      if (!(await clearOverride(pool, petIds, date, random))) {
+        res.status(409).json({ error: "not_override" });
+        return;
+      }
+      res.json({ ok: true });
+    }),
+  );
 
   // Stateless grading for anonymous players. The answer is revealed only to a
   // batch containing the right guess.
