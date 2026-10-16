@@ -74,7 +74,11 @@ function showAccount(user: AccountUser | null, fetch: Fetch): void {
   $("#account-name").textContent = user.name;
   $("#account-avatar").textContent = (user.name[0] ?? "?").toUpperCase();
   $("#menu-email").textContent = user.email;
-  $<HTMLAnchorElement>("#admin-link").hidden = !user.admin;
+  const adminLink = $<HTMLAnchorElement>("#admin-link");
+  adminLink.hidden = !user.admin;
+  if (user.pending) {
+    adminLink.textContent = `Admin (${user.pending})`;
+  }
   const button = $<HTMLButtonElement>("#user-menu-button");
   const panel = $("#user-menu-panel");
   button.setAttribute("aria-label", `Account menu for ${user.name}`);

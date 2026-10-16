@@ -4,6 +4,7 @@ import type pg from "pg";
 import type { Entry } from "../../game/game.ts";
 import { dayNumber, ensureAnswer, todayIn } from "../answers.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
+import type { MailConfig } from "../mailer.ts";
 import {
   findGame,
   loadRoster,
@@ -18,6 +19,8 @@ export interface AppContext {
   random: () => number;
   timeZone: string;
   secureCookies: boolean;
+  // Mail transport; absent when SMTP is not configured
+  mail?: MailConfig | undefined;
 }
 
 // Request input is untrusted: these are the only places it is cast, and every

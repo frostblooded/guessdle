@@ -1,4 +1,5 @@
-// Admin page: Users and Backups tabs (answers live in each game's editor).
+// Admin page: Users, Backups and Queue tabs (answers live in each game's editor).
+import { initQueue } from "./admin-queue.ts";
 
 interface AdminUser {
   id: number;
@@ -134,18 +135,27 @@ export function initAdmin(): void {
     );
   };
 
+  const queuePanel = $<HTMLElement>("#queue-panel");
+  const showQueue = initQueue();
+
   const tabs = {
     users: $<HTMLElement>("#tab-users"),
     backup: $<HTMLElement>("#tab-backup"),
+    queue: $<HTMLElement>("#tab-queue"),
   };
-  const selectTab = (name: "users" | "backup"): void => {
+  const selectTab = (name: keyof typeof tabs): void => {
     usersPanel.hidden = name !== "users";
     backupPanel.hidden = name !== "backup";
+    queuePanel.hidden = name !== "queue";
     for (const [key, tab] of Object.entries(tabs)) {
       tab.ariaSelected = String(key === name);
       tab.tabIndex = key === name ? 0 : -1;
     }
-    void (name === "users" ? showUsers() : showBackup());
+    void (name === "users"
+      ? showUsers()
+      : name === "queue"
+        ? showQueue()
+        : showBackup());
   };
   for (const [name, tab] of Object.entries(tabs)) {
     tab.onclick = (): void => selectTab(name as keyof typeof tabs);

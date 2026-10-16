@@ -69,6 +69,7 @@ export function createApp({
     random,
     timeZone,
     secureCookies,
+    mail,
   };
   const app = express();
   // One hop: nginx (or nothing in dev) sets X-Forwarded-For to the real client IP
@@ -84,7 +85,7 @@ export function createApp({
   });
 
   authRoutes(app, ctx, { mail, adminEmails, testLogin });
-  adminRoutes(app, ctx, backupDir);
+  adminRoutes(app, ctx, backupDir, uploadsDir);
   gameRoutes(app, ctx);
   manageRoutes(app, ctx, uploadsDir, writeLimit);
   uploadRoutes(app, ctx, uploadsDir, uploadLimit, uploadQuotaBytes);
