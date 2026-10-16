@@ -300,3 +300,8 @@ body .autoComplete_wrapper > ul > li mark {
     padding: 4px 8px;
   }
 }
+
+#backup-status[data-state="red"] {
+  color: var(--incorrect);
+  font-weight: bold;
+}

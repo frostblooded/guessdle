@@ -1,5 +1,6 @@
 import express from "express";
 import type { ErrorRequestHandler, Express, Request, Response } from "express";
+import { readBackupStatus } from "./backup.ts";
 import { Passport } from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import type pg from "pg";
@@ -54,6 +55,8 @@ export interface AppDeps {
   testLogin?: boolean;
   // Per-user (anonymous: per-IP) request budget per window
   limit?: RateLimit;
+  // Backups volume (read-only) holding status.json for the admin panel
+  backupDir?: string | undefined;
 }
 
 // The API only; callers add static files (dev server) or sit behind nginx (prod)
@@ -68,6 +71,7 @@ export function createApp({
   secureCookies = false,
   testLogin = false,
   limit = DEFAULT_RATE_LIMIT,
+  backupDir = "/backups",
 }: AppDeps): Express {
   if (testLogin && process.env["NODE_ENV"] === "production") {
     throw new Error("The test login route cannot run in production");
@@ -280,6 +284,12 @@ export function createApp({
     }),
   );
 
+  app.get(
+    "/api/admin/backup",
+    adminRoute(async ({ res }) => {
+      res.json(await readBackupStatus(backupDir, now()));
+    }),
+  );
   app.get(
     "/api/admin/users",
     adminRoute(async ({ res, actor }) => {

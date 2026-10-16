@@ -20,6 +20,15 @@ interface AdminUser {
   admin: boolean;
 }
 
+type BackupStatus =
+  | { state: "error"; message: string }
+  | {
+      state: "ok" | "red";
+      reasons: string[];
+      newestDump: string | null;
+      lastRestore: { ok: boolean; error?: string } | null;
+    };
+
 const $ = <T extends HTMLElement>(selector: string): T =>
   document.querySelector<T>(selector)!;
 
@@ -208,19 +217,53 @@ export function initAdmin(): (admin: boolean) => void {
     );
   };
 
+  const backupPanel = $<HTMLElement>("#backup-panel");
+  const showBackup = async (): Promise<void> => {
+    const line = $<HTMLElement>("#backup-status");
+    const reasons = $<HTMLElement>("#backup-reasons");
+    const { ok, json } = await call("GET", "/api/admin/backup");
+    const data = json as BackupStatus;
+    const problems = !ok
+      ? ["Could not load the backup status."]
+      : data.state === "error"
+        ? [data.message]
+        : data.reasons;
+    if (ok && data.state !== "error" && data.lastRestore?.error) {
+      problems.push(`Restore error: ${data.lastRestore.error}`);
+    }
+    const newest = ok && data.state !== "error" ? data.newestDump : null;
+    line.textContent = newest
+      ? `Newest dump: ${((Date.now() - Date.parse(newest)) / 3600e3).toFixed(1)} hours ago`
+      : "Newest dump: none";
+    line.dataset["state"] = ok && data.state === "ok" ? "ok" : "red";
+    reasons.replaceChildren(
+      ...problems.map((text) =>
+        Object.assign(document.createElement("li"), { textContent: text }),
+      ),
+    );
+  };
+
   const tabs = {
     answers: $<HTMLElement>("#tab-answers"),
     users: $<HTMLElement>("#tab-users"),
+    backup: $<HTMLElement>("#tab-backup"),
   };
-  const selectTab = (name: "answers" | "users"): void => {
+  const selectTab = (name: "answers" | "users" | "backup"): void => {
     answersPanel.hidden = name !== "answers";
     usersPanel.hidden = name !== "users";
-    tabs.answers.ariaSelected = String(name === "answers");
-    tabs.users.ariaSelected = String(name === "users");
-    void (name === "answers" ? show() : showUsers());
+    backupPanel.hidden = name !== "backup";
+    for (const [key, tab] of Object.entries(tabs)) {
+      tab.ariaSelected = String(key === name);
+    }
+    void (name === "answers"
+      ? show()
+      : name === "users"
+        ? showUsers()
+        : showBackup());
   };
   tabs.answers.onclick = (): void => selectTab("answers");
   tabs.users.onclick = (): void => selectTab("users");
+  tabs.backup.onclick = (): void => selectTab("backup");
   button.onclick = (): void => {
     dialog.showModal();
     selectTab("answers");

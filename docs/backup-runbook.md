@@ -30,7 +30,7 @@ The `backup` compose service (`deploy/backup/`, Dockerfile target `backup`) prot
 }
 ```
 
-`time` is UTC ISO 8601, `error` appears only when `ok` is false, and a key is absent until its first attempt. A consumer should show red when `lastDump` is missing, not `ok`, or older than 36 hours, or when `lastRestore` exists with `ok: false`. After a failed dump the file still names the failed attempt, so `lastDump.ok` is what to check, not just the time.
+`time` is UTC ISO 8601, `error` appears only when `ok` is false, and a key is absent until its first attempt. The admin panel (BACKUPS tab, `src/server/backup.ts`) is the consumer and also requires a `.dump` file in `daily/` newer than 36 hours. A consumer should show red when `lastDump` is missing, not `ok`, or older than 36 hours, or when `lastRestore` exists with `ok: false`. After a failed dump the file still names the failed attempt, so `lastDump.ok` is what to check, not just the time.
 
 ## Manual restore
 

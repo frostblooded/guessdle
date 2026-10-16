@@ -36,7 +36,14 @@
         <button type="button" role="tab" id="tab-users" aria-selected="false">
           USERS
         </button>
+        <button type="button" role="tab" id="tab-backup" aria-selected="false">
+          BACKUPS
+        </button>
       </div>
+      <section id="backup-panel" hidden>
+        <p id="backup-status" role="status"></p>
+        <ul id="backup-reasons"></ul>
+      </section>
       <section id="users-panel" hidden>
         <p id="users-message" role="status" hidden></p>
         <table>

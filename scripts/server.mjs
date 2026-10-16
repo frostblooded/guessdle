@@ -59,6 +59,7 @@ if (process.env.DATABASE_URL) {
     timeZone: process.env.SERVER_TIMEZONE || undefined,
     google: googleConfigFromEnv(process.env),
     limit: rateLimitFromEnv(process.env),
+    backupDir: process.env.BACKUP_DIR || undefined,
     adminEmails: adminEmailsFromEnv(process.env.ADMIN_EMAILS),
     // Only the e2e suite sets NODE_ENV=test; the stub login never exists elsewhere
     testLogin: process.env.NODE_ENV === "test",

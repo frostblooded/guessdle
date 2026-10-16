@@ -31,5 +31,6 @@ if (import.meta.main) {
     adminEmails: adminEmailsFromEnv(process.env["ADMIN_EMAILS"]),
     secureCookies: true,
     limit: rateLimitFromEnv(process.env),
+    backupDir: process.env["BACKUP_DIR"] || undefined,
   }).listen(Number(process.env["PORT"] ?? 3000), "0.0.0.0");
 }
