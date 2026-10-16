@@ -234,6 +234,16 @@ test("help popup examples use real roster pets and fit a phone screen", async ({
   for (const name of [...shown, "Eddie"]) {
     expect(names, name).toContain(name);
   }
+  // The popup's green/orange/red claims must still hold for the roster data.
+  const pet = (n: string) => GUESS_DATA.find((p) => p.name === n)!;
+  const [ati, cookie, eddie] = [pet("Ati"), pet("Cookie"), pet("Eddie")];
+  expect(cookie.colors).toEqual(ati.colors);
+  expect(cookie.owners).toEqual(ati.owners);
+  expect(
+    ati.colors.filter((c) => eddie.colors.includes(c)).length,
+  ).toBeGreaterThan(0);
+  expect(ati.colors).not.toEqual(eddie.colors);
+  expect(ati.owners.some((o) => eddie.owners.includes(o))).toBe(false);
   const photos: Locator = dialog.locator(".help-example img");
   await expect(photos).toHaveCount(2);
   for (const img of await photos.all()) {
