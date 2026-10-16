@@ -1,6 +1,6 @@
 // Prod build (ADR 0007): content-hashed bundle names plus an index.html that points at them,
 // so a deploy never mixes a stale cached asset with a new page.
-// Usage: node build-prod.mjs [outdir]  (default: dist)
+// Usage: node scripts/build-prod.mjs [outdir]  (default: dist)
 import { build } from "esbuild";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";

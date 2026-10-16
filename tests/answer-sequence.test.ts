@@ -12,8 +12,9 @@ const {
   generateAnswerSequence,
   getAnswerSeed,
   getDayNumber,
-} = await import("../src/answer-sequence.ts");
-const { ANSWER_SKIP_PERIOD, GUESS_DATA } = await import("../src/roster.ts");
+} = await import("../src/game/answer-sequence.ts");
+const { ANSWER_SKIP_PERIOD, GUESS_DATA } =
+  await import("../src/game/roster.ts");
 
 interface Golden {
   seed: string;

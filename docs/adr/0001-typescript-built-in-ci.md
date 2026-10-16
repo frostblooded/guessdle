@@ -9,5 +9,5 @@ The front-end is written in TypeScript (`script.ts`, strict mode). `tsc` emits `
 
 ## Consequences
 
-- Local development needs Node 24 (`.nvmrc`) and `npx tsc --watch` alongside `npm start`, since the Node server (`server.mjs`) serves the repo root.
+- Local development needs Node 24 (`.nvmrc`) and `npx tsc --watch` alongside `npm start`, since the Node server (`scripts/server.mjs`) serves the repo root.
 - The daily answer depends on roster order and RNG. Conversion must not change them. The golden fixture and unit tests guard this (ADR 0003), and CI runs them before deploy.

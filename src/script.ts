@@ -2,14 +2,14 @@ import autoComplete from "@tarekraafat/autocomplete.js";
 import seedrandom from "seedrandom";
 import "../styles.css";
 import "@tarekraafat/autocomplete.js/dist/css/autoComplete.css";
-import { correctnessClass } from "./correctness.ts";
+import { correctnessClass } from "./game/correctness.ts";
 import {
   createGame,
   type Game,
   type GradedAttribute,
   type GuessResult,
-} from "./game.ts";
-import { GUESS_DATA, type Pet } from "./roster.ts";
+} from "./game/game.ts";
+import { GUESS_DATA, type Pet } from "./game/roster.ts";
 import { initTheme } from "./theme.ts";
 import type {
   AutoCompleteItem,

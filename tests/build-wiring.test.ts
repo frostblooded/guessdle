@@ -22,9 +22,9 @@ describe("build output is wired through the page and the deploy", () => {
 
   it("Pages serves redirect.html as index and 404, all to one URL", () => {
     const deploy: string = read(".github/workflows/deploy.yml");
-    assert.match(deploy, /cp redirect\.html _site\/index\.html/);
-    assert.match(deploy, /cp redirect\.html _site\/404\.html/);
-    const redirect: string = read("redirect.html");
+    assert.match(deploy, /cp deploy\/redirect\.html _site\/index\.html/);
+    assert.match(deploy, /cp deploy\/redirect\.html _site\/404\.html/);
+    const redirect: string = read("deploy/redirect.html");
     const urls: string[] = [
       ...redirect.matchAll(/https:\/\/guessdle\.niki\.casa\//g),
     ].map((m) => m[0]);
@@ -40,7 +40,7 @@ describe("build output is wired through the page and the deploy", () => {
 
   it("prod build hashes bundle names and rewrites index.html to match", () => {
     const out: string = mkdtempSync(join(tmpdir(), "petdle-prod-"));
-    execFileSync("node", ["build-prod.mjs", out], {
+    execFileSync("node", ["scripts/build-prod.mjs", out], {
       cwd: join(import.meta.dirname, ".."),
     });
     const prodHtml: string = readFileSync(join(out, "index.html"), "utf8");
@@ -57,7 +57,7 @@ describe("build output is wired through the page and the deploy", () => {
   });
 
   it("nginx revalidates by default and caches dist/ forever", () => {
-    const conf: string = read("nginx.conf");
+    const conf: string = read("deploy/nginx.conf");
     assert.match(conf, /add_header Cache-Control "no-cache"/);
     assert.match(conf, /location \/dist\/ \{[^}]*max-age=31536000, immutable/);
   });

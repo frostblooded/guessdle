@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { GUESS_DATA } from "../../src/roster.ts";
+import { GUESS_DATA } from "../../src/game/roster.ts";
 
 // Phones (small to large, portrait and landscape) and a small tablet
 const VIEWPORTS = [

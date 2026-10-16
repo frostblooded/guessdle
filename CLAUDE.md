@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-"Petdle": a Wordle-style daily guessing game where players guess a pet from a fixed roster. Static front-end (`index.html`, `src/script.ts`, `styles.css`) served by a tiny Node server (`server.mjs`). Strict TypeScript, ES modules bundled by esbuild into `dist/` (gitignored, ADR 0001); `tsc` only type-checks (Node 24, see `.nvmrc`). ESLint (`npm run lint`, typescript-eslint) lints; Prettier formats. `typescript` is pinned `~6.0` because typescript-eslint does not support 7 yet. Libs come from npm (`seedrandom`, `@tarekraafat/autocomplete.js`).
+"Petdle": a Wordle-style daily guessing game where players guess a pet from a fixed roster. Static front-end (`index.html`, `src/script.ts`, `styles.css`) served by a tiny Node server (`scripts/server.mjs`). Strict TypeScript, ES modules bundled by esbuild into `dist/` (gitignored, ADR 0001); `tsc` only type-checks (Node 24, see `.nvmrc`). ESLint (`npm run lint`, typescript-eslint) lints; Prettier formats. `typescript` is pinned `~6.0` because typescript-eslint does not support 7 yet. Libs come from npm (`seedrandom`, `@tarekraafat/autocomplete.js`).
 
 ## Commands
 
@@ -12,17 +12,17 @@ Scripts are in `package.json`.
 
 - `npm start` must run from the repo root (the static dir is the relative path `./`). Run `npm run build` first: `index.html` loads `dist/`.
 - A `PostToolUse` hook (`.claude/hooks/prettier.mjs`) runs `eslint --fix` then Prettier on edited `.ts`/`.mjs` files; lint errors it cannot fix come back as hook feedback.
-- Deploy uses `npm run build:prod` (`build-prod.mjs`: minified, no sourcemaps, content-hashed names, writes `dist/index.html`; ADR 0007; issue #6). GitHub Pages serves only `redirect.html` (ADR 0005); the game deploys to the home server from `prod`.
+- Deploy uses `npm run build:prod` (`scripts/build-prod.mjs`: minified, no sourcemaps, content-hashed names, writes `dist/index.html`; ADR 0007; issue #6). GitHub Pages serves only `deploy/redirect.html` (ADR 0005); the game deploys to the home server from `prod`.
 - Golden fixture `tests/fixtures/answer-sequence.golden.json`: regenerate only deliberately (ADR 0002).
 - `npm run test:e2e` needs Chromium once: `npx playwright install chromium`.
 - Edits to `.ts` need `npm run build` (or `npm run watch`) before the browser refresh. HTML/CSS need only a refresh.
 
 ## Architecture
 
-- Source files live in `src/` and are ES modules (imports use `.ts` extensions) bundled from `src/script.ts` into `dist/script.js` + `dist/script.css`. The pure ones (`answer-sequence`, `date`, `game`, `game-state`, `correctness`, `roster`) are unit-tested by importing the `.ts` directly under Node's type stripping, so keep them erasable-syntax only (no `enum`) (ADR 0004). `game.ts` holds the pure game flow (Daily Answer pick, guess judging); `script.ts` holds the DOM logic. `src/autocomplete.d.ts` types autoComplete.
-  - `GUESS_DATA` (in `roster.ts`) is the pet roster (`photo`, `name`, `colors[]`, `owners[]`). Adding a pet = add photo to `photos/` and an entry here; the `Pet` interface makes a missing or misspelled attribute a compile error. The key order of each entry drives table column order in `addGuessResultElement` (iterates `for key in resultData`), and must match the column headers in `index.html`. Adding a new field needs a header in `index.html` and handling in `gradeCorrectness` (supports only strings and arrays).
+- Source files live in `src/` and are ES modules (imports use `.ts` extensions) bundled from `src/script.ts` into `dist/script.js` + `dist/script.css`. The pure ones (`answer-sequence`, `date`, `game`, `game-state`, `correctness`, `roster`) are unit-tested by importing the `.ts` directly under Node's type stripping, so keep them erasable-syntax only (no `enum`) (ADR 0004). `src/game/game.ts` holds the pure game flow (Daily Answer pick, guess judging); `script.ts` holds the DOM logic. `src/autocomplete.d.ts` types autoComplete.
+  - `GUESS_DATA` (in `src/game/roster.ts`) is the pet roster (`photo`, `name`, `colors[]`, `owners[]`). Adding a pet = add photo to `photos/` and an entry here; the `Pet` interface makes a missing or misspelled attribute a compile error. The key order of each entry drives table column order in `addGuessResultElement` (iterates `for key in resultData`), and must match the column headers in `index.html`. Adding a new field needs a header in `index.html` and handling in `gradeCorrectness` (supports only strings and arrays).
   - Daily answer is deterministic with no backend: `generateAnswerIdx` seeds `seedrandom` with `ANSWER_START_DATE` (2025-08-15), not today, then `generateAnswerSequence` replays every day from the start date to today, drawing each day's answer uniformly from the roster minus the previous `ANSWER_SKIP_PERIOD` answers (ADR 0002). Consequence: changing `GUESS_DATA` (order or length), `ANSWER_START_DATE`, or the skip logic changes the answers for all days, including today's.
-  - `createGame({ roster, storage, now, makeRandom })` (`game.ts`) is the one interface `script.ts` uses: it holds the Daily Answer, and `submit` returns graded rows (`gradeGuess`). `createGameState(storage, now)` (`game-state.ts`) owns the `localStorage` state; on creation a missing or other-day `lastPlayed` clears guesses and victory, then stamps today. Blocked storage falls back to memory. `initTheme` (`theme.ts`) wires the theme button.
+  - `createGame({ roster, storage, now, makeRandom })` (`src/game/game.ts`) is the one interface `script.ts` uses: it holds the Daily Answer, and `submit` returns graded rows (`gradeGuess`). `createGameState(storage, now)` (`src/game/game-state.ts`) owns the `localStorage` state; on creation a missing or other-day `lastPlayed` clears guesses and victory, then stamps today. Blocked storage falls back to memory. `initTheme` (`src/theme.ts`) wires the theme button.
 - Cell result classes: `correct` / `partially-correct` (arrays sharing an element) / `incorrect`, styled in `styles.css`.
 
 ## Agent skills

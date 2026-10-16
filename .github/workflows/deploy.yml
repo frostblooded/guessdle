@@ -18,8 +18,8 @@ jobs:
       - name: Assemble deploy folder
         run: |
           mkdir _site
-          cp redirect.html _site/index.html
-          cp redirect.html _site/404.html
+          cp deploy/redirect.html _site/index.html
+          cp deploy/redirect.html _site/404.html
       - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
@@ -28,8 +28,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - run: docker build --target dev .
-      - run: docker build --target prod .
+      - run: docker build -f deploy/Dockerfile --target dev .
+      - run: docker build -f deploy/Dockerfile --target prod .
 
   unit:
     runs-on: ubuntu-latest
@@ -97,5 +97,5 @@ jobs:
       cancel-in-progress: false
     steps:
       # Runs in the server's existing clone, not the runner workspace: start.sh does git pull --ff-only.
-      - run: ./start.sh
+      - run: ./deploy/start.sh
         working-directory: ${{ vars.DEPLOY_DIR }}

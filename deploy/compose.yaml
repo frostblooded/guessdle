@@ -2,20 +2,21 @@
 services:
   dev:
     build:
-      context: .
+      context: ..
+      dockerfile: deploy/Dockerfile
       target: dev
     ports:
       - "8080:8080"
     develop:
       watch:
         - action: sync
-          path: .
+          path: ..
           target: /app
           ignore:
             - node_modules/
             - dist/
             - .git/
         - action: rebuild
-          path: package.json
+          path: ../package.json
         - action: rebuild
-          path: package-lock.json
+          path: ../package-lock.json

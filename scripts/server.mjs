@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, relative, resolve, sep } from "node:path";
 
-const ROOT = resolve(import.meta.dirname);
+const ROOT = resolve(import.meta.dirname, "..");
 const PORT = process.env.PORT ?? 8080;
 
 const ALLOWED = /^\/(index\.html|styles\.css|favicon\.ico|(dist|photos)\/.+)$/;
