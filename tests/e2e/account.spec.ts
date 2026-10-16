@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { GUESS_DATA } from "../../src/game/roster.ts";
-import { findAnswerName, submitGuess } from "./helpers.ts";
+import { findAnswerName, signOutViaMenu, submitGuess } from "./helpers.ts";
 
 // The email-link flow is in email-login.spec.ts; elsewhere the test-only login stub signs in
 const stubLogin = (
@@ -9,23 +9,47 @@ const stubLogin = (
 ): ReturnType<Page["request"]["post"]> =>
   page.request.post("/api/test/login", { data });
 
-test("a signed-out visitor sees the email sign-in form and no sign-out", async ({
+test("a signed-out visitor sees a Sign in link, no account menu", async ({
   page,
 }) => {
   await page.goto("/");
-  await expect(page.locator("#login-form")).toBeVisible();
-  await expect(page.locator("#login-email")).toBeVisible();
-  await expect(page.locator("#logout-button")).toBeHidden();
-  await expect(page.locator("#account-name")).toBeHidden();
+  await expect(page.locator("#signin-link")).toBeVisible();
+  await expect(page.locator("#signin-link")).toHaveAttribute("href", "/login");
+  await expect(page.locator("#user-menu-button")).toHaveCount(0);
+  await expect(page.locator("#logout-button")).toHaveCount(0);
 });
 
-test("signing in shows the name and a sign-out control", async ({ page }) => {
+test("signing in shows the name and a sign-out control in the account menu", async ({
+  page,
+}) => {
   await stubLogin(page, { email: "ann@example.test", name: "Ann" });
   await page.goto("/");
 
   await expect(page.locator("#account-name")).toHaveText("Ann");
+  await expect(page.locator("#signin-link")).toHaveCount(0);
+  await expect(page.locator("#logout-button")).toBeHidden();
+  await page.locator("#user-menu-button").click();
+  await expect(page.locator("#user-menu-button")).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
+  await expect(page.locator("#menu-email")).toHaveText("ann@example.test");
   await expect(page.locator("#logout-button")).toBeVisible();
-  await expect(page.locator("#login-form")).toBeHidden();
+  await expect(page.locator("#admin-link")).toBeHidden();
+});
+
+test("the account menu closes on Escape and on an outside click", async ({
+  page,
+}) => {
+  await stubLogin(page, { email: "ann@example.test", name: "Ann" });
+  await page.goto("/");
+  await page.locator("#user-menu-button").click();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#user-menu-panel")).toBeHidden();
+  await expect(page.locator("#user-menu-button")).toBeFocused();
+  await page.locator("#user-menu-button").click();
+  await page.locator("h1").click();
+  await expect(page.locator("#user-menu-panel")).toBeHidden();
 });
 
 test("the session survives a reload", async ({ page }) => {
@@ -58,10 +82,10 @@ test("signing out returns to signed-out and clears the local game", async ({
   await submitGuess(page, wrong);
   await expect(page.locator(".guess-result-row")).toHaveCount(1);
 
-  await page.locator("#logout-button").click();
+  await signOutViaMenu(page);
 
-  await expect(page.locator("#login-form")).toBeVisible();
-  await expect(page.locator("#logout-button")).toBeHidden();
+  await expect(page.locator("#signin-link")).toBeVisible();
+  await expect(page.locator("#user-menu-button")).toHaveCount(0);
   await expect(page.locator(".guess-result-row")).toHaveCount(0);
   await page.reload();
   await expect(page.locator(".guess-result-row")).toHaveCount(0);
@@ -80,7 +104,7 @@ test("a session revoked on the server is signed out on the next load", async ({
   await page.context().clearCookies();
   await page.reload();
 
-  await expect(page.locator("#login-form")).toBeVisible();
+  await expect(page.locator("#signin-link")).toBeVisible();
 });
 
 test("mutating requests that are not JSON or come from another origin are refused", async ({

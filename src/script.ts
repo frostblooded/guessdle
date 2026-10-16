@@ -1,9 +1,5 @@
 import autoComplete from "@tarekraafat/autocomplete.js";
-import "../styles.css";
 import "@tarekraafat/autocomplete.js/dist/css/autoComplete.css";
-import { fetchUser, signOut, type AccountUser } from "./account.ts";
-import { completeLogin, initLogin } from "./login.ts";
-import { initAdmin } from "./admin.ts";
 import { correctnessClass } from "./game/correctness.ts";
 import { findPetId, type GradedAttribute } from "./game/game.ts";
 import { mergeLocalGame } from "./game/merge.ts";
@@ -16,20 +12,21 @@ import {
   type SubmitResult,
 } from "./game/play.ts";
 import { GUESS_DATA, type Pet } from "./game/roster.ts";
-import type { Fetch } from "./game/transport.ts";
-import { initTheme } from "./theme.ts";
+import { browserFetch, initShell } from "./shell.ts";
 import type {
   AutoCompleteItem,
   AutoCompleteResults,
   AutoCompleteSelectionEvent,
 } from "@tarekraafat/autocomplete.js";
 
-const browserFetch: Fetch = (url, init) => fetch(url, init);
 const now = (): Date => new Date();
 
 const GUESS_DATA_NAMES: string[] = GUESS_DATA.map(
   (item: Pet): string => item.name,
 );
+
+// Renders the header at once; resolves to the signed-in user (or null)
+const userPromise = initShell(browserFetch);
 
 const anonymousPlay: Play = createPlay({
   roster: GUESS_DATA,
@@ -41,7 +38,6 @@ const anonymousPlay: Play = createPlay({
 // Signed-in players use the server-stored game instead
 let play: Play = anonymousPlay;
 
-let setAdmin: (admin: boolean) => void = () => {};
 let autoCompleteJs: autoComplete | null = null;
 
 window.onload = function (): void {
@@ -67,17 +63,13 @@ window.onload = function (): void {
   });
 
   initButtons();
-  setAdmin = initAdmin();
   initNewGuessSubmit();
   void start();
 };
 
 // Who is signed in decides where the game lives, so ask before loading it
 async function start(): Promise<void> {
-  await completeLogin(browserFetch);
-  const user: AccountUser | null = await fetchUser(browserFetch);
-  showAccount(user);
-  if (user !== null) {
+  if ((await userPromise) !== null) {
     const merged = await mergeLocalGame(localStorage, now, browserFetch);
     if (merged === "rate_limited") {
       showNotice(RATE_LIMITED);
@@ -118,14 +110,9 @@ function initNewGuessSubmit(): void {
 }
 
 function initButtons(): void {
-  initTheme(
-    document.documentElement,
-    document.querySelector<HTMLButtonElement>("#theme-button")!,
-    localStorage,
-  );
-  const submitNewGuessButton: HTMLButtonElement =
-    document.querySelector<HTMLButtonElement>("#submit-new-guess-button")!;
-  submitNewGuessButton.onclick = (): void => {
+  document.querySelector<HTMLButtonElement>(
+    "#submit-new-guess-button",
+  )!.onclick = (): void => {
     void handleSubmitSelection();
   };
   document.querySelector<HTMLButtonElement>("#give-up-button")!.onclick =
@@ -136,49 +123,20 @@ function initButtons(): void {
     (): void => {
       void handleReset();
     };
-  initHelpDialog();
-  initLogin(browserFetch);
-  document.querySelector<HTMLButtonElement>("#logout-button")!.onclick =
-    (): void => {
-      void handleLogout();
-    };
 }
 
-function showAccount(user: AccountUser | null): void {
-  const name: HTMLElement =
-    document.querySelector<HTMLElement>("#account-name")!;
-  name.textContent = user === null ? "" : user.name;
-  name.hidden = user === null;
-  document.querySelector<HTMLElement>("#login-form")!.hidden = user !== null;
-  if (user !== null) {
-    document.querySelector<HTMLElement>("#login-status")!.hidden = true;
-  }
-  document.querySelector<HTMLElement>("#logout-button")!.hidden = user === null;
-  setAdmin(user?.admin === true);
-}
-
-// Signing out also forgets the local game, so the next person starts clean
 async function handleReset(): Promise<void> {
   if (await play.reset()) {
     clearBoard();
   }
 }
 
-async function handleLogout(): Promise<void> {
-  if (await signOut(browserFetch)) {
-    play = anonymousPlay;
-    play.reset();
-    clearBoard();
-    showAccount(null);
-  }
-}
-
 // Empties the board and shows the guess input again
 function clearBoard(): void {
   document.querySelector("#guess-results-container")!.replaceChildren();
-  document.querySelector("#victory-title")?.remove();
-  document.querySelector("#give-up-title")?.remove();
+  document.querySelector("#result-banner")!.replaceChildren();
   setFinished(false);
+  refreshEmptyState();
 }
 
 // A finished game (won or gave up) swaps guessing for the reset button
@@ -201,63 +159,51 @@ async function handleGiveUp(): Promise<void> {
   const result: GiveUpResult = await play.giveUp();
   showNotice(result.kind === "rate_limited" ? RATE_LIMITED : null);
   if (result.kind === "gaveUp") {
-    addGiveUpTitle(result.answer);
+    showBanner("give-up", result.answer);
     setFinished(true);
   }
 }
 
-function addGiveUpTitle(answerName: string): void {
-  if (document.querySelector("#give-up-title")) {
-    return;
+// The result card above the guesses: the answer's photo and name
+function showBanner(kind: "victory" | "give-up", answerName: string): void {
+  const banner = document.createElement("div");
+  banner.id = kind === "victory" ? "victory-title" : "give-up-title";
+  banner.className = `banner banner-${kind}`;
+  const photo = GUESS_DATA.find((pet: Pet) => pet.name === answerName)?.photo;
+  if (photo !== undefined) {
+    const image = document.createElement("img");
+    image.src = "/" + photo;
+    image.alt = "";
+    banner.append(image);
   }
-
-  const title: HTMLSpanElement = document.createElement("span");
-  title.id = "give-up-title";
-  title.append("THE ANSWER WAS: ");
-  const name: HTMLSpanElement = document.createElement("span");
-  name.id = "give-up-answer-name";
+  const text = document.createElement("div");
+  const heading = document.createElement("strong");
+  heading.textContent =
+    kind === "victory" ? "You did it!" : "Better luck tomorrow";
+  const line = document.createElement("span");
+  line.append(kind === "victory" ? "The answer is " : "The answer was ");
+  const name = document.createElement("span");
+  name.id = kind === "victory" ? "victory-answer-name" : "give-up-answer-name";
   name.textContent = answerName;
-  title.append(name);
-  const gameContainer: Element = document.querySelector("#game-container")!;
-  gameContainer.parentNode!.insertBefore(title, gameContainer);
+  line.append(name);
+  text.append(heading, line);
+  banner.append(text);
+  document.querySelector("#result-banner")!.replaceChildren(banner);
 }
 
-function initHelpDialog(): void {
-  const dialog: HTMLDialogElement =
-    document.querySelector<HTMLDialogElement>("#help-dialog")!;
-  const steps: HTMLElement[] = [
-    ...dialog.querySelectorAll<HTMLElement>(".help-step"),
-  ];
-  const prev: HTMLButtonElement =
-    document.querySelector<HTMLButtonElement>("#help-prev")!;
-  const next: HTMLButtonElement =
-    document.querySelector<HTMLButtonElement>("#help-next")!;
-  const count: HTMLElement =
-    document.querySelector<HTMLElement>("#help-count")!;
-  let current = 0;
-
-  const show = (index: number): void => {
-    current = index;
-    steps.forEach((step: HTMLElement, i: number): void => {
-      step.hidden = i !== current;
-    });
-    prev.disabled = current === 0;
-    next.disabled = current === steps.length - 1;
-    count.textContent = `${current + 1} / ${steps.length}`;
-  };
-
-  prev.onclick = (): void => show(current - 1);
-  next.onclick = (): void => show(current + 1);
-  document.querySelector<HTMLButtonElement>("#help-button")!.onclick =
-    (): void => {
-      show(0);
-      dialog.showModal();
-    };
+function refreshEmptyState(): void {
+  const empty =
+    document.querySelector("#guess-results-container")!.childElementCount === 0;
+  document.querySelector<HTMLElement>("#empty-state")!.hidden = !empty;
 }
 
 async function loadInitialUsedGuessesElements(): Promise<void> {
   const loaded: Loaded | null = await play.load();
+  document.querySelector("#board")!.removeAttribute("aria-busy");
+  document.querySelector<HTMLElement>("#loading-state")!.hidden = true;
   if (loaded === null) {
+    showNotice("Could not load your game. Check your connection and refresh.");
+    refreshEmptyState();
     return;
   }
 
@@ -265,11 +211,12 @@ async function loadInitialUsedGuessesElements(): Promise<void> {
     addGuessResultElement(row);
   }
   if (loaded.victory && loaded.answer !== undefined) {
-    addVictoryTitle(loaded.answer);
+    showBanner("victory", loaded.answer);
   } else if (loaded.gaveUp && loaded.answer !== undefined) {
-    addGiveUpTitle(loaded.answer);
+    showBanner("give-up", loaded.answer);
   }
   setFinished(loaded.victory || loaded.gaveUp === true);
+  refreshEmptyState();
 }
 
 function addGuessResultElement(row: GradedAttribute[]): void {
@@ -282,7 +229,8 @@ function addGuessResultElement(row: GradedAttribute[]): void {
 
     if (key === "photo") {
       const image: HTMLImageElement = document.createElement("img");
-      image.src = value as string;
+      image.src = "/" + (value as string);
+      image.alt = "";
       resultCell.appendChild(image);
     } else {
       resultCell.textContent = Array.isArray(value) ? value.join(", ") : value;
@@ -337,27 +285,11 @@ async function handleSubmitSelection(): Promise<void> {
   }
 
   if (result.isAnswer && result.answer !== undefined) {
-    addVictoryTitle(result.answer);
+    showBanner("victory", result.answer);
     setFinished(true);
   }
   addGuessResultElement(result.row);
-}
-
-function addVictoryTitle(answerName: string): void {
-  if (document.querySelector("#victory-title")) {
-    return;
-  }
-
-  const victoryTitle: HTMLSpanElement = document.createElement("span");
-  victoryTitle.id = "victory-title";
-  victoryTitle.innerHTML =
-    "YOU DID IT! THE ANSWER IS: <span id='victory-answer-name'>".concat(
-      answerName,
-      "</span>",
-    );
-
-  const gameContainer: Element = document.querySelector("#game-container")!;
-  gameContainer.parentNode!.insertBefore(victoryTitle, gameContainer);
+  refreshEmptyState();
 }
 
 function handleResultsList(list: HTMLElement, data: AutoCompleteResults): void {

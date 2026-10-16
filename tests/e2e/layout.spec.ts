@@ -32,6 +32,7 @@ const WORST_GUESSES: string[] = [
 // Page-side checks. Returns a list of human-readable problems; empty means fine.
 // Runs inside the browser, so it must not reference anything from this file.
 function findLayoutProblems(): string[] {
+  window.scrollTo(0, 0);
   const problems: string[] = [];
   const vw = document.documentElement.clientWidth;
   const label = (el: Element): string =>
@@ -50,7 +51,7 @@ function findLayoutProblems(): string[] {
   }
 
   const blocks = all(
-    "#page-title, #theme-button, #help-button, #new-guess-input, #submit-new-guess-button, #guess-results-titles-row, .guess-result-row, #victory-title, #victory-answer-name",
+    ".brand, .nav, #theme-button, #signin-link, #user-menu-button, h1, #new-guess-input, #submit-new-guess-button, #guess-results-titles-row, .guess-result-row, #victory-title, #victory-answer-name, .auth-card, .help-step, .tabs",
   );
   for (const el of blocks) {
     const r = el.getBoundingClientRect();
@@ -161,27 +162,82 @@ for (const { name, width, height } of VIEWPORTS) {
       await expectNoProblems(page);
     });
 
-    test("how-to-play popup, every step", async ({ page }) => {
-      await page.locator("#help-button").click();
-      const dialog = page.locator("#help-dialog");
-      for (let step = 0; step < 5; step++) {
-        const box = (await dialog.boundingBox())!;
-        expect(box.x, `step ${step + 1} left`).toBeGreaterThanOrEqual(0);
-        expect(box.x + box.width, `step ${step + 1} right`).toBeLessThanOrEqual(
-          width,
-        );
-        // No sideways scrolling inside the popup, and its buttons stay usable
-        expect(
-          await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth),
-          `step ${step + 1} scrolls sideways`,
-        ).toBe(true);
-        for (const id of ["#help-prev", "#help-next"]) {
-          await expect(page.locator(id)).toBeVisible();
-        }
-        if (step < 4) {
-          await page.locator("#help-next").click();
-        }
-      }
+    test("how-to-play page", async ({ page }) => {
+      await page.goto("/how-to-play");
+      await expectNoProblems(page);
+    });
+
+    test("sign-in page: idle, error, check-your-email", async ({ page }) => {
+      await page.goto("/login");
+      await expectNoProblems(page);
+      await page.locator("#login-email").fill("nope");
+      await page.locator("#login-button").click();
+      await expect(page.locator("#login-status")).toBeVisible();
+      await expectNoProblems(page);
+      await page.route("**/api/auth/email/request", (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: '{"ok":true}',
+        }),
+      );
+      await page
+        .locator("#login-email")
+        .fill("a-rather-long-address-to-wrap-in-the-card@example.test");
+      await page.locator("#login-button").click();
+      await expect(page.locator("#login-sent")).toBeVisible();
+      await expectNoProblems(page);
+    });
+
+    test("link landing page and its error", async ({ page }) => {
+      await page.goto("/verify?token=bogus");
+      await expect(page.locator("#verify-failed")).toBeVisible();
+      await expectNoProblems(page);
+    });
+
+    test("signed-in header with a long address and the open menu", async ({
+      page,
+    }) => {
+      await page.request.post("/api/test/login", {
+        data: {
+          email: `a.very.long.address.indeed.${width}@some-long-domain.example.test`,
+        },
+      });
+      await page.goto("/");
+      await page.locator("#user-menu-button").click();
+      await expect(page.locator("#user-menu-panel")).toBeVisible();
+      const box = (await page.locator("#user-menu-panel").boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width);
+      await expectNoProblems(page);
+    });
+
+    test("admin page: every tab, and the 403 page", async ({ page }) => {
+      await page.request.post("/api/test/login", {
+        data: { email: `plain-${width}@example.test`, admin: false },
+      });
+      await page.goto("/admin");
+      await expect(page.locator("#gate-forbidden")).toBeVisible();
+      await expectNoProblems(page);
+      await page.context().clearCookies();
+      await page.request.post("/api/test/login", {
+        data: { email: `root-${width}@example.test`, admin: true },
+      });
+      await page.goto("/admin");
+      await expect(page.locator("#admin-days tr").first()).toBeVisible();
+      await expectNoProblems(page);
+      await page.locator("#admin-days tr").nth(1).locator("button").click();
+      await expectNoProblems(page);
+      await page.locator("#tab-users").click();
+      await expect(page.locator("#admin-users tr").first()).toBeVisible();
+      await expectNoProblems(page);
+      await page.locator("#tab-backup").click();
+      await expectNoProblems(page);
+    });
+
+    test("not-found page", async ({ page }) => {
+      await page.goto("/no-such-page");
+      await expectNoProblems(page);
     });
   });
 }

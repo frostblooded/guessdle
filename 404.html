@@ -1,13 +1,32 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <title>Not found - Petdle</title>
-    <link rel="stylesheet" href="/styles.css" />
-    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Not found - Petdle</title>
+    <script>
+      try {
+        const theme = localStorage.getItem("theme");
+        if (theme === "light" || theme === "dark") {
+          document.documentElement.dataset.theme = theme;
+        }
+      } catch {}
+    </script>
+    <link rel="stylesheet" href="/dist/styles.css" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   </head>
   <body>
-    <span id="page-title">404</span>
-    <p><a href="/">Back to PETDLE</a></p>
+    <header class="site-header">
+      <div class="bar">
+        <a class="brand" href="/"><span>Petdle</span></a>
+      </div>
+    </header>
+    <main id="main" class="page page-narrow">
+      <section class="card auth-card center">
+        <h1>404: page not found</h1>
+        <p class="lede">There is nothing at this address.</p>
+        <a class="btn btn-primary" href="/">Back to PETDLE</a>
+      </section>
+    </main>
   </body>
 </html>

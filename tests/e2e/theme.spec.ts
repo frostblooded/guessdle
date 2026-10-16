@@ -29,7 +29,7 @@ const background = (page: Page): Promise<string> =>
 
 const themeButton = (page: Page): Locator => page.locator("#theme-button");
 
-const LIGHT_BG = "rgb(255, 255, 255)";
+const LIGHT_BG = "rgb(246, 245, 251)";
 
 test.describe("dark OS preference, auto mode", () => {
   test.use({ colorScheme: "dark" });
@@ -52,9 +52,8 @@ test.describe("dark OS preference, auto mode", () => {
       input: page.locator("#new-guess-input"),
       "autocomplete item": option,
       "column title": page.locator(".guess-result-title").first(),
-      "correct cell": page.locator(".help-example .correct").first(),
-      "partial cell": page.locator(".help-example .partially-correct").first(),
-      "incorrect cell": page.locator(".help-example .incorrect").first(),
+      "nav link": page.locator(".nav a").first(),
+      "sign in button": page.locator("#signin-link"),
       "submit button": page.locator("#submit-new-guess-button"),
     };
     for (const [name, locator] of Object.entries(checks)) {
@@ -87,9 +86,9 @@ test.describe("light OS preference", () => {
       "#new-guess-input",
       "[role=option]",
       ".guess-result-title",
-      ".help-example .correct",
-      ".help-example .partially-correct",
-      ".help-example .incorrect",
+      ".nav a",
+      "#signin-link",
+      "#theme-button",
     ]) {
       expect(
         await contrast(page.locator(selector).first()),
@@ -148,10 +147,71 @@ test.describe("light OS preference", () => {
   });
 });
 
-test("theme button does not overlap the title on a phone", async ({ page }) => {
+for (const scheme of ["light", "dark"] as const) {
+  test(`result colors and every other page are readable in ${scheme}`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.goto("/how-to-play");
+    for (const selector of [
+      ".help-example .correct",
+      ".help-example .partially-correct",
+      ".help-example .incorrect",
+      ".help-head .cell",
+    ]) {
+      expect(
+        await contrast(page.locator(selector).first()),
+        selector,
+      ).toBeGreaterThanOrEqual(WCAG_AA);
+    }
+    await page.goto("/login");
+    for (const selector of [
+      "#login-email",
+      "#login-button",
+      ".btn-secondary, .btn-quiet, #theme-button",
+    ]) {
+      expect(
+        await contrast(page.locator(selector).first()),
+        selector,
+      ).toBeGreaterThanOrEqual(WCAG_AA);
+    }
+    await page.locator("#login-email").fill("nope");
+    await page.locator("#login-button").click();
+    expect(
+      await contrast(page.locator("#login-status")),
+      "error",
+    ).toBeGreaterThanOrEqual(WCAG_AA);
+  });
+
+  test(`the 404 page follows the ${scheme} theme`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.goto("/nowhere");
+    expect((await background(page)) === LIGHT_BG).toBe(scheme === "light");
+  });
+}
+
+test("the theme choice carries over to other pages", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.goto("/");
+  await themeButton(page).click();
+  await themeButton(page).click();
+  await page.goto("/login");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(themeButton(page)).toHaveText("Theme: dark");
+  expect(await background(page)).not.toBe(LIGHT_BG);
+});
+
+test("the header fits a phone: theme and account controls beside the brand, nav below", async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 360, height: 640 });
   await page.goto("/");
-  const button = await themeButton(page).boundingBox();
-  const title = await page.locator("#page-title").boundingBox();
-  expect(button!.y + button!.height).toBeLessThanOrEqual(title!.y);
+  const brand = (await page.locator(".brand").boundingBox())!;
+  const theme = (await themeButton(page).boundingBox())!;
+  const signIn = (await page.locator("#signin-link").boundingBox())!;
+  const nav = (await page.locator(".nav").boundingBox())!;
+  expect(brand.x + brand.width).toBeLessThanOrEqual(theme.x);
+  expect(theme.x + theme.width).toBeLessThanOrEqual(signIn.x);
+  expect(signIn.x + signIn.width).toBeLessThanOrEqual(360);
+  expect(nav.y).toBeGreaterThanOrEqual(brand.y + brand.height - 1);
 });

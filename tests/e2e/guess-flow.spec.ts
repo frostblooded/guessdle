@@ -35,7 +35,7 @@ test("a correct guess shows the victory banner with the answer", async ({
 }) => {
   await submitGuess(page, answerName);
 
-  await expect(victory(page)).toContainText("YOU DID IT");
+  await expect(victory(page)).toContainText("You did it");
   await expect(page.locator("#victory-answer-name")).toHaveText(answerName);
   await expect(rows(page)).toHaveCount(1);
   await expect(rows(page).first().locator(".cell.incorrect")).toHaveCount(0);
@@ -262,34 +262,41 @@ test.describe("upgrading state stored by an older version", () => {
   });
 });
 
-test("help button opens and closes the how-to-play popup", async ({ page }) => {
+test("the how-to-play page is linked from the nav and shows five steps", async ({
+  page,
+}) => {
   await openOnDay(page);
-  const dialog: Locator = page.locator("#help-dialog");
-  await expect(dialog).toBeHidden();
-  await page.locator("#help-button").click();
-  await expect(dialog).toBeVisible();
+  await page
+    .getByRole("navigation", { name: "Main" })
+    .getByRole("link", { name: "How to play" })
+    .click();
+  await expect(page).toHaveURL(/\/how-to-play$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "How to play",
+  );
+  await expect(page.locator(".help-step")).toHaveCount(5);
   await expect(
-    dialog.locator(".correct, .partially-correct, .incorrect"),
+    page.locator(
+      ".help-example .correct, .help-example .partially-correct, .help-example .incorrect",
+    ),
   ).toHaveCount(12);
-  await dialog.getByRole("button", { name: "CLOSE" }).click();
-  await expect(dialog).toBeHidden();
+  await page.getByRole("link", { name: "Start playing" }).click();
+  await expect(page).toHaveURL(/\/$/);
 });
 
-test("help popup examples use real roster pets and fit a phone screen", async ({
+test("how-to-play examples use real roster pets and fit a phone screen", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 667 });
-  await openOnDay(page);
-  await page.locator("#help-button").click();
-  const dialog: Locator = page.locator("#help-dialog");
+  await page.goto("/how-to-play");
 
-  const shown: string[] = await dialog
+  const shown: string[] = await page
     .locator(".help-example .guess-result-cell:nth-child(2)")
     .allTextContents();
   for (const name of [...shown, "Ati"]) {
     expect(names, name).toContain(name);
   }
-  // The popup's green/orange/red claims must still hold for the roster data.
+  // The guide's green/orange/red claims must still hold for the roster data.
   const pet = (n: string) => GUESS_DATA.find((p) => p.name === n)!;
   const [ati, cookie, eddie] = [pet("Ati"), pet("Cookie"), pet("Eddie")];
   expect(cookie.colors).toEqual(ati.colors);
@@ -299,49 +306,19 @@ test("help popup examples use real roster pets and fit a phone screen", async ({
   ).toBeGreaterThan(0);
   expect(ati.colors).not.toEqual(eddie.colors);
   expect(ati.owners.some((o) => eddie.owners.includes(o))).toBe(false);
-  const photos: Locator = dialog.locator(".help-example img");
-  await expect(photos).toHaveCount(4);
-  // Step through the guide: each step fits and shows its photo.
-  const next: Locator = page.locator("#help-next");
-  const stepCount: number = await dialog.locator(".help-step").count();
-  expect(stepCount).toBe(5);
-  for (let i = 0; i < stepCount; i++) {
-    await expect(dialog.locator(".help-step:not([hidden])")).toHaveCount(1);
-    for (const img of await dialog
-      .locator(".help-step:not([hidden]) img")
-      .all()) {
-      await expect(img).toBeVisible();
-      expect(
-        await img.evaluate((el: HTMLImageElement) => el.naturalWidth),
-      ).toBeGreaterThan(0);
-    }
+  await expect(page.locator(".help-example img")).toHaveCount(4);
+  for (const img of await page.locator(".help-step img").all()) {
+    await img.scrollIntoViewIfNeeded();
+    await expect(img).toBeVisible();
     expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth,
-      ),
-    ).toBe(true);
-    const box = (await dialog.boundingBox())!;
-    expect(box.x).toBeGreaterThanOrEqual(0);
-    expect(box.x + box.width).toBeLessThanOrEqual(375);
-    if (i < stepCount - 1) {
-      await next.click();
-    }
+      await img.evaluate((el: HTMLImageElement) => el.naturalWidth),
+    ).toBeGreaterThan(0);
   }
-  await expect(next).toBeDisabled();
-  await page.locator("#help-prev").click();
-  await expect(next).toBeEnabled();
-});
-
-test("help popup restarts at step 1 on reopen", async ({ page }) => {
-  await openOnDay(page);
-  const dialog: Locator = page.locator("#help-dialog");
-  await page.locator("#help-button").click();
-  await page.locator("#help-next").click();
-  await expect(page.locator("#help-count")).toHaveText("2 / 5");
-  await dialog.getByRole("button", { name: "CLOSE" }).click();
-  await page.locator("#help-button").click();
-  await expect(page.locator("#help-count")).toHaveText("1 / 5");
-  await expect(page.locator("#help-prev")).toBeDisabled();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
 });
 
 const giveUpButton = (page: Page): Locator => page.locator("#give-up-button");

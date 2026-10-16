@@ -35,7 +35,7 @@ What is remembered about today: the Guesses made (as pet ids), whether the playe
 An Admin's choice of Daily Answer for today or a future day, replacing the generated one. Past days cannot be overridden. Setting or clearing an Override re-draws every later generated day; overridden days are never re-drawn.
 
 **Admin**:
-A signed-in user with the admin flag. Admins see the admin panel: Answer History with Overrides, users (promote or demote, never oneself or the last Admin) and backup age. Emails in `ADMIN_EMAILS` become Admins on login.
+A signed-in user with the admin flag. Admins get an Admin link in the account menu and use the admin page (`/admin`): Answer History with Overrides, users (promote or demote, never oneself or the last Admin) and backup age. Emails in `ADMIN_EMAILS` become Admins on login.
 
 **Day Number**:
 Whole calendar days since the game's start date. The start date itself is day 0. Each Day Number maps to exactly one Daily Answer.

@@ -17,3 +17,9 @@ export async function submitGuess(page: Page, name: string): Promise<void> {
   await page.locator("#submit-new-guess-button").click();
   await expect(page.locator("#new-guess-input")).toHaveValue("");
 }
+
+// Opens the account menu and signs out; the app then returns to Play
+export async function signOutViaMenu(page: Page): Promise<void> {
+  await page.locator("#user-menu-button").click();
+  await page.locator("#logout-button").click();
+}

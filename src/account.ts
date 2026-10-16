@@ -61,11 +61,19 @@ export async function requestLoginLink(
       : "error";
 }
 
-// True when the emailed token was valid and the session cookie is now set
+export type VerifyResult = "ok" | "invalid" | "rate_limited" | "error";
+
+// "ok" when the emailed token was valid and the session cookie is now set
 export async function verifyLoginToken(
   fetch: Fetch,
   token: string,
-): Promise<boolean> {
+): Promise<VerifyResult> {
   const res = await call(fetch, "/api/auth/email/verify", { token }, false);
-  return res?.ok === true;
+  if (res === null) {
+    return "error";
+  }
+  if (res.status === 429) {
+    return "rate_limited";
+  }
+  return res.ok ? "ok" : res.status === 400 ? "invalid" : "error";
 }

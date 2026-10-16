@@ -16,8 +16,7 @@ const openBackups = async (page: Page, admin = true): Promise<void> => {
   await page.request.post("/api/test/login", {
     data: { email: `backup-${Date.now()}@example.test`, admin },
   });
-  await page.goto("/");
-  await page.locator("#admin-button").click();
+  await page.goto("/admin");
   await page.locator("#tab-backup").click();
 };
 

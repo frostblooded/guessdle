@@ -94,7 +94,7 @@ describe("requestLoginLink", () => {
 });
 
 describe("verifyLoginToken", () => {
-  it("posts the token and reports success only for 2xx", async () => {
+  it("posts the token and tells ok from invalid", async () => {
     const bodies: unknown[] = [];
     const fetch =
       (ok: boolean): Fetch =>
@@ -106,12 +106,19 @@ describe("verifyLoginToken", () => {
           json: () => Promise.resolve({}),
         });
       };
-    assert.equal(await verifyLoginToken(fetch(true), "t1"), true);
-    assert.equal(await verifyLoginToken(fetch(false), "t2"), false);
+    assert.equal(await verifyLoginToken(fetch(true), "t1"), "ok");
+    assert.equal(await verifyLoginToken(fetch(false), "t2"), "invalid");
     assert.deepEqual(bodies, ['{"token":"t1"}', '{"token":"t2"}']);
   });
 
-  it("is false when the server is unreachable", async () => {
-    assert.equal(await verifyLoginToken(down, "t"), false);
+  it("is an error when the server is unreachable or broken", async () => {
+    assert.equal(await verifyLoginToken(down, "t"), "error");
+    assert.equal(await verifyLoginToken(reply(false, {}), "t"), "error");
+  });
+
+  it("reports rate limiting", async () => {
+    const limited: Fetch = () =>
+      Promise.resolve({ ok: false, status: 429, json: () => Promise.reject() });
+    assert.equal(await verifyLoginToken(limited, "t"), "rate_limited");
   });
 });

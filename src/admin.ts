@@ -1,4 +1,4 @@
-// Admin panel (Answers tab): peek at stored Daily Answers and override them.
+// Admin page: Answers (peek and override Daily Answers), Users and Backups tabs.
 import { GUESS_DATA } from "./game/roster.ts";
 
 interface AnswerDay {
@@ -49,9 +49,7 @@ async function call(
   }
 }
 
-export function initAdmin(): (admin: boolean) => void {
-  const dialog = $<HTMLDialogElement>("#admin-dialog");
-  const button = $<HTMLButtonElement>("#admin-button");
+export function initAdmin(): void {
   const from = $<HTMLInputElement>("#admin-from");
   const to = $<HTMLInputElement>("#admin-to");
   const message = $<HTMLElement>("#admin-message");
@@ -73,6 +71,7 @@ export function initAdmin(): (admin: boolean) => void {
 
   const show = async (query = ""): Promise<void> => {
     form.hidden = true;
+    say("Loading days…");
     const { ok, json } = await call("GET", `/api/admin/answers${query}`);
     if (!ok) {
       say("Could not load the days. Check the range and try again.");
@@ -170,6 +169,8 @@ export function initAdmin(): (admin: boolean) => void {
   const usersBody = $<HTMLElement>("#admin-users");
 
   const showUsers = async (): Promise<void> => {
+    usersMessage.textContent = "Loading users…";
+    usersMessage.hidden = false;
     const { ok, json } = await call("GET", "/api/admin/users");
     if (!ok) {
       usersMessage.textContent = "Could not load the users.";
@@ -254,6 +255,7 @@ export function initAdmin(): (admin: boolean) => void {
     backupPanel.hidden = name !== "backup";
     for (const [key, tab] of Object.entries(tabs)) {
       tab.ariaSelected = String(key === name);
+      tab.tabIndex = key === name ? 0 : -1;
     }
     void (name === "answers"
       ? show()
@@ -261,14 +263,20 @@ export function initAdmin(): (admin: boolean) => void {
         ? showUsers()
         : showBackup());
   };
-  tabs.answers.onclick = (): void => selectTab("answers");
-  tabs.users.onclick = (): void => selectTab("users");
-  tabs.backup.onclick = (): void => selectTab("backup");
-  button.onclick = (): void => {
-    dialog.showModal();
-    selectTab("answers");
+  for (const [name, tab] of Object.entries(tabs)) {
+    tab.onclick = (): void => selectTab(name as keyof typeof tabs);
+  }
+  // Arrow keys move between tabs, as in any tablist
+  $<HTMLElement>("#admin-tabs").onkeydown = (event: KeyboardEvent): void => {
+    const names = Object.keys(tabs) as (keyof typeof tabs)[];
+    const step =
+      event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    const current = names.findIndex((n) => tabs[n].ariaSelected === "true");
+    if (step !== 0) {
+      const next = names[(current + step + names.length) % names.length]!;
+      selectTab(next);
+      tabs[next].focus();
+    }
   };
-  return (admin) => {
-    button.hidden = !admin;
-  };
+  selectTab("answers");
 }

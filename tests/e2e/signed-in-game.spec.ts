@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { GUESS_DATA } from "../../src/game/roster.ts";
-import { findAnswerName, submitGuess } from "./helpers.ts";
+import { findAnswerName, signOutViaMenu, submitGuess } from "./helpers.ts";
 
 // Each test is its own player, so stored games never collide
 let counter = 0;
@@ -102,7 +102,7 @@ test("a signed-in player's game does not leak to a signed-out visitor", async ({
   await stubLogin(page, newEmail());
   await page.goto("/");
   await submitGuess(page, wrong!);
-  await page.locator("#logout-button").click();
+  await signOutViaMenu(page);
   await expect(page.locator(".guess-result-row")).toHaveCount(0);
 
   await page.reload();
