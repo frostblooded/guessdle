@@ -313,6 +313,35 @@ describe("Google sign-in, sessions and CSRF protection", () => {
       assert.equal(rows[0].last_seen.getTime(), clock.getTime());
     });
 
+    it("looks the session up once per request, not once per middleware", async () => {
+      const { token } = await signIn("ann@x.test");
+      let updates = 0;
+      const counting = {
+        query: (...args: unknown[]) => {
+          if (String(args[0]).includes("update sessions")) {
+            updates++;
+          }
+          return (db.pool.query as (...a: unknown[]) => unknown)(...args);
+        },
+        connect: () => db.pool.connect(),
+      };
+      const base = await serve({ pool: counting as never });
+      assert.ok((await me(token, base)).user);
+      assert.equal(updates, 1);
+    });
+
+    it("purges expired sessions when someone logs in", async () => {
+      await signIn("old@x.test");
+      assert.equal(await count("sessions"), 1);
+      clock = new Date(START.getTime() + 31 * DAY);
+      await signIn("new@x.test");
+      assert.equal(await count("sessions"), 1);
+      const { rows } = await db.pool.query(
+        "select u.email from sessions s join users u on u.id = s.user_id",
+      );
+      assert.deepEqual(rows, [{ email: "new@x.test" }]);
+    });
+
     it("logout deletes the session; the same cookie is signed out next request", async () => {
       const { token } = await signIn("ann@x.test");
       const res = await fetch(
@@ -541,15 +570,51 @@ describe("Google sign-in, sessions and CSRF protection", () => {
       assert.match(to.searchParams.get("scope") ?? "", /email/);
     });
 
+    it("bind the login to a random state kept in a short-lived cookie", async () => {
+      const base = await serve({ google: GOOGLE });
+      const res = await fetch(`${base}/api/auth/google`, {
+        redirect: "manual",
+      });
+      const state = new URL(res.headers.get("location")!).searchParams.get(
+        "state",
+      );
+      const cookie = res.headers.get("set-cookie") ?? "";
+      assert.ok(state);
+      assert.ok(cookie.includes(`oauth_state=${state}`));
+      assert.match(cookie, /HttpOnly/);
+      assert.match(cookie, /SameSite=Lax/);
+      assert.match(cookie, /Max-Age=600/);
+    });
+
+    it("reject a callback with a missing or mismatched state", async () => {
+      const base = await serve({ google: GOOGLE });
+      for (const [query, cookie] of [
+        ["code=x", undefined],
+        ["code=x&state=abc", undefined],
+        ["code=x", "oauth_state=abc"],
+        ["code=x&state=abd", "oauth_state=abc"],
+        ["code=x&state=ab", "oauth_state=abc"],
+      ] as const) {
+        const res = await fetch(`${base}/api/auth/google/callback?${query}`, {
+          redirect: "manual",
+          headers: cookie ? { Cookie: cookie } : {},
+        });
+        assert.equal(res.status, 302, query);
+        assert.equal(res.headers.get("location"), "/?login=failed", query);
+        assert.ok(!(res.headers.get("set-cookie") ?? "").includes("sid="));
+      }
+      assert.equal(await count("sessions"), 0);
+    });
+
     it("send a refused consent back to the page with no session", async () => {
       const base = await serve({ google: GOOGLE });
       const res = await fetch(
-        `${base}/api/auth/google/callback?error=access_denied`,
-        { redirect: "manual" },
+        `${base}/api/auth/google/callback?error=access_denied&state=s`,
+        { redirect: "manual", headers: { Cookie: "oauth_state=s" } },
       );
       assert.equal(res.status, 302);
       assert.equal(res.headers.get("location"), "/?login=failed");
-      assert.equal(res.headers.get("set-cookie"), null);
+      assert.doesNotMatch(res.headers.get("set-cookie") ?? "", /sid=/);
       assert.equal(await count("sessions"), 0);
     });
   });

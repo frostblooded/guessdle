@@ -1,4 +1,5 @@
 import express from "express";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import type { ErrorRequestHandler, Express, Request, Response } from "express";
 import { readBackupStatus } from "./backup.ts";
 import { Passport } from "passport";
@@ -29,11 +30,11 @@ import {
   csrfGuard,
   endSession,
   googleVerify,
+  requestUser,
   sessionToken,
   setSessionCookie,
   startSession,
   upsertUser,
-  userForSession,
   type GoogleConfig,
   type SessionUser,
 } from "./auth.ts";
@@ -76,6 +77,34 @@ export function createApp({
   if (testLogin && process.env["NODE_ENV"] === "production") {
     throw new Error("The test login route cannot run in production");
   }
+  const petIds = roster.map((pet) => pet.id);
+  const isIdList = (value: unknown): value is string[] =>
+    Array.isArray(value) &&
+    value.length <= roster.length &&
+    value.every((id: unknown) => typeof id === "string");
+  // Today's answer, or a 500 sent and undefined
+  const todaysAnswer = async (
+    res: Response,
+    date: string,
+    day: number,
+  ): Promise<Pet | undefined> => {
+    const answerId = await ensureAnswer(pool, petIds, date, random);
+    const answer = roster.find((pet) => pet.id === answerId);
+    if (!answer) {
+      res.status(500).json({ error: "answer_missing", day });
+    }
+    return answer;
+  };
+  const refusePastDay = (
+    res: Response,
+    date: string,
+    today: string,
+  ): boolean => {
+    if (date < today) {
+      res.status(409).json({ error: "past_day" });
+    }
+    return date < today;
+  };
   const app = express();
   // One hop: nginx (or nothing in dev) sets X-Forwarded-For to the real client IP
   app.set("trust proxy", 1);
@@ -90,7 +119,7 @@ export function createApp({
   });
 
   app.get("/api/me", async (req, res) => {
-    const user = await userForSession(pool, sessionToken(req), now());
+    const user = await requestUser(pool, req, now());
     res.set("Cache-Control", "no-store");
     res.json({
       user: user && { name: user.name, email: user.email, admin: user.admin },
@@ -114,16 +143,42 @@ export function createApp({
   if (google) {
     const passport = new Passport();
     passport.use(new GoogleStrategy(google, googleVerify(pool, adminEmails)));
-    // shortcut: no OAuth state check (needs a session store), so login CSRF is possible; upgrade with a signed state cookie
-    app.get(
-      "/api/auth/google",
+    // OAuth state: random per login, kept in a short-lived cookie, compared on the callback
+    const stateCookie = {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: secureCookies,
+      path: "/api/auth/google",
+    } as const;
+    app.get("/api/auth/google", (_req, res, next) => {
+      const state = randomBytes(24).toString("base64url");
+      res.cookie("oauth_state", state, { ...stateCookie, maxAge: 600_000 });
       passport.authenticate("google", {
         scope: ["email", "profile"],
         session: false,
-      }),
-    );
+        state,
+      })(_req, res, next);
+    });
     app.get(
       "/api/auth/google/callback",
+      (req, res, next) => {
+        const expected = /(?:^|;s*)oauth_state=([^;]+)/.exec(
+          req.headers.cookie ?? "",
+        )?.[1];
+        const got = req.query["state"];
+        res.clearCookie("oauth_state", stateCookie);
+        const a = Buffer.from(expected ?? "");
+        const b = Buffer.from(typeof got === "string" ? got : "");
+        if (
+          expected === undefined ||
+          a.length !== b.length ||
+          !timingSafeEqual(a, b)
+        ) {
+          res.redirect("/?login=failed");
+          return;
+        }
+        next();
+      },
       passport.authenticate("google", {
         session: false,
         failureRedirect: "/?login=failed",
@@ -172,7 +227,6 @@ export function createApp({
     /^\d{4}-\d{2}-\d{2}$/.test(value) &&
     !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) &&
     dateOfDay(dayNumber(value)) === value;
-  const petIds = roster.map((pet) => pet.id);
   const adminRoute =
     (
       handler: (ctx: {
@@ -185,7 +239,7 @@ export function createApp({
     ) =>
     async (req: Request, res: Response): Promise<void> => {
       res.set("Cache-Control", "no-store");
-      const user = await userForSession(pool, sessionToken(req), now());
+      const user = await requestUser(pool, req, now());
       if (!user) {
         res.status(401).json({ error: "unauthorized" });
         return;
@@ -256,8 +310,7 @@ export function createApp({
         res.status(400).json({ error: "invalid" });
         return;
       }
-      if (date < today) {
-        res.status(409).json({ error: "past_day" });
+      if (refusePastDay(res, date, today)) {
         return;
       }
       await setOverride(pool, petIds, date, petId, random);
@@ -272,8 +325,7 @@ export function createApp({
         res.status(400).json({ error: "invalid" });
         return;
       }
-      if (date < today) {
-        res.status(409).json({ error: "past_day" });
+      if (refusePastDay(res, date, today)) {
         return;
       }
       if (!(await clearOverride(pool, petIds, date, random))) {
@@ -330,28 +382,17 @@ export function createApp({
       res.status(status).json({ error, day });
     };
     const ids: unknown = (req.body as { ids?: unknown } | undefined)?.ids;
-    if (
-      !Array.isArray(ids) ||
-      ids.length > roster.length ||
-      !ids.every((id: unknown) => typeof id === "string")
-    ) {
+    if (!isIdList(ids)) {
       fail(400, "invalid");
       return;
     }
 
-    const answerId = await ensureAnswer(
-      pool,
-      roster.map((pet) => pet.id),
-      date,
-      random,
-    );
-    const answer = roster.find((pet) => pet.id === answerId);
+    const answer = await todaysAnswer(res, date, day);
     if (!answer) {
-      fail(500, "answer_missing");
       return;
     }
 
-    const graded = gradeIds(roster, answer, ids as string[]);
+    const graded = gradeIds(roster, answer, ids);
     if (graded.kind === "invalid") {
       fail(400, "invalid");
       return;
@@ -372,18 +413,10 @@ export function createApp({
   app.post("/api/give-up", async (_req, res) => {
     const date = todayIn(now(), timeZone);
     const day = dayNumber(date);
-    const answerId = await ensureAnswer(
-      pool,
-      roster.map((pet) => pet.id),
-      date,
-      random,
-    );
-    const answer = roster.find((pet) => pet.id === answerId);
-    if (!answer) {
-      res.status(500).json({ error: "answer_missing", day });
-      return;
+    const answer = await todaysAnswer(res, date, day);
+    if (answer) {
+      res.json({ day, answer: answer.name });
     }
-    res.json({ day, answer: answer.name });
   });
 
   // Signed-in Game State. Every route needs a session and today's answer.
@@ -401,20 +434,13 @@ export function createApp({
       res.set("Cache-Control", "no-store");
       const date = todayIn(now(), timeZone);
       const day = dayNumber(date);
-      const user = await userForSession(pool, sessionToken(req), now());
+      const user = await requestUser(pool, req, now());
       if (!user) {
         res.status(401).json({ error: "unauthorized" });
         return;
       }
-      const answerId = await ensureAnswer(
-        pool,
-        roster.map((pet) => pet.id),
-        date,
-        random,
-      );
-      const answer = roster.find((pet) => pet.id === answerId);
+      const answer = await todaysAnswer(res, date, day);
       if (!answer) {
-        res.status(500).json({ error: "answer_missing", day });
         return;
       }
       const body = (req.body ?? {}) as Record<string, unknown>;
@@ -500,11 +526,9 @@ export function createApp({
     changeRoute(async ({ user, date, day, body, answer }, current, q) => {
       const { ids, gaveUp } = body;
       if (
-        !Array.isArray(ids) ||
-        ids.length > roster.length ||
-        !ids.every((id: unknown) => typeof id === "string") ||
+        !isIdList(ids) ||
         (gaveUp !== undefined && typeof gaveUp !== "boolean") ||
-        !ids.every((id: string) => roster.some((pet) => pet.id === id))
+        !ids.every((id) => petIds.includes(id))
       ) {
         return "invalid";
       }
@@ -515,7 +539,7 @@ export function createApp({
         return "has_progress";
       }
       // Keep first occurrences in order, stop after the answer
-      const keep = [...new Set(ids as string[])];
+      const keep = [...new Set(ids)];
       const end = keep.indexOf(answer.id);
       const adopted = end === -1 ? keep : keep.slice(0, end + 1);
       for (const id of adopted) {

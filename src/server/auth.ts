@@ -106,6 +106,8 @@ export async function startSession(
   userId: number,
   now: Date,
 ): Promise<string> {
+  // Expired rows are dead weight; purge them on each login
+  await pool.query("delete from sessions where expires_at <= $1", [now]);
   const token = randomBytes(32).toString("base64url");
   await pool.query(
     "insert into sessions (token_hash, user_id, expires_at) values ($1, $2, $3)",
@@ -132,6 +134,21 @@ export async function userForSession(
     [hash(token), new Date(now.getTime() + SESSION_DAYS * DAY_MS), now],
   );
   return rows[0] ?? null;
+}
+
+// One lookup per request (the rate limiter and the route share it): each lookup rolls the expiry
+const lookups = new WeakMap<Request, Promise<SessionUser | null>>();
+export function requestUser(
+  pool: pg.Pool,
+  req: Request,
+  now: Date,
+): Promise<SessionUser | null> {
+  let user = lookups.get(req);
+  if (!user) {
+    user = userForSession(pool, sessionToken(req), now);
+    lookups.set(req, user);
+  }
+  return user;
 }
 
 export async function endSession(

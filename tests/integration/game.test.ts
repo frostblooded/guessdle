@@ -119,6 +119,22 @@ describe("signed-in Game State on the server", () => {
     });
   });
 
+  describe("a stored guess whose pet left the roster", () => {
+    it("is dropped from the view instead of failing the day", async () => {
+      const cookie = await login("a@x.test");
+      await post("/api/game/guess", cookie, { id: OTHERS[0] });
+      await db.pool.query(
+        "insert into user_guesses (user_id, day, pet_id) select id, '2026-10-16', 'ghost' from users",
+      );
+      const { status, body } = await get("/api/game", cookie);
+      assert.equal(status, 200);
+      assert.deepEqual(body.ids, [OTHERS[0]]);
+      assert.equal(body.rows.length, 1);
+      const next = await post("/api/game/guess", cookie, { id: OTHERS[1] });
+      assert.deepEqual(next.body.ids, [OTHERS[0], OTHERS[1]]);
+    });
+  });
+
   describe("guess", () => {
     it("grades, persists and returns every row oldest first", async () => {
       const cookie = await login("a@x.test");

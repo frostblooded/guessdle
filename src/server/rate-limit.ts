@@ -1,6 +1,6 @@
 import type { RequestHandler } from "express";
 import type pg from "pg";
-import { sessionToken, userForSession } from "./auth.ts";
+import { requestUser } from "./auth.ts";
 
 export interface RateLimit {
   max: number;
@@ -29,7 +29,7 @@ export function rateLimit(
           windows.delete(key);
         }
       }
-      const user = await userForSession(pool, sessionToken(req), now());
+      const user = await requestUser(pool, req, now());
       const key = user ? `user:${user.id}` : `ip:${req.ip}`;
       let w = windows.get(key);
       if (!w || time - w.start >= windowMs) {

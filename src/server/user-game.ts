@@ -46,11 +46,15 @@ async function view(
         [userId, date],
       )
     ).rowCount === 1;
-  const ids = guesses.rows.map((row) => row.pet_id);
+  // Guesses of pets that left the roster are dropped from the view
+  const known = new Set(roster.map((pet) => pet.id));
+  const ids = guesses.rows
+    .map((row) => row.pet_id)
+    .filter((id) => known.has(id));
   const graded = gradeIds(roster, answer, ids);
   if (graded.kind !== "graded") {
-    // A guessed pet left the roster; stored rows are never duplicated
-    throw new Error("stored guesses no longer match the roster");
+    // Stored rows are never duplicated
+    throw new Error("stored guesses are not gradable");
   }
   return {
     day,
