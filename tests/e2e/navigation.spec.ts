@@ -3,7 +3,7 @@ import { GUESS_DATA } from "./roster.ts";
 import { submitGuess } from "./helpers.ts";
 
 const PAGES = [
-  ["/", "Guess today's pet"],
+  ["/", "Pick a game"],
   ["/how-to-play", "How to play"],
   ["/login", "Sign in or sign up"],
   ["/admin", /Sign in required|403|^Admin$/],
@@ -19,7 +19,7 @@ for (const [path, heading] of PAGES) {
     await expect(page.getByRole("contentinfo")).toBeVisible();
     await expect(
       page.getByRole("navigation", { name: "Main" }).getByRole("link"),
-    ).toHaveText(["Play", "How to play"]);
+    ).toHaveText(["Games", "How to play"]);
     await expect(page.locator("h1:visible")).toHaveCount(1);
     await expect(page.locator("h1:visible")).toHaveText(heading);
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
@@ -36,7 +36,7 @@ test("the nav marks the current page and moves between pages without hashes", as
   await page.goto("/");
   const nav = page.getByRole("navigation", { name: "Main" });
   await expect(
-    nav.getByRole("link", { name: "Play", exact: true }),
+    nav.getByRole("link", { name: "Games", exact: true }),
   ).toHaveAttribute("aria-current", "page");
   await nav.getByRole("link", { name: "How to play" }).click();
   await expect(page).toHaveURL(/\/how-to-play$/);
@@ -45,7 +45,7 @@ test("the nav marks the current page and moves between pages without hashes", as
     "page",
   );
   await expect(
-    nav.getByRole("link", { name: "Play", exact: true }),
+    nav.getByRole("link", { name: "Games", exact: true }),
   ).not.toHaveAttribute("aria-current", "page");
   await page.getByRole("link", { name: "Sign in" }).first().click();
   await expect(page).toHaveURL(/\/login$/);
@@ -80,7 +80,7 @@ test("keyboard users can reach and use the account menu", async ({ page }) => {
 });
 
 test("status messages are announced through live regions", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/g/petdle");
   await expect(page.locator("#notice")).toHaveAttribute("role", "status");
   await expect(page.locator("#result-banner")).toHaveAttribute(
     "aria-live",
@@ -98,14 +98,14 @@ test("the play page shows loading, then the empty state", async ({ page }) => {
     await new Promise((resolve) => setTimeout(resolve, 400));
     await route.continue();
   });
-  await page.goto("/");
+  await page.goto("/g/petdle");
   await expect(page.locator("#loading-state")).toBeVisible();
   await expect(page.locator("#empty-state")).toBeVisible();
   await expect(page.locator("#loading-state")).toBeHidden();
 });
 
 test("a failed game load is reported, not silent", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/g/petdle");
   await submitGuess(page, GUESS_DATA[0]!.name);
   await page.route("**/api/games/petdle/grade", (route) => route.abort());
   await page.reload();

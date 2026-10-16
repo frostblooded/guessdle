@@ -131,6 +131,64 @@ describe("games in the database", () => {
     });
   });
 
+  describe("GET /api/games (the gallery)", () => {
+    const addGame = async (
+      slug: string,
+      status: string,
+      entries: number,
+      created: string,
+    ): Promise<void> => {
+      await db.pool.query(
+        "insert into games (slug, name, description, cover_url, status, start_date, created_at) values ($1, $1, 'About ' || $1, '/uploads/c.webp', $2, '2026-10-16', $3)",
+        [slug, status, created],
+      );
+      for (let i = 0; i < entries; i++) {
+        await db.pool.query(
+          "insert into entries (game_id, name) select id, 'E' from games where slug = $1",
+          [slug],
+        );
+      }
+    };
+    afterEach(async () => {
+      await db.pool.query("delete from games where slug like 'gal-%'");
+    });
+
+    it("lists Petdle first, then approved playable games newest first, with an entry count", async () => {
+      await addGame("gal-old", "approved", 2, "2026-01-01");
+      await addGame("gal-new", "approved", 3, "2026-06-01");
+      const { status, body } = await request("GET", "/api/games");
+      assert.equal(status, 200);
+      assert.deepEqual(
+        body.map((g: Body) => g.slug),
+        [GAME, "gal-new", "gal-old"],
+      );
+      assert.deepEqual(body[1], {
+        slug: "gal-new",
+        name: "gal-new",
+        description: "About gal-new",
+        cover: "/uploads/c.webp",
+        entryCount: 3,
+      });
+      assert.equal(body[0].entryCount, PET_IDS.length);
+    });
+
+    it("hides drafts, pending, rejected, and games under 2 active entries", async () => {
+      await addGame("gal-draft", "draft", 3, "2026-01-01");
+      await addGame("gal-pending", "pending", 3, "2026-01-01");
+      await addGame("gal-rejected", "rejected", 3, "2026-01-01");
+      await addGame("gal-small", "approved", 1, "2026-01-01");
+      await addGame("gal-gone", "approved", 3, "2026-01-01");
+      await db.pool.query(
+        "update entries set deleted_at = now() where id in (select id from entries where game_id = (select id from games where slug = 'gal-gone') limit 2)",
+      );
+      const { body } = await request("GET", "/api/games");
+      assert.deepEqual(
+        body.map((g: Body) => g.slug),
+        [GAME],
+      );
+    });
+  });
+
   describe("GET /api/games/:slug", () => {
     it("describes the game: attributes in order and the active entries", async () => {
       const { status, body } = await request("GET", G);

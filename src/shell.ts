@@ -1,6 +1,6 @@
 // The chrome shared by every page: header (brand, nav, theme, account area) and footer.
 import { fetchUser, signOut, type AccountUser } from "./account.ts";
-import { createGameState } from "./game/game-state.ts";
+import { createGameState, wipeLegacyState } from "./game/game-state.ts";
 import type { Fetch } from "./game/transport.ts";
 import { initTheme } from "./theme.ts";
 
@@ -14,7 +14,7 @@ const HEADER = `
   <div class="bar">
     <a class="brand" href="/">${PAW}<span>Guessdle</span></a>
     <nav class="nav" aria-label="Main">
-      <a href="/">Play</a>
+      <a href="/">Games</a>
       <a href="/how-to-play">How to play</a>
     </nav>
     <div class="tools">
@@ -27,7 +27,7 @@ const FOOTER = `
   <div class="footer-inner">
     <p>Guessdle: new games to guess every day.</p>
     <nav aria-label="Footer">
-      <a href="/">Play</a>
+      <a href="/">Games</a>
       <a href="/how-to-play">How to play</a>
       <a href="/login">Sign in</a>
     </nav>
@@ -109,6 +109,11 @@ export async function initShell(fetch: Fetch): Promise<AccountUser | null> {
   $("#site-header").innerHTML = HEADER;
   $("#site-footer").innerHTML = FOOTER;
   markCurrentPage();
+  try {
+    wipeLegacyState(localStorage);
+  } catch {
+    // blocked storage has nothing to wipe
+  }
   initTheme(
     document.documentElement,
     $<HTMLButtonElement>("#theme-button"),

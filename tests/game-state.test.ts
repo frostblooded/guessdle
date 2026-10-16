@@ -5,6 +5,7 @@ import {
   type GameState,
   type StateStorage,
   gameStorage,
+  wipeLegacyState,
 } from "../src/game/game-state.ts";
 
 class MemoryStorage implements StateStorage {
@@ -271,5 +272,26 @@ describe("gave up", () => {
     const blockedState = createGameState(blocked, () => today);
     blockedState.setGaveUp();
     assert.equal(blockedState.getGaveUp(), true);
+  });
+});
+
+describe("wipeLegacyState", () => {
+  it("removes the un-namespaced keys and keeps per-game and other keys", () => {
+    for (const key of [
+      "usedGuesses",
+      "victory",
+      "day",
+      "gaveUp",
+      "lastPlayed",
+    ]) {
+      storage.setItem(key, "1");
+    }
+    storage.setItem("game:petdle:usedGuesses", "[1]");
+    storage.setItem("theme", "dark");
+    wipeLegacyState(storage);
+    assert.deepEqual([...storage.items.keys()].sort(), [
+      "game:petdle:usedGuesses",
+      "theme",
+    ]);
   });
 });

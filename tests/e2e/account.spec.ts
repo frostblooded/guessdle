@@ -12,7 +12,7 @@ const stubLogin = (
 test("a signed-out visitor sees a Sign in link, no account menu", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/g/petdle");
   await expect(page.locator("#signin-link")).toBeVisible();
   await expect(page.locator("#signin-link")).toHaveAttribute("href", "/login");
   await expect(page.locator("#user-menu-button")).toHaveCount(0);
@@ -23,7 +23,7 @@ test("signing in shows the name and a sign-out control in the account menu", asy
   page,
 }) => {
   await stubLogin(page, { email: "ann@example.test", name: "Ann" });
-  await page.goto("/");
+  await page.goto("/g/petdle");
 
   await expect(page.locator("#account-name")).toHaveText("Ann");
   await expect(page.locator("#signin-link")).toHaveCount(0);
@@ -42,7 +42,7 @@ test("the account menu closes on Escape and on an outside click", async ({
   page,
 }) => {
   await stubLogin(page, { email: "ann@example.test", name: "Ann" });
-  await page.goto("/");
+  await page.goto("/g/petdle");
   await page.locator("#user-menu-button").click();
   await page.keyboard.press("Escape");
   await expect(page.locator("#user-menu-panel")).toBeHidden();
@@ -54,7 +54,7 @@ test("the account menu closes on Escape and on an outside click", async ({
 
 test("the session survives a reload", async ({ page }) => {
   await stubLogin(page, { email: "ann@example.test", name: "Ann" });
-  await page.goto("/");
+  await page.goto("/g/petdle");
   await page.reload();
 
   await expect(page.locator("#account-name")).toHaveText("Ann");
@@ -78,7 +78,7 @@ test("signing out returns to signed-out and clears the local game", async ({
   const answer = await findAnswerName(request);
   const wrong = GUESS_DATA.find((pet) => pet.name !== answer)!.name;
   await stubLogin(page, { email: "ann@example.test", name: "Ann" });
-  await page.goto("/");
+  await page.goto("/g/petdle");
   await submitGuess(page, wrong);
   await expect(page.locator(".guess-result-row")).toHaveCount(1);
 
@@ -97,7 +97,7 @@ test("a session revoked on the server is signed out on the next load", async ({
   page,
 }) => {
   await stubLogin(page, { email: "ann@example.test", name: "Ann" });
-  await page.goto("/");
+  await page.goto("/g/petdle");
   await expect(page.locator("#account-name")).toBeVisible();
 
   // Same effect as an admin removing the session: the server forgets the cookie
@@ -110,7 +110,7 @@ test("a session revoked on the server is signed out on the next load", async ({
 test("mutating requests that are not JSON or come from another origin are refused", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/g/petdle");
   const text = await page.request.post("/api/games/petdle/grade", {
     headers: { "Content-Type": "text/plain" },
     data: "{}",

@@ -35,7 +35,7 @@ test.describe("dark OS preference, auto mode", () => {
   test.use({ colorScheme: "dark" });
 
   test("page is dark and everything is readable", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/g/petdle");
     expect(await background(page)).not.toBe(LIGHT_BG);
     await expect(themeButton(page)).toHaveAttribute(
       "aria-label",
@@ -77,7 +77,7 @@ test.describe("light OS preference", () => {
   test.use({ colorScheme: "light" });
 
   test("page is light and everything is readable", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/g/petdle");
     expect(await background(page)).toBe(LIGHT_BG);
     await page.locator("#new-guess-input").fill("a");
     await expect(page.locator("[role=option]").first()).toBeVisible();

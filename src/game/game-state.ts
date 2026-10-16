@@ -30,6 +30,19 @@ export interface GameState {
   reset(): void;
 }
 
+// Before games had slugs the keys had no prefix (spec #66): forget them once
+export function wipeLegacyState(storage: StateStorage): void {
+  for (const key of [
+    LOCAL_STORAGE_USED_GUESSES_STRING,
+    LOCAL_STORAGE_VICTORY_STRING,
+    LOCAL_STORAGE_DAY_STRING,
+    LOCAL_STORAGE_GAVE_UP_STRING,
+    LOCAL_LAST_PLAYED_STRING,
+  ]) {
+    storage.removeItem(key);
+  }
+}
+
 // One game's keys inside the shared browser storage, so games never share state
 export function gameStorage(storage: StateStorage, slug: string): StateStorage {
   const key = (name: string): string => `game:${slug}:${name}`;

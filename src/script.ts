@@ -26,8 +26,8 @@ import type {
 
 const now = (): Date => new Date();
 
-// The Play page plays game 1 until the gallery routes games by slug
-const SLUG = "petdle";
+// /g/<slug>: the game this page plays
+const SLUG = decodeURIComponent(location.pathname.split("/")[2] ?? "");
 
 let roster: EntryRef[] = [];
 
@@ -39,14 +39,19 @@ let play: Play;
 let autoCompleteJs: autoComplete | null = null;
 
 // The game's attributes and entries, or null when it could not be loaded
-async function loadGame(): Promise<{
-  attributes: GameAttribute[];
-  entries: EntryRef[];
-} | null> {
+async function loadGame(): Promise<
+  | { name: string; attributes: GameAttribute[]; entries: EntryRef[] }
+  | "missing"
+  | null
+> {
   try {
-    const res = await fetch(`/api/games/${SLUG}`);
+    const res = await fetch(`/api/games/${encodeURIComponent(SLUG)}`);
+    if (res.status === 404) {
+      return "missing";
+    }
     return res.ok
       ? ((await res.json()) as {
+          name: string;
           attributes: GameAttribute[];
           entries: EntryRef[];
         })
@@ -69,6 +74,15 @@ function showColumnTitles(attributes: GameAttribute[]): void {
 
 window.onload = async function (): Promise<void> {
   const game = await loadGame();
+  if (game === "missing") {
+    document.querySelector("#game-title")!.textContent = "Game not found";
+    document.querySelector("#game-lede")!.textContent =
+      "There is no game at this address.";
+    document.querySelector<HTMLElement>("#board")!.hidden = true;
+    document.querySelector<HTMLElement>("#not-found")!.hidden = false;
+    document.title = "Game not found - Guessdle";
+    return;
+  }
   if (game === null) {
     document.querySelector("#board")!.removeAttribute("aria-busy");
     document.querySelector<HTMLElement>("#loading-state")!.hidden = true;
@@ -76,6 +90,8 @@ window.onload = async function (): Promise<void> {
     return;
   }
   roster = game.entries;
+  document.querySelector("#game-title")!.textContent = game.name;
+  document.title = `${game.name} - Guessdle`;
   showColumnTitles(game.attributes);
   const storage = gameStorage(localStorage, SLUG);
   // Signed-in players use the server-stored game instead
@@ -89,7 +105,7 @@ window.onload = async function (): Promise<void> {
   });
   autoCompleteJs = new autoComplete({
     selector: "#new-guess-input",
-    placeHolder: "Guess a pet...",
+    placeHolder: "Guess a name...",
     data: {
       src: roster.map((item: EntryRef): string => item.name),
       filter: filterOutGuesses,

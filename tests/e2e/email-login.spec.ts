@@ -68,11 +68,13 @@ test("local guesses made before signing in are merged into the account", async (
 }) => {
   const answer = await findAnswerName(request);
   const wrong = GUESS_DATA.find((pet) => pet.name !== answer)!.name;
-  await page.goto("/");
+  await page.goto("/g/petdle");
   await submitGuess(page, wrong);
   const token = await tokenFor(page, freshEmail());
 
   await page.goto(`/verify?token=${token}`);
+  await expect(page).toHaveURL(/\/$/);
+  await page.goto("/g/petdle");
   await expect(page.locator("#account-name")).toBeVisible();
   await expect(page.locator(".guess-result-row")).toHaveCount(1);
   expect(

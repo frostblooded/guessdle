@@ -16,7 +16,7 @@ const victory = (page: Page): Locator => page.locator("#victory-title");
 
 async function openOnDay(page: Page, now: Date = DAY): Promise<void> {
   await page.clock.install({ time: now });
-  await page.goto("/");
+  await page.goto("/g/petdle");
   // The game loads after the page does; the form works once it has
   await expect(page.locator("#loading-state")).toBeHidden();
 }

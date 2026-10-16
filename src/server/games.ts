@@ -99,3 +99,24 @@ export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
     all,
   };
 }
+
+export interface GalleryCard {
+  slug: string;
+  name: string;
+  description: string;
+  cover: string;
+  entryCount: number;
+}
+
+// Approved games with at least MIN_ENTRIES active entries: the original first, then newest first
+export async function listGallery(q: Q): Promise<GalleryCard[]> {
+  const { rows } = await q.query<GalleryCard>(
+    `select g.slug, g.name, g.description, g.cover_url as cover, count(e.id)::int as "entryCount"
+     from games g join entries e on e.game_id = g.id and e.deleted_at is null
+     where g.status = 'approved'
+     group by g.id having count(e.id) >= $1
+     order by g.slug = 'petdle' desc, g.created_at desc, g.id desc`,
+    [MIN_ENTRIES],
+  );
+  return rows;
+}

@@ -24,7 +24,7 @@ test("a signed-in guess survives a reload and shows on another device", async ({
   const [wrong] = wrongNames(answer);
   const email = newEmail();
   await stubLogin(page, email);
-  await page.goto("/");
+  await page.goto("/g/petdle");
   await submitGuess(page, wrong!);
   await expect(page.locator(".guess-result-row")).toHaveCount(1);
 
@@ -34,7 +34,7 @@ test("a signed-in guess survives a reload and shows on another device", async ({
   const other = await browser.newContext({ baseURL: page.url() });
   const phone = await other.newPage();
   await stubLogin(phone, email);
-  await phone.goto("/");
+  await phone.goto("/g/petdle");
   await expect(phone.locator(".guess-result-row")).toHaveCount(1);
   await other.close();
 });
@@ -45,7 +45,7 @@ test("the guess is stored on the server, not in the browser", async ({
 }) => {
   const [wrong] = wrongNames(await findAnswerName(request));
   await stubLogin(page, newEmail());
-  await page.goto("/");
+  await page.goto("/g/petdle");
   await submitGuess(page, wrong!);
 
   expect(
@@ -61,7 +61,7 @@ test("winning shows the answer, locks guessing, and reset restarts across a relo
 }) => {
   const answer = await findAnswerName(request);
   await stubLogin(page, newEmail());
-  await page.goto("/");
+  await page.goto("/g/petdle");
   await submitGuess(page, answer);
   await expect(page.locator("#victory-answer-name")).toHaveText(answer);
   await expect(page.locator("#reset-button")).toBeVisible();
@@ -85,7 +85,7 @@ test("giving up is stored: the answer shows after a reload, reset clears it", as
 }) => {
   const answer = await findAnswerName(request);
   await stubLogin(page, newEmail());
-  await page.goto("/");
+  await page.goto("/g/petdle");
   await page.locator("#give-up-button").click();
   await expect(page.locator("#give-up-answer-name")).toHaveText(answer);
 
@@ -107,7 +107,7 @@ test("a signed-in player's game does not leak to a signed-out visitor", async ({
 }) => {
   const [wrong] = wrongNames(await findAnswerName(request));
   await stubLogin(page, newEmail());
-  await page.goto("/");
+  await page.goto("/g/petdle");
   await submitGuess(page, wrong!);
   await signOutViaMenu(page);
   await expect(page.locator(".guess-result-row")).toHaveCount(0);
@@ -121,7 +121,7 @@ test("anonymous guesses are adopted into the account on login", async ({
   request,
 }) => {
   const [one, two] = wrongNames(await findAnswerName(request));
-  await page.goto("/");
+  await page.goto("/g/petdle");
   await submitGuess(page, one!);
   await submitGuess(page, two!);
   await expect(page.locator(".guess-result-row")).toHaveCount(2);
@@ -144,13 +144,13 @@ test("an account with progress keeps it and discards leftover local guesses", as
   const [one, two, three] = wrongNames(await findAnswerName(request));
   const email = newEmail();
   await stubLogin(page, email);
-  await page.goto("/");
+  await page.goto("/g/petdle");
   await submitGuess(page, one!);
 
   // Another browser: anonymous guesses, then signs in to the same account
   const other = await browser.newContext({ baseURL: page.url() });
   const phone = await other.newPage();
-  await phone.goto("/");
+  await phone.goto("/g/petdle");
   await submitGuess(phone, two!);
   await submitGuess(phone, three!);
   await stubLogin(phone, email);
@@ -168,7 +168,7 @@ test("an account with progress keeps it and discards leftover local guesses", as
 
 test("an anonymous give-up is adopted on login", async ({ page, request }) => {
   const answer = await findAnswerName(request);
-  await page.goto("/");
+  await page.goto("/g/petdle");
   await page.locator("#give-up-button").click();
   await expect(page.locator("#give-up-answer-name")).toHaveText(answer);
 
@@ -185,7 +185,7 @@ test("a signed-in player can reset mid-game, stored on the server", async ({
 }) => {
   const [wrong] = wrongNames(await findAnswerName(request));
   await stubLogin(page, newEmail());
-  await page.goto("/");
+  await page.goto("/g/petdle");
   await submitGuess(page, wrong!);
 
   await page.locator("#reset-guesses-button").click();

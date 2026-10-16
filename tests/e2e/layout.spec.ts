@@ -127,7 +127,7 @@ for (const { name, width, height } of VIEWPORTS) {
 
     test.beforeEach(async ({ page }) => {
       await page.clock.install({ time: DAY });
-      await page.goto("/");
+      await page.goto("/g/petdle");
     });
 
     test("empty game", async ({ page }) => {

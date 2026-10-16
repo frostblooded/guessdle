@@ -3,6 +3,7 @@ import express from "express";
 import type { Express, Request, Response } from "express";
 import type pg from "pg";
 import { gradeIds } from "../../game/game.ts";
+import { listGallery } from "../games.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
 import {
   addGuess,
@@ -29,6 +30,11 @@ import {
 export function gameRoutes(app: Express, ctx: AppContext): void {
   const { pool, now } = ctx;
   const base = "/api/games/:slug";
+
+  app.get("/api/games", async (_req, res) => {
+    res.set("Cache-Control", "no-store");
+    res.json(await listGallery(pool));
+  });
 
   // What a player needs to render the game: its attributes and active entries
   app.get(base, async (req, res) => {

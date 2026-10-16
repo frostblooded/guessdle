@@ -39,7 +39,7 @@ for (const [kind, respond] of [
   test(`anonymous: a ${kind} 429 shows the message and keeps the typed guess`, async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/g/petdle");
     await expect(page.locator("#loading-state")).toBeHidden();
     await page.route("**/api/games/petdle/grade", respond);
     await input(page).fill(wrongName);
@@ -60,7 +60,7 @@ for (const [kind, respond] of [
     page,
   }) => {
     await signIn(page);
-    await page.goto("/");
+    await page.goto("/g/petdle");
     await expect(page.locator("#loading-state")).toBeHidden();
     await page.route("**/api/games/petdle/state/guess", respond);
     await input(page).fill(wrongName);
@@ -79,7 +79,7 @@ for (const [kind, respond] of [
   test(`a ${kind} 429 on give up shows the message and the game goes on`, async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/g/petdle");
     // The buttons work once the game has loaded
     await expect(page.locator("#loading-state")).toBeHidden();
     await page.route("**/api/games/petdle/give-up", respond);
@@ -94,7 +94,7 @@ for (const [kind, respond] of [
 test("merge: a 429 on sign-in shows the message and keeps the local guess", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/g/petdle");
   await submitGuess(page, wrongName);
   await signIn(page);
   await page.route("**/api/games/petdle/state/merge", nginx429);

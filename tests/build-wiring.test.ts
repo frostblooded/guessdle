@@ -9,7 +9,8 @@ const read = (path: string): string =>
   readFileSync(join(import.meta.dirname, "..", path), "utf8");
 
 const PAGES: Record<string, string> = {
-  "index.html": "script",
+  "index.html": "gallery",
+  "game.html": "script",
   "login.html": "login",
   "verify.html": "verify",
   "admin.html": "admin",
@@ -111,6 +112,14 @@ describe("build output is wired through the pages and the deploy", () => {
     assert.match(
       conf,
       /location \/ \{[^}]*try_files \$uri \$uri\/index\.html \$uri\.html =404;/,
+    );
+  });
+
+  it("nginx serves /g/<slug> from the game shell", () => {
+    const conf: string = read("deploy/nginx.conf");
+    assert.match(
+      conf,
+      /location ~ \^\/g\/\[\^\/\]\+\$ \{[^}]*try_files \/game\.html =404;/,
     );
   });
 
