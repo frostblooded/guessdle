@@ -31,7 +31,7 @@ const TYPES = {
 
 function pageFor(urlPath) {
   if (urlPath === "/") return "index.html";
-  // /g/<slug> is the game shell; the slug is resolved client-side
+  // /g/<slug> is the game shell (with DATABASE_URL the API serves it first, with meta injected)
   if (/^\/g\/[^/]+$/.test(urlPath)) return "game.html";
   // /g/<slug>/edit is the editor shell
   if (/^\/g\/[^/]+\/edit$/.test(urlPath)) return "edit.html";

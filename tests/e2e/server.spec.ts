@@ -4,7 +4,6 @@ const SERVED = [
   ["/", "text/html"],
   ["/index.html", "text/html"],
   ["/g/petdle", "text/html"],
-  ["/g/no-such-game", "text/html"],
   ["/game.html", "text/html"],
   ["/dist/gallery.js", "text/javascript"],
   ["/login", "text/html"],

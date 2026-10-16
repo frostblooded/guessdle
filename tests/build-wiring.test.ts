@@ -118,11 +118,11 @@ describe("build output is wired through the pages and the deploy", () => {
     );
   });
 
-  it("nginx serves /g/<slug> from the game shell", () => {
+  it("nginx proxies /g/<slug> to the API for meta injection", () => {
     const conf: string = read("deploy/nginx.conf");
     assert.match(
       conf,
-      /location ~ \^\/g\/\[\^\/\]\+\$ \{[^}]*try_files \/game\.html =404;/,
+      /location ~ \^\/g\/\[\^\/\]\+\$ \{[^}]*proxy_pass http:\/\/api:3000;/,
     );
   });
 

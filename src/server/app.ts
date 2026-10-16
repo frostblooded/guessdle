@@ -10,6 +10,7 @@ import { authRoutes } from "./routes/auth.ts";
 import type { AppContext } from "./routes/context.ts";
 import { gameRoutes } from "./routes/game.ts";
 import { manageRoutes } from "./routes/manage.ts";
+import { shellRoutes } from "./routes/shell.ts";
 import { uploadRoutes } from "./routes/uploads.ts";
 
 export interface AppDeps {
@@ -37,6 +38,8 @@ export interface AppDeps {
   uploadQuotaBytes?: number;
   // Per-user budget for creating and editing games per window
   writeLimit?: RateLimit;
+  // Folder holding game.html, the shell served at /g/<slug>
+  shellDir?: string;
 }
 
 // The API only; callers add static files (dev server) or sit behind nginx (prod)
@@ -55,6 +58,7 @@ export function createApp({
   uploadLimit,
   uploadQuotaBytes,
   writeLimit,
+  shellDir = ".",
 }: AppDeps): Express {
   if (testLogin && process.env["NODE_ENV"] === "production") {
     throw new Error("The test login route cannot run in production");
@@ -85,6 +89,7 @@ export function createApp({
   manageRoutes(app, ctx, uploadsDir, writeLimit);
   uploadRoutes(app, ctx, uploadsDir, uploadLimit, uploadQuotaBytes);
   answersRoutes(app, ctx);
+  shellRoutes(app, ctx, shellDir);
 
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "not_found" });
