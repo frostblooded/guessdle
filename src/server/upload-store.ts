@@ -52,9 +52,12 @@ export async function removeUpload(
   }
 }
 
-// URLs still used by content. Nothing stores upload URLs yet; the game tables add theirs here.
-function referencedUrls(_pool: pg.Pool): Promise<Set<string>> {
-  return Promise.resolve(new Set());
+// URLs still used by content: game covers and entry photos (soft-deleted entries stay, they can be restored)
+async function referencedUrls(pool: pg.Pool): Promise<Set<string>> {
+  const { rows } = await pool.query<{ url: string }>(
+    "select cover_url as url from games union select photo_url from entries",
+  );
+  return new Set(rows.map((r) => r.url));
 }
 
 // Deletes unreferenced files older than the grace period, and quota rows whose file is gone.

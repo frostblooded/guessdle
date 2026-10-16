@@ -1,15 +1,18 @@
 // Admin page: Answers (peek and override Daily Answers), Users and Backups tabs.
-import { GUESS_DATA } from "./game/roster.ts";
+import type { EntryRef } from "./game/game.ts";
+
+// The answers tab edits Petdle until the game editor exists
+const GAME = "petdle";
 
 interface AnswerDay {
   date: string;
-  petId: string;
+  entryId: number;
   name: string | null;
   source: "generated" | "override";
   today: boolean;
   locked: boolean;
   missing: boolean;
-  previous: string[];
+  previous: number[];
 }
 
 interface AdminUser {
@@ -77,9 +80,13 @@ export function initAdmin(): void {
   let days: AnswerDay[] = [];
   let editing: AnswerDay | null = null;
 
-  for (const { id, name } of GUESS_DATA) {
-    pet.append(new Option(name, id));
-  }
+  let entries: EntryRef[] = [];
+  void call("GET", `/api/games/${GAME}`).then(({ json }) => {
+    entries = (json as { entries?: EntryRef[] }).entries ?? [];
+    for (const { id, name } of entries) {
+      pet.append(new Option(name, String(id)));
+    }
+  });
   const say = (text: string | null): void => {
     message.textContent = text ?? "";
     message.hidden = text === null;
@@ -88,7 +95,10 @@ export function initAdmin(): void {
   const show = async (query = ""): Promise<void> => {
     form.hidden = true;
     say("Loading days…");
-    const { ok, json } = await call("GET", `/api/admin/answers${query}`);
+    const { ok, json } = await call(
+      "GET",
+      `/api/games/${GAME}/answers${query}`,
+    );
     if (!ok) {
       say("Could not load the days. Check the range and try again.");
       return;
@@ -112,7 +122,7 @@ export function initAdmin(): void {
           );
         };
         cell(day.date);
-        cell(day.missing ? `MISSING (${day.petId})` : day.name!);
+        cell(day.missing ? `MISSING (${day.entryId})` : day.name!);
         row.append(
           tagCell(
             ...(day.today ? ["today"] : []),
@@ -138,12 +148,13 @@ export function initAdmin(): void {
   };
 
   const updateNotice = (): void => {
-    notice.hidden = editing === null || !editing.previous.includes(pet.value);
+    notice.hidden =
+      editing === null || !editing.previous.includes(Number(pet.value));
   };
   const openEditor = (day: AnswerDay): void => {
     editing = day;
     $<HTMLElement>("#override-title").textContent = `Override ${day.date}`;
-    pet.value = day.missing ? GUESS_DATA[0]!.id : day.petId;
+    pet.value = String(day.missing ? entries[0]?.id : day.entryId);
     clearButton.hidden = day.source !== "override";
     updateNotice();
     form.hidden = false;
@@ -156,7 +167,7 @@ export function initAdmin(): void {
   const apply = async (method: string, body?: unknown): Promise<void> => {
     const { ok } = await call(
       method,
-      `/api/admin/answers/${editing!.date}`,
+      `/api/games/${GAME}/answers/${editing!.date}`,
       body ?? {},
     );
     if (!ok) {
@@ -167,7 +178,7 @@ export function initAdmin(): void {
   };
   form.onsubmit = (event): void => {
     event.preventDefault();
-    void apply("PUT", { petId: pet.value });
+    void apply("PUT", { entryId: Number(pet.value) });
   };
   clearButton.onclick = (): void => void apply("DELETE");
   $<HTMLButtonElement>("#override-cancel").onclick = (): void => {

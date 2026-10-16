@@ -1,11 +1,11 @@
 // A signed-in player's Game State for one day, stored in Postgres.
 import type pg from "pg";
-import { gradeIds, type GradedAttribute } from "../game/game.ts";
-import type { Pet } from "../game/roster.ts";
+import { gradeIds, type Entry, type GradedAttribute } from "../game/game.ts";
+import type { GameRow, Roster } from "./games.ts";
 
 export interface GameView {
   day: number;
-  ids: string[];
+  ids: number[];
   rows: GradedAttribute[][];
   victory: boolean;
   gaveUp: boolean;
@@ -30,8 +30,9 @@ type Q = Pick<pg.Pool, "query">;
 
 // Who is playing which day, and against which answer
 export interface GameContext {
-  roster: readonly Pet[];
-  answer: Pet;
+  game: GameRow;
+  roster: Roster;
+  answer: Entry;
   userId: number;
   date: string;
   day: number;
@@ -40,25 +41,22 @@ export interface GameContext {
 // Graded on read against the current answer, so an overridden answer applies at once
 export async function view(
   q: Q,
-  { roster, answer, userId, date, day }: GameContext,
+  { game, roster, answer, userId, date, day }: GameContext,
 ): Promise<GameView> {
-  const guesses = await q.query<{ pet_id: string }>(
-    "select pet_id from user_guesses where user_id = $1 and day = $2 order by seq",
-    [userId, date],
+  const guesses = await q.query<{ entry_id: number }>(
+    "select entry_id::int from user_guesses where user_id = $1 and game_id = $2 and day = $3 order by seq",
+    [userId, game.id, date],
   );
   const gaveUp =
     (
       await q.query(
-        "select 1 from user_give_ups where user_id = $1 and day = $2",
-        [userId, date],
+        "select 1 from user_give_ups where user_id = $1 and game_id = $2 and day = $3",
+        [userId, game.id, date],
       )
     ).rowCount === 1;
-  // Guesses of pets that left the roster are dropped from the view
-  const known = new Set(roster.map((pet) => pet.id));
-  const ids = guesses.rows
-    .map((row) => row.pet_id)
-    .filter((id) => known.has(id));
-  const graded = gradeIds(roster, answer, ids);
+  // Soft-deleted entries still resolve, so past guesses keep their rows
+  const ids = guesses.rows.map((row) => row.entry_id);
+  const graded = gradeIds(roster.attributes, roster.all, answer, ids);
   if (graded.kind !== "graded") {
     // Stored rows are never duplicated
     throw new Error("stored guesses are not gradable");
@@ -108,51 +106,51 @@ const finished = (current: GameView): boolean =>
 
 export async function addGuess(
   q: Q,
-  { roster, userId, date }: GameContext,
+  { game, roster, userId, date }: GameContext,
   current: GameView,
   id: unknown,
 ): Promise<Refusal | null> {
-  if (typeof id !== "string" || !roster.some((pet) => pet.id === id)) {
+  if (typeof id !== "number" || !roster.entries.some((e) => e.id === id)) {
     return "invalid";
   }
   if (finished(current)) {
     return "finished";
   }
   const { rowCount } = await q.query(
-    "insert into user_guesses (user_id, day, pet_id) values ($1, $2, $3) on conflict do nothing",
-    [userId, date, id],
+    "insert into user_guesses (user_id, game_id, day, entry_id) values ($1, $2, $3, $4) on conflict do nothing",
+    [userId, game.id, date, id],
   );
   return rowCount === 1 ? null : "duplicate";
 }
 
 export async function giveUp(
   q: Q,
-  { userId, date }: GameContext,
+  { game, userId, date }: GameContext,
   current: GameView,
 ): Promise<Refusal | null> {
   if (finished(current)) {
     return "finished";
   }
-  await q.query("insert into user_give_ups (user_id, day) values ($1, $2)", [
-    userId,
-    date,
-  ]);
+  await q.query(
+    "insert into user_give_ups (user_id, game_id, day) values ($1, $2, $3)",
+    [userId, game.id, date],
+  );
   return null;
 }
 
-// Adopts anonymous local history (POST /api/game/merge body); the user-row lock
+// Adopts anonymous local history (POST /api/games/:slug/state/merge body); the user-row lock
 // in changeGame makes the "no rows yet" check and the inserts one atomic step.
 export async function mergeLocal(
   q: Q,
-  { roster, answer, userId, date, day }: GameContext,
+  { game, roster, answer, userId, date, day }: GameContext,
   current: GameView,
   body: Record<string, unknown>,
 ): Promise<Refusal | null> {
   const { ids, gaveUp } = body;
   if (
     !Array.isArray(ids) ||
-    ids.length > roster.length ||
-    !ids.every((id) => roster.some((pet) => pet.id === id)) ||
+    ids.length > roster.entries.length ||
+    !ids.every((id) => roster.entries.some((e) => e.id === id)) ||
     (gaveUp !== undefined && typeof gaveUp !== "boolean")
   ) {
     return "invalid";
@@ -164,34 +162,34 @@ export async function mergeLocal(
     return "has_progress";
   }
   // Keep first occurrences in order, stop after the answer
-  const keep = [...new Set(ids as string[])];
+  const keep = [...new Set(ids as number[])];
   const end = keep.indexOf(answer.id);
   const adopted = end === -1 ? keep : keep.slice(0, end + 1);
   for (const id of adopted) {
     await q.query(
-      "insert into user_guesses (user_id, day, pet_id) values ($1, $2, $3)",
-      [userId, date, id],
+      "insert into user_guesses (user_id, game_id, day, entry_id) values ($1, $2, $3, $4)",
+      [userId, game.id, date, id],
     );
   }
   if (gaveUp === true && end === -1) {
-    await q.query("insert into user_give_ups (user_id, day) values ($1, $2)", [
-      userId,
-      date,
-    ]);
+    await q.query(
+      "insert into user_give_ups (user_id, game_id, day) values ($1, $2, $3)",
+      [userId, game.id, date],
+    );
   }
   return null;
 }
 
 export async function resetGame(
   q: Q,
-  { userId, date }: GameContext,
+  { game, userId, date }: GameContext,
 ): Promise<Refusal | null> {
   // Any time, even with no rows: deleting nothing is fine
   for (const table of ["user_guesses", "user_give_ups"]) {
-    await q.query(`delete from ${table} where user_id = $1 and day = $2`, [
-      userId,
-      date,
-    ]);
+    await q.query(
+      `delete from ${table} where user_id = $1 and game_id = $2 and day = $3`,
+      [userId, game.id, date],
+    );
   }
   return null;
 }

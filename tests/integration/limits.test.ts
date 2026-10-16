@@ -2,16 +2,17 @@ import assert from "node:assert/strict";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { after, before, beforeEach, describe, it } from "node:test";
-import { GUESS_DATA } from "../../src/game/roster.ts";
 import { createApp } from "../../src/server/app.ts";
 import { MIGRATIONS_DIR } from "../../src/server/main.ts";
 import { migrate } from "../../src/server/migrate.ts";
+import { PET_IDS } from "./petdle.ts";
 import { startDb } from "./postgres.ts";
 import type { TestDb } from "./postgres.ts";
 
 const NOW = new Date("2026-10-16T10:00:00Z");
 const MAX = 5;
-const IDS = GUESS_DATA.map((pet) => pet.id);
+const IDS = PET_IDS;
+const G = "/api/games/petdle";
 
 describe("abuse protection", () => {
   let db: TestDb;
@@ -89,8 +90,8 @@ describe("abuse protection", () => {
       const ip = "10.1.0.2";
       await burst(MAX, { ip });
       for (const [path, body] of [
-        ["/api/grade", { ids: [] }],
-        ["/api/give-up", {}],
+        [`${G}/grade`, { ids: [] }],
+        [`${G}/give-up`, {}],
         ["/api/me", undefined],
         ["/api/nope", undefined],
       ] as const) {
@@ -138,7 +139,7 @@ describe("abuse protection", () => {
     it("limits the signed-in game routes too", async () => {
       const cookie = await login("c@x.test", "10.1.0.11");
       await burst(MAX, { cookie, ip: "10.1.0.11" });
-      const res = await call("/api/game/guess", {
+      const res = await call(`${G}/state/guess`, {
         cookie,
         ip: "10.1.0.11",
         body: { id: IDS[0] },
@@ -157,11 +158,11 @@ describe("abuse protection", () => {
       const cookie = await login("d@x.test", ip());
       const big = JSON.stringify({ ids: [], pad: "x".repeat(11 * 1024) });
       for (const path of [
-        "/api/grade",
-        "/api/game/guess",
-        "/api/game/merge",
-        "/api/game/give-up",
-        "/api/game/reset",
+        `${G}/grade`,
+        `${G}/state/guess`,
+        `${G}/state/merge`,
+        `${G}/state/give-up`,
+        `${G}/state/reset`,
       ]) {
         const res = await call(path, { cookie, ip: ip(), raw: big });
         assert.equal(res.status, 413, path);
@@ -170,7 +171,7 @@ describe("abuse protection", () => {
     });
 
     it("accepts a body just under the cap", async () => {
-      const res = await call("/api/grade", {
+      const res = await call(`${G}/grade`, {
         ip: ip(),
         raw: JSON.stringify({ ids: [], pad: "x".repeat(9 * 1024) }),
       });
@@ -180,9 +181,9 @@ describe("abuse protection", () => {
     it("rejects more ids than the roster on grade and merge", async () => {
       const cookie = await login("e@x.test", ip());
       const ids = [...IDS, IDS[0]];
-      const grade = await call("/api/grade", { ip: ip(), body: { ids } });
+      const grade = await call(`${G}/grade`, { ip: ip(), body: { ids } });
       assert.equal(grade.status, 400);
-      const merge = await call("/api/game/merge", {
+      const merge = await call(`${G}/state/merge`, {
         cookie,
         ip: ip(),
         body: { day: 1, ids },
@@ -192,7 +193,7 @@ describe("abuse protection", () => {
     });
 
     it("accepts exactly the roster size", async () => {
-      const res = await call("/api/grade", { ip: ip(), body: { ids: IDS } });
+      const res = await call(`${G}/grade`, { ip: ip(), body: { ids: IDS } });
       assert.equal(res.status, 200);
     });
   });

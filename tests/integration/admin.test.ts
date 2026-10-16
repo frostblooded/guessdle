@@ -1,20 +1,27 @@
 import assert from "node:assert/strict";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { after, before, beforeEach, describe, it } from "node:test";
-import { ANSWER_SKIP_PERIOD, GUESS_DATA } from "../../src/game/roster.ts";
-import { dateOfDay, dayNumber } from "../../src/server/answers.ts";
+import { after, afterEach, before, beforeEach, describe, it } from "node:test";
+import {
+  dateOfDay as dateOf,
+  dayNumber as dayNo,
+} from "../../src/server/answers.ts";
 import { createApp } from "../../src/server/app.ts";
 import { MIGRATIONS_DIR } from "../../src/server/main.ts";
 import { migrate } from "../../src/server/migrate.ts";
+import { GAME, PET_IDS, START, petName, pid } from "./petdle.ts";
 import { startDb } from "./postgres.ts";
 import type { TestDb } from "./postgres.ts";
 
+const ANSWER_SKIP_PERIOD = 5;
+const dayNumber = (date: string): number => dayNo(date, START);
+const dateOfDay = (day: number): string => dateOf(day, START);
 const TODAY = "2026-10-16";
+const ANSWERS = `/api/games/${GAME}/answers`;
 const TODAY_N = dayNumber(TODAY);
 // What the backfill stores for TODAY
-const TODAY_PET = "bela";
-const ALL_IDS = GUESS_DATA.map((pet) => pet.id);
+const TODAY_PET = pid("bela");
+const ALL_IDS = PET_IDS;
 const at = (offset: number): string => dateOfDay(TODAY_N + offset);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -60,44 +67,42 @@ describe("admin Answers: peek and overrides", () => {
     return res.headers.get("set-cookie")!.split(";")[0]!;
   };
   const list = (from?: string, to?: string): Promise<Reply> =>
-    send(
-      "GET",
-      `/api/admin/answers${from ? `?from=${from}&to=${to}` : ""}`,
-      admin,
-    );
-  const put = (date: string, petId: unknown): Promise<Reply> =>
-    send("PUT", `/api/admin/answers/${date}`, admin, { petId });
+    send("GET", `${ANSWERS}${from ? `?from=${from}&to=${to}` : ""}`, admin);
+  const put = (date: string, entryId: unknown): Promise<Reply> =>
+    send("PUT", `${ANSWERS}/${date}`, admin, { entryId });
   const clear = (date: string): Promise<Reply> =>
-    send("DELETE", `/api/admin/answers/${date}`, admin, {});
+    send("DELETE", `${ANSWERS}/${date}`, admin, {});
   const stored = async (): Promise<
-    { day: string; pet_id: string; source: string }[]
+    { day: string; entry_id: number; source: string }[]
   > =>
     (
       await db.pool.query(
-        "select to_char(day, 'YYYY-MM-DD') as day, pet_id, source from daily_answers where day > $1 order by day",
+        "select to_char(day, 'YYYY-MM-DD') as day, entry_id::int, source from daily_answers where day > $1 order by day",
         [TODAY],
       )
     ).rows;
   // What a player gets for the current day
-  const playerAnswer = async (): Promise<string> => {
-    const res = await fetch(`${url}/api/grade`, {
+  const playerAnswer = async (): Promise<number> => {
+    const res = await fetch(`${url}/api/games/${GAME}/grade`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids: ALL_IDS }),
     });
     const name = ((await res.json()) as Body).answer;
-    return GUESS_DATA.find((pet) => pet.name === name)!.id;
+    return ALL_IDS.find((id) => petName(id) === name)!;
   };
   // The pet the draw rule picks for a random value, after `prev`
-  const draw = (prev: string[], r: number): string => {
+  const draw = (prev: number[], r: number): number => {
     const recent = prev.slice(-ANSWER_SKIP_PERIOD);
     const allowed = ALL_IDS.filter((id) => !recent.includes(id));
     return allowed[Math.floor(r * allowed.length)]!;
   };
-  const allRows = async (): Promise<string[]> =>
+  const allRows = async (): Promise<number[]> =>
     (
-      await db.pool.query("select pet_id from daily_answers order by day")
-    ).rows.map((r) => r.pet_id as string);
+      await db.pool.query(
+        "select entry_id::int from daily_answers order by day",
+      )
+    ).rows.map((r) => r.entry_id as number);
   const assertWindowsHold = async (): Promise<void> => {
     const rows = await allRows();
     rows.forEach((id, i) => {
@@ -106,7 +111,7 @@ describe("admin Answers: peek and overrides", () => {
       }
     });
   };
-  const someOtherPet = (...not: string[]): string =>
+  const someOtherPet = (...not: number[]): number =>
     ALL_IDS.find((id) => !not.includes(id))!;
 
   before(async () => {
@@ -133,7 +138,7 @@ describe("admin Answers: peek and overrides", () => {
   beforeEach(async () => {
     await db.pool.query("delete from daily_answers where day > $1", [TODAY]);
     await db.pool.query(
-      "update daily_answers set pet_id = $2, source = 'generated' where day = $1",
+      "update daily_answers set entry_id = $2, source = 'generated' where day = $1",
       [TODAY, TODAY_PET],
     );
     await db.pool.query("delete from users where email <> 'admin@x.test'");
@@ -143,9 +148,9 @@ describe("admin Answers: peek and overrides", () => {
 
   describe("access", () => {
     const calls: [string, string, unknown][] = [
-      ["GET", "/api/admin/answers", undefined],
-      ["PUT", `/api/admin/answers/${at(1)}`, { petId: "ati" }],
-      ["DELETE", `/api/admin/answers/${at(1)}`, {}],
+      ["GET", ANSWERS, undefined],
+      ["PUT", `${ANSWERS}/${at(1)}`, { entryId: 1 }],
+      ["DELETE", `${ANSWERS}/${at(1)}`, {}],
     ];
 
     it("answers 401 without a session", async () => {
@@ -164,6 +169,78 @@ describe("admin Answers: peek and overrides", () => {
         );
       }
       assert.deepEqual(await stored(), []);
+    });
+
+    describe("on a user's own game", () => {
+      const mine = "/api/games/mine/answers";
+      const makeGame = async (status: string, entries = 2): Promise<void> => {
+        const owner = await login("owner@x.test");
+        void owner;
+        await db.pool.query(
+          `insert into games (slug, name, status, start_date, owner_id)
+           select 'mine', 'Mine', $1, $2, id from users where email = 'owner@x.test'`,
+          [status, TODAY],
+        );
+        for (let i = 0; i < entries; i++) {
+          await db.pool.query(
+            "insert into entries (game_id, name) select id, $1 from games where slug = 'mine'",
+            [`E${i}`],
+          );
+        }
+      };
+      afterEach(async () => {
+        await db.pool.query("delete from games where slug = 'mine'");
+      });
+
+      it("lets the owner peek and override, with day 0 at the game's start", async () => {
+        await makeGame("approved");
+        const owner = await login("owner@x.test");
+        const peek = await send(
+          "GET",
+          `${mine}?from=${TODAY}&to=${at(1)}`,
+          owner,
+        );
+        assert.equal(peek.status, 200);
+        assert.deepEqual(
+          peek.body.days.map((d: Body) => d.date),
+          [at(0), at(1)],
+        );
+        const entry = peek.body.days[1].entryId;
+        const other = (
+          await db.pool.query(
+            "select id::int from entries where game_id = (select id from games where slug = 'mine') and id <> $1",
+            [entry],
+          )
+        ).rows[0].id;
+        assert.equal(
+          (await send("PUT", `${mine}/${at(1)}`, owner, { entryId: other }))
+            .status,
+          200,
+        );
+      });
+
+      it("refuses other players, and entries of another game", async () => {
+        await makeGame("approved");
+        const stranger = await login("stranger@x.test");
+        assert.equal((await send("GET", mine, stranger)).status, 403);
+        const owner = await login("owner@x.test");
+        const res = await send("PUT", `${mine}/${at(1)}`, owner, {
+          entryId: 1,
+        });
+        assert.equal(res.status, 400);
+      });
+
+      it("hides a draft or too-small game from other players as a 404 but not from admins", async () => {
+        await makeGame("draft");
+        const stranger = await login("stranger@x.test");
+        assert.equal((await send("GET", mine, stranger)).status, 404);
+        assert.equal((await send("GET", mine, admin)).status, 200);
+      });
+
+      it("answers 404 for an unknown game", async () => {
+        const res = await send("GET", "/api/games/nope/answers", admin);
+        assert.deepEqual([res.status, res.body.error], [404, "not_found"]);
+      });
     });
 
     it("reports the admin flag on /api/me so the client can show the panel", async () => {
@@ -201,17 +278,16 @@ describe("admin Answers: peek and overrides", () => {
         [false, true, false],
       );
       assert.equal(now.source, "generated");
-      const pet = GUESS_DATA.find((p) => p.id === now.petId)!;
-      assert.equal(now.name, pet.name);
+      assert.equal(now.name, petName(now.entryId));
       assert.equal(now.missing, false);
     });
 
     it("matches what players get", async () => {
       const { body } = await list(at(0), at(3));
-      const peeked: string[] = body.days.map((d: Body) => d.petId);
+      const peeked: number[] = body.days.map((d: Body) => d.entryId);
       assert.equal(await playerAnswer(), peeked[0]);
       assert.deepEqual(
-        (await stored()).map((r) => r.pet_id),
+        (await stored()).map((r) => r.entry_id),
         peeked.slice(1),
       );
     });
@@ -268,14 +344,18 @@ describe("admin Answers: peek and overrides", () => {
       assert.deepEqual(await stored(), []);
     });
 
-    it("flags a day whose pet is no longer in the roster", async () => {
+    it("still names a day whose entry was soft-deleted", async () => {
       await db.pool.query(
-        "update daily_answers set pet_id = 'gone' where day = $1",
-        [TODAY],
+        "update entries set deleted_at = now() where id = $1",
+        [TODAY_PET],
       );
-      const { body } = await list(at(0), at(0));
-      assert.equal(body.days[0].missing, true);
-      assert.equal(body.days[0].name, null);
+      try {
+        const { body } = await list(at(0), at(0));
+        assert.equal(body.days[0].missing, false);
+        assert.equal(body.days[0].name, petName(TODAY_PET));
+      } finally {
+        await db.pool.query("update entries set deleted_at = null");
+      }
     });
   });
 
@@ -286,7 +366,7 @@ describe("admin Answers: peek and overrides", () => {
       assert.equal((await put(at(2), pet)).status, 200);
       const { body } = await list(at(2), at(2));
       assert.deepEqual(
-        [body.days[0].petId, body.days[0].source],
+        [body.days[0].entryId, body.days[0].source],
         [pet, "override"],
       );
     });
@@ -303,7 +383,7 @@ describe("admin Answers: peek and overrides", () => {
         rows.map((r) => r.source),
         ["generated", "generated", "generated", "override"],
       );
-      assert.equal(rows[3]!.pet_id, pet);
+      assert.equal(rows[3]!.entry_id, pet);
       assert.equal(draws, 3);
     });
 
@@ -311,25 +391,27 @@ describe("admin Answers: peek and overrides", () => {
       const player = await login("mid@x.test");
       const answer = await playerAnswer();
       const other = someOtherPet(answer);
-      const guessed = await send("POST", "/api/game/guess", player, {
-        id: other,
-      });
+      const guessed = await send(
+        "POST",
+        `/api/games/${GAME}/state/guess`,
+        player,
+        {
+          id: other,
+        },
+      );
       assert.equal(guessed.body.victory, false);
 
       // Overriding today to the guessed pet turns that guess into a win
       assert.equal((await put(at(0), other)).status, 200);
       assert.equal(await playerAnswer(), other);
-      const game = await send("GET", "/api/game", player);
+      const game = await send("GET", `/api/games/${GAME}/state`, player);
       assert.equal(game.body.victory, true);
-      assert.equal(
-        game.body.answer,
-        GUESS_DATA.find((p) => p.id === other)!.name,
-      );
+      assert.equal(game.body.answer, petName(other));
 
       // ...and away again: no stale win
       assert.equal((await put(at(0), answer)).status, 200);
       assert.equal(
-        (await send("GET", "/api/game", player)).body.victory,
+        (await send("GET", `/api/games/${GAME}/state`, player)).body.victory,
         false,
       );
     });
@@ -337,8 +419,8 @@ describe("admin Answers: peek and overrides", () => {
     it("rejects past days and leaves them untouched", async () => {
       const before = await allRows();
       for (const method of ["PUT", "DELETE"]) {
-        const res = await send(method, `/api/admin/answers/${at(-1)}`, admin, {
-          petId: "ati",
+        const res = await send(method, `${ANSWERS}/${at(-1)}`, admin, {
+          entryId: 1,
         });
         assert.equal(res.status, 409, method);
         assert.equal(res.body.error, "past_day");
@@ -346,17 +428,17 @@ describe("admin Answers: peek and overrides", () => {
       assert.deepEqual(await allRows(), before);
     });
 
-    it("rejects an unknown pet, a bad date, a non-string pet and days before the start or too far ahead", async () => {
-      for (const [date, petId] of [
-        [at(1), "nope"],
-        [at(1), 5],
+    it("rejects an unknown entry, a bad date, a non-number entry and days before the start or too far ahead", async () => {
+      for (const [date, entryId] of [
+        [at(1), 999],
+        [at(1), "1"],
         [at(1), undefined],
-        ["garbage", "ati"],
-        ["2025-08-14", "ati"],
-        [at(500), "ati"],
+        ["garbage", 1],
+        ["2025-08-14", 1],
+        [at(500), 1],
       ] as const) {
-        const res = await put(date, petId);
-        assert.equal(res.status, 400, `${date} ${String(petId)}`);
+        const res = await put(date, entryId);
+        assert.equal(res.status, 400, `${date} ${String(entryId)}`);
         assert.equal(res.body.error, "invalid");
       }
       assert.deepEqual(await stored(), []);
@@ -376,23 +458,23 @@ describe("admin Answers: peek and overrides", () => {
       const rows = await stored();
       const byDay = Object.fromEntries(rows.map((r) => [r.day, r]));
       // Days before the override are unchanged; the override itself holds
-      assert.equal(byDay[at(1)]!.pet_id, beforeRows[0]!.pet_id);
-      assert.equal(byDay[at(2)]!.pet_id, pet);
+      assert.equal(byDay[at(1)]!.entry_id, beforeRows[0]!.entry_id);
+      assert.equal(byDay[at(2)]!.entry_id, pet);
       // The later override survived; later generated days follow the new draws
       assert.deepEqual(
-        [byDay[at(6)]!.pet_id, byDay[at(6)]!.source],
+        [byDay[at(6)]!.entry_id, byDay[at(6)]!.source],
         [keep, "override"],
       );
       let prev = (await allRows()).slice(0, TODAY_N + 3);
       for (const offset of [3, 4, 5]) {
         const expected = draw(prev, 0.999);
-        assert.equal(byDay[at(offset)]!.pet_id, expected, `day +${offset}`);
+        assert.equal(byDay[at(offset)]!.entry_id, expected, `day +${offset}`);
         prev = [...prev, expected];
       }
       prev = [...prev, keep];
       for (const offset of [7, 8]) {
         const expected = draw(prev, 0.999);
-        assert.equal(byDay[at(offset)]!.pet_id, expected, `day +${offset}`);
+        assert.equal(byDay[at(offset)]!.entry_id, expected, `day +${offset}`);
         prev = [...prev, expected];
       }
     });
@@ -415,7 +497,7 @@ describe("admin Answers: peek and overrides", () => {
       assert.ok(rows.every((r) => r.source === "generated"));
       const history = (await allRows()).slice(0, TODAY_N + 2);
       assert.equal(
-        rows.find((r) => r.day === at(2))!.pet_id,
+        rows.find((r) => r.day === at(2))!.entry_id,
         draw(history, 0.999),
       );
       await assertWindowsHold();
@@ -428,7 +510,7 @@ describe("admin Answers: peek and overrides", () => {
       assert.equal((await clear(at(0))).status, 200);
       const { body } = await list(at(0), at(0));
       assert.equal(body.days[0].source, "generated");
-      assert.equal(await playerAnswer(), body.days[0].petId);
+      assert.equal(await playerAnswer(), body.days[0].entryId);
     });
 
     it("refuses to clear a day that is not an override or not stored", async () => {
@@ -448,7 +530,7 @@ describe("admin Answers: peek and overrides", () => {
       await put(at(1), someOtherPet(first));
       const { body } = await list(at(1), at(1));
       assert.deepEqual(
-        [body.days[0].petId, body.days[0].source],
+        [body.days[0].entryId, body.days[0].source],
         [someOtherPet(first), "override"],
       );
     });

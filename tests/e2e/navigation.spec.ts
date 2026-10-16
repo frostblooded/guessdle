@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { GUESS_DATA } from "../../src/game/roster.ts";
+import { GUESS_DATA } from "./roster.ts";
 import { submitGuess } from "./helpers.ts";
 
 const PAGES = [
@@ -107,7 +107,7 @@ test("the play page shows loading, then the empty state", async ({ page }) => {
 test("a failed game load is reported, not silent", async ({ page }) => {
   await page.goto("/");
   await submitGuess(page, GUESS_DATA[0]!.name);
-  await page.route("**/api/grade", (route) => route.abort());
+  await page.route("**/api/games/petdle/grade", (route) => route.abort());
   await page.reload();
   await expect(page.locator("#notice")).toContainText(
     "Could not load your game",

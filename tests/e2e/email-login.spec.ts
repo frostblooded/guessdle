@@ -4,7 +4,7 @@ import {
   publishedMailpitUrl,
   tokenIn,
 } from "../integration/mailpit.ts";
-import { GUESS_DATA } from "../../src/game/roster.ts";
+import { GUESS_DATA } from "./roster.ts";
 import { findAnswerName, signOutViaMenu, submitGuess } from "./helpers.ts";
 
 let counter = 0;
@@ -75,9 +75,9 @@ test("local guesses made before signing in are merged into the account", async (
   await page.goto(`/verify?token=${token}`);
   await expect(page.locator("#account-name")).toBeVisible();
   await expect(page.locator(".guess-result-row")).toHaveCount(1);
-  expect(await page.evaluate(() => localStorage.getItem("usedGuesses"))).toBe(
-    null,
-  );
+  expect(
+    await page.evaluate(() => localStorage.getItem("game:petdle:usedGuesses")),
+  ).toBe(null);
 });
 
 test("a link works once: opening it again shows the error with a way to get a new one", async ({

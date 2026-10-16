@@ -5,12 +5,31 @@ import {
   Correctness,
   gradeCorrectness,
 } from "./correctness.ts";
-import type { Pet } from "./roster.ts";
 
-// One Attribute of a guessed pet, graded against the Daily Answer. Rows list
-// Attributes in roster key order, which is the table column order.
+export type AttributeType = "text" | "list";
+
+export interface GameAttribute {
+  name: string;
+  type: AttributeType;
+}
+
+// What the client knows of an entry: enough to autocomplete and show a photo
+export interface EntryRef {
+  id: number;
+  name: string;
+  photo: string;
+}
+
+// An entry with its values, one per game attribute in attribute order (Text as
+// a string, List as an array)
+export interface Entry extends EntryRef {
+  values: AttributeValue[];
+}
+
+// One column of a guessed entry, graded against the Daily Answer. Rows list the
+// photo, the name, then the game's Attributes: the table column order.
 export interface GradedAttribute {
-  key: Exclude<keyof Pet, "id">;
+  key: string;
   value: AttributeValue;
   correctness: Correctness;
 }
@@ -22,14 +41,31 @@ export function isAnswerRow(row: GradedAttribute[]): boolean {
   );
 }
 
-export function gradeGuess(answer: Pet, guess: Pet): GradedAttribute[] {
-  return (Object.keys(guess) as (keyof Pet)[])
-    .filter((key: keyof Pet): key is GradedAttribute["key"] => key !== "id")
-    .map((key: GradedAttribute["key"]): GradedAttribute => ({
-      key,
-      value: guess[key],
-      correctness: gradeCorrectness(guess[key], answer[key]),
-    }));
+export function gradeGuess(
+  attributes: readonly GameAttribute[],
+  answer: Entry,
+  guess: Entry,
+): GradedAttribute[] {
+  return [
+    {
+      key: "photo",
+      value: guess.photo,
+      correctness:
+        guess.id === answer.id ? Correctness.Correct : Correctness.Incorrect,
+    },
+    {
+      key: "name",
+      value: guess.name,
+      correctness: gradeCorrectness(guess.name, answer.name),
+    },
+    ...attributes.map(
+      (attribute: GameAttribute, i: number): GradedAttribute => ({
+        key: attribute.name,
+        value: guess.values[i]!,
+        correctness: gradeCorrectness(guess.values[i]!, answer.values[i]!),
+      }),
+    ),
+  ];
 }
 
 export type GradeIdsResult =
@@ -37,22 +73,23 @@ export type GradeIdsResult =
   | { kind: "duplicate" }
   | { kind: "graded"; rows: GradedAttribute[][]; victory: boolean };
 
-// Grades guesses given by pet id, in order. Any unknown id makes the whole
+// Grades guesses given by entry id, in order. Any unknown id makes the whole
 // batch invalid; otherwise any repeated id makes it a duplicate.
 export function gradeIds(
-  roster: readonly Pet[],
-  answer: Pet,
-  ids: readonly string[],
+  attributes: readonly GameAttribute[],
+  roster: readonly Entry[],
+  answer: Entry,
+  ids: readonly number[],
 ): GradeIdsResult {
-  const guesses: Pet[] = [];
+  const guesses: Entry[] = [];
   for (const id of ids) {
-    const pet: Pet | undefined = roster.find(
-      (item: Pet): boolean => item.id === id,
+    const entry: Entry | undefined = roster.find(
+      (item: Entry): boolean => item.id === id,
     );
-    if (!pet) {
+    if (!entry) {
       return { kind: "invalid" };
     }
-    guesses.push(pet);
+    guesses.push(entry);
   }
   if (new Set(ids).size !== ids.length) {
     return { kind: "duplicate" };
@@ -60,21 +97,22 @@ export function gradeIds(
 
   return {
     kind: "graded",
-    rows: guesses.map((guess: Pet): GradedAttribute[] =>
-      gradeGuess(answer, guess),
+    rows: guesses.map((guess: Entry): GradedAttribute[] =>
+      gradeGuess(attributes, answer, guess),
     ),
     victory: ids.includes(answer.id),
   };
 }
 
-// The id of the pet whose name is the typed text (case-insensitive), or null
-export function findPetId(
-  roster: readonly Pet[],
+// The id of the entry whose name is the typed text (case-insensitive), or null
+export function findEntryId(
+  roster: readonly EntryRef[],
   input: string,
-): string | null {
+): number | null {
   const lower: string = input.toLowerCase();
   return (
-    roster.find((pet: Pet): boolean => pet.name.toLowerCase() === lower)?.id ??
-    null
+    roster.find(
+      (entry: EntryRef): boolean => entry.name.toLowerCase() === lower,
+    )?.id ?? null
   );
 }

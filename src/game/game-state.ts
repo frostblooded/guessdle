@@ -16,9 +16,10 @@ export interface StateStorage {
 }
 
 export interface GameState {
-  getUsedGuesses(): string[];
-  addUsedGuess(guess: string): void;
-  setUsedGuesses(guesses: string[]): void;
+  // Entry ids
+  getUsedGuesses(): number[];
+  addUsedGuess(guess: number): void;
+  setUsedGuesses(guesses: number[]): void;
   // Server Day Number the guesses were graded on, null until a response says
   getDay(): number | null;
   setDay(day: number): void;
@@ -27,6 +28,17 @@ export interface GameState {
   setGaveUp(): void;
   // Forgets guesses, day and give-up (a newer day was seen, or the player reset)
   reset(): void;
+}
+
+// One game's keys inside the shared browser storage, so games never share state
+export function gameStorage(storage: StateStorage, slug: string): StateStorage {
+  const key = (name: string): string => `game:${slug}:${name}`;
+  return {
+    getItem: (name: string): string | null => storage.getItem(key(name)),
+    setItem: (name: string, value: string): void =>
+      storage.setItem(key(name), value),
+    removeItem: (name: string): void => storage.removeItem(key(name)),
+  };
 }
 
 // Blocked storage (private mode, disabled cookies) throws. Writes are kept in
@@ -81,14 +93,14 @@ export function createGameState(
   now: () => Date,
 ): GameState {
   const storage: StateStorage = tolerantStorage(rawStorage);
-  const getUsedGuesses = (): string[] => {
+  const getUsedGuesses = (): number[] => {
     const value: unknown = readJson(storage, LOCAL_STORAGE_USED_GUESSES_STRING);
     if (!Array.isArray(value)) {
       return [];
     }
 
-    return value.filter(
-      (item: unknown): item is string => typeof item === "string",
+    return value.filter((item: unknown): item is number =>
+      Number.isInteger(item),
     );
   };
 
@@ -104,14 +116,14 @@ export function createGameState(
   return {
     getUsedGuesses,
 
-    addUsedGuess(guess: string): void {
+    addUsedGuess(guess: number): void {
       storage.setItem(
         LOCAL_STORAGE_USED_GUESSES_STRING,
         JSON.stringify([...getUsedGuesses(), guess]),
       );
     },
 
-    setUsedGuesses(guesses: string[]): void {
+    setUsedGuesses(guesses: number[]): void {
       storage.setItem(
         LOCAL_STORAGE_USED_GUESSES_STRING,
         JSON.stringify(guesses),

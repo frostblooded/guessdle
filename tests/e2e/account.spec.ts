@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { GUESS_DATA } from "../../src/game/roster.ts";
+import { GUESS_DATA } from "./roster.ts";
 import { findAnswerName, signOutViaMenu, submitGuess } from "./helpers.ts";
 
 // The email-link flow is in email-login.spec.ts; elsewhere the test-only login stub signs in
@@ -111,7 +111,7 @@ test("mutating requests that are not JSON or come from another origin are refuse
   page,
 }) => {
   await page.goto("/");
-  const text = await page.request.post("/api/grade", {
+  const text = await page.request.post("/api/games/petdle/grade", {
     headers: { "Content-Type": "text/plain" },
     data: "{}",
   });

@@ -96,6 +96,74 @@ describe("migrate", () => {
     await migrate(db.pool, join(import.meta.dirname, "../../db/migrations"));
   });
 
+  it("rewrites stored pet ids to entry ids when Petdle moves into games", async () => {
+    const real = join(import.meta.dirname, "../../db/migrations");
+    const { copyFile } = await import("node:fs/promises");
+    for (const file of [
+      "001_daily_answers.sql",
+      "002_users_sessions.sql",
+      "003_user_games.sql",
+      "004_email_login.sql",
+    ]) {
+      await copyFile(join(real, file), join(dir, file));
+    }
+    await migrate(db.pool, dir);
+    await db.pool.query(
+      "insert into users (email, name, google_sub) values ('a@x.test', 'A', 'sub')",
+    );
+    await db.pool.query(
+      "insert into user_guesses (user_id, day, pet_id) select id, '2026-10-16', p from users, unnest(array['todorka', 'ati', 'gone-pet']) p",
+    );
+    await db.pool.query(
+      "insert into user_give_ups (user_id, day) select id, '2026-10-15' from users",
+    );
+    await db.pool.query(
+      "update daily_answers set pet_id = 'dido', source = 'override' where day = '2025-08-16'",
+    );
+    await copyFile(join(real, "005_games.sql"), join(dir, "005_games.sql"));
+    assert.deepEqual(await migrate(db.pool, dir), ["005_games.sql"]);
+
+    const entry = async (name: string): Promise<number> =>
+      (
+        await db.pool.query("select id::int from entries where name = $1", [
+          name,
+        ])
+      ).rows[0].id;
+    const answers = await db.pool.query(
+      "select to_char(day, 'YYYY-MM-DD') as day, entry_id::int, source from daily_answers order by day",
+    );
+    assert.equal(answers.rowCount, 428);
+    assert.deepEqual(answers.rows[0], {
+      day: "2025-08-15",
+      entry_id: await entry("Patio"),
+      source: "generated",
+    });
+    assert.deepEqual(answers.rows[1], {
+      day: "2025-08-16",
+      entry_id: await entry("Dido"),
+      source: "override",
+    });
+    const guesses = await db.pool.query(
+      "select entry_id::int from user_guesses order by seq",
+    );
+    assert.deepEqual(
+      guesses.rows.map((r) => r.entry_id),
+      [await entry("Todorka"), await entry("Ati")],
+    );
+    const giveUps = await db.pool.query(
+      "select game_id = (select id from games where slug = 'petdle') as petdle from user_give_ups",
+    );
+    assert.deepEqual(giveUps.rows, [{ petdle: true }]);
+    assert.equal(
+      (
+        await db.pool.query(
+          "select 1 from information_schema.columns where column_name = 'pet_id'",
+        )
+      ).rowCount,
+      0,
+    );
+  });
+
   after(async () => {
     await rm(dir, { recursive: true, force: true });
   });

@@ -1,0 +1,101 @@
+// Game, attribute and entry data: the one seam between routes and the tables.
+import type pg from "pg";
+import type { AttributeValue } from "../game/correctness.ts";
+import type { AttributeType, Entry, GameAttribute } from "../game/game.ts";
+
+type Q = Pick<pg.Pool, "query">;
+
+export const DEFAULT_SKIP_PERIOD = 5;
+
+export type GameStatus = "draft" | "pending" | "approved" | "rejected";
+
+export interface GameRow {
+  id: number;
+  slug: string;
+  name: string;
+  description: string;
+  coverUrl: string;
+  ownerId: number | null;
+  status: GameStatus;
+  // Day Number 0 ("YYYY-MM-DD")
+  startDate: string;
+  skipPeriod: number | null;
+}
+
+// A game plays with at least this many active entries
+export const MIN_ENTRIES = 2;
+
+export const skipOf = (game: GameRow): number =>
+  game.skipPeriod ?? DEFAULT_SKIP_PERIOD;
+
+export async function findGame(q: Q, slug: string): Promise<GameRow | null> {
+  const { rows } = await q.query<GameRow>(
+    `select id::int, slug, name, description, cover_url as "coverUrl",
+       owner_id::int as "ownerId", status,
+       to_char(start_date, 'YYYY-MM-DD') as "startDate",
+       skip_period as "skipPeriod"
+     from games where slug = $1`,
+    [slug],
+  );
+  return rows[0] ?? null;
+}
+
+export interface Roster {
+  attributes: GameAttribute[];
+  // Active entries, by id
+  entries: Entry[];
+  // Every entry including soft-deleted ones, so past guesses still resolve
+  all: Entry[];
+}
+
+// A game's attributes and entries with their values
+export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
+  const attributes = await q.query<{
+    id: number;
+    name: string;
+    type: AttributeType;
+  }>(
+    "select id::int, name, type from attributes where game_id = $1 order by position, id",
+    [game.id],
+  );
+  const entries = await q.query<{
+    id: number;
+    name: string;
+    photo: string;
+    deleted: boolean;
+  }>(
+    `select id::int, name, photo_url as photo, deleted_at is not null as deleted
+     from entries where game_id = $1 order by id`,
+    [game.id],
+  );
+  const values = await q.query<{
+    entry_id: number;
+    attribute_id: number;
+    value: string;
+  }>(
+    `select v.entry_id::int, v.attribute_id::int, v.value
+     from entry_values v join entries e on e.id = v.entry_id
+     where e.game_id = $1 order by v.position`,
+    [game.id],
+  );
+  const byCell = new Map<string, string[]>();
+  for (const { entry_id, attribute_id, value } of values.rows) {
+    const key = `${entry_id}:${attribute_id}`;
+    byCell.set(key, [...(byCell.get(key) ?? []), value]);
+  }
+  const cell = (entryId: number, attr: (typeof attributes.rows)[number]) => {
+    const list = byCell.get(`${entryId}:${attr.id}`) ?? [];
+    return (attr.type === "list" ? list : (list[0] ?? "")) as AttributeValue;
+  };
+  const all = entries.rows.map(({ id, name, photo }): Entry => ({
+    id,
+    name,
+    photo,
+    values: attributes.rows.map((attr) => cell(id, attr)),
+  }));
+  return {
+    attributes: attributes.rows.map(({ name, type }) => ({ name, type })),
+    entries: all.filter((_, i) => !entries.rows[i]!.deleted),
+    all,
+  };
+}

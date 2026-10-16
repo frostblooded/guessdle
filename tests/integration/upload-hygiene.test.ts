@@ -161,6 +161,35 @@ describe("upload hygiene", () => {
     );
   });
 
+  it("sweep keeps files used as a game cover or an entry photo", async () => {
+    const cookie = await login("refs@x.test");
+    const cover = (await upload(cookie)).body.url!;
+    const photo = (await upload(cookie)).body.url!;
+    // Written directly: the quota allows only two uploads
+    const orphan = `/uploads/${"a".repeat(32)}.webp`;
+    await writeFile(join(dir, orphan.slice(9)), "x");
+    await db.pool.query(
+      "insert into games (slug, name, start_date, cover_url) values ('refs', 'Refs', '2026-10-16', $1)",
+      [cover],
+    );
+    await db.pool.query(
+      "insert into entries (game_id, name, photo_url) select id, 'A', $1 from games where slug = 'refs'",
+      [photo],
+    );
+    const old = new Date(Date.now() - 3 * 24 * 3600_000);
+    for (const u of [cover, photo, orphan]) {
+      await utimes(join(dir, u.slice(9)), old, old);
+    }
+    assert.deepEqual(await sweepUploads(db.pool, dir, new Date()), [
+      orphan.slice(9),
+    ]);
+    assert.deepEqual(
+      (await readdir(dir)).sort(),
+      [cover.slice(9), photo.slice(9)].sort(),
+    );
+    await db.pool.query("delete from games where slug = 'refs'");
+  });
+
   it("sweep leaves files that are not ours and drops quota rows of vanished old files", async () => {
     const cookie = await login("vanish@x.test");
     const url1 = (await upload(cookie)).body.url!;

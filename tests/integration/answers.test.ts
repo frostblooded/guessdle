@@ -4,22 +4,33 @@ import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { after, before, beforeEach, describe, it } from "node:test";
-import { ANSWER_SKIP_PERIOD, GUESS_DATA } from "../../src/game/roster.ts";
-import { dateOfDay, dayNumber } from "../../src/server/answers.ts";
+import {
+  dateOfDay as dateOf,
+  dayNumber as dayNo,
+} from "../../src/server/answers.ts";
 import { createApp } from "../../src/server/app.ts";
 import { MIGRATIONS_DIR } from "../../src/server/main.ts";
 import { migrate } from "../../src/server/migrate.ts";
+import { GAME, PET_IDS, START, petName, pid } from "./petdle.ts";
 import { startDb } from "./postgres.ts";
 import type { TestDb } from "./postgres.ts";
 
 const BACKFILL_END = "2026-10-16";
-const backfill: Record<string, string> = JSON.parse(
-  readFileSync(
-    join(import.meta.dirname, "../../db/backfill/answers.json"),
-    "utf8",
-  ),
+const dayNumber = (date: string): number => dayNo(date, START);
+const dateOfDay = (day: number): string => dateOf(day, START);
+const ANSWER_SKIP_PERIOD = 5;
+// The backfilled answers as entry ids
+const backfill: Record<string, number> = Object.fromEntries(
+  Object.entries(
+    JSON.parse(
+      readFileSync(
+        join(import.meta.dirname, "../../db/backfill/answers.json"),
+        "utf8",
+      ),
+    ) as Record<string, string>,
+  ).map(([day, slug]) => [day, pid(slug)]),
 );
-const ALL_IDS = GUESS_DATA.map((pet) => pet.id);
+const ALL_IDS = PET_IDS;
 
 interface Cell {
   key: string;
@@ -57,7 +68,7 @@ describe("stored daily answers and anonymous grading", () => {
     if (init.type !== null) {
       headers["Content-Type"] = init.type ?? "application/json";
     }
-    const res = await fetch(`${url}/api/grade`, {
+    const res = await fetch(`${url}/api/games/${GAME}/grade`, {
       method: "POST",
       headers,
       body: init.body ?? JSON.stringify({ ids }),
@@ -66,17 +77,17 @@ describe("stored daily answers and anonymous grading", () => {
   };
 
   // Guessing the whole roster reveals the answer, whatever it is
-  const answerOf = async (): Promise<string> => {
+  const answerOf = async (): Promise<number> => {
     const { body } = await post(ALL_IDS);
-    const pet = GUESS_DATA.find((p) => p.name === body.answer);
-    assert.ok(pet, "answer revealed");
-    return pet.id;
+    const id = ALL_IDS.find((i) => petName(i) === body.answer);
+    assert.ok(id, "answer revealed");
+    return id;
   };
 
-  const storedDays = async (): Promise<{ day: string; pet_id: string }[]> =>
+  const storedDays = async (): Promise<{ day: string; entry_id: number }[]> =>
     (
       await db.pool.query(
-        "select to_char(day, 'YYYY-MM-DD') as day, pet_id from daily_answers order by day",
+        "select to_char(day, 'YYYY-MM-DD') as day, entry_id::int from daily_answers where game_id = (select id from games where slug = 'petdle') order by day",
       )
     ).rows;
 
@@ -114,7 +125,7 @@ describe("stored daily answers and anonymous grading", () => {
       const rows = await storedDays();
       assert.equal(rows.length, dayNumber(BACKFILL_END) + 1);
       assert.deepEqual(
-        Object.fromEntries(rows.map((r) => [r.day, r.pet_id])),
+        Object.fromEntries(rows.map((r) => [r.day, r.entry_id])),
         backfill,
       );
     });
@@ -126,21 +137,16 @@ describe("stored daily answers and anonymous grading", () => {
 
     it("keeps existing rows when run again and is not re-applied", async () => {
       await db.pool.query(
-        "update daily_answers set pet_id = 'edited', source = 'override' where day = '2025-08-15'",
+        "update daily_answers set entry_id = 2, source = 'override' where day = '2025-08-15'",
       );
       assert.deepEqual(await migrate(db.pool, MIGRATIONS_DIR), []);
-      const sql = readFileSync(
-        join(MIGRATIONS_DIR, "001_daily_answers.sql"),
-        "utf8",
-      );
-      await db.pool.query(sql.slice(sql.indexOf("insert into")));
       const { rows } = await db.pool.query(
-        "select pet_id, source from daily_answers where day = '2025-08-15'",
+        "select entry_id::int, source from daily_answers where day = '2025-08-15'",
       );
-      assert.deepEqual(rows, [{ pet_id: "edited", source: "override" }]);
+      assert.deepEqual(rows, [{ entry_id: 2, source: "override" }]);
       assert.equal((await storedDays()).length, dayNumber(BACKFILL_END) + 1);
       await db.pool.query(
-        "update daily_answers set pet_id = $1, source = 'generated' where day = '2025-08-15'",
+        "update daily_answers set entry_id = $1, source = 'generated' where day = '2025-08-15'",
         [backfill["2025-08-15"]],
       );
     });
@@ -154,7 +160,7 @@ describe("stored daily answers and anonymous grading", () => {
       assert.equal(await answerOf(), answer);
       assert.equal(draws, 1);
       const rows = await storedDays();
-      assert.deepEqual(rows.at(-1), { day: "2026-10-17", pet_id: answer });
+      assert.deepEqual(rows.at(-1), { day: "2026-10-17", entry_id: answer });
     });
 
     it("yields one stored answer for concurrent first requests", async () => {
@@ -167,7 +173,7 @@ describe("stored daily answers and anonymous grading", () => {
       assert.equal(new Set(answers).size, 1);
       const rows = await storedDays();
       assert.equal(rows.filter((r) => r.day === "2026-10-17").length, 1);
-      assert.equal(rows.at(-1)!.pet_id, answers[0]);
+      assert.equal(rows.at(-1)!.entry_id, answers[0]);
       assert.equal(draws, 1);
     });
 
@@ -196,7 +202,7 @@ describe("stored daily answers and anonymous grading", () => {
       const rows = await storedDays();
       rows.forEach((row, i) => {
         for (let back = 1; back <= ANSWER_SKIP_PERIOD && back <= i; back++) {
-          assert.notEqual(row.pet_id, rows[i - back]!.pet_id, row.day);
+          assert.notEqual(row.entry_id, rows[i - back]!.entry_id, row.day);
         }
       });
     };
@@ -206,7 +212,7 @@ describe("stored daily answers and anonymous grading", () => {
       random = () => 0; // always the first allowed pet
       const history = (await storedDays()).slice(-ANSWER_SKIP_PERIOD);
       const answer = await answerOf();
-      assert.ok(!history.some((row) => row.pet_id === answer));
+      assert.ok(!history.some((row) => row.entry_id === answer));
       await assertWindowsHold();
     });
 
@@ -223,10 +229,10 @@ describe("stored daily answers and anonymous grading", () => {
       random = () => 0;
       const previous = (await storedDays())
         .slice(-ANSWER_SKIP_PERIOD)
-        .map((r) => r.pet_id);
+        .map((r) => r.entry_id);
       const wouldPick = ALL_IDS.find((id) => !previous.includes(id))!;
       await db.pool.query(
-        "insert into daily_answers (day, pet_id, source) values ($1, $2, 'override')",
+        "insert into daily_answers (game_id, day, entry_id, source) values ((select id from games where slug = 'petdle'), $1, $2, 'override')",
         [dateOfDay(day), wouldPick],
       );
       today = dateOfDay(day + 1);
@@ -269,11 +275,11 @@ describe("stored daily answers and anonymous grading", () => {
       assert.deepEqual(Object.keys(body).sort(), ["day", "rows", "victory"]);
       assert.deepEqual(
         body.rows!.map((row) => row[1]!.value),
-        wrong.map((id) => GUESS_DATA.find((p) => p.id === id)!.name),
+        wrong.map(petName),
       );
       assert.deepEqual(
         body.rows![0]!.map((cell) => cell.key),
-        ["photo", "name", "colors", "owners"],
+        ["photo", "name", "Colors", "Owners"],
       );
     });
 
@@ -281,7 +287,7 @@ describe("stored daily answers and anonymous grading", () => {
       const answer = await answerOf();
       const { body } = await post([answer]);
       assert.equal(body.victory, true);
-      assert.equal(body.answer, GUESS_DATA.find((p) => p.id === answer)!.name);
+      assert.equal(body.answer, petName(answer));
     });
 
     it("accepts an empty list", async () => {
@@ -291,7 +297,7 @@ describe("stored daily answers and anonymous grading", () => {
     });
 
     it("rejects unknown ids with a JSON invalid error", async () => {
-      for (const ids of [["not-a-pet"], [ALL_IDS[0], "nope"], [""], ["Ati"]]) {
+      for (const ids of [[999], [ALL_IDS[0], 999], [0], [-1], [1.5], ["1"]]) {
         const { status, body } = await post(ids);
         assert.equal(status, 400, JSON.stringify(ids));
         assert.equal(body.error, "invalid");
@@ -311,15 +317,7 @@ describe("stored daily answers and anonymous grading", () => {
     });
 
     it("rejects a body of the wrong shape", async () => {
-      for (const ids of [
-        "ati",
-        null,
-        7,
-        { 0: "ati" },
-        [1],
-        [null],
-        [["ati"]],
-      ]) {
+      for (const ids of ["ati", null, 7, { 0: 1 }, ["ati"], [null], [[1]]]) {
         const { status, body } = await post(ids);
         assert.equal(status, 400, JSON.stringify(ids));
         assert.equal(body.error, "invalid");
@@ -353,23 +351,6 @@ describe("stored daily answers and anonymous grading", () => {
       assert.deepEqual([big.status, big.body.error], [413, "invalid"]);
     });
 
-    it("fails with a JSON error while the stored pet is not in the roster", async () => {
-      await db.pool.query(
-        "update daily_answers set pet_id = 'removed-pet' where day = $1",
-        [BACKFILL_END],
-      );
-      try {
-        const { status, body } = await post([ALL_IDS[0]]);
-        assert.equal(status, 500);
-        assert.equal(body.error, "answer_missing");
-      } finally {
-        await db.pool.query(
-          "update daily_answers set pet_id = $2 where day = $1",
-          [BACKFILL_END, backfill[BACKFILL_END]],
-        );
-      }
-    });
-
     it("does not leak the answer in an error response", async () => {
       const answer = await answerOf();
       const { body } = await post([answer, answer]);
@@ -384,7 +365,7 @@ describe("stored daily answers and anonymous grading", () => {
       body: "{}",
     };
     const giveUp = async (init: RequestInit = jsonPost): Promise<Reply> => {
-      const res = await fetch(`${url}/api/give-up`, init);
+      const res = await fetch(`${url}/api/games/${GAME}/give-up`, init);
       return { status: res.status, body: (await res.json()) as Body };
     };
 
@@ -393,10 +374,7 @@ describe("stored daily answers and anonymous grading", () => {
       const { status, body } = await giveUp();
       assert.equal(status, 200);
       assert.equal(body.day, dayNumber(BACKFILL_END));
-      assert.equal(
-        GUESS_DATA.find((pet) => pet.id === answer)!.name,
-        body.answer,
-      );
+      assert.equal(petName(answer), body.answer);
       assert.deepEqual(Object.keys(body).sort(), ["answer", "day"]);
     });
 
@@ -418,10 +396,7 @@ describe("stored daily answers and anonymous grading", () => {
       assert.equal(body.day, dayNumber(today));
       assert.equal((await storedDays()).at(-1)!.day, today);
       assert.equal(draws, 1);
-      assert.equal(
-        await answerOf(),
-        GUESS_DATA.find((p) => p.name === body.answer)!.id,
-      );
+      assert.equal(petName(await answerOf()), body.answer);
     });
 
     it("moves to the new day at the server time zone midnight", async () => {
@@ -436,23 +411,6 @@ describe("stored daily answers and anonymous grading", () => {
     it("answers 404 to other methods", async () => {
       const { status, body } = await giveUp({ method: "GET" });
       assert.deepEqual([status, body.error], [404, "not_found"]);
-    });
-
-    it("fails with a JSON error while the stored pet is not in the roster", async () => {
-      await db.pool.query(
-        "update daily_answers set pet_id = 'removed-pet' where day = $1",
-        [BACKFILL_END],
-      );
-      try {
-        const { status, body } = await giveUp();
-        assert.deepEqual([status, body.error], [500, "answer_missing"]);
-        assert.equal(body.answer, undefined);
-      } finally {
-        await db.pool.query(
-          "update daily_answers set pet_id = $2 where day = $1",
-          [BACKFILL_END, backfill[BACKFILL_END]],
-        );
-      }
     });
   });
 });

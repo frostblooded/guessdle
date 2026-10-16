@@ -1,10 +1,10 @@
 import express from "express";
 import type { ErrorRequestHandler, Express } from "express";
 import type pg from "pg";
-import { GUESS_DATA, type Pet } from "../game/roster.ts";
 import { DEFAULT_RATE_LIMIT, rateLimit, type RateLimit } from "./rate-limit.ts";
 import { csrfGuard } from "./auth.ts";
 import type { MailConfig } from "./mailer.ts";
+import { answersRoutes } from "./routes/answers.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { authRoutes } from "./routes/auth.ts";
 import type { AppContext } from "./routes/context.ts";
@@ -13,7 +13,6 @@ import { uploadRoutes } from "./routes/uploads.ts";
 
 export interface AppDeps {
   pool: pg.Pool;
-  roster?: readonly Pet[];
   now?: () => Date;
   random?: () => number;
   // IANA zone whose midnight starts a new day
@@ -40,7 +39,6 @@ export interface AppDeps {
 // The API only; callers add static files (dev server) or sit behind nginx (prod)
 export function createApp({
   pool,
-  roster = GUESS_DATA,
   now = (): Date => new Date(),
   random = Math.random,
   timeZone = "Europe/Sofia",
@@ -59,8 +57,6 @@ export function createApp({
   }
   const ctx: AppContext = {
     pool,
-    roster,
-    petIds: roster.map((pet) => pet.id),
     now,
     random,
     timeZone,
@@ -83,6 +79,7 @@ export function createApp({
   adminRoutes(app, ctx, backupDir);
   gameRoutes(app, ctx);
   uploadRoutes(app, ctx, uploadsDir, uploadLimit, uploadQuotaBytes);
+  answersRoutes(app, ctx);
 
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "not_found" });

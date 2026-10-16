@@ -1,4 +1,4 @@
-// On sign-in, hands leftover anonymous Game State to the server (POST /api/game/merge).
+// On sign-in, hands leftover anonymous Game State to the server (POST /api/games/:slug/state/merge).
 import { createGameState, type StateStorage } from "./game-state.ts";
 import { call, type Fetch } from "./transport.ts";
 
@@ -11,12 +11,13 @@ export type MergeOutcome =
   "nothing" | "merged" | "discarded" | "rate_limited" | "error";
 
 export async function mergeLocalGame(
+  slug: string,
   storage: StateStorage,
   now: () => Date,
   fetch: Fetch,
 ): Promise<MergeOutcome> {
   const state = createGameState(storage, now);
-  const ids: string[] = state.getUsedGuesses();
+  const ids: number[] = state.getUsedGuesses();
   const gaveUp: boolean = state.getGaveUp();
   if (ids.length === 0 && !gaveUp) {
     return "nothing";
@@ -26,7 +27,12 @@ export async function mergeLocalGame(
     state.reset();
     return "discarded";
   }
-  const res = await call(fetch, "/api/game/merge", { day, ids, gaveUp }, false);
+  const res = await call(
+    fetch,
+    `/api/games/${slug}/state/merge`,
+    { day, ids, gaveUp },
+    false,
+  );
   if (res?.status === 200) {
     state.reset();
     return "merged";

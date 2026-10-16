@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 import { gradeIds } from "../src/game/game.ts";
-import { GUESS_DATA } from "../src/game/roster.ts";
+import { ATTRIBUTES, GUESS_DATA, SLUG } from "./roster-fixture.ts";
 import { createServerPlay } from "../src/game/server-play.ts";
 import type { Fetch } from "../src/game/transport.ts";
 
@@ -11,7 +11,7 @@ const [, one, two] = GUESS_DATA;
 // A fake of the /api/game routes holding one player's state
 class FakeServer {
   day: number = 100;
-  ids: string[] = [];
+  ids: number[] = [];
   gaveUp: boolean = false;
   down: boolean = false;
   status: number | null = null; // forces an error response
@@ -19,7 +19,7 @@ class FakeServer {
   calls: string[] = [];
 
   view() {
-    const graded = gradeIds(GUESS_DATA, answer, this.ids);
+    const graded = gradeIds(ATTRIBUTES, GUESS_DATA, answer, this.ids);
     assert.equal(graded.kind, "graded");
     const g = graded as Extract<typeof graded, { kind: "graded" }>;
     return {
@@ -52,11 +52,11 @@ class FakeServer {
       return reply(this.status, { error: "rate_limited" });
     }
     const finished = this.view().victory || this.gaveUp;
-    if (url === "/api/game") {
+    if (url === `/api/games/${SLUG}/state`) {
       return reply(200, this.view());
     }
-    if (url === "/api/game/guess") {
-      const id = (JSON.parse(init!.body) as { id: string }).id;
+    if (url === `/api/games/${SLUG}/state/guess`) {
+      const id = (JSON.parse(init!.body) as { id: number }).id;
       if (finished) {
         return reply(409, { error: "finished", day: this.day });
       }
@@ -66,14 +66,14 @@ class FakeServer {
       this.ids = [...this.ids, id];
       return reply(200, this.view());
     }
-    if (url === "/api/game/give-up") {
+    if (url === `/api/games/${SLUG}/state/give-up`) {
       if (finished) {
         return reply(409, { error: "finished", day: this.day });
       }
       this.gaveUp = true;
       return reply(200, this.view());
     }
-    assert.equal(url, "/api/game/reset");
+    assert.equal(url, `/api/games/${SLUG}/state/reset`);
     this.ids = [];
     this.gaveUp = false;
     return reply(200, this.view());
@@ -83,7 +83,11 @@ class FakeServer {
 let server: FakeServer;
 let newDays: number;
 const open = () =>
-  createServerPlay({ fetch: server.fetch, onNewDay: () => newDays++ });
+  createServerPlay({
+    slug: SLUG,
+    fetch: server.fetch,
+    onNewDay: () => newDays++,
+  });
 
 beforeEach(() => {
   server = new FakeServer();
@@ -163,7 +167,7 @@ describe("submit", () => {
       status: 400,
       json: async () => ({ error: "invalid" }),
     });
-    assert.deepEqual(await open().submit("nope"), { kind: "invalid" });
+    assert.deepEqual(await open().submit(999), { kind: "invalid" });
   });
 
   it("is an error when the request fails, keeping state", async () => {
