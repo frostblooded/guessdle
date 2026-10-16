@@ -97,7 +97,7 @@ jobs:
   deploy-home:
     needs: [build, unit, e2e]
     if: github.ref == 'refs/heads/staging' && github.event_name != 'pull_request'
-    runs-on: [self-hosted, home]
+    runs-on: [self-hosted, home-server]
     concurrency:
       group: deploy-home
       cancel-in-progress: false
