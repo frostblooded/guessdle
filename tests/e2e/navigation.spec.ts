@@ -128,3 +128,21 @@ test("the old /?login= links no longer sign anyone in", async ({ page }) => {
   await page.goto("/?login=abc");
   await expect(page.locator("#signin-link")).toBeVisible();
 });
+
+test("old un-namespaced browser guesses are cleared once, with a notice", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem("seeded")) {
+      sessionStorage.setItem("seeded", "1");
+      localStorage.setItem("usedGuesses", "[1]");
+    }
+  });
+  await page.goto("/g/petdle");
+  await expect(page.locator("#reset-notice")).toContainText("reset once");
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem("usedGuesses")))
+    .toBeNull();
+  await page.reload();
+  await expect(page.locator("#reset-notice")).toHaveCount(0);
+});

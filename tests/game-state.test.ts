@@ -5,6 +5,7 @@ import {
   type GameState,
   type StateStorage,
   gameStorage,
+  forgetAllGames,
   wipeLegacyState,
 } from "../src/game/game-state.ts";
 
@@ -21,6 +22,14 @@ class MemoryStorage implements StateStorage {
 
   removeItem(key: string): void {
     this.items.delete(key);
+  }
+
+  get length(): number {
+    return this.items.size;
+  }
+
+  key(index: number): string | null {
+    return [...this.items.keys()][index] ?? null;
   }
 }
 
@@ -288,10 +297,31 @@ describe("wipeLegacyState", () => {
     }
     storage.setItem("game:petdle:usedGuesses", "[1]");
     storage.setItem("theme", "dark");
-    wipeLegacyState(storage);
+    assert.equal(wipeLegacyState(storage), true);
     assert.deepEqual([...storage.items.keys()].sort(), [
       "game:petdle:usedGuesses",
       "theme",
     ]);
+  });
+});
+
+describe("wipeLegacyState result", () => {
+  beforeEach(() => storage.items.clear());
+  it("says whether anything was removed, so the reset is announced once", () => {
+    assert.equal(wipeLegacyState(storage), false);
+    storage.setItem("usedGuesses", "[1]");
+    assert.equal(wipeLegacyState(storage), true);
+    assert.equal(wipeLegacyState(storage), false);
+  });
+});
+
+describe("forgetAllGames", () => {
+  beforeEach(() => storage.items.clear());
+  it("removes every game's keys and keeps other keys", () => {
+    storage.setItem("game:petdle:usedGuesses", "[1]");
+    storage.setItem("game:other:gaveUp", "1");
+    storage.setItem("theme", "dark");
+    forgetAllGames(storage);
+    assert.deepEqual([...storage.items.keys()], ["theme"]);
   });
 });

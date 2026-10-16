@@ -31,7 +31,9 @@ export interface GameState {
 }
 
 // Before games had slugs the keys had no prefix (spec #66): forget them once
-export function wipeLegacyState(storage: StateStorage): void {
+// Returns whether any existed, so the shell can tell the player once
+export function wipeLegacyState(storage: StateStorage): boolean {
+  let found = false;
   for (const key of [
     LOCAL_STORAGE_USED_GUESSES_STRING,
     LOCAL_STORAGE_VICTORY_STRING,
@@ -39,7 +41,21 @@ export function wipeLegacyState(storage: StateStorage): void {
     LOCAL_STORAGE_GAVE_UP_STRING,
     LOCAL_LAST_PLAYED_STRING,
   ]) {
+    found ||= storage.getItem(key) !== null;
     storage.removeItem(key);
+  }
+  return found;
+}
+
+// Signing out: every game's local state goes, whichever game page we are on
+export function forgetAllGames(
+  storage: StateStorage & Pick<Storage, "length" | "key">,
+): void {
+  const keys = Array.from({ length: storage.length }, (_, i) => storage.key(i));
+  for (const key of keys) {
+    if (key?.startsWith("game:")) {
+      storage.removeItem(key);
+    }
   }
 }
 

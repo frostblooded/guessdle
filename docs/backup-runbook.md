@@ -8,7 +8,7 @@ The `backup` compose service (`deploy/backup/`, Dockerfile target `backup`) prot
 - `prune.sh` keeps the newest 14 files in `daily/` and 8 in `weekly/`.
 - Unless the last restore test passed in the past 7 days, `restore-test.sh` restores the newest daily dump into a throwaway Postgres started inside the sidecar, then requires `select count(*) from daily_answers` > 0.
 - A failed dump or restore test is retried at the next hourly check and logged: `docker compose -f deploy/compose.prod.yaml logs backup`.
-- `backup.sh` also tars the `uploads` volume (mounted read-only at `/uploads`) to `uploads/petdle-YYYY-MM-DD.tar`, 14 kept. A failed tar marks the attempt failed in `status.json`. Restore: `tar -xf` into the uploads volume.
+- `backup.sh` also tars the `uploads` volume (mounted read-only at `/uploads`) to `uploads/petdle-YYYY-MM-DD.tar`, 14 kept. A failed tar marks the attempt failed in `status.json`. Restore: `tar -xf` into the uploads volume. A database restore does not touch it; files the restored rows do not reference are swept after a day.
 - `api` mounts the volume read-only at `/backups`.
 
 ## Status file
@@ -52,8 +52,8 @@ To get a dump out of the volume (for example before wiping the host): `docker cp
 Dumps lost or all corrupt: start with an empty database and let the API migrate it.
 
 1. `docker compose -f deploy/compose.prod.yaml down`, then remove the `db-data` volume (`docker volume rm`, name prefixed by the compose project).
-2. `up -d`. Migration `001_daily_answers.sql` inserts the committed backfill (`db/backfill/answers.json`, days up to 2026-10-16); the API then generates later days at random on first request.
-3. Accepted loss: days after the backfill get new answers (players may see a different answer for a past day), and all users, sessions and server-side Game State are gone. Players sign in again; the `ADMIN_EMAILS` list re-promotes admins.
+2. `up -d`. The migrations rebuild the schema and the original game (`005_games.sql`), and `001_daily_answers.sql` inserts the committed backfill (`db/backfill/answers.json`, days up to 2026-10-16); the API then generates later days at random on first request. Restore the `uploads` volume from `uploads/*.tar` first if it survived; otherwise rerun the photo import from the cutover runbook in [deploy.md](deploy.md).
+3. Accepted loss: days after the backfill get new answers (players may see a different answer for a past day), and all users, sessions, server-side Game State and every user-created game and entry are gone. Players sign in again; the `ADMIN_EMAILS` list re-promotes admins.
 
 ## Tests
 

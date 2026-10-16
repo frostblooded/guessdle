@@ -2,11 +2,11 @@
 
 [![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg?style=flat-square)](https://github.com/prettier/prettier)
 
-A Wordle-style daily guessing game. Guess the pet of the day from a fixed roster. Each guess is graded per attribute (colors, owners) as correct, partially correct, or incorrect. Everyone gets the same pet on the same date.
+A site of Wordle-style daily guessing games. Pick a game and guess its entry of the day from the roster. Each guess is graded per attribute as correct, partially correct, or incorrect, and everyone gets the same entry on the same date. Signed-in users create their own games; admins approve them for the gallery.
 
 ## How it works
 
-- Multi-page static front-end: `index.html` (Play, `/`), `how-to-play.html`, `login.html`, `verify.html` (the emailed link lands here) and `admin.html`, each with a small entry in `src/` (`script.ts`, `src/pages/*.ts`), bundled by esbuild into `dist/` with one shared `src/styles.css`. Header and footer come from `src/shell.ts` (ADR 0012).
+- Multi-page static front-end: `index.html` (the gallery, `/`), `game.html` (`/g/<slug>`), `edit.html` (`/g/<slug>/edit`), `create.html`, `my-games.html`, `how-to-play.html`, `login.html`, `verify.html` (the emailed link lands here) and `admin.html`, each with a small entry in `src/` (`script.ts`, `src/pages/*.ts`), bundled by esbuild into `dist/` with one shared `src/styles.css`. Header and footer come from `src/shell.ts` (ADR 0012).
 - Express API (`src/server/`) on Postgres. The daily answer is drawn at random on first request and stored per day, graded server-side and never sent to the browser until a win or give-up (ADRs 0008-0010).
 - Anonymous progress is kept in `localStorage`; signing in with an emailed link stores it on the server. Both reset each day.
 - `scripts/server.mjs` serves the static files and mounts the API for local development (needs Postgres, see `docs/deploy.md`).
@@ -48,9 +48,9 @@ The server's existing Cloudflare Tunnel (service `http://guessdle-server:8080`) 
 
 `--build` rebuilds the image from the pulled source before starting, so the container runs the new code. Without it compose reuses the old image. `-d` runs detached; the container restarts on reboot (`unless-stopped`).
 
-## Adding a pet
+## Adding a game or an entry
 
-Entries and photos live in the database; photos are uploads (`POST /api/uploads`). The original `photos/*.jpg` were moved there once with `scripts/import-photos.mjs` (issue #71; restore the folder from git history before that commit to rerun it).
+Signed-in users create games at `/create` and manage entries, attributes and photos in the editor at `/g/<slug>/edit` (photos are uploads, ADR 0014). The original `photos/*.jpg` were moved into the database once with `scripts/import-photos.mjs` (issue #71; cutover steps in `docs/deploy.md`).
 
 ## Deployment
 

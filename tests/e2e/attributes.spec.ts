@@ -52,3 +52,29 @@ test("the Attributes tab adds, renames, retypes and removes attributes", async (
   await page.getByRole("button", { name: "Remove Hue" }).click();
   await expect(page.locator("#attr-list li")).toHaveCount(0);
 });
+
+test("a slow attribute load neither shows the editor early nor overwrites typing", async ({
+  page,
+}) => {
+  await page.request.post("/api/test/login", {
+    data: { email: `slow-${unique()}@example.test` },
+  });
+  const created = await page.request.post("/api/games", {
+    data: { name: `Slow ${unique()}` },
+  });
+  const { slug } = (await created.json()) as { slug: string };
+  await page.route(`**/api/games/${slug}/attributes`, async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    await route.continue();
+  });
+  await page.goto(`/g/${slug}/edit`);
+  await expect(page.locator("#editor")).toBeHidden();
+  await expect(page.locator("#loading-state")).toBeHidden();
+  await page.locator("#edit-name").fill("Typed name");
+  await page.locator("#tab-attributes").click();
+  await page.locator("#attr-name").fill("Color");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(page.getByLabel("Name of Color")).toBeVisible();
+  await page.locator("#tab-details").click();
+  await expect(page.locator("#edit-name")).toHaveValue("Typed name");
+});

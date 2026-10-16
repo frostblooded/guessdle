@@ -1,5 +1,7 @@
 # 0010: Grading happens on the server; the answer is not sent until win or give-up
 
+Status: accepted. The pet-id and `/api/grade`, `/api/game` wording below is superseded by ADR 0013: guesses are numeric entry ids and every route lives under `/api/games/:slug/`. The grading and answer-hiding decisions stand.
+
 The client keeps the roster (autocomplete and photos) but not the Daily Answer. Guesses are pet ids; the server grades them with the same core as before (`gradeIds` in `src/game/game.ts`).
 
 - **Anonymous**: guesses stay in `localStorage`. `POST /api/grade {ids}` is stateless and returns graded rows and `victory`, plus the answer name only on a win. Stored guesses are re-graded on load, so an override of today's answer reaches players mid-game.

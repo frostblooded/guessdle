@@ -1,7 +1,7 @@
 # Deploy (home server)
 
 - Push to `prod` triggers the self-hosted runner (label `home-server`), which runs `./deploy/start.sh`: `git pull --ff-only`, then `docker compose -f deploy/compose.prod.yaml up -d --build`.
-- Four compose services: `web` (nginx, container `guessdle-server`, port 8080), `api` (Express, port 3000, internal only), `db` (Postgres 17, named volume `db-data`, no published port) and `backup` (below). nginx proxies `/api/` to `api`. The Cloudflare tunnel service is `http://guessdle-server:8080` (public URL https://guessdle.niki.casa/).
+- Four compose services: `web` (nginx, container `guessdle-server`, port 8080), `api` (Express, port 3000, internal only), `db` (Postgres 17, named volume `db-data`, no published port) and `backup` (below). nginx proxies `/api/` and the game shell `/g/<slug>` to `api` (which injects link-preview meta), serves `/g/<slug>/edit` and the other pages itself, and serves `/uploads/` from the `uploads` named volume (read-only; `api` writes it; uploaded images, ADR 0014). The Cloudflare tunnel service is `http://guessdle-server:8080` (public URL https://guessdle.niki.casa/).
 - Only `web` joins the external Docker network `immich_default`, the one `cloudflared` is on. The immich stack creates it, so immich must be up first. `api` and `db` sit on the private `internal` network.
 - Secrets: untracked `deploy/.env` on the server (copy `deploy/.env.example`). Required keys: `POSTGRES_PASSWORD`. Sign-in mail keys: `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `PUBLIC_URL` (`https://guessdle.niki.casa`, used in the emailed link) and `ADMIN_EMAILS` (comma-separated; these emails become admins on sign-in, never demoted by the list). Without `SMTP_HOST`/`PUBLIC_URL` `POST /api/auth/email/request` answers 503 `login_unavailable` and anonymous play still works. See Email sign-in below. The API gets `DATABASE_URL` from compose; `api` runs pending migrations (`db/migrations/*.sql`) at startup.
 - Sessions: opaque cookie token (HttpOnly, Secure, SameSite=Lax), hash stored in the `sessions` table, 30-day rolling lifetime. Revoke with `delete from sessions where user_id = ...`; it takes effect on that user's next request. `Secure` needs the site served over HTTPS (the tunnel does).
@@ -24,3 +24,22 @@
 - `npm run test:integration` needs Docker (Testcontainers starts Postgres itself).
 - Dev compose and prod compose both publish Postgres/ports on this machine: a leftover `deploy-db-1` (prod stack) makes `docker compose up` fail with a port-in-use error, and the dev app then cannot resolve host `db`. Run `docker compose -f deploy/compose.prod.yaml down` first, then `start_dev.bat`.
 - Git Bash mangles `-v "$PWD/...:/..."` paths into a junk directory (once created `deploy/nginx.conf;C`). Prefix `docker run` with `MSYS_NO_PATHCONV=1` or run it from PowerShell.
+
+## Cutover to many games (one-off, spec #66)
+
+The release that adds games, uploads and the Guessdle brand. Do it from the repo on the home server, in order. Compose here is `docker compose -f deploy/compose.prod.yaml` (`dc` below).
+
+1. **Back up first.** `dc exec backup sh /opt/backup/backup.sh` (or wait for tonight's), then check `dc exec backup ls /backups/daily` lists a dump from today and `status.json` says `lastDump.ok`. Copy it out of the volume (see [backup-runbook.md](backup-runbook.md)). Note the currently running image: `docker images` / `docker inspect guessdle-server --format '{{.Image}}'`, to redeploy on rollback.
+2. **Deploy** by pushing `prod` (or run `./deploy/start.sh`). One deploy adds the `uploads` volume and the new nginx routes (`/uploads/`, `/g/<slug>`, `/g/<slug>/edit`, the 5 MB `/api/uploads` body cap). `api` runs the new migrations (`005_games.sql`, `006_uploads.sql`) on start: the roster, answers and signed-in Game State move into game `petdle`, text pet ids become numeric entry ids. Watch `dc logs -f api` for the applied migrations; `/api/health` must answer 200. Anonymous browser guesses are not translated: each browser clears them once and shows a notice.
+3. **Move the photos** (manual, once). Until this runs, Petdle's entries point at `/photos/<slug>.jpg`, which no longer exists, so pictures are broken. The `photos/` folder is gone from the checkout; restore it from git history outside the repo, sign in once as an admin so the user exists, then run the script inside the `api` container (the image has no `scripts/` or photos):
+   ```sh
+   mkdir /tmp/petdle-photos && git archive 7e987f9^ photos | tar -x -C /tmp/petdle-photos   # the commit before "Move Petdle photos to uploads (#71)"
+   API=$(dc ps -q api)
+   docker cp scripts "$API":/app/scripts
+   docker cp /tmp/petdle-photos/photos "$API":/tmp/photos
+   dc exec api node scripts/import-photos.mjs /tmp/photos you@example.com
+   ```
+   The email is the user charged for the bytes. It prints `Imported 19 photos; missing: none`. Rerunning is safe: entries already moved are skipped. Clean up with `docker exec "$API" rm -rf /app/scripts /tmp/photos`.
+   Petdle gets no cover image: the gallery card shows without a picture. To add one later pass an image as the optional third argument, or upload it in the editor at `/g/petdle/edit` as an admin.
+4. **Smoke test** in a browser: `/` (Petdle first and full-width, Guessdle branding), `/g/petdle` (pictures load, autocomplete lists 19 entries, a guess grades, the reset notice shows only if the browser had old guesses), `/admin` (Queue, All games, Users and Backups tabs; Backups is green after tonight's dump), `/g/petdle/edit` as an admin. Sign in and check that the Game State from before is still there.
+5. **Rollback** if it fails: stop the writers (`dc stop web api`), redeploy the previous commit/image (`git checkout <previous prod commit>` then `docker compose -f deploy/compose.prod.yaml up -d --build`, with `api` stopped until the restore finishes), restore the pre-cutover dump as in the backup runbook's manual restore (it replaces the whole database, undoing the migrations), then start again. The `uploads` volume is left in place; the old release ignores it. Games created after cutover are lost with the restore.

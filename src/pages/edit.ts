@@ -28,7 +28,9 @@ function blocked(text: string): void {
   $("#edit-blocked").hidden = false;
 }
 
-function render(d: Details): void {
+// Inputs and cover: only for the first load and the user's own saves. A refresh that lands
+// while the user types (attributes, entries) must not overwrite what they entered.
+function renderFields(d: Details): void {
   $("#edit-title").textContent = d.name;
   document.title = `Edit ${d.name} - Guessdle`;
   $<HTMLAnchorElement>("#view-link").href = `/g/${encodeURIComponent(d.slug)}`;
@@ -37,11 +39,16 @@ function render(d: Details): void {
   $<HTMLInputElement>("#edit-slug").value = `/g/${d.slug}`;
   const skip = $<HTMLInputElement>("#edit-skip");
   skip.value = d.skipPeriod === null ? "" : String(d.skipPeriod);
-  skip.max = String(Math.max(0, d.entryCount - 1));
   const cover = $<HTMLImageElement>("#cover-preview");
   cover.hidden = d.cover === "";
   cover.src = d.cover;
   $("#cover-remove").hidden = d.cover === "";
+}
+
+// What other tabs can change under the user's hands: status, counts, buttons
+function renderStatus(d: Details): void {
+  const skip = $<HTMLInputElement>("#edit-skip");
+  skip.max = String(Math.max(0, d.entryCount - 1));
   const notice = $("#status-notice");
   notice.textContent = statusNotice(d);
   notice.dataset["status"] = d.status;
@@ -50,6 +57,11 @@ function render(d: Details): void {
   submit.hidden = d.status !== "draft" && d.status !== "rejected";
   submit.disabled = d.entryCount < MIN_ENTRIES_FOR_PLAY;
   $("#unpublish-button").hidden = d.status !== "approved";
+}
+
+function render(d: Details): void {
+  renderFields(d);
+  renderStatus(d);
 }
 
 void initShell(browserFetch).then(async (user) => {
@@ -78,11 +90,9 @@ void initShell(browserFetch).then(async (user) => {
   const refreshEntries = await initEntries(API, async () => {
     const fresh = await api<Details>("GET", `${API}/details`);
     if (fresh?.status === 200) {
-      render(fresh.data);
+      renderStatus(fresh.data);
     }
   });
-  $("#loading-state").hidden = true;
-  $("#editor").hidden = false;
   render(reply.data);
 
   const error = $("#edit-error");
@@ -111,7 +121,7 @@ void initShell(browserFetch).then(async (user) => {
     $(button).onclick = async (): Promise<void> => {
       const out = await api<Details>("POST", `${API}/${action}`, {});
       if (out?.status === 200) {
-        render(out.data);
+        renderStatus(out.data);
       }
       $("#flow-error").textContent = out?.status === 200 ? "" : errorText(out);
     };
@@ -222,7 +232,7 @@ void initShell(browserFetch).then(async (user) => {
       drawAttributes(out.data);
       const fresh = await api<Details>("GET", `${API}/details`);
       if (fresh?.status === 200) {
-        render(fresh.data);
+        renderStatus(fresh.data);
       }
     } else {
       attrError.textContent = errorText(out as Reply | null);
@@ -252,5 +262,8 @@ void initShell(browserFetch).then(async (user) => {
       }
     });
   };
+  // Shown only once everything is drawn, so "loaded" is a real signal
   await attributes("GET", `${API}/attributes`);
+  $("#loading-state").hidden = true;
+  $("#editor").hidden = false;
 });

@@ -5,7 +5,7 @@ import { describe, it } from "node:test";
 
 // Files where "Petdle" is the game's own data or history, not the site brand
 const EXEMPT_FILES =
-  /^(db\/migrations\/|docs\/adr\/0003-|docs\/adr\/0013-|docs\/architecture\.md|CONTEXT\.md|tests\/brand\.test\.ts|tests\/integration\/(games|migrate)\.test\.ts|tests\/integration\/petdle\.ts|tests\/e2e\/roster\.ts|src\/server\/import-photos\.ts)/;
+  /^(db\/migrations\/|docs\/adr\/0003-|docs\/adr\/0013-|docs\/(architecture|deploy)\.md|CONTEXT\.md|tests\/brand\.test\.ts|tests\/integration\/(games|migrate)\.test\.ts|tests\/integration\/petdle\.ts|tests\/e2e\/roster\.ts|src\/server\/import-photos\.ts)/;
 
 // Infrastructure identifiers and the game's slug stay "petdle" (spec #66, "Rename")
 const KEPT = [

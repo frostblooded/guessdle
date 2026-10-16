@@ -1,6 +1,6 @@
 // The chrome shared by every page: header (brand, nav, theme, account area) and footer.
 import { fetchUser, signOut, type AccountUser } from "./account.ts";
-import { createGameState, wipeLegacyState } from "./game/game-state.ts";
+import { forgetAllGames, wipeLegacyState } from "./game/game-state.ts";
 import type { Fetch } from "./game/transport.ts";
 import { initTheme } from "./theme.ts";
 
@@ -106,9 +106,27 @@ function showAccount(user: AccountUser | null, fetch: Fetch): void {
 // Signing out also forgets the local game, so the next person starts clean
 async function signOutAndLeave(fetch: Fetch): Promise<void> {
   if (await signOut(fetch)) {
-    createGameState(localStorage, () => new Date()).reset();
+    forgetAllGames(localStorage);
     location.assign("/");
   }
+}
+
+// One-time notice (spec #66, story 73): the old un-namespaced browser guesses were cleared
+function showResetNotice(): void {
+  const notice = document.createElement("p");
+  notice.id = "reset-notice";
+  notice.className = "alert alert-warn";
+  notice.setAttribute("role", "status");
+  notice.append(
+    "Guessdle now hosts many games. Your saved guesses in this browser were reset once; sign in to keep your progress across devices. ",
+  );
+  const dismiss = document.createElement("button");
+  dismiss.type = "button";
+  dismiss.className = "btn btn-ghost btn-sm";
+  dismiss.textContent = "Dismiss";
+  dismiss.onclick = (): void => notice.remove();
+  notice.append(dismiss);
+  $("#main").prepend(notice);
 }
 
 // Renders the header and footer, wires the theme button, and resolves to the signed-in user (null if none)
@@ -117,7 +135,9 @@ export async function initShell(fetch: Fetch): Promise<AccountUser | null> {
   $("#site-footer").innerHTML = FOOTER;
   markCurrentPage();
   try {
-    wipeLegacyState(localStorage);
+    if (wipeLegacyState(localStorage)) {
+      showResetNotice();
+    }
   } catch {
     // blocked storage has nothing to wipe
   }
