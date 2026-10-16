@@ -2,7 +2,7 @@ name: Build and deploy
 
 on:
   push:
-    branches: [master, staging]
+    branches: [master, prod]
   pull_request:
   workflow_dispatch:
 
@@ -96,7 +96,7 @@ jobs:
 
   deploy-home:
     needs: [build, unit, e2e]
-    if: github.ref == 'refs/heads/staging' && github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/prod' && github.event_name != 'pull_request'
     runs-on: [self-hosted, home-server]
     concurrency:
       group: deploy-home
