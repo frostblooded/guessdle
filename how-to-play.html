@@ -38,11 +38,22 @@
             Every day one pet is secret. Your job: find out which one. You get
             unlimited guesses.
           </p>
-          <img
-            class="help-secret"
-            src="/photos/ati.jpg"
-            alt="Silhouette of the secret pet"
-          />
+          <div class="help-example row help-head" aria-hidden="true">
+            <div class="cell">Photo</div>
+            <div class="cell">Name</div>
+            <div class="cell">Colors</div>
+            <div class="cell">Owners</div>
+          </div>
+          <div
+            class="help-example row"
+            role="img"
+            aria-label="The secret pet: photo, name, colors and owners are all hidden"
+          >
+            <div class="cell help-unknown help-unknown-photo">?</div>
+            <div class="cell help-unknown">?</div>
+            <div class="cell help-unknown">?</div>
+            <div class="cell help-unknown">?</div>
+          </div>
         </li>
         <li class="help-step card">
           <h2>2. Make a guess</h2>

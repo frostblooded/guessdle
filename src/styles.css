@@ -763,10 +763,15 @@ input[aria-invalid="true"] {
   font-size: 0.8125rem;
 }
 
-.help-secret {
-  width: 7rem;
-  border-radius: var(--radius-sm);
-  filter: brightness(0) invert(0.5);
+.help-unknown {
+  background-color: var(--border);
+  color: var(--muted);
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+
+.help-unknown-photo {
+  aspect-ratio: 1;
 }
 
 /* autoComplete.js: override its stylesheet (loaded later); the body prefix wins on specificity */
