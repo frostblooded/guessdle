@@ -146,9 +146,40 @@ function initButtons(): void {
   submitNewGuessButton.onclick = (): void => {
     handleSubmitSelection();
   };
+  initHelpDialog();
+}
+
+function initHelpDialog(): void {
+  const dialog: HTMLDialogElement =
+    document.querySelector<HTMLDialogElement>("#help-dialog")!;
+  const steps: HTMLElement[] = [
+    ...dialog.querySelectorAll<HTMLElement>(".help-step"),
+  ];
+  const prev: HTMLButtonElement =
+    document.querySelector<HTMLButtonElement>("#help-prev")!;
+  const next: HTMLButtonElement =
+    document.querySelector<HTMLButtonElement>("#help-next")!;
+  const count: HTMLElement =
+    document.querySelector<HTMLElement>("#help-count")!;
+  let current = 0;
+
+  const show = (index: number): void => {
+    current = index;
+    steps.forEach((step: HTMLElement, i: number): void => {
+      step.hidden = i !== current;
+    });
+    prev.disabled = current === 0;
+    next.disabled = current === steps.length - 1;
+    count.textContent = `${current + 1} / ${steps.length}`;
+  };
+
+  prev.onclick = (): void => show(current - 1);
+  next.onclick = (): void => show(current + 1);
   document.querySelector<HTMLButtonElement>("#help-button")!.onclick =
-    (): void =>
-      document.querySelector<HTMLDialogElement>("#help-dialog")!.showModal();
+    (): void => {
+      show(0);
+      dialog.showModal();
+    };
 }
 
 function loadInitialUsedGuessesElements(): void {

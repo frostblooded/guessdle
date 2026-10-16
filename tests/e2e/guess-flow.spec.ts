@@ -231,7 +231,7 @@ test("help popup examples use real roster pets and fit a phone screen", async ({
   const shown: string[] = await dialog
     .locator(".help-example .guess-result-cell:nth-child(2)")
     .allTextContents();
-  for (const name of [...shown, "Eddie"]) {
+  for (const name of [...shown, "Ati"]) {
     expect(names, name).toContain(name);
   }
   // The popup's green/orange/red claims must still hold for the roster data.
@@ -245,19 +245,46 @@ test("help popup examples use real roster pets and fit a phone screen", async ({
   expect(ati.colors).not.toEqual(eddie.colors);
   expect(ati.owners.some((o) => eddie.owners.includes(o))).toBe(false);
   const photos: Locator = dialog.locator(".help-example img");
-  await expect(photos).toHaveCount(2);
-  for (const img of await photos.all()) {
-    await expect(img).toBeVisible();
+  await expect(photos).toHaveCount(3);
+  // Step through the guide: each step fits and shows its photo.
+  const next: Locator = page.locator("#help-next");
+  const stepCount: number = await dialog.locator(".help-step").count();
+  expect(stepCount).toBe(5);
+  for (let i = 0; i < stepCount; i++) {
+    await expect(dialog.locator(".help-step:not([hidden])")).toHaveCount(1);
+    for (const img of await dialog
+      .locator(".help-step:not([hidden]) img")
+      .all()) {
+      await expect(img).toBeVisible();
+      expect(
+        await img.evaluate((el: HTMLImageElement) => el.naturalWidth),
+      ).toBeGreaterThan(0);
+    }
     expect(
-      await img.evaluate((el: HTMLImageElement) => el.naturalWidth),
-    ).toBeGreaterThan(0);
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    const box = (await dialog.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(375);
+    if (i < stepCount - 1) {
+      await next.click();
+    }
   }
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-  ).toBe(true);
-  const box = (await dialog.boundingBox())!;
-  expect(box.x).toBeGreaterThanOrEqual(0);
-  expect(box.x + box.width).toBeLessThanOrEqual(375);
+  await expect(next).toBeDisabled();
+  await page.locator("#help-prev").click();
+  await expect(next).toBeEnabled();
+});
+
+test("help popup restarts at step 1 on reopen", async ({ page }) => {
+  await openOnDay(page);
+  const dialog: Locator = page.locator("#help-dialog");
+  await page.locator("#help-button").click();
+  await page.locator("#help-next").click();
+  await expect(page.locator("#help-count")).toHaveText("2 / 5");
+  await dialog.getByRole("button", { name: "CLOSE" }).click();
+  await page.locator("#help-button").click();
+  await expect(page.locator("#help-count")).toHaveText("1 / 5");
+  await expect(page.locator("#help-prev")).toBeDisabled();
 });

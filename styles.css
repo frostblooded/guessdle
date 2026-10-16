@@ -216,6 +216,25 @@ button {
       font-size: 1em;
     }
   }
+
+  .help-head .cell {
+    background-color: var(--title-bg);
+    padding: 5px;
+    font-size: 0.8em;
+  }
+
+  .help-secret {
+    width: 40%;
+    border-radius: 10px;
+    filter: brightness(0);
+  }
+
+  .help-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 10px 0;
+  }
 }
 
 /* Override autoComplete.css (loaded later); the body prefix wins on specificity */

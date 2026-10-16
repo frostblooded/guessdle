@@ -25,35 +25,91 @@
     <button id="help-button" aria-label="How to play">?</button>
     <dialog id="help-dialog">
       <h2>How to play</h2>
-      <p>
-        Guess the pet of the day. Each guess shows how close you are. Say the
-        pet of the day is Ati:
-      </p>
-      <div class="help-example row">
-        <div class="cell"><img src="photos/cookie.jpg" alt="Cookie" /></div>
-        <div class="cell guess-result-cell incorrect">Cookie</div>
-        <div class="cell guess-result-cell correct">Black, Orange, White</div>
-        <div class="cell guess-result-cell correct">Niki</div>
-      </div>
-      <p>
-        <b>Green</b>: exact match. <b>Red</b>: no match. Cookie is not Ati, but
-        has the same colors and owner.
-      </p>
-      <p>Now say the pet of the day is Eddie:</p>
-      <div class="help-example row">
-        <div class="cell"><img src="photos/ati.jpg" alt="Ati" /></div>
-        <div class="cell guess-result-cell incorrect">Ati</div>
-        <div class="cell guess-result-cell partially-correct">
-          Black, Orange, White
+      <section class="help-step">
+        <h3>1. Mystery pet</h3>
+        <p>
+          Every day one pet is secret. Your job: find out which one. You get
+          unlimited guesses! In this guide the secret pet is
+          <b>Ati</b>.
+        </p>
+        <img
+          class="help-secret"
+          src="photos/ati.jpg"
+          alt="Silhouette of the secret pet"
+        />
+      </section>
+      <section class="help-step" hidden>
+        <h3>2. Make a guess</h3>
+        <p>
+          Type a pet name and press SUBMIT. Every guess adds a row. Let us guess
+          <b>Cookie</b>.
+        </p>
+        <div class="help-example row help-head">
+          <div class="cell">Photo</div>
+          <div class="cell">Name</div>
+          <div class="cell">Colors</div>
+          <div class="cell">Owners</div>
         </div>
-        <div class="cell guess-result-cell incorrect">Niki</div>
+        <div class="help-example row">
+          <div class="cell"><img src="photos/cookie.jpg" alt="Cookie" /></div>
+          <div class="cell guess-result-cell">Cookie</div>
+          <div class="cell guess-result-cell">Black, Orange, White</div>
+          <div class="cell guess-result-cell">Niki</div>
+        </div>
+      </section>
+      <section class="help-step" hidden>
+        <h3>3. Green and red</h3>
+        <p>
+          <b>Green</b>: same as the secret pet. <b>Red</b>: not the same. Cookie
+          is not Ati (red name), but has Ati's colors and owner (green).
+        </p>
+        <div class="help-example row help-head">
+          <div class="cell">Photo</div>
+          <div class="cell">Name</div>
+          <div class="cell">Colors</div>
+          <div class="cell">Owners</div>
+        </div>
+        <div class="help-example row">
+          <div class="cell"><img src="photos/cookie.jpg" alt="Cookie" /></div>
+          <div class="cell guess-result-cell incorrect">Cookie</div>
+          <div class="cell guess-result-cell correct">Black, Orange, White</div>
+          <div class="cell guess-result-cell correct">Niki</div>
+        </div>
+      </section>
+      <section class="help-step" hidden>
+        <h3>4. Orange</h3>
+        <p>
+          Now guess <b>Eddie</b>. Colors and owners are lists, so they can be
+          <b>orange</b>: some items match, not all. Eddie and Ati both have
+          Orange and White, but Ati also has Black.
+        </p>
+        <div class="help-example row help-head">
+          <div class="cell">Photo</div>
+          <div class="cell">Name</div>
+          <div class="cell">Colors</div>
+          <div class="cell">Owners</div>
+        </div>
+        <div class="help-example row">
+          <div class="cell"><img src="photos/eddie.jpg" alt="Eddie" /></div>
+          <div class="cell guess-result-cell incorrect">Eddie</div>
+          <div class="cell guess-result-cell partially-correct">
+            Orange, White
+          </div>
+          <div class="cell guess-result-cell incorrect">Stefi, Yasen</div>
+        </div>
+      </section>
+      <section class="help-step" hidden>
+        <h3>5. Photo is a hint</h3>
+        <p>
+          The photo never changes color. Use it to remember who is who. A new
+          pet appears every day. Good luck!
+        </p>
+      </section>
+      <div class="help-nav">
+        <button id="help-prev" type="button">BACK</button>
+        <span id="help-count"></span>
+        <button id="help-next" type="button">NEXT</button>
       </div>
-      <p>
-        <b>Orange</b>: a list (colors, owners) where some, but not all, items
-        match. Ati and Eddie share Orange and White. The photo is only a hint
-        and is never colored.
-      </p>
-      <p>A new pet appears every day.</p>
       <form method="dialog"><button>CLOSE</button></form>
     </dialog>
     <div id="game-container">
