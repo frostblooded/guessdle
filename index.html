@@ -23,7 +23,18 @@
     </button>
     <button id="help-button" aria-label="How to play">?</button>
     <div id="account">
-      <a id="login-link" href="/api/auth/google">Sign in with Google</a>
+      <form id="login-form">
+        <input
+          id="login-email"
+          type="email"
+          placeholder="Email"
+          autocomplete="email"
+          maxlength="254"
+          required
+        />
+        <button id="login-button" type="submit">SEND LINK</button>
+      </form>
+      <span id="login-status" role="status" hidden></span>
       <span id="account-name" hidden></span>
       <button id="logout-button" type="button" hidden>SIGN OUT</button>
       <button id="admin-button" type="button" hidden>ADMIN</button>

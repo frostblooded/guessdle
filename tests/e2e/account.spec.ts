@@ -2,20 +2,19 @@ import { expect, test, type Page } from "@playwright/test";
 import { GUESS_DATA } from "../../src/game/roster.ts";
 import { findAnswerName, submitGuess } from "./helpers.ts";
 
-// The real Google flow is checked by hand; here the test-only login stub signs in
+// The email-link flow is in email-login.spec.ts; elsewhere the test-only login stub signs in
 const stubLogin = (
   page: Page,
   data: { email: string; name?: string; admin?: boolean },
 ): ReturnType<Page["request"]["post"]> =>
   page.request.post("/api/test/login", { data });
 
-test("a signed-out visitor sees the Google sign-in link and no sign-out", async ({
+test("a signed-out visitor sees the email sign-in form and no sign-out", async ({
   page,
 }) => {
   await page.goto("/");
-  const link = page.locator("#login-link");
-  await expect(link).toBeVisible();
-  await expect(link).toHaveAttribute("href", "/api/auth/google");
+  await expect(page.locator("#login-form")).toBeVisible();
+  await expect(page.locator("#login-email")).toBeVisible();
   await expect(page.locator("#logout-button")).toBeHidden();
   await expect(page.locator("#account-name")).toBeHidden();
 });
@@ -26,7 +25,7 @@ test("signing in shows the name and a sign-out control", async ({ page }) => {
 
   await expect(page.locator("#account-name")).toHaveText("Ann");
   await expect(page.locator("#logout-button")).toBeVisible();
-  await expect(page.locator("#login-link")).toBeHidden();
+  await expect(page.locator("#login-form")).toBeHidden();
 });
 
 test("the session survives a reload", async ({ page }) => {
@@ -61,7 +60,7 @@ test("signing out returns to signed-out and clears the local game", async ({
 
   await page.locator("#logout-button").click();
 
-  await expect(page.locator("#login-link")).toBeVisible();
+  await expect(page.locator("#login-form")).toBeVisible();
   await expect(page.locator("#logout-button")).toBeHidden();
   await expect(page.locator(".guess-result-row")).toHaveCount(0);
   await page.reload();
@@ -81,7 +80,7 @@ test("a session revoked on the server is signed out on the next load", async ({
   await page.context().clearCookies();
   await page.reload();
 
-  await expect(page.locator("#login-link")).toBeVisible();
+  await expect(page.locator("#login-form")).toBeVisible();
 });
 
 test("mutating requests that are not JSON or come from another origin are refused", async ({

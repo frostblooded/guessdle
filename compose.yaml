@@ -9,15 +9,20 @@ services:
       target: dev
     ports:
       - "8080:8080"
-    # .env (optional) supplies GOOGLE_* and ADMIN_EMAILS; the DATABASE_URL below wins over its localhost one
+    # .env (optional) supplies ADMIN_EMAILS (and SMTP_* to use a real server); the DATABASE_URL below wins over its localhost one
     env_file:
       - path: .env
         required: false
     environment:
       DATABASE_URL: postgres://petdle:petdle@db:5432/petdle
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      PUBLIC_URL: http://localhost:8080
     depends_on:
       db:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     develop:
       watch:
         - action: sync
@@ -31,6 +36,13 @@ services:
           path: ./package.json
         - action: rebuild
           path: ./package-lock.json
+
+  # Dev inbox: sign-in mails land at http://localhost:8025
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "127.0.0.1:8025:8025"
+      - "127.0.0.1:1025:1025"
 
   # Also reachable from the host for `npm start`: DATABASE_URL=postgres://petdle:petdle@localhost:5432/petdle
   db:

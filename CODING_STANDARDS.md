@@ -16,7 +16,7 @@ Read during review. Judgement calls only; tooling covers the rest (`npm run lint
 
 Check each of these when the diff touches `src/server/auth.ts`, sessions, or any `/api` route:
 
-- The OAuth flow verifies `state`; only email-verified Google accounts sign in.
+- Login tokens are random, stored only as a hash, single use (atomic consume) and short-lived; `email/request` answers the same for every address; `email/verify` stays a POST behind the guard.
 - Mutating routes pass the JSON-only and Origin guard.
 - Every `/api/admin/*` route checks the admin flag on the request, not a cached value.
 - Responses reveal the Daily Answer only after a win or give-up.

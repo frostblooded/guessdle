@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { fetchUser, signOut } from "../src/account.ts";
+import {
+  fetchUser,
+  requestLoginLink,
+  signOut,
+  verifyLoginToken,
+} from "../src/account.ts";
 import type { Fetch } from "../src/game/transport.ts";
 
 const reply =
@@ -57,5 +62,56 @@ describe("signOut", () => {
   it("is false when the server refuses or cannot be reached", async () => {
     assert.equal(await signOut(reply(false, {})), false);
     assert.equal(await signOut(down), false);
+  });
+});
+
+describe("requestLoginLink", () => {
+  const status =
+    (code: number): Fetch =>
+    (url, init) => {
+      assert.equal(url, "/api/auth/email/request");
+      assert.equal(init?.body, JSON.stringify({ email: "a@x.test" }));
+      return Promise.resolve({
+        ok: code === 200,
+        status: code,
+        json: () => Promise.resolve({}),
+      });
+    };
+
+  it("maps each reply to a result", async () => {
+    const result = (code: number): Promise<string> =>
+      requestLoginLink(status(code), "a@x.test");
+    assert.equal(await result(200), "sent");
+    assert.equal(await result(400), "invalid");
+    assert.equal(await result(503), "unavailable");
+    assert.equal(await result(429), "rate_limited");
+    assert.equal(await result(500), "error");
+  });
+
+  it("is an error when the server is unreachable", async () => {
+    assert.equal(await requestLoginLink(down, "a@x.test"), "error");
+  });
+});
+
+describe("verifyLoginToken", () => {
+  it("posts the token and reports success only for 2xx", async () => {
+    const bodies: unknown[] = [];
+    const fetch =
+      (ok: boolean): Fetch =>
+      (_url, init) => {
+        bodies.push(init?.body);
+        return Promise.resolve({
+          ok,
+          status: ok ? 200 : 400,
+          json: () => Promise.resolve({}),
+        });
+      };
+    assert.equal(await verifyLoginToken(fetch(true), "t1"), true);
+    assert.equal(await verifyLoginToken(fetch(false), "t2"), false);
+    assert.deepEqual(bodies, ['{"token":"t1"}', '{"token":"t2"}']);
+  });
+
+  it("is false when the server is unreachable", async () => {
+    assert.equal(await verifyLoginToken(down, "t"), false);
   });
 });

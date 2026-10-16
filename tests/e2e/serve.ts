@@ -4,8 +4,15 @@ import { mkdirSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
+import { publishMailpitUrl, startMailpit } from "../integration/mailpit.ts";
 
 const container = await new PostgreSqlContainer("postgres:17-alpine").start();
+// Sign-in mail goes to a throwaway Mailpit; the specs read it back through its API
+const mailpit = await startMailpit();
+publishMailpitUrl(mailpit.apiUrl);
+process.env["SMTP_HOST"] = "127.0.0.1";
+process.env["SMTP_PORT"] = String(mailpit.smtpPort);
+process.env["PUBLIC_URL"] = `http://127.0.0.1:${process.env["PORT"]}`;
 process.env["NODE_ENV"] = "test";
 // The suite fires far more than the per-minute budget from one IP
 process.env["RATE_LIMIT_MAX"] = "100000";

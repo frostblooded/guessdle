@@ -1,26 +1,28 @@
-// Sign-in, sign-out and the session probe.
+// Email-link sign-in, sign-out and the session probe.
 import express from "express";
-import { randomBytes, timingSafeEqual } from "node:crypto";
 import type { Express, Response } from "express";
-import { Passport } from "passport";
-import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import {
   clearSessionCookie,
   endSession,
-  googleVerify,
   requestUser,
   sessionToken,
   setSessionCookie,
   startSession,
   upsertUser,
-  type GoogleConfig,
   type SessionUser,
 } from "../auth.ts";
+import {
+  consumeLoginToken,
+  MAX_TOKEN_LENGTH,
+  normalizeEmail,
+  requestLoginLink,
+} from "../email-login.ts";
+import type { MailConfig } from "../mailer.ts";
 import { bodyOf, type AppContext } from "./context.ts";
 
 export interface AuthOptions {
-  // Without Google credentials the sign-in routes answer 503
-  google: GoogleConfig | undefined;
+  // Without mail config the email sign-in routes answer 503
+  mail: MailConfig | undefined;
   adminEmails: readonly string[];
   testLogin: boolean;
 }
@@ -28,7 +30,7 @@ export interface AuthOptions {
 export function authRoutes(
   app: Express,
   ctx: AppContext,
-  { google, adminEmails, testLogin }: AuthOptions,
+  { mail, adminEmails, testLogin }: AuthOptions,
 ): void {
   const { pool, now, secureCookies } = ctx;
   app.get("/api/me", async (req, res) => {
@@ -53,59 +55,52 @@ export function authRoutes(
     );
   };
 
-  if (google) {
-    const passport = new Passport();
-    passport.use(new GoogleStrategy(google, googleVerify(pool, adminEmails)));
-    // OAuth state: random per login, kept in a short-lived cookie, compared on the callback
-    const stateCookie = {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: secureCookies,
-      path: "/api/auth/google",
-    } as const;
-    app.get("/api/auth/google", (_req, res, next) => {
-      const state = randomBytes(24).toString("base64url");
-      res.cookie("oauth_state", state, { ...stateCookie, maxAge: 600_000 });
-      passport.authenticate("google", {
-        scope: ["email", "profile"],
-        session: false,
-        state,
-      })(_req, res, next);
-    });
-    app.get(
-      "/api/auth/google/callback",
-      (req, res, next) => {
-        const expected = /(?:^|;s*)oauth_state=([^;]+)/.exec(
-          req.headers.cookie ?? "",
-        )?.[1];
-        const got = req.query["state"];
-        res.clearCookie("oauth_state", stateCookie);
-        const a = Buffer.from(expected ?? "");
-        const b = Buffer.from(typeof got === "string" ? got : "");
-        if (
-          expected === undefined ||
-          a.length !== b.length ||
-          !timingSafeEqual(a, b)
-        ) {
-          res.redirect("/?login=failed");
-          return;
-        }
-        next();
-      },
-      passport.authenticate("google", {
-        session: false,
-        failureRedirect: "/?login=failed",
-      }),
-      async (req, res) => {
-        await signedIn(res, req.user as SessionUser);
-        res.redirect("/");
-      },
-    );
-  } else {
-    app.get(["/api/auth/google", "/api/auth/google/callback"], (_req, res) => {
-      res.status(503).json({ error: "login_unavailable" });
-    });
-  }
+  app.post(
+    "/api/auth/email/request",
+    express.json({ limit: "1kb" }),
+    async (req, res) => {
+      if (!mail) {
+        res.status(503).json({ error: "login_unavailable" });
+        return;
+      }
+      const email = normalizeEmail(bodyOf(req)["email"]);
+      if (email === null) {
+        res.status(400).json({ error: "invalid_email" });
+        return;
+      }
+      try {
+        // Same answer whether or not it mailed, and no user lookup: no enumeration
+        await requestLoginLink(pool, mail.mailer, mail.publicUrl, email, now());
+      } catch (err) {
+        console.error(err);
+        res.status(503).json({ error: "login_unavailable" });
+        return;
+      }
+      res.json({ ok: true });
+    },
+  );
+
+  // POST, not GET: a mail scanner that prefetches the link must not burn the token
+  app.post(
+    "/api/auth/email/verify",
+    express.json({ limit: "1kb" }),
+    async (req, res) => {
+      const token = bodyOf(req)["token"];
+      const email =
+        typeof token === "string" && token.length <= MAX_TOKEN_LENGTH
+          ? await consumeLoginToken(pool, token, now())
+          : null;
+      if (email === null) {
+        res.status(400).json({ error: "invalid_token" });
+        return;
+      }
+      await signedIn(
+        res,
+        await upsertUser(pool, email, email, adminEmails.includes(email)),
+      );
+      res.json({ ok: true });
+    },
+  );
 
   if (testLogin) {
     app.post(
@@ -119,7 +114,6 @@ export function authRoutes(
         }
         const user = await upsertUser(
           pool,
-          `test:${email}`,
           email,
           typeof name === "string" && name !== "" ? name : email,
           admin === true,

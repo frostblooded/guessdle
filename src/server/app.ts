@@ -3,7 +3,8 @@ import type { ErrorRequestHandler, Express } from "express";
 import type pg from "pg";
 import { GUESS_DATA, type Pet } from "../game/roster.ts";
 import { DEFAULT_RATE_LIMIT, rateLimit, type RateLimit } from "./rate-limit.ts";
-import { csrfGuard, type GoogleConfig } from "./auth.ts";
+import { csrfGuard } from "./auth.ts";
+import type { MailConfig } from "./mailer.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { authRoutes } from "./routes/auth.ts";
 import type { AppContext } from "./routes/context.ts";
@@ -16,8 +17,8 @@ export interface AppDeps {
   random?: () => number;
   // IANA zone whose midnight starts a new day
   timeZone?: string | undefined;
-  // Google OAuth credentials; without them the sign-in routes answer 503
-  google?: GoogleConfig | undefined;
+  // SMTP mailer and public URL for sign-in links; without them sign-in answers 503
+  mail?: MailConfig | undefined;
   // Lowercase emails promoted to admin on sign-in
   adminEmails?: readonly string[];
   // Mark the session cookie Secure (HTTPS deployments)
@@ -37,7 +38,7 @@ export function createApp({
   now = (): Date => new Date(),
   random = Math.random,
   timeZone = "Europe/Sofia",
-  google,
+  mail,
   adminEmails = [],
   secureCookies = false,
   testLogin = false,
@@ -69,7 +70,7 @@ export function createApp({
     }
   });
 
-  authRoutes(app, ctx, { google, adminEmails, testLogin });
+  authRoutes(app, ctx, { mail, adminEmails, testLogin });
   adminRoutes(app, ctx, backupDir);
   gameRoutes(app, ctx);
 

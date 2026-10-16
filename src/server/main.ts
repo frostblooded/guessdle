@@ -2,7 +2,8 @@
 import { join } from "node:path";
 import pg from "pg";
 import { createApp } from "./app.ts";
-import { adminEmailsFromEnv, googleConfigFromEnv } from "./auth.ts";
+import { adminEmailsFromEnv } from "./auth.ts";
+import { mailConfigFromEnv } from "./mailer.ts";
 import { migrate } from "./migrate.ts";
 import { rateLimitFromEnv } from "./rate-limit.ts";
 
@@ -27,7 +28,7 @@ if (import.meta.main) {
   createApp({
     pool,
     timeZone: process.env["SERVER_TIMEZONE"],
-    google: googleConfigFromEnv(process.env),
+    mail: mailConfigFromEnv(process.env),
     adminEmails: adminEmailsFromEnv(process.env["ADMIN_EMAILS"]),
     secureCookies: true,
     limit: rateLimitFromEnv(process.env),

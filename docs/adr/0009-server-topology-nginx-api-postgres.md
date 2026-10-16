@@ -9,7 +9,7 @@ Production runs four compose services (`deploy/compose.prod.yaml`):
 
 Dev: `scripts/server.mjs` serves static files and mounts the same Express app in one Node process; `deploy/compose.yaml` adds a Postgres service. There is no nginx in dev. Without `DATABASE_URL` only static files are served.
 
-- **Auth**: Google OAuth only (Passport), email-verified accounts only, no linking. Users are keyed by the Google subject. Sessions are opaque random tokens in an HttpOnly, Secure, SameSite=Lax cookie; only a hash is stored in `sessions` (30-day rolling lifetime), so deleting a row revokes access on the next request. `ADMIN_EMAILS` promotes on login and never demotes. CSRF defence: SameSite=Lax, JSON-only mutating endpoints and an Origin check.
+- **Auth** (Google OAuth superseded by email links, ADR 0011): users are keyed by lowercase email. Sessions are opaque random tokens in an HttpOnly, Secure, SameSite=Lax cookie; only a hash is stored in `sessions` (30-day rolling lifetime), so deleting a row revokes access on the next request. `ADMIN_EMAILS` promotes on login and never demotes. CSRF defence: SameSite=Lax, JSON-only mutating endpoints and an Origin check.
 - **Abuse protection** (floods only, starting values): nginx limits per IP (60/min, burst 30 on `/api/`; 10/min, burst 5 on login routes) using `CF-Connecting-IP` trusted only from private networks; Express limits per user (per IP when anonymous, 120/min, `trust proxy` one hop). Bodies are capped at 10 KB. Both layers answer 429 and the client treats them alike.
 - **Secrets** live in an untracked `deploy/.env`; keys are listed in `docs/deploy.md`.
 - **Tests**: HTTP integration tests and Playwright e2e run against Testcontainers Postgres. A test-only login route exists only with `NODE_ENV=test` and is refused under `production`.
@@ -23,5 +23,5 @@ Dev: `scripts/server.mjs` serves static files and mounts the same Express app in
 ## Consequences
 
 - A deploy now depends on Docker volumes and Postgres health; `/api/health` returns 503 when the database is unreachable.
-- Express is a runtime dependency (plus `pg`, Passport).
+- Express is a runtime dependency (plus `pg`, and `nodemailer` since ADR 0011).
 - No offsite backup (accepted); dumps contain user emails and must not enter the repo.

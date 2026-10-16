@@ -23,7 +23,7 @@ Stored server-side (`daily_answers`, `src/server/answers.ts`), never in the bund
 ## Play
 
 - Anonymous (`createPlay`, `src/game/play.ts`): pet ids live in `localStorage` (`createGameState`, `src/game/game-state.ts`: a missing or other-day `lastPlayed`, or a newer server `day`, clears them; blocked storage falls back to memory; legacy name-keyed state is upgraded). `POST /api/grade {ids}` returns `{day, rows, victory, answer?}`, `answer` only on victory. `POST /api/give-up` is stateless and open to anyone by decision. Every response carries the Day Number; a client seeing a newer day resets itself (`onNewDay`).
-- Signed in: Google OAuth (`src/server/auth.ts`), Postgres sessions. `GET /api/game` and `POST /api/game/guess|give-up|merge|reset` store ids per user and day (`src/server/user-game.ts`, client `src/game/server-play.ts`); victory is derived on read. `merge` adopts leftover anonymous guesses on login (`src/game/merge.ts`).
+- Signed in: email magic link (`src/server/email-login.ts`, `mailer.ts`, ADR 0011; client `src/login.ts`), Postgres sessions (`src/server/auth.ts`). `GET /api/game` and `POST /api/game/guess|give-up|merge|reset` store ids per user and day (`src/server/user-game.ts`, client `src/game/server-play.ts`); victory is derived on read. `merge` adopts leftover anonymous guesses on login (`src/game/merge.ts`).
 - Routes live in `src/server/routes/` (`auth`, `game`, `admin`), each taking one `AppContext`.
 
 ## Admin
@@ -39,4 +39,4 @@ Stored server-side (`daily_answers`, `src/server/answers.ts`), never in the bund
 ## Tests
 
 - `npm run test:integration` runs the HTTP API against Testcontainers Postgres (needs Docker).
-- `npm run test:e2e` starts a Testcontainers Postgres via `tests/e2e/serve.ts` (needs Docker). The Daily Answer is random there; tests learn it through the API.
+- `npm run test:e2e` starts a Testcontainers Postgres and Mailpit via `tests/e2e/serve.ts` (needs Docker); sign-in mail is read back through Mailpit's API. One integration test delivers through real nodemailer to Mailpit. The Daily Answer is random there; tests learn it through the API.

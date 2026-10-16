@@ -3,7 +3,6 @@ import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { after, before, beforeEach, describe, it } from "node:test";
 import { createApp } from "../../src/server/app.ts";
-import { googleVerify } from "../../src/server/auth.ts";
 import { MIGRATIONS_DIR } from "../../src/server/main.ts";
 import { migrate } from "../../src/server/migrate.ts";
 import { startDb } from "./postgres.ts";
@@ -202,48 +201,5 @@ describe("admin Users: list, promote, demote", () => {
     );
     assert.equal(res.status, 415);
     assert.equal(await adminCount(), 1);
-  });
-
-  describe("admin email list", () => {
-    const verify = (
-      sub: string,
-      email: string,
-      list: string[],
-      verified: unknown = true,
-    ): Promise<boolean | undefined> =>
-      new Promise((resolve) => {
-        googleVerify(db.pool, list)(
-          "a",
-          "r",
-          {
-            id: sub,
-            displayName: sub,
-            emails: [{ value: email, verified }],
-          } as never,
-          (_err, user) => resolve(user ? user.admin : undefined),
-        );
-      });
-
-    it("promotes a verified listed email on login", async () => {
-      assert.equal(await verify("g1", "Boss@X.test", ["boss@x.test"]), true);
-    });
-
-    it("does not promote or sign in an unverified listed email", async () => {
-      assert.equal(
-        await verify("g2", "boss@x.test", ["boss@x.test"], false),
-        undefined,
-      );
-      assert.equal(await adminCount(), 0);
-    });
-
-    it("never demotes: removing the email later keeps the flag", async () => {
-      await verify("g3", "boss@x.test", ["boss@x.test"]);
-      assert.equal(await verify("g3", "boss@x.test", []), true);
-    });
-
-    it("promotes an existing non-admin when their email is added later", async () => {
-      assert.equal(await verify("g4", "late@x.test", []), false);
-      assert.equal(await verify("g4", "late@x.test", ["late@x.test"]), true);
-    });
   });
 });

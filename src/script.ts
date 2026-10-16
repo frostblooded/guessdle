@@ -2,6 +2,7 @@ import autoComplete from "@tarekraafat/autocomplete.js";
 import "../styles.css";
 import "@tarekraafat/autocomplete.js/dist/css/autoComplete.css";
 import { fetchUser, signOut, type AccountUser } from "./account.ts";
+import { completeLogin, initLogin } from "./login.ts";
 import { initAdmin } from "./admin.ts";
 import { correctnessClass } from "./game/correctness.ts";
 import { findPetId, type GradedAttribute } from "./game/game.ts";
@@ -73,6 +74,7 @@ window.onload = function (): void {
 
 // Who is signed in decides where the game lives, so ask before loading it
 async function start(): Promise<void> {
+  await completeLogin(browserFetch);
   const user: AccountUser | null = await fetchUser(browserFetch);
   showAccount(user);
   if (user !== null) {
@@ -135,6 +137,7 @@ function initButtons(): void {
       void handleReset();
     };
   initHelpDialog();
+  initLogin(browserFetch);
   document.querySelector<HTMLButtonElement>("#logout-button")!.onclick =
     (): void => {
       void handleLogout();
@@ -146,7 +149,10 @@ function showAccount(user: AccountUser | null): void {
     document.querySelector<HTMLElement>("#account-name")!;
   name.textContent = user === null ? "" : user.name;
   name.hidden = user === null;
-  document.querySelector<HTMLElement>("#login-link")!.hidden = user !== null;
+  document.querySelector<HTMLElement>("#login-form")!.hidden = user !== null;
+  if (user !== null) {
+    document.querySelector<HTMLElement>("#login-status")!.hidden = true;
+  }
   document.querySelector<HTMLElement>("#logout-button")!.hidden = user === null;
   setAdmin(user?.admin === true);
 }

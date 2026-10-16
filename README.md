@@ -8,7 +8,7 @@ A Wordle-style daily guessing game. Guess the pet of the day from a fixed roster
 
 - Static front-end: `index.html`, `src/script.ts` and the ES modules it imports, bundled by esbuild into `dist/`, `styles.css`.
 - Express API (`src/server/`) on Postgres. The daily answer is drawn at random on first request and stored per day, graded server-side and never sent to the browser until a win or give-up (ADRs 0008-0010).
-- Anonymous progress is kept in `localStorage`; signing in with Google stores it on the server. Both reset each day.
+- Anonymous progress is kept in `localStorage`; signing in with an emailed link stores it on the server. Both reset each day.
 - `scripts/server.mjs` serves the static files and mounts the API for local development (needs Postgres, see `docs/deploy.md`).
 
 ## Requirements

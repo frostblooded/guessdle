@@ -51,13 +51,13 @@ let handler = serveStatic;
 if (process.env.DATABASE_URL) {
   const { connect } = await import("../src/server/main.ts");
   const { createApp } = await import("../src/server/app.ts");
-  const { adminEmailsFromEnv, googleConfigFromEnv } =
-    await import("../src/server/auth.ts");
+  const { adminEmailsFromEnv } = await import("../src/server/auth.ts");
+  const { mailConfigFromEnv } = await import("../src/server/mailer.ts");
   const { rateLimitFromEnv } = await import("../src/server/rate-limit.ts");
   const app = createApp({
     pool: await connect(process.env.DATABASE_URL),
     timeZone: process.env.SERVER_TIMEZONE || undefined,
-    google: googleConfigFromEnv(process.env),
+    mail: mailConfigFromEnv(process.env),
     limit: rateLimitFromEnv(process.env),
     backupDir: process.env.BACKUP_DIR || undefined,
     adminEmails: adminEmailsFromEnv(process.env.ADMIN_EMAILS),

@@ -1,5 +1,4 @@
-// Accounts and sessions: Google sign-in (Passport), opaque cookie sessions in
-// Postgres, and the CSRF guard for mutating endpoints.
+// Accounts and sessions: opaque cookie sessions in Postgres, the admin email list and the CSRF guard for mutating endpoints.
 import { createHash, randomBytes } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
 import type pg from "pg";
@@ -15,25 +14,6 @@ export interface SessionUser {
   admin: boolean;
 }
 
-export interface GoogleConfig {
-  clientID: string;
-  clientSecret: string;
-  callbackURL: string;
-}
-
-// The part of a Passport Google profile the sign-in rule reads
-export interface GoogleProfile {
-  id: string;
-  displayName?: string;
-  emails?: { value: string; verified?: unknown }[];
-}
-
-// Only Google accounts whose email Google has verified may sign in
-export function isVerifiedGoogleProfile(profile: GoogleProfile): boolean {
-  const email = profile.emails?.[0];
-  return profile.id !== "" && !!email?.value && email.verified === true;
-}
-
 export function adminEmailsFromEnv(value: string | undefined): string[] {
   return (value ?? "")
     .split(",")
@@ -41,63 +21,24 @@ export function adminEmailsFromEnv(value: string | undefined): string[] {
     .filter((email) => email !== "");
 }
 
-export function googleConfigFromEnv(
-  env: Record<string, string | undefined>,
-): GoogleConfig | undefined {
-  const clientID = env["GOOGLE_CLIENT_ID"];
-  const clientSecret = env["GOOGLE_CLIENT_SECRET"];
-  const callbackURL = env["GOOGLE_CALLBACK_URL"];
-  return clientID && clientSecret && callbackURL
-    ? { clientID, clientSecret, callbackURL }
-    : undefined;
-}
-
-// Creates or updates the user for a Google subject; an email on the admin list
-// promotes, nothing here demotes.
+// Finds or creates the user for an email (case-insensitive, so Google-era rows
+// match); an email on the admin list promotes, nothing here demotes.
 export async function upsertUser(
   pool: pg.Pool,
-  sub: string,
   email: string,
   name: string,
   makeAdmin: boolean,
 ): Promise<SessionUser> {
   const { rows } = await pool.query<SessionUser>(
-    `insert into users (google_sub, email, name, admin) values ($1, $2, $3, $4)
-     on conflict (google_sub) do update
-       set email = excluded.email, name = excluded.name, admin = users.admin or excluded.admin
+    `insert into users (email, name, admin) values (lower($1), $2, $3)
+     on conflict (lower(email)) do update set admin = users.admin or excluded.admin
      returning id::int, name, email, admin`,
-    [sub, email, name, makeAdmin],
+    [email, name, makeAdmin],
   );
   return rows[0]!;
 }
 
-// Passport's verify callback: hands Passport the user, false when refused, or an error
-export function googleVerify(pool: pg.Pool, adminEmails: readonly string[]) {
-  return (
-    _accessToken: string,
-    _refreshToken: string,
-    profile: GoogleProfile,
-    done: (err: unknown, user?: SessionUser | false) => void,
-  ): void => {
-    if (!isVerifiedGoogleProfile(profile)) {
-      done(null, false);
-      return;
-    }
-    const email = profile.emails![0]!.value;
-    upsertUser(
-      pool,
-      profile.id,
-      email,
-      profile.displayName || email,
-      adminEmails.includes(email.toLowerCase()),
-    ).then(
-      (user) => done(null, user),
-      (err: unknown) => done(err),
-    );
-  };
-}
-
-const hash = (token: string): string =>
+export const hash = (token: string): string =>
   createHash("sha256").update(token).digest("hex");
 
 // Returns the cookie token; only its hash is stored
