@@ -15,6 +15,7 @@ import {
   setOverride,
   todayIn,
 } from "./answers.ts";
+import { listUsers, setAdmin } from "./users.ts";
 import {
   changeGame,
   readGame,
@@ -175,6 +176,7 @@ export function createApp({
         res: Response;
         today: string;
         todayN: number;
+        actor: SessionUser;
       }) => Promise<void>,
     ) =>
     async (req: Request, res: Response): Promise<void> => {
@@ -189,7 +191,7 @@ export function createApp({
         return;
       }
       const today = todayIn(now(), timeZone);
-      await handler({ req, res, today, todayN: dayNumber(today) });
+      await handler({ req, res, today, todayN: dayNumber(today), actor: user });
     };
   // A date the admin may name: valid, not before the start, within a year ahead
   const adminDate = (value: unknown, todayN: number): value is string =>
@@ -275,6 +277,37 @@ export function createApp({
         return;
       }
       res.json({ ok: true });
+    }),
+  );
+
+  app.get(
+    "/api/admin/users",
+    adminRoute(async ({ res, actor }) => {
+      res.json({ users: await listUsers(pool), self: actor.id });
+    }),
+  );
+  app.put(
+    "/api/admin/users/:id",
+    express.json({ limit: "1kb" }),
+    adminRoute(async ({ req, res, actor }) => {
+      const id = String(req.params["id"]);
+      const admin = (req.body as { admin?: unknown } | undefined)?.admin;
+      if (
+        !/^[1-9]\d{0,9}$/.test(id) ||
+        Number(id) > 2147483647 ||
+        typeof admin !== "boolean"
+      ) {
+        res.status(400).json({ error: "invalid" });
+        return;
+      }
+      const result = await setAdmin(pool, actor.id, Number(id), admin);
+      if (result === "ok") {
+        res.json({ ok: true });
+      } else {
+        res
+          .status(result === "not_found" ? 404 : 409)
+          .json({ error: result === "self" ? "self_demotion" : result });
+      }
     }),
   );
 

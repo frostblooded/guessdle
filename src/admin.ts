@@ -12,6 +12,14 @@ interface AnswerDay {
   previous: string[];
 }
 
+interface AdminUser {
+  id: number;
+  name: string;
+  email: string;
+  lastSeen: string;
+  admin: boolean;
+}
+
 const $ = <T extends HTMLElement>(selector: string): T =>
   document.querySelector<T>(selector)!;
 
@@ -147,9 +155,75 @@ export function initAdmin(): (admin: boolean) => void {
     event.preventDefault();
     void reload();
   };
+  const usersPanel = $<HTMLElement>("#users-panel");
+  const answersPanel = $<HTMLElement>("#answers-panel");
+  const usersMessage = $<HTMLElement>("#users-message");
+  const usersBody = $<HTMLElement>("#admin-users");
+
+  const showUsers = async (): Promise<void> => {
+    const { ok, json } = await call("GET", "/api/admin/users");
+    if (!ok) {
+      usersMessage.textContent = "Could not load the users.";
+      usersMessage.hidden = false;
+      return;
+    }
+    usersMessage.hidden = true;
+    const data = json as { users: AdminUser[]; self: number };
+    const admins = data.users.filter((user) => user.admin).length;
+    usersBody.replaceChildren(
+      ...data.users.map((user) => {
+        const row = document.createElement("tr");
+        row.dataset["email"] = user.email;
+        const cell = (text: string): void => {
+          row.append(
+            Object.assign(document.createElement("td"), { textContent: text }),
+          );
+        };
+        cell(user.name);
+        cell(user.email);
+        cell(new Date(user.lastSeen).toLocaleString());
+        cell(user.admin ? "admin" : "player");
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "role-toggle";
+        toggle.textContent = user.admin ? "DEMOTE" : "PROMOTE";
+        // The server enforces both guards too; the button just shows them
+        toggle.disabled = user.admin && (user.id === data.self || admins <= 1);
+        toggle.onclick = async (): Promise<void> => {
+          const res = await call("PUT", `/api/admin/users/${user.id}`, {
+            admin: !user.admin,
+          });
+          if (!res.ok) {
+            usersMessage.textContent = "Could not change that role.";
+            usersMessage.hidden = false;
+            return;
+          }
+          await showUsers();
+        };
+        const action = document.createElement("td");
+        action.append(toggle);
+        row.append(action);
+        return row;
+      }),
+    );
+  };
+
+  const tabs = {
+    answers: $<HTMLElement>("#tab-answers"),
+    users: $<HTMLElement>("#tab-users"),
+  };
+  const selectTab = (name: "answers" | "users"): void => {
+    answersPanel.hidden = name !== "answers";
+    usersPanel.hidden = name !== "users";
+    tabs.answers.ariaSelected = String(name === "answers");
+    tabs.users.ariaSelected = String(name === "users");
+    void (name === "answers" ? show() : showUsers());
+  };
+  tabs.answers.onclick = (): void => selectTab("answers");
+  tabs.users.onclick = (): void => selectTab("users");
   button.onclick = (): void => {
     dialog.showModal();
-    void show();
+    selectTab("answers");
   };
   return (admin) => {
     button.hidden = !admin;

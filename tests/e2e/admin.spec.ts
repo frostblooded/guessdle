@@ -87,3 +87,54 @@ test("an admin peeks, overrides with warnings, edits and clears", async ({
   await page.reload();
   await expect(page.locator("#admin-button")).toBeVisible();
 });
+
+test("an admin promotes and demotes a user; self-demotion is disabled and refused", async ({
+  page,
+  browser,
+  baseURL,
+}) => {
+  const stamp = Date.now();
+  const player = `target-${stamp}@example.test`;
+  const me = `boss-${stamp}@example.test`;
+  const playerPage = await browser.newPage({
+    baseURL: baseURL!,
+  });
+  await playerPage.request.post("/api/test/login", { data: { email: player } });
+  await page.request.post("/api/test/login", {
+    data: { email: me, admin: true },
+  });
+  await page.goto("/");
+  await page.locator("#admin-button").click();
+  await page.locator("#tab-users").click();
+
+  const row = (email: string): ReturnType<Page["locator"]> =>
+    page.locator(`#admin-users tr[data-email="${email}"]`);
+  await expect(row(player)).toContainText("player");
+  await expect(row(me)).toContainText("admin");
+  await expect(row(me).locator("button")).toBeDisabled();
+
+  // The server refuses self-demotion too
+  const users = (await (await page.request.get("/api/admin/users")).json()) as {
+    users: { id: number; email: string }[];
+  };
+  const myId = users.users.find((user) => user.email === me)!.id;
+  const refused = await page.request.put(`/api/admin/users/${myId}`, {
+    data: { admin: false },
+  });
+  expect(refused.status()).toBe(409);
+
+  await row(player).locator("button").click();
+  await expect(row(player)).toContainText("admin");
+  await expect(row(player).locator("button")).toHaveText("DEMOTE");
+  // Effective on the promoted user's next request
+  expect((await playerPage.request.get("/api/admin/users")).status()).toBe(200);
+
+  await row(player).locator("button").click();
+  await expect(row(player)).toContainText("player");
+  expect((await playerPage.request.get("/api/admin/users")).status()).toBe(403);
+
+  // Back on the Answers tab the day list is still there
+  await page.locator("#tab-answers").click();
+  await expect(page.locator("#admin-days tr")).toHaveCount(7);
+  await playerPage.close();
+});
