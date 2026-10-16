@@ -1,8 +1,14 @@
-# Petdle
+# Guessdle
 
-A daily guessing game. Players guess which pet of the day it is by comparing attributes.
+A site of daily guessing games. Players guess the answer of the day in a game by comparing attributes.
 
 ## Language
+
+**Game**:
+One guessing game: a name, a cover image, attribute definitions and a roster of entries. Has its own Daily Answers. Created by a signed-in user (its **Owner**), or ownerless (the original Petdle game, editable only by Admins).
+
+**Approval**:
+An Admin's sign-off that lets a Game appear in the front-page gallery. Unapproved Games stay reachable by link. Editing the text or images of an approved Game resets it to pending.
 
 **Pet**:
 One entry in the roster: a photo, a name, and its attributes.
