@@ -22,3 +22,5 @@
 
 - `docker compose up -d db`, copy `.env.example` to `.env`, then `npm run build && npm start`: one Node process serves the page and `/api`. For sign-in locally, `docker compose up -d mailpit` and keep the `SMTP_*`/`PUBLIC_URL` defaults from `.env.example`: mails land in the inbox at http://localhost:8025. `docker compose up` (dev container) starts Mailpit itself and points the container at it (`SMTP_HOST=mailpit`, `PUBLIC_URL=http://localhost:8080`), so sign-in works with no setup. Without `SMTP_HOST` the request route answers 503 `login_unavailable`.
 - `npm run test:integration` needs Docker (Testcontainers starts Postgres itself).
+- Dev compose and prod compose both publish Postgres/ports on this machine: a leftover `deploy-db-1` (prod stack) makes `docker compose up` fail with a port-in-use error, and the dev app then cannot resolve host `db`. Run `docker compose -f deploy/compose.prod.yaml down` first, then `start_dev.bat`.
+- Git Bash mangles `-v "$PWD/...:/..."` paths into a junk directory (once created `deploy/nginx.conf;C`). Prefix `docker run` with `MSYS_NO_PATHCONV=1` or run it from PowerShell.
