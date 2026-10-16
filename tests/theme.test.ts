@@ -54,4 +54,17 @@ describe("theme mode", () => {
     );
     assert.deepEqual(keys, [THEME_STORAGE_KEY]);
   });
+
+  it("survives blocked storage", () => {
+    const blocked: ThemeStorage = {
+      getItem: () => {
+        throw new Error("blocked");
+      },
+      setItem: () => {
+        throw new Error("blocked");
+      },
+    };
+    assert.equal(readThemeMode(blocked), "auto");
+    assert.doesNotThrow(() => writeThemeMode(blocked, "dark"));
+  });
 });

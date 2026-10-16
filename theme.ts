@@ -12,14 +12,23 @@ export interface ThemeStorage {
   setItem(key: string, value: string): void;
 }
 
-// Missing or unknown stored value reads as auto
+// Missing, unknown or unreadable (blocked storage) reads as auto
 export function readThemeMode(storage: ThemeStorage): ThemeMode {
-  const raw: string | null = storage.getItem(THEME_STORAGE_KEY);
-  return CYCLE.find((mode: ThemeMode): boolean => mode === raw) ?? "auto";
+  try {
+    const raw: string | null = storage.getItem(THEME_STORAGE_KEY);
+    return CYCLE.find((mode: ThemeMode): boolean => mode === raw) ?? "auto";
+  } catch {
+    return "auto";
+  }
 }
 
+// Blocked storage keeps the choice for this page view only
 export function writeThemeMode(storage: ThemeStorage, mode: ThemeMode): void {
-  storage.setItem(THEME_STORAGE_KEY, mode);
+  try {
+    storage.setItem(THEME_STORAGE_KEY, mode);
+  } catch {
+    // ignored on purpose
+  }
 }
 
 export function nextThemeMode(mode: ThemeMode): ThemeMode {
