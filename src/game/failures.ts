@@ -1,6 +1,8 @@
 // Every failure code the server sends: its HTTP status and the text the browser shows.
 // One table so a new code cannot reach one side without the other.
 
+import { MIN_ENTRIES } from "./limits.ts";
+
 const failure = (status: number, text: string) => ({ status, text });
 
 export const FAILURES = {
@@ -11,7 +13,10 @@ export const FAILURES = {
   forbidden: failure(403, "You cannot change this game."),
   quota_exceeded: failure(403, "You have used all your upload space."),
   not_found: failure(404, "This game no longer exists."),
-  too_few_entries: failure(409, "Add at least 2 entries before submitting."),
+  too_few_entries: failure(
+    409,
+    `Add at least ${MIN_ENTRIES} entries before submitting.`,
+  ),
   invalid_state: failure(409, "This game's status changed. Reload the page."),
   attribute_exists: failure(409, "Another attribute already has that name."),
   entry_exists: failure(409, "Another entry already has that name."),

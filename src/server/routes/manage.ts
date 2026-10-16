@@ -4,12 +4,8 @@ import express from "express";
 import type { Express, Request, Response } from "express";
 import { slugBase, slugError } from "../../game/slug.ts";
 import { gameLifecycle, type Move } from "../lifecycle.ts";
-import {
-  MAX_NAME,
-  nameIn,
-  parseEntryInput,
-  parseGamePatch,
-} from "../validate.ts";
+import { MAX_ATTRIBUTE_NAME, MAX_NAME } from "../../game/limits.ts";
+import { nameIn, parseEntryInput, parseGamePatch } from "../validate.ts";
 import { redrawFuture, releaseEntry, todayIn } from "../answers.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
 import type { AttributeType } from "../../game/game.ts";
@@ -19,7 +15,6 @@ import {
   editAttributes,
   listAttributes,
   listOwned,
-  MAX_ATTRIBUTE_NAME,
   patchKind,
   skipOf,
   updateGame,

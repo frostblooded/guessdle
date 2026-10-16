@@ -2,7 +2,6 @@
 import type pg from "pg";
 
 type Q = Pick<pg.Pool, "query">;
-export const MAX_REASON = 500;
 
 export interface QueueItem {
   slug: string;

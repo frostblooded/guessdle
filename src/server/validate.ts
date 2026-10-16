@@ -1,12 +1,14 @@
 // Pure checks of game and entry request input: no database, no HTTP. Upload ownership is a
 // database check and stays with the caller.
-import { MAX_VALUE_LENGTH, type GamePatch } from "./games.ts";
+import {
+  MAX_DESCRIPTION,
+  MAX_ENTRY_NAME,
+  MAX_LIST_ITEMS,
+  MAX_NAME,
+  MAX_VALUE_LENGTH,
+} from "../game/limits.ts";
+import type { GamePatch } from "./games.ts";
 import type { EntryInput } from "./entries.ts";
-
-export const MAX_NAME = 60;
-export const MAX_DESCRIPTION = 500;
-export const MAX_ENTRY_NAME = 60;
-export const MAX_LIST_ITEMS = 20;
 
 // A non-empty string of at most max chars once trimmed; undefined otherwise
 export const nameIn = (v: unknown, max: number): string | undefined =>

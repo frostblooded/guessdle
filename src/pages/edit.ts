@@ -1,9 +1,6 @@
 // The game editor: top tabs, Details, Attributes, Entries and Answers.
-import {
-  MIN_ENTRIES_FOR_PLAY,
-  statusNotice,
-  type Details,
-} from "../game/editor.ts";
+import { statusNotice, type Details } from "../game/editor.ts";
+import { MAX_ATTRIBUTE_NAME, MIN_ENTRIES } from "../game/limits.ts";
 import { api, errorText, signInThen, type Reply } from "../manage-client.ts";
 import { initAnswers } from "./edit-answers.ts";
 import { initEntries } from "./edit-entries.ts";
@@ -55,7 +52,7 @@ function renderStatus(d: Details): void {
   // A rejected game resubmits by editing, but a plain Submit is allowed too
   const submit = $<HTMLButtonElement>("#submit-button");
   submit.hidden = d.status !== "draft" && d.status !== "rejected";
-  submit.disabled = d.entryCount < MIN_ENTRIES_FOR_PLAY;
+  submit.disabled = d.entryCount < MIN_ENTRIES;
   $("#unpublish-button").hidden = d.status !== "approved";
 }
 
@@ -188,7 +185,7 @@ void initShell(browserFetch).then(async (user) => {
         row.className = "attr-row";
         const name = document.createElement("input");
         name.type = "text";
-        name.maxLength = 40;
+        name.maxLength = MAX_ATTRIBUTE_NAME;
         name.value = attr.name;
         name.setAttribute("aria-label", `Name of ${attr.name}`);
         name.onchange = (): void => void change(attr.id, { name: name.value });
@@ -235,12 +232,12 @@ void initShell(browserFetch).then(async (user) => {
         renderStatus(fresh.data);
       }
     } else {
-      attrError.textContent = errorText(out as Reply | null);
-      // Show what the server actually has after a refused edit
+      // Show what the server actually has after a refused edit, then the error: a reader (or a test) that waits for the error must not see the list redrawn under it
       const now = await api<Attribute[]>("GET", `${API}/attributes`);
       if (now?.status === 200) {
         drawAttributes(now.data);
       }
+      attrError.textContent = errorText(out as Reply | null);
     }
   };
   const change = (

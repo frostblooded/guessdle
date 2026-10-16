@@ -1,7 +1,8 @@
 // Admin-only backup status and user management (spec #38).
 import express from "express";
 import type { Express, Request, Response } from "express";
-import { listAllGames, listQueue, MAX_REASON } from "../approval.ts";
+import { MAX_REASON } from "../../game/limits.ts";
+import { listAllGames, listQueue } from "../approval.ts";
 import { gameLifecycle, type MoveResult } from "../lifecycle.ts";
 import { readBackupStatus } from "../backup.ts";
 import type { GameRow } from "../games.ts";

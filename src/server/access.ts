@@ -4,13 +4,8 @@
 import type { Request } from "express";
 import type pg from "pg";
 import { requestUser, type SessionUser } from "./auth.ts";
-import {
-  findGame,
-  loadRoster,
-  MIN_ENTRIES,
-  type GameRow,
-  type Roster,
-} from "./games.ts";
+import { MIN_ENTRIES } from "../game/limits.ts";
+import { findGame, loadRoster, type GameRow, type Roster } from "./games.ts";
 
 export type Need = "play" | "edit" | "admin";
 export type Denial = "not_found" | "unauthorized" | "forbidden";

@@ -1,4 +1,9 @@
 // Game, attribute and entry data: the one seam between routes and the tables.
+import {
+  MAX_ATTRIBUTES,
+  MAX_VALUE_LENGTH,
+  MIN_ENTRIES,
+} from "../game/limits.ts";
 import type pg from "pg";
 import type { AttributeValue } from "../game/correctness.ts";
 import type { AttributeType, Entry, GameAttribute } from "../game/game.ts";
@@ -26,7 +31,6 @@ export interface GameRow {
 }
 
 // A game plays with at least this many active entries
-export const MIN_ENTRIES = 2;
 
 export const skipOf = (game: GameRow): number =>
   game.skipPeriod ?? DEFAULT_SKIP_PERIOD;
@@ -208,9 +212,6 @@ export async function updateGame(
 }
 
 // Abuse caps (spec #66); entry value caps live with entry editing
-export const MAX_ATTRIBUTES = 10;
-export const MAX_ATTRIBUTE_NAME = 40;
-export const MAX_VALUE_LENGTH = 200;
 
 export interface AttributeRow {
   id: number;

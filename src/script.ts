@@ -188,7 +188,11 @@ function initNewGuessSubmit(): void {
   });
 }
 
+// The buttons ship disabled so a click before the game has loaded is not silently lost
 function initButtons(): void {
+  for (const id of ["#submit-new-guess-button", "#give-up-button"]) {
+    document.querySelector<HTMLButtonElement>(id)!.disabled = false;
+  }
   document.querySelector<HTMLButtonElement>(
     "#submit-new-guess-button",
   )!.onclick = (): void => {

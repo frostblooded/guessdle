@@ -1,7 +1,8 @@
 // The game status lifecycle (spec #66): which edits send a game back to pending, the guarded
 // moves (submit, unpublish, approve, reject) and the admin email on entering pending.
 import type pg from "pg";
-import { MIN_ENTRIES, type GameRow, type GameStatus } from "./games.ts";
+import { MIN_ENTRIES } from "../game/limits.ts";
+import { type GameRow, type GameStatus } from "./games.ts";
 import type { MailConfig } from "./mailer.ts";
 import { withGameLock } from "./tx.ts";
 

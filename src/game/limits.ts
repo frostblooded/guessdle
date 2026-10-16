@@ -1,0 +1,16 @@
+// Size limits for games, shared by the server checks, the editor scripts and (via a test) the
+// HTML maxlength attributes. Change a number here and the test names every page to update.
+
+export const MAX_NAME = 60;
+export const MAX_DESCRIPTION = 500;
+export const MIN_SLUG = 3;
+export const MAX_SLUG = 40;
+export const MAX_ENTRY_NAME = 60;
+export const MAX_ATTRIBUTES = 10;
+export const MAX_ATTRIBUTE_NAME = 40;
+// One value, and how many a List attribute may hold
+export const MAX_VALUE_LENGTH = 200;
+export const MAX_LIST_ITEMS = 20;
+export const MAX_REASON = 500;
+// A game plays with at least this many active entries
+export const MIN_ENTRIES = 2;

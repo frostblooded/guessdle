@@ -1,4 +1,5 @@
 // The editor's Entries tab: list, add, change and delete entries with photo and values.
+import { MAX_LIST_ITEMS, MAX_VALUE_LENGTH } from "../game/limits.ts";
 import { api, errorText, type Reply } from "../manage-client.ts";
 
 const $ = <T extends HTMLElement>(selector: string): T =>
@@ -62,7 +63,8 @@ export async function initEntries(
             : el("input", { type: "text", value: items[0] ?? "" });
         input.id = `entry-attr-${attr.id}`;
         input.dataset["attr"] = String(attr.id);
-        input.maxLength = 200 * (attr.type === "list" ? 20 : 1);
+        input.maxLength =
+          MAX_VALUE_LENGTH * (attr.type === "list" ? MAX_LIST_ITEMS : 1);
         const label = el(
           "label",
           { htmlFor: input.id, className: "field-label" },

@@ -1,3 +1,5 @@
+import { MIN_ENTRIES } from "./limits.ts";
+
 // Editor wording that depends on a game's status (pure, so it is unit tested).
 
 export interface Details {
@@ -11,11 +13,8 @@ export interface Details {
   entryCount: number;
 }
 
-// A game plays with at least this many active entries (mirrors the server)
-export const MIN_ENTRIES_FOR_PLAY = 2;
-
 export function statusNotice(d: Details): string {
-  const missing = Math.max(0, MIN_ENTRIES_FOR_PLAY - d.entryCount);
+  const missing = Math.max(0, MIN_ENTRIES - d.entryCount);
   const needs =
     missing > 0
       ? ` It needs ${missing} more ${missing === 1 ? "entry" : "entries"} before anyone can play it.`
