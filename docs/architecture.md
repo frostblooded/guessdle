@@ -34,7 +34,7 @@ Stored server-side (`daily_answers`, `src/server/answers.ts`), never in the bund
 
 ## Uploads
 
-`POST /api/uploads?kind=photo|cover` (signed in, raw bytes as `application/octet-stream`, 5 MB) runs `src/server/images.ts`: type by magic bytes (JPEG, PNG, WebP), sharp resize (photo 800px, cover 1200px), WebP re-encode, random-hex name in `UPLOADS_DIR` (default `./uploads`); answers `{url: "/uploads/<hex>.webp"}` or 413 `too_large`, 415 `unsupported`, 422 `corrupt`. Prod: the `uploads` named volume is rw for `api`, ro for nginx (`/uploads/`, `/api/uploads` body cap 5m). The dev server serves the same folder.
+`POST /api/uploads?kind=photo|cover` (signed in, raw bytes as `application/octet-stream`, 5 MB) runs `src/server/images.ts`: type by magic bytes (JPEG, PNG, WebP), sharp resize (photo 800px, cover 1200px), WebP re-encode, random-hex name in `UPLOADS_DIR` (default `./uploads`); answers `{url: "/uploads/<hex>.webp"}` or 413 `too_large`, 415 `unsupported`, 422 `corrupt`. Prod: the `uploads` named volume is rw for `api`, ro for nginx (`/uploads/`, `/api/uploads` body cap 5m). The dev server serves the same folder. Hygiene (`src/server/upload-store.ts`, table `uploads`): per-user rate limit (60/hour, `uploadLimit`) and byte quota (200 MB, 403 `quota_exceeded`); `removeUpload` deletes file and quota row (call it on replace, remove and game delete); `main.ts` sweeps at start and every 24h, deleting files older than 1 day that `referencedUrls` does not list (extend it when tables store upload URLs).
 
 ## Server
 

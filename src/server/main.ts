@@ -6,6 +6,7 @@ import { adminEmailsFromEnv } from "./auth.ts";
 import { mailConfigFromEnv } from "./mailer.ts";
 import { migrate } from "./migrate.ts";
 import { rateLimitFromEnv } from "./rate-limit.ts";
+import { sweepUploads } from "./upload-store.ts";
 
 export const MIGRATIONS_DIR = join(import.meta.dirname, "../../db/migrations");
 
@@ -25,6 +26,20 @@ if (import.meta.main) {
     throw new Error("DATABASE_URL is required");
   }
   const pool = await connect(url);
+  const uploadsDir = process.env["UPLOADS_DIR"] || "uploads";
+  // shortcut: sweeps at start and every 24h rather than at a fixed night hour; the 1-day grace makes timing irrelevant
+  const sweep = (): void => {
+    sweepUploads(pool, uploadsDir, new Date()).then(
+      (names) => {
+        if (names.length > 0) {
+          console.log(`Upload sweep removed ${names.length} files`);
+        }
+      },
+      (err: unknown) => console.error("Upload sweep failed", err),
+    );
+  };
+  sweep();
+  setInterval(sweep, 24 * 3600_000).unref();
   createApp({
     pool,
     timeZone: process.env["SERVER_TIMEZONE"],
@@ -33,6 +48,6 @@ if (import.meta.main) {
     secureCookies: true,
     limit: rateLimitFromEnv(process.env),
     backupDir: process.env["BACKUP_DIR"] || undefined,
-    uploadsDir: process.env["UPLOADS_DIR"] || undefined,
+    uploadsDir,
   }).listen(Number(process.env["PORT"] ?? 3000), "0.0.0.0");
 }

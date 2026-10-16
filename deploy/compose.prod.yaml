@@ -63,6 +63,7 @@ services:
       PGDATABASE: petdle
     volumes:
       - backups:/backups
+      - uploads:/uploads:ro
     networks:
       - internal
     depends_on:

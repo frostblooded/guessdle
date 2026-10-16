@@ -130,6 +130,35 @@ describe("backup sidecar scripts (real Postgres, real sidecar image)", () => {
     assert.equal(status()["lastDump"]?.["ok"], false);
   });
 
+  it("archives the uploads folder next to the dump and prunes it to 14", () => {
+    run(
+      "mkdir -p /tmp/up && echo img > /tmp/up/aaaa.webp && rm -rf /backups/uploads",
+    );
+    const out = run(
+      "for i in $(seq 0 15); do UPLOADS_DIR=/tmp/up BACKUP_TODAY=$(date -u -d @$((1767225600 + i * 86400)) +%F) /opt/backup/backup.sh || exit 1; done",
+    );
+    assert.equal(out[0], 0, out[1]);
+    const tars = ls("uploads");
+    assert.equal(tars.length, 14);
+    assert.equal(tars.at(-1), "petdle-2026-01-16.tar");
+    assert.match(
+      run("tar -tf /backups/uploads/petdle-2026-01-16.tar")[1],
+      /aaaa.webp/,
+    );
+  });
+
+  it("an unreadable upload fails the backup and records it", () => {
+    run("echo img > /tmp/up/bad.webp && chmod 000 /tmp/up/bad.webp");
+    const [code] = run(
+      "UPLOADS_DIR=/tmp/up BACKUP_TODAY=2026-02-01 /opt/backup/backup.sh",
+    );
+    assert.notEqual(code, 0);
+    assert.equal(status()["lastDump"]?.["ok"], false);
+    assert.match(String(status()["lastDump"]?.["error"]), /uploads/);
+    assert.ok(!ls("uploads").some((n) => n.includes("2026-02-01")));
+    run("rm -f /tmp/up/bad.webp");
+  });
+
   it("prunes to 14 daily and 8 weekly dumps", () => {
     run("rm -rf /backups/daily /backups/weekly");
     // 2026-01-01 is a Thursday; 70 consecutive days = 10 Sundays

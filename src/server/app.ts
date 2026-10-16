@@ -32,6 +32,9 @@ export interface AppDeps {
   backupDir?: string | undefined;
   // Folder the upload pipeline writes WebP images to (served at /uploads/)
   uploadsDir?: string | undefined;
+  // Per-user upload budget per window, and per-user stored bytes
+  uploadLimit?: RateLimit;
+  uploadQuotaBytes?: number;
 }
 
 // The API only; callers add static files (dev server) or sit behind nginx (prod)
@@ -48,6 +51,8 @@ export function createApp({
   limit = DEFAULT_RATE_LIMIT,
   backupDir = "/backups",
   uploadsDir = "uploads",
+  uploadLimit,
+  uploadQuotaBytes,
 }: AppDeps): Express {
   if (testLogin && process.env["NODE_ENV"] === "production") {
     throw new Error("The test login route cannot run in production");
@@ -77,7 +82,7 @@ export function createApp({
   authRoutes(app, ctx, { mail, adminEmails, testLogin });
   adminRoutes(app, ctx, backupDir);
   gameRoutes(app, ctx);
-  uploadRoutes(app, ctx, uploadsDir);
+  uploadRoutes(app, ctx, uploadsDir, uploadLimit, uploadQuotaBytes);
 
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "not_found" });

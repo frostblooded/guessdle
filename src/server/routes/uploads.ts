@@ -6,16 +6,29 @@ import {
   ImageError,
   isImageKind,
   MAX_UPLOAD_BYTES,
-  saveUpload,
+  processImage,
+  storeWebp,
 } from "../images.ts";
+import { rateLimit, type RateLimit } from "../rate-limit.ts";
+import {
+  DEFAULT_UPLOAD_QUOTA_BYTES,
+  recordUpload,
+  removeUpload,
+  usedBytes,
+} from "../upload-store.ts";
 import { queryOf, type AppContext } from "./context.ts";
 
 const STATUS = { unsupported: 415, too_large: 413, corrupt: 422 } as const;
+
+// Starting values, tune after launch (docs/deploy.md)
+export const DEFAULT_UPLOAD_LIMIT: RateLimit = { max: 60, windowMs: 3600_000 };
 
 export function uploadRoutes(
   app: Express,
   { pool, now }: AppContext,
   uploadsDir: string,
+  limit: RateLimit = DEFAULT_UPLOAD_LIMIT,
+  quotaBytes: number = DEFAULT_UPLOAD_QUOTA_BYTES,
 ): void {
   const needUser = async (
     req: Request,
@@ -35,6 +48,7 @@ export function uploadRoutes(
   app.post(
     "/api/uploads",
     needUser,
+    rateLimit(pool, now, limit),
     express.raw({ type: "application/octet-stream", limit: MAX_UPLOAD_BYTES }),
     // A body over the cap fails in the parser; name it for the client
     (err: unknown, _req: Request, res: Response, next: NextFunction): void => {
@@ -53,11 +67,23 @@ export function uploadRoutes(
       // express.raw leaves {} when there is no body
       const body: unknown = req.body;
       try {
-        const url = await saveUpload(
-          uploadsDir,
+        const webp = await processImage(
           Buffer.isBuffer(body) ? body : Buffer.alloc(0),
           kind,
         );
+        // needUser ran, so the session lookup is cached and non-null
+        const user = (await requestUser(pool, req, now()))!;
+        if ((await usedBytes(pool, user.id)) + webp.length > quotaBytes) {
+          res.status(403).json({ error: "quota_exceeded" });
+          return;
+        }
+        const url = await storeWebp(uploadsDir, webp);
+        try {
+          await recordUpload(pool, user.id, url, webp.length, now());
+        } catch (err) {
+          await removeUpload(pool, uploadsDir, url);
+          throw err;
+        }
         res.json({ url });
       } catch (err) {
         if (err instanceof ImageError) {

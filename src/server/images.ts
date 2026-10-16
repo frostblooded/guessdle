@@ -55,13 +55,8 @@ export async function processImage(
   }
 }
 
-// Processes and stores an upload; returns its public URL path
-export async function saveUpload(
-  dir: string,
-  input: Buffer,
-  kind: ImageKind,
-): Promise<string> {
-  const webp = await processImage(input, kind);
+// Stores processed WebP bytes under a random name; returns the public URL path
+export async function storeWebp(dir: string, webp: Buffer): Promise<string> {
   const name = `${randomBytes(16).toString("hex")}.webp`;
   await mkdir(dir, { recursive: true });
   await writeFile(join(dir, name), webp);

@@ -8,6 +8,7 @@ The `backup` compose service (`deploy/backup/`, Dockerfile target `backup`) prot
 - `prune.sh` keeps the newest 14 files in `daily/` and 8 in `weekly/`.
 - Unless the last restore test passed in the past 7 days, `restore-test.sh` restores the newest daily dump into a throwaway Postgres started inside the sidecar, then requires `select count(*) from daily_answers` > 0.
 - A failed dump or restore test is retried at the next hourly check and logged: `docker compose -f deploy/compose.prod.yaml logs backup`.
+- `backup.sh` also tars the `uploads` volume (mounted read-only at `/uploads`) to `uploads/petdle-YYYY-MM-DD.tar`, 14 kept. A failed tar marks the attempt failed in `status.json`. Restore: `tar -xf` into the uploads volume.
 - `api` mounts the volume read-only at `/backups`.
 
 ## Status file
