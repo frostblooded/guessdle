@@ -23,3 +23,11 @@ export async function signOutViaMenu(page: Page): Promise<void> {
   await page.locator("#user-menu-button").click();
   await page.locator("#logout-button").click();
 }
+
+// Accepts the "Reset today's guesses?" dialog
+export async function confirmReset(page: Page): Promise<void> {
+  await page.locator("#reset-dialog button[value=confirm]").click();
+  await expect(page.locator("#reset-dialog")).toBeHidden();
+  // The dialog closes before the reset itself finishes
+  await expect(page.locator(".guess-result-row")).toHaveCount(0);
+}

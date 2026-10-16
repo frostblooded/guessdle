@@ -315,13 +315,43 @@ describe("signed-in Game State on the server", () => {
       assert.equal(body.answer, undefined);
     });
 
-    it("is refused while the game is still going, keeping the guesses", async () => {
+    it("works mid-game: drops the guesses and keeps the Daily Answer", async () => {
       const cookie = await login("a@x.test");
       await post("/api/game/guess", cookie, { id: OTHERS[0] });
+      await post("/api/game/guess", cookie, { id: OTHERS[1] });
       const { status, body } = await post("/api/game/reset", cookie);
-      assert.equal(status, 409);
-      assert.equal(body.error, "not_finished");
-      assert.deepEqual((await get("/api/game", cookie)).body.ids, [OTHERS[0]]);
+      assert.equal(status, 200);
+      assert.deepEqual(body.ids, []);
+      assert.equal(body.victory, false);
+      const win = await post("/api/game/guess", cookie, { id: ANSWER });
+      assert.equal(win.body.victory, true);
+    });
+
+    it("with no rows is still 200 and idempotent", async () => {
+      const cookie = await login("a@x.test");
+      for (let i = 0; i < 2; i++) {
+        const { status, body } = await post("/api/game/reset", cookie);
+        assert.equal(status, 200);
+        assert.deepEqual(body.ids, []);
+      }
+    });
+
+    it("allows guess, reset, the same guess again", async () => {
+      const cookie = await login("a@x.test");
+      await post("/api/game/guess", cookie, { id: OTHERS[0] });
+      await post("/api/game/reset", cookie);
+      const again = await post("/api/game/guess", cookie, { id: OTHERS[0] });
+      assert.equal(again.status, 200);
+      assert.deepEqual(again.body.ids, [OTHERS[0]]);
+    });
+
+    it("mid-game only touches the caller's rows", async () => {
+      const ann = await login("a@x.test");
+      const bob = await login("b@x.test");
+      await post("/api/game/guess", ann, { id: OTHERS[0] });
+      await post("/api/game/guess", bob, { id: OTHERS[0] });
+      await post("/api/game/reset", ann);
+      assert.deepEqual((await get("/api/game", bob)).body.ids, [OTHERS[0]]);
     });
 
     it("only touches the caller's rows", async () => {
@@ -376,7 +406,7 @@ describe("signed-in Game State on the server", () => {
       const cookie = await login("a@x.test");
       await post("/api/game/give-up", cookie);
       clock = new Date("2026-10-17T10:00:00Z");
-      assert.equal((await post("/api/game/reset", cookie)).status, 409);
+      assert.equal((await post("/api/game/reset", cookie)).status, 200);
       clock = NOW;
       assert.equal((await get("/api/game", cookie)).body.gaveUp, true);
     });

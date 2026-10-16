@@ -3,7 +3,7 @@
 The client keeps the roster (autocomplete and photos) but not the Daily Answer. Guesses are pet ids; the server grades them with the same core as before (`gradeIds` in `src/game/game.ts`).
 
 - **Anonymous**: guesses stay in `localStorage`. `POST /api/grade {ids}` is stateless and returns graded rows and `victory`, plus the answer name only on a win. Stored guesses are re-graded on load, so an override of today's answer reaches players mid-game.
-- **Signed in**: `GET /api/game` and `POST /api/game/guess|give-up|merge|reset` store pet ids per user and day (`user_guesses`, `user_give_ups`). Victory is derived from guesses and the current answer, never stored. Further guesses after a win or give-up get `finished` (409); reset deletes that day's rows.
+- **Signed in**: `GET /api/game` and `POST /api/game/guess|give-up|merge|reset` store pet ids per user and day (`user_guesses`, `user_give_ups`). Victory is derived from guesses and the current answer, never stored. Further guesses after a win or give-up get `finished` (409); reset deletes that day's guess and give-up rows at any time (mid-game too; no rows is still 200), and the page asks for confirmation first.
 - **Merge**: on login, leftover local guesses are adopted only if the account has no rows for that day (else 409, server state wins). The payload is validated like guesses; the day must equal the current Day Number.
 - Every response carries the Day Number; a client that sees a newer day resets itself. Errors are JSON `invalid` (400), `duplicate` or `finished` (409); unknown ids are rejected server-side.
 

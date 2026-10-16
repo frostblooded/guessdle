@@ -56,6 +56,14 @@
           </div>
           <div class="game-actions">
             <button
+              id="reset-guesses-button"
+              class="btn btn-quiet btn-sm"
+              type="button"
+              disabled
+            >
+              Reset
+            </button>
+            <button
               id="give-up-button"
               class="btn btn-quiet btn-sm"
               type="button"
@@ -72,6 +80,20 @@
             </button>
           </div>
         </div>
+        <dialog id="reset-dialog" class="dialog" aria-labelledby="reset-title">
+          <form method="dialog">
+            <h2 id="reset-title">Reset today's guesses?</h2>
+            <p>
+              The Daily Answer stays the same; you start with a fresh board.
+            </p>
+            <div class="dialog-actions">
+              <button class="btn btn-secondary" value="cancel" autofocus>
+                Cancel
+              </button>
+              <button class="btn btn-primary" value="confirm">Reset</button>
+            </div>
+          </form>
+        </dialog>
         <div class="results">
           <div id="guess-results-titles-row" class="row" aria-hidden="true">
             <div class="guess-result-title cell">Photo</div>

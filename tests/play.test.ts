@@ -403,6 +403,15 @@ describe("reset", () => {
     assert.equal((await play.giveUp()).kind, "gaveUp");
   });
 
+  it("works mid-game, keeping the same answer", async () => {
+    const play = open();
+    await play.submit(one!.id);
+    assert.equal(play.reset(), true);
+    assert.deepEqual(play.getUsedGuesses(), []);
+    assert.equal((await play.submit(one!.id)).kind, "accepted");
+    assert.equal((await play.submit(answer.id)).kind, "accepted");
+  });
+
   it("is harmless on a fresh game", async () => {
     const play = open();
     play.reset();

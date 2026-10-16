@@ -563,6 +563,7 @@ input[aria-invalid="true"] {
 .game-actions {
   display: flex;
   justify-content: flex-end;
+  gap: var(--s2);
   margin-top: var(--s2);
 }
 
@@ -572,6 +573,36 @@ input[aria-invalid="true"] {
 
 #reset-button {
   width: 100%;
+}
+
+.dialog {
+  width: min(24rem, calc(100vw - 2rem));
+  padding: var(--s5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background-color: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.dialog::backdrop {
+  background-color: rgb(0 0 0 / 0.5);
+}
+
+.dialog h2 {
+  margin: 0 0 var(--s2);
+  font-size: var(--text-lg);
+}
+
+.dialog p {
+  margin: 0 0 var(--s4);
+  color: var(--muted);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s2);
 }
 
 .banner {

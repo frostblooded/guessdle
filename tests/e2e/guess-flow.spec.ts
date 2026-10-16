@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { GUESS_DATA } from "../../src/game/roster.ts";
-import { findAnswerName, submitGuess } from "./helpers.ts";
+import { confirmReset, findAnswerName, submitGuess } from "./helpers.ts";
 
 // The browser's own (fake) clock; the server decides the Daily Answer's day
 const DAY = new Date(2025, 7, 18, 12);
@@ -432,6 +432,7 @@ test.describe("reset", () => {
     await expect(input(page)).toBeHidden();
 
     await resetButton(page).click();
+    await confirmReset(page);
 
     await expect(rows(page)).toHaveCount(0);
     await expect(victory(page)).toHaveCount(0);
@@ -451,6 +452,7 @@ test.describe("reset", () => {
     await submitGuess(page, wrongName);
     await giveUpButton(page).click();
     await resetButton(page).click();
+    await confirmReset(page);
 
     await expect(giveUpTitle(page)).toHaveCount(0);
     await expect(rows(page)).toHaveCount(0);
@@ -463,6 +465,7 @@ test.describe("reset", () => {
   test("holds after a reload", async ({ page }) => {
     await submitGuess(page, answerName);
     await resetButton(page).click();
+    await confirmReset(page);
 
     await page.reload();
 
@@ -479,9 +482,82 @@ test.describe("reset", () => {
     await submitGuess(page, wrongName);
     await giveUpButton(page).click();
     await resetButton(page).click();
+    await confirmReset(page);
 
     await submitGuess(page, wrongName);
     await expect(rows(page)).toHaveCount(1);
+  });
+});
+
+test.describe("mid-game reset", () => {
+  const midReset = (page: Page): Locator =>
+    page.locator("#reset-guesses-button");
+  const dialog = (page: Page): Locator => page.locator("#reset-dialog");
+
+  test("is visible but disabled until a guess, and again after a reset", async ({
+    page,
+  }) => {
+    await expect(midReset(page)).toBeVisible();
+    await expect(midReset(page)).toBeDisabled();
+    await submitGuess(page, wrongName);
+    await expect(midReset(page)).toBeEnabled();
+    await midReset(page).click();
+    await confirmReset(page);
+    await expect(midReset(page)).toBeDisabled();
+  });
+
+  test("confirming clears the board and keeps the same answer", async ({
+    page,
+  }) => {
+    await submitGuess(page, wrongName);
+    await midReset(page).click();
+    await expect(dialog(page)).toContainText("Reset today's guesses?");
+    await confirmReset(page);
+    await expect(rows(page)).toHaveCount(0);
+    await expect(input(page)).toBeVisible();
+    await submitGuess(page, answerName);
+    await expect(victory(page)).toContainText(answerName);
+  });
+
+  test("cancelling keeps the guesses", async ({ page }) => {
+    await submitGuess(page, wrongName);
+    await midReset(page).click();
+    await dialog(page).getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog(page)).toBeHidden();
+    await expect(rows(page)).toHaveCount(1);
+    await expect(midReset(page)).toBeFocused();
+  });
+
+  test("Escape cancels", async ({ page }) => {
+    await submitGuess(page, wrongName);
+    await midReset(page).click();
+    await expect(dialog(page)).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(dialog(page)).toBeHidden();
+    await expect(rows(page)).toHaveCount(1);
+  });
+
+  test("works from the keyboard", async ({ page }) => {
+    await submitGuess(page, wrongName);
+    await midReset(page).focus();
+    await page.keyboard.press("Enter");
+    // Cancel has initial focus; Tab moves to Reset
+    await expect(
+      dialog(page).getByRole("button", { name: "Cancel" }),
+    ).toBeFocused();
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Enter");
+    await expect(dialog(page)).toBeHidden();
+    await expect(rows(page)).toHaveCount(0);
+  });
+
+  test("asks before resetting after a win too", async ({ page }) => {
+    await submitGuess(page, answerName);
+    await resetButton(page).click();
+    await expect(dialog(page)).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(victory(page)).toBeVisible();
+    await expect(midReset(page)).toBeHidden();
   });
 });
 

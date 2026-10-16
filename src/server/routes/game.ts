@@ -149,6 +149,6 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
   app.post(
     "/api/game/reset",
     json,
-    changeRoute((game, current, q) => resetGame(q, game, current)),
+    changeRoute((game, _current, q) => resetGame(q, game)),
   );
 }

@@ -119,14 +119,29 @@ function initButtons(): void {
     (): void => {
       void handleGiveUp();
     };
-  document.querySelector<HTMLButtonElement>("#reset-button")!.onclick =
-    (): void => {
+  for (const id of ["#reset-button", "#reset-guesses-button"]) {
+    document.querySelector<HTMLButtonElement>(id)!.onclick = (): void => {
       void handleReset();
     };
+  }
+}
+
+// Native modal dialog: focus trap, Escape and focus return come for free
+function confirmReset(): Promise<boolean> {
+  const dialog = document.querySelector<HTMLDialogElement>("#reset-dialog")!;
+  dialog.returnValue = "";
+  return new Promise((resolve) => {
+    dialog.addEventListener(
+      "close",
+      (): void => resolve(dialog.returnValue === "confirm"),
+      { once: true },
+    );
+    dialog.showModal();
+  });
 }
 
 async function handleReset(): Promise<void> {
-  if (await play.reset()) {
+  if ((await confirmReset()) && (await play.reset())) {
     clearBoard();
   }
 }
@@ -143,6 +158,8 @@ function clearBoard(): void {
 function setFinished(finished: boolean): void {
   document.querySelector<HTMLElement>("#new-guess-row")!.hidden = finished;
   document.querySelector<HTMLElement>("#give-up-button")!.hidden = finished;
+  document.querySelector<HTMLElement>("#reset-guesses-button")!.hidden =
+    finished;
   document.querySelector<HTMLElement>("#reset-button")!.hidden = !finished;
 }
 
@@ -195,6 +212,9 @@ function refreshEmptyState(): void {
   const empty =
     document.querySelector("#guess-results-container")!.childElementCount === 0;
   document.querySelector<HTMLElement>("#empty-state")!.hidden = !empty;
+  // Nothing to reset until a guess is made
+  document.querySelector<HTMLButtonElement>("#reset-guesses-button")!.disabled =
+    empty;
 }
 
 async function loadInitialUsedGuessesElements(): Promise<void> {

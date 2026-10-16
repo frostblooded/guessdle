@@ -153,13 +153,30 @@ for (const { name, width, height } of VIEWPORTS) {
       await expectNoProblems(page);
     });
 
+    test("reset confirmation dialog", async ({ page }) => {
+      await submitGuess(page, WORST_GUESSES[0]!);
+      await page.locator("#reset-guesses-button").click();
+      const box = await page.locator("#reset-dialog").boundingBox();
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+      expect(box!.y).toBeGreaterThanOrEqual(0);
+      expect(box!.y + box!.height).toBeLessThanOrEqual(height);
+    });
+
     test("autocomplete suggestions", async ({ page }) => {
       await page.locator("#new-guess-input").fill("a");
       await expect(page.locator("[role=option]").first()).toBeVisible();
       const list = await page.locator("[role=listbox]").boundingBox();
       expect(list!.x).toBeGreaterThanOrEqual(0);
       expect(list!.x + list!.width).toBeLessThanOrEqual(width);
-      await expectNoProblems(page);
+      // The open list overlays the Reset button by design
+      const problems = await page.evaluate(findLayoutProblems);
+      expect(
+        problems.filter(
+          (p) =>
+            p !== "#reset-guesses-button is covered by #autoComplete_result_0",
+        ),
+      ).toEqual([]);
     });
 
     test("how-to-play page", async ({ page }) => {

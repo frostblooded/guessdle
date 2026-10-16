@@ -18,7 +18,6 @@ export const REFUSAL_STATUS = {
   invalid: 400,
   duplicate: 409,
   finished: 409,
-  not_finished: 409,
   // merge: the account already has rows for the day
   has_progress: 409,
   // merge: the payload is for another day
@@ -186,11 +185,8 @@ export async function mergeLocal(
 export async function resetGame(
   q: Q,
   { userId, date }: GameContext,
-  current: GameView,
 ): Promise<Refusal | null> {
-  if (!finished(current)) {
-    return "not_finished";
-  }
+  // Any time, even with no rows: deleting nothing is fine
   for (const table of ["user_guesses", "user_give_ups"]) {
     await q.query(`delete from ${table} where user_id = $1 and day = $2`, [
       userId,

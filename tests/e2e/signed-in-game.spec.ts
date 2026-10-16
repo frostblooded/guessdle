@@ -1,6 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 import { GUESS_DATA } from "../../src/game/roster.ts";
-import { findAnswerName, signOutViaMenu, submitGuess } from "./helpers.ts";
+import {
+  confirmReset,
+  findAnswerName,
+  signOutViaMenu,
+  submitGuess,
+} from "./helpers.ts";
 
 // Each test is its own player, so stored games never collide
 let counter = 0;
@@ -66,6 +71,7 @@ test("winning shows the answer, locks guessing, and reset restarts across a relo
   await expect(page.locator("#victory-answer-name")).toHaveText(answer);
 
   await page.locator("#reset-button").click();
+  await confirmReset(page);
   await expect(page.locator(".guess-result-row")).toHaveCount(0);
   await expect(page.locator("#victory-title")).toHaveCount(0);
   await page.reload();
@@ -88,6 +94,7 @@ test("giving up is stored: the answer shows after a reload, reset clears it", as
   await expect(page.locator("#reset-button")).toBeVisible();
 
   await page.locator("#reset-button").click();
+  await confirmReset(page);
   await expect(page.locator("#give-up-title")).toHaveCount(0);
   await page.reload();
   await expect(page.locator("#give-up-title")).toHaveCount(0);
@@ -168,4 +175,23 @@ test("an anonymous give-up is adopted on login", async ({ page, request }) => {
   await expect(page.locator("#give-up-answer-name")).toHaveText(answer);
   const game = await (await page.request.get("/api/game")).json();
   expect(game.gaveUp).toBe(true);
+});
+
+test("a signed-in player can reset mid-game, stored on the server", async ({
+  page,
+  request,
+}) => {
+  const [wrong] = wrongNames(await findAnswerName(request));
+  await stubLogin(page, newEmail());
+  await page.goto("/");
+  await submitGuess(page, wrong!);
+
+  await page.locator("#reset-guesses-button").click();
+  await confirmReset(page);
+  await expect(page.locator(".guess-result-row")).toHaveCount(0);
+  await expect(page.locator("#reset-guesses-button")).toBeDisabled();
+
+  await page.reload();
+  await expect(page.locator(".guess-result-row")).toHaveCount(0);
+  expect((await (await page.request.get("/api/game")).json()).ids).toEqual([]);
 });

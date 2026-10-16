@@ -74,9 +74,6 @@ class FakeServer {
       return reply(200, this.view());
     }
     assert.equal(url, "/api/game/reset");
-    if (!finished) {
-      return reply(409, { error: "not_finished", day: this.day });
-    }
     this.ids = [];
     this.gaveUp = false;
     return reply(200, this.view());
@@ -231,6 +228,16 @@ describe("reset", () => {
   it("clears the server game and allows guessing again", async () => {
     const play = open();
     await play.submit(answer.id);
+    assert.equal(await play.reset(), true);
+    assert.deepEqual(server.ids, []);
+    assert.deepEqual(play.getUsedGuesses(), []);
+    assert.equal((await play.submit(one!.id)).kind, "accepted");
+  });
+
+  it("works mid-game and on an empty board", async () => {
+    const play = open();
+    assert.equal(await play.reset(), true);
+    await play.submit(one!.id);
     assert.equal(await play.reset(), true);
     assert.deepEqual(server.ids, []);
     assert.deepEqual(play.getUsedGuesses(), []);
