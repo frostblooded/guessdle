@@ -153,7 +153,7 @@ export async function deleteEntry(
 
 // The entry fields in a request body, checked; undefined when any is malformed
 export async function parseEntryInput(
-  pool: Pick<pg.Pool, "query">,
+  pool: pg.Pool,
   body: Record<string, unknown>,
   current: string,
 ): Promise<EntryInput | undefined> {

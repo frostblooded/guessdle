@@ -64,10 +64,12 @@ test("an admin session is reported as admin by the API", async ({ page }) => {
   await stubLogin(page, { email: "root@example.test", admin: true });
   const me = await (await page.request.get("/api/me")).json();
 
-  expect(me.user).toEqual({
+  // `pending` is the review queue size, which other specs change
+  expect(me.user).toMatchObject({
     name: "root@example.test",
     email: "root@example.test",
     admin: true,
+    pending: expect.any(Number),
   });
 });
 
