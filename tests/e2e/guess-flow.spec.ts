@@ -215,7 +215,7 @@ test("help button opens and closes the how-to-play popup", async ({ page }) => {
   await expect(dialog).toBeVisible();
   await expect(
     dialog.locator(".correct, .partially-correct, .incorrect"),
-  ).toHaveCount(6);
+  ).toHaveCount(12);
   await dialog.getByRole("button", { name: "CLOSE" }).click();
   await expect(dialog).toBeHidden();
 });
@@ -245,7 +245,7 @@ test("help popup examples use real roster pets and fit a phone screen", async ({
   expect(ati.colors).not.toEqual(eddie.colors);
   expect(ati.owners.some((o) => eddie.owners.includes(o))).toBe(false);
   const photos: Locator = dialog.locator(".help-example img");
-  await expect(photos).toHaveCount(3);
+  await expect(photos).toHaveCount(4);
   // Step through the guide: each step fits and shows its photo.
   const next: Locator = page.locator("#help-next");
   const stepCount: number = await dialog.locator(".help-step").count();

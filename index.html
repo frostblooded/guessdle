@@ -41,7 +41,8 @@
       <section class="help-step" hidden>
         <h3>2. Make a guess</h3>
         <p>
-          Type a pet name and press SUBMIT. Every guess adds a row. Let us guess
+          Type a pet name and press SUBMIT. Every guess adds a row, colored by
+          how close it is. Let us guess
           <b>Cookie</b>.
         </p>
         <div class="help-example row help-head">
@@ -52,9 +53,9 @@
         </div>
         <div class="help-example row">
           <div class="cell"><img src="photos/cookie.jpg" alt="Cookie" /></div>
-          <div class="cell guess-result-cell">Cookie</div>
-          <div class="cell guess-result-cell">Black, Orange, White</div>
-          <div class="cell guess-result-cell">Niki</div>
+          <div class="cell guess-result-cell incorrect">Cookie</div>
+          <div class="cell guess-result-cell correct">Black, Orange, White</div>
+          <div class="cell guess-result-cell correct">Niki</div>
         </div>
       </section>
       <section class="help-step" hidden>
@@ -102,8 +103,21 @@
         <h3>5. Photo is a hint</h3>
         <p>
           The photo never changes color. Use it to remember who is who. A new
-          pet appears every day. Good luck!
+          pet appears every day. Guess Ati and the whole row turns green: you
+          win!
         </p>
+        <div class="help-example row help-head">
+          <div class="cell">Photo</div>
+          <div class="cell">Name</div>
+          <div class="cell">Colors</div>
+          <div class="cell">Owners</div>
+        </div>
+        <div class="help-example row">
+          <div class="cell"><img src="photos/ati.jpg" alt="Ati" /></div>
+          <div class="cell guess-result-cell correct">Ati</div>
+          <div class="cell guess-result-cell correct">Black, Orange, White</div>
+          <div class="cell guess-result-cell correct">Niki</div>
+        </div>
       </section>
       <div class="help-nav">
         <button id="help-prev" type="button">BACK</button>
