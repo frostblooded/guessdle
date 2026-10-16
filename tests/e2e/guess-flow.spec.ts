@@ -343,3 +343,224 @@ test("help popup restarts at step 1 on reopen", async ({ page }) => {
   await expect(page.locator("#help-count")).toHaveText("1 / 5");
   await expect(page.locator("#help-prev")).toBeDisabled();
 });
+
+const giveUpButton = (page: Page): Locator => page.locator("#give-up-button");
+const resetButton = (page: Page): Locator => page.locator("#reset-button");
+const giveUpTitle = (page: Page): Locator => page.locator("#give-up-title");
+
+// Makes the server look like it moved to the next day (a tab left open past midnight)
+async function serverMovesToNextDay(page: Page, url: string): Promise<void> {
+  await page.route(url, async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    await route.fulfill({
+      response,
+      json: { ...body, day: body.day + 1 },
+    });
+  });
+}
+
+test.describe("give up", () => {
+  test("reveals the answer, ends the game and offers a reset", async ({
+    page,
+  }) => {
+    await expect(resetButton(page)).toBeHidden();
+    await submitGuess(page, wrongName);
+    await giveUpButton(page).click();
+
+    await expect(page.locator("#give-up-answer-name")).toHaveText(answerName);
+    await expect(victory(page)).toHaveCount(0);
+    await expect(rows(page)).toHaveCount(1);
+    await expect(input(page)).toBeHidden();
+    await expect(giveUpButton(page)).toBeHidden();
+    await expect(resetButton(page)).toBeVisible();
+  });
+
+  test("works before any guess", async ({ page }) => {
+    await giveUpButton(page).click();
+
+    await expect(page.locator("#give-up-answer-name")).toHaveText(answerName);
+    await expect(rows(page)).toHaveCount(0);
+  });
+
+  test("survives a reload with the answer and the guesses", async ({
+    page,
+  }) => {
+    await submitGuess(page, wrongName);
+    await giveUpButton(page).click();
+    await expect(giveUpTitle(page)).toBeVisible();
+
+    await page.reload();
+
+    await expect(page.locator("#give-up-answer-name")).toHaveText(answerName);
+    await expect(rows(page)).toHaveCount(1);
+    await expect(input(page)).toBeHidden();
+    await expect(resetButton(page)).toBeVisible();
+  });
+
+  test("a failed request changes nothing", async ({ page }) => {
+    await page.route("**/api/give-up", (route) => route.abort());
+    await giveUpButton(page).click();
+
+    await expect(giveUpTitle(page)).toHaveCount(0);
+    await expect(input(page)).toBeVisible();
+    await expect(resetButton(page)).toBeHidden();
+
+    await page.unroute("**/api/give-up");
+    await giveUpButton(page).click();
+    await expect(giveUpTitle(page)).toBeVisible();
+  });
+
+  test("a rate limited request shows nothing and can be retried", async ({
+    page,
+  }) => {
+    await page.route("**/api/give-up", (route) =>
+      route.fulfill({
+        status: 429,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "rate_limited" }),
+      }),
+    );
+    await giveUpButton(page).click();
+
+    await expect(giveUpTitle(page)).toHaveCount(0);
+    await expect(giveUpButton(page)).toBeVisible();
+  });
+
+  test("is not offered after a win", async ({ page }) => {
+    await submitGuess(page, answerName);
+
+    await expect(giveUpButton(page)).toBeHidden();
+    await expect(giveUpTitle(page)).toHaveCount(0);
+  });
+
+  test("the next day starts a fresh game", async ({ page }) => {
+    await giveUpButton(page).click();
+    await expect(giveUpTitle(page)).toBeVisible();
+
+    await page.clock.setSystemTime(NEXT_DAY);
+    await page.reload();
+
+    await expect(giveUpTitle(page)).toHaveCount(0);
+    await expect(input(page)).toBeVisible();
+    await expect(resetButton(page)).toBeHidden();
+  });
+});
+
+test.describe("reset", () => {
+  test("after a win clears the board and allows replay", async ({ page }) => {
+    await submitGuess(page, wrongName);
+    await submitGuess(page, answerName);
+    await expect(resetButton(page)).toBeVisible();
+    await expect(input(page)).toBeHidden();
+
+    await resetButton(page).click();
+
+    await expect(rows(page)).toHaveCount(0);
+    await expect(victory(page)).toHaveCount(0);
+    await expect(resetButton(page)).toBeHidden();
+    await expect(input(page)).toBeVisible();
+    await expect(giveUpButton(page)).toBeVisible();
+
+    await submitGuess(page, wrongName);
+    await expect(rows(page)).toHaveCount(1);
+    await submitGuess(page, answerName);
+    await expect(victory(page)).toContainText(answerName);
+  });
+
+  test("after a give-up clears the board and allows replay", async ({
+    page,
+  }) => {
+    await submitGuess(page, wrongName);
+    await giveUpButton(page).click();
+    await resetButton(page).click();
+
+    await expect(giveUpTitle(page)).toHaveCount(0);
+    await expect(rows(page)).toHaveCount(0);
+    await expect(input(page)).toBeVisible();
+
+    await submitGuess(page, answerName);
+    await expect(victory(page)).toContainText(answerName);
+  });
+
+  test("holds after a reload", async ({ page }) => {
+    await submitGuess(page, answerName);
+    await resetButton(page).click();
+
+    await page.reload();
+
+    await expect(rows(page)).toHaveCount(0);
+    await expect(victory(page)).toHaveCount(0);
+    await expect(input(page)).toBeVisible();
+    await expect(resetButton(page)).toBeHidden();
+    expect(
+      await page.evaluate(() => localStorage.getItem("usedGuesses")),
+    ).toBeNull();
+  });
+
+  test("makes used pets guessable again", async ({ page }) => {
+    await submitGuess(page, wrongName);
+    await giveUpButton(page).click();
+    await resetButton(page).click();
+
+    await submitGuess(page, wrongName);
+    await expect(rows(page)).toHaveCount(1);
+  });
+});
+
+test.describe("day rollover in an open tab", () => {
+  test("a guess after midnight clears the old board and starts the new day", async ({
+    page,
+  }) => {
+    await submitGuess(page, wrongName);
+    await expect(rows(page)).toHaveCount(1);
+
+    await serverMovesToNextDay(page, "**/api/grade");
+    await submitGuess(page, wrongName);
+
+    // Only the new day's guess is shown
+    await expect(rows(page)).toHaveCount(1);
+    await expect(victory(page)).toHaveCount(0);
+  });
+
+  test("a reload on a later server day clears a won game", async ({ page }) => {
+    await submitGuess(page, answerName);
+    await expect(victory(page)).toBeVisible();
+
+    await serverMovesToNextDay(page, "**/api/grade");
+    await page.reload();
+
+    await expect(victory(page)).toHaveCount(0);
+    await expect(rows(page)).toHaveCount(0);
+    await expect(input(page)).toBeVisible();
+    await expect(resetButton(page)).toBeHidden();
+  });
+
+  test("giving up in a stale tab starts the new day instead of revealing", async ({
+    page,
+  }) => {
+    await submitGuess(page, wrongName);
+    await serverMovesToNextDay(page, "**/api/give-up");
+
+    await giveUpButton(page).click();
+
+    await expect(giveUpTitle(page)).toHaveCount(0);
+    await expect(rows(page)).toHaveCount(0);
+    await expect(input(page)).toBeVisible();
+    await expect(giveUpButton(page)).toBeVisible();
+  });
+
+  test("a reload on a later server day clears a finished game", async ({
+    page,
+  }) => {
+    await giveUpButton(page).click();
+    await expect(giveUpTitle(page)).toBeVisible();
+
+    await serverMovesToNextDay(page, "**/api/give-up");
+    await page.reload();
+
+    await expect(giveUpTitle(page)).toHaveCount(0);
+    await expect(input(page)).toBeVisible();
+    await expect(resetButton(page)).toBeHidden();
+  });
+});

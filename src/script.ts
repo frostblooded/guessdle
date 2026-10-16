@@ -5,6 +5,7 @@ import { correctnessClass } from "./game/correctness.ts";
 import { findPetId, type GradedAttribute } from "./game/game.ts";
 import {
   createPlay,
+  type GiveUpResult,
   type Loaded,
   type Play,
   type SubmitResult,
@@ -26,6 +27,7 @@ const play: Play = createPlay({
   storage: localStorage,
   now: (): Date => new Date(),
   fetch: (url, init) => fetch(url, init),
+  onNewDay: clearBoard,
 });
 
 let autoCompleteJs: autoComplete | null = null;
@@ -95,7 +97,55 @@ function initButtons(): void {
   submitNewGuessButton.onclick = (): void => {
     void handleSubmitSelection();
   };
+  document.querySelector<HTMLButtonElement>("#give-up-button")!.onclick =
+    (): void => {
+      void handleGiveUp();
+    };
+  document.querySelector<HTMLButtonElement>("#reset-button")!.onclick =
+    (): void => {
+      play.reset();
+      clearBoard();
+    };
   initHelpDialog();
+}
+
+// Empties the board and shows the guess input again
+function clearBoard(): void {
+  document.querySelector("#guess-results-container")!.replaceChildren();
+  document.querySelector("#victory-title")?.remove();
+  document.querySelector("#give-up-title")?.remove();
+  setFinished(false);
+}
+
+// A finished game (won or gave up) swaps guessing for the reset button
+function setFinished(finished: boolean): void {
+  document.querySelector<HTMLElement>("#new-guess-row")!.hidden = finished;
+  document.querySelector<HTMLElement>("#give-up-button")!.hidden = finished;
+  document.querySelector<HTMLElement>("#reset-button")!.hidden = !finished;
+}
+
+async function handleGiveUp(): Promise<void> {
+  const result: GiveUpResult = await play.giveUp();
+  if (result.kind === "gaveUp") {
+    addGiveUpTitle(result.answer);
+    setFinished(true);
+  }
+}
+
+function addGiveUpTitle(answerName: string): void {
+  if (document.querySelector("#give-up-title")) {
+    return;
+  }
+
+  const title: HTMLSpanElement = document.createElement("span");
+  title.id = "give-up-title";
+  title.append("THE ANSWER WAS: ");
+  const name: HTMLSpanElement = document.createElement("span");
+  name.id = "give-up-answer-name";
+  name.textContent = answerName;
+  title.append(name);
+  const gameContainer: Element = document.querySelector("#game-container")!;
+  gameContainer.parentNode!.insertBefore(title, gameContainer);
 }
 
 function initHelpDialog(): void {
@@ -142,7 +192,10 @@ async function loadInitialUsedGuessesElements(): Promise<void> {
   }
   if (loaded.victory && loaded.answer !== undefined) {
     addVictoryTitle(loaded.answer);
+  } else if (loaded.gaveUp && loaded.answer !== undefined) {
+    addGiveUpTitle(loaded.answer);
   }
+  setFinished(loaded.victory || loaded.gaveUp === true);
 }
 
 function addGuessResultElement(row: GradedAttribute[]): void {
@@ -193,7 +246,11 @@ async function handleSubmitSelection(): Promise<void> {
     submitting = false;
   }
   // The typed guess stays when the server could not grade it, to retry
-  if (result.kind === "invalid" || result.kind === "error") {
+  if (
+    result.kind === "invalid" ||
+    result.kind === "error" ||
+    result.kind === "finished"
+  ) {
     return;
   }
 
@@ -205,6 +262,7 @@ async function handleSubmitSelection(): Promise<void> {
 
   if (result.isAnswer && result.answer !== undefined) {
     addVictoryTitle(result.answer);
+    setFinished(true);
   }
   addGuessResultElement(result.row);
 }

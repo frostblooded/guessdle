@@ -213,3 +213,51 @@ describe("storage keys", () => {
     });
   });
 });
+
+describe("gave up", () => {
+  it("starts false and is kept across a new instance on the same day", () => {
+    assert.equal(state.getGaveUp(), false);
+    state.setGaveUp();
+    assert.equal(state.getGaveUp(), true);
+    assert.equal(
+      createGameState(storage, () => MONDAY_NIGHT).getGaveUp(),
+      true,
+    );
+  });
+
+  it("is cleared by reset", () => {
+    state.setGaveUp();
+    state.reset();
+    assert.equal(state.getGaveUp(), false);
+    assert.equal(storage.items.has("gaveUp"), false);
+  });
+
+  it("is cleared on the next local day", () => {
+    state.setGaveUp();
+    assert.equal(createGameState(storage, () => TUESDAY).getGaveUp(), false);
+  });
+
+  it("reads anything but true as false", () => {
+    storage.setItem("gaveUp", "garbage");
+    assert.equal(state.getGaveUp(), false);
+    storage.setItem("gaveUp", '"true"');
+    assert.equal(state.getGaveUp(), false);
+  });
+
+  it("is kept in memory when storage is blocked", () => {
+    const blocked: StateStorage = {
+      getItem: () => {
+        throw new Error("blocked");
+      },
+      setItem: () => {
+        throw new Error("blocked");
+      },
+      removeItem: () => {
+        throw new Error("blocked");
+      },
+    };
+    const blockedState = createGameState(blocked, () => today);
+    blockedState.setGaveUp();
+    assert.equal(blockedState.getGaveUp(), true);
+  });
+});

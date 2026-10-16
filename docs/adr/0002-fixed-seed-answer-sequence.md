@@ -1,5 +1,7 @@
 # The answer sequence uses a fixed seed derived from START_DATE
 
+Superseded (spec #38, ticket #42): Daily Answers are stored server-side. The seeded replay, `seedrandom` and the golden fixture are removed; the last replay was exported once into `db/backfill/answers.json`.
+
 `generateAnswerIdx` replays every day from `START_DATE` to today, picking each day's Daily Answer uniformly from the roster minus the previous Skip Period answers. The RNG is seeded once, with `START_DATE`, before the replay. The seed is not today's date.
 
 Previously the seed was today's date string. Every day then replayed a different random sequence, so the Skip Period only held inside one replay and never between two real consecutive days. The same pet could be the answer on back-to-back days, and some pets appeared noticeably more or less often than others. The old collision handling (`(idx + 1) % roster`) also favored the pet listed after any recently used one.

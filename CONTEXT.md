@@ -16,8 +16,8 @@ A pet the player submits as their attempt at the daily answer.
 **Daily Answer**:
 The one pet chosen for a given calendar date. Every player gets the same daily answer on the same date.
 
-**Answer Sequence**:
-The series of Daily Answers from the game's start date onward. It is the same for every player and never depends on when it is computed.
+**Answer History**:
+The stored Daily Answers from the game's start date onward, one per calendar date in the server time zone. Past days never change.
 
 **Skip Period**:
 The number of most recent daily answers that cannot be chosen again, including across consecutive days. Currently 5.
@@ -29,7 +29,7 @@ A compared property of a pet, such as colors or owners. A guess is graded per at
 How well one attribute of a guess matches the Daily Answer: correct, partially correct, or incorrect. Partially correct applies only to attributes holding several values that share at least one.
 
 **Game State**:
-What the player's browser remembers about today: the Guesses made, whether they won, and the day last played. It resets on a new calendar day.
+What the player's browser remembers about today: the Guesses made, whether they gave up, and the day last played. It resets on a new calendar day, or when the player resets after a win or give-up.
 
 **Day Number**:
 Whole calendar days since the game's start date. The start date itself is day 0. Each Day Number maps to exactly one Daily Answer.

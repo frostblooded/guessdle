@@ -73,7 +73,8 @@ button {
   }
 }
 
-#victory-title {
+#victory-title,
+#give-up-title {
   display: block;
   text-align: center;
   margin: 40px 0 40px 0;
@@ -84,6 +85,10 @@ button {
     font-size: 2em;
     margin: 10px 0 10px 0;
   }
+}
+
+#give-up-title {
+  color: inherit;
 }
 
 #game-container {
@@ -110,6 +115,15 @@ button {
   display: grid;
   grid-template-columns: 4fr 1fr;
   gap: 10px;
+  margin-bottom: 10px;
+}
+
+#new-guess-row[hidden] {
+  display: none;
+}
+
+#game-actions {
+  display: grid;
   margin-bottom: 10px;
 }
 

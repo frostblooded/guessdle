@@ -22,16 +22,26 @@ interface GradeResponse {
   answer?: string;
 }
 
+// POST /api/give-up
+interface GiveUpResponse {
+  day: number;
+  answer: string;
+}
+
 export interface Loaded {
   rows: GradedAttribute[][];
   victory: boolean;
+  // The answer's name: present on victory and after a give-up
   answer?: string;
+  gaveUp?: true;
 }
 
 export type SubmitResult =
   | { kind: "invalid" }
   | { kind: "duplicate" }
   | { kind: "error" }
+  // The game is over (won or gave up); reset to play again
+  | { kind: "finished" }
   | {
       kind: "accepted";
       row: GradedAttribute[];
@@ -39,12 +49,23 @@ export type SubmitResult =
       answer?: string;
     };
 
+export type GiveUpResult =
+  | { kind: "gaveUp"; answer: string }
+  | { kind: "finished" }
+  | { kind: "error" }
+  // The server is on a newer day: the game started over and nothing was revealed
+  | { kind: "newday" };
+
 export interface Play {
   // Graded rows of the guesses stored for today, oldest first; null if the
   // server could not be reached (the stored guesses stay)
   load(): Promise<Loaded | null>;
   // Takes a pet id
   submit(id: string): Promise<SubmitResult>;
+  // Reveals the answer and finishes the game
+  giveUp(): Promise<GiveUpResult>;
+  // Forgets today's guesses and finished state, so the player can replay
+  reset(): void;
   // Pet ids
   getUsedGuesses(): string[];
 }
@@ -54,10 +75,21 @@ export interface PlayDeps {
   storage: StateStorage;
   now: () => Date;
   fetch: FetchLike;
+  // Called when a response shows the server is on a newer day and the stored
+  // game was forgotten, so the page can clear what it shows
+  onNewDay?: () => void;
 }
 
-export function createPlay({ roster, storage, now, fetch }: PlayDeps): Play {
+export function createPlay({
+  roster,
+  storage,
+  now,
+  fetch,
+  onNewDay = (): void => {},
+}: PlayDeps): Play {
   const state: GameState = createGameState(storage, now);
+  // Won or gave up; not stored, it is re-derived on load
+  let finished: boolean = false;
   // Before ids, guesses were stored by display name: upgrade them, drop unknowns
   const stored: string[] = state.getUsedGuesses();
   const upgraded: string[] = stored.flatMap((entry: string): string[] => {
@@ -70,25 +102,27 @@ export function createPlay({ roster, storage, now, fetch }: PlayDeps): Play {
     state.setUsedGuesses(upgraded);
   }
 
-  async function grade(ids: string[]): Promise<GradeResponse | null> {
+  async function post<T>(url: string, body: unknown): Promise<T | null> {
     try {
-      const res = await fetch("/api/grade", {
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids }),
+        body: JSON.stringify(body),
       });
-      return res.ok ? ((await res.json()) as GradeResponse) : null;
+      return res.ok ? ((await res.json()) as T) : null;
     } catch {
       return null;
     }
   }
 
-  // True if the response is from a newer day than the stored guesses, which
-  // are then forgotten
-  function isNewDay(res: GradeResponse): boolean {
+  // True if the response is from a newer day than the stored game, which is
+  // then forgotten
+  function isNewDay(responseDay: number): boolean {
     const day: number | null = state.getDay();
-    if (day !== null && day !== res.day) {
+    if (day !== null && day !== responseDay) {
       state.reset();
+      finished = false;
+      onNewDay();
       return true;
     }
     return false;
@@ -97,25 +131,43 @@ export function createPlay({ roster, storage, now, fetch }: PlayDeps): Play {
   const play: Play = {
     async load(): Promise<Loaded | null> {
       const ids: string[] = state.getUsedGuesses();
-      if (ids.length === 0) {
-        return { rows: [], victory: false };
+      const gaveUp: boolean = state.getGaveUp();
+      const loaded: Loaded = { rows: [], victory: false };
+      if (ids.length > 0) {
+        const res: GradeResponse | null = await post("/api/grade", { ids });
+        if (res === null) {
+          return null;
+        }
+        if (isNewDay(res.day)) {
+          return { rows: [], victory: false };
+        }
+        state.setDay(res.day);
+        loaded.rows = res.rows;
+        loaded.victory = res.victory;
+        if (res.answer !== undefined) {
+          loaded.answer = res.answer;
+        }
       }
-      const res: GradeResponse | null = await grade(ids);
-      if (res === null) {
-        return null;
+      if (gaveUp) {
+        const res: GiveUpResponse | null = await post("/api/give-up", {});
+        if (res === null) {
+          return null;
+        }
+        if (isNewDay(res.day)) {
+          return { rows: [], victory: false };
+        }
+        state.setDay(res.day);
+        loaded.answer = res.answer;
+        loaded.gaveUp = true;
       }
-      if (isNewDay(res)) {
-        return { rows: [], victory: false };
-      }
-      state.setDay(res.day);
-      return {
-        rows: res.rows,
-        victory: res.victory,
-        ...(res.answer !== undefined && { answer: res.answer }),
-      };
+      finished = loaded.victory || gaveUp;
+      return loaded;
     },
 
     async submit(id: string): Promise<SubmitResult> {
+      if (finished) {
+        return { kind: "finished" };
+      }
       if (!roster.some((pet: Pet): boolean => pet.id === id)) {
         return { kind: "invalid" };
       }
@@ -123,11 +175,13 @@ export function createPlay({ roster, storage, now, fetch }: PlayDeps): Play {
       if (used.includes(id)) {
         return { kind: "duplicate" };
       }
-      const res: GradeResponse | null = await grade([...used, id]);
+      const res: GradeResponse | null = await post("/api/grade", {
+        ids: [...used, id],
+      });
       if (res === null) {
         return { kind: "error" };
       }
-      if (isNewDay(res)) {
+      if (isNewDay(res.day)) {
         return play.submit(id);
       }
       state.addUsedGuess(id);
@@ -137,12 +191,35 @@ export function createPlay({ roster, storage, now, fetch }: PlayDeps): Play {
         (cell: GradedAttribute): boolean =>
           cell.correctness === Correctness.Correct,
       );
+      finished = isAnswer;
       return {
         kind: "accepted",
         row,
         isAnswer,
         ...(res.answer !== undefined && { answer: res.answer }),
       };
+    },
+
+    async giveUp(): Promise<GiveUpResult> {
+      if (finished) {
+        return { kind: "finished" };
+      }
+      const res: GiveUpResponse | null = await post("/api/give-up", {});
+      if (res === null) {
+        return { kind: "error" };
+      }
+      if (isNewDay(res.day)) {
+        return { kind: "newday" };
+      }
+      state.setGaveUp();
+      state.setDay(res.day);
+      finished = true;
+      return { kind: "gaveUp", answer: res.answer };
+    },
+
+    reset(): void {
+      state.reset();
+      finished = false;
     },
 
     getUsedGuesses: state.getUsedGuesses,

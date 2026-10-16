@@ -370,4 +370,80 @@ describe("stored daily answers and anonymous grading", () => {
       assert.equal(body.answer, undefined);
     });
   });
+
+  describe("POST /api/give-up", () => {
+    const giveUp = async (
+      init: RequestInit = { method: "POST" },
+    ): Promise<Reply> => {
+      const res = await fetch(`${url}/api/give-up`, init);
+      return { status: res.status, body: (await res.json()) as Body };
+    };
+
+    it("reveals today's answer name and the day number", async () => {
+      const answer = await answerOf();
+      const { status, body } = await giveUp();
+      assert.equal(status, 200);
+      assert.equal(body.day, dayNumber(BACKFILL_END));
+      assert.equal(
+        GUESS_DATA.find((pet) => pet.id === answer)!.name,
+        body.answer,
+      );
+      assert.deepEqual(Object.keys(body).sort(), ["answer", "day"]);
+    });
+
+    it("is stateless: needs no body or content type, same reply every time", async () => {
+      const first = await giveUp();
+      const second = await giveUp({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: ["whatever"] }),
+      });
+      assert.equal(first.status, 200);
+      assert.deepEqual(second, first);
+    });
+
+    it("generates and stores a missing day like a first grade request", async () => {
+      today = dateOfDay(dayNumber(BACKFILL_END) + 1);
+      const { status, body } = await giveUp();
+      assert.equal(status, 200);
+      assert.equal(body.day, dayNumber(today));
+      assert.equal((await storedDays()).at(-1)!.day, today);
+      assert.equal(draws, 1);
+      assert.equal(
+        await answerOf(),
+        GUESS_DATA.find((p) => p.name === body.answer)!.id,
+      );
+    });
+
+    it("moves to the new day at the server time zone midnight", async () => {
+      clock = new Date("2026-10-16T20:59:59Z"); // 23:59:59 in Sofia (UTC+3)
+      const before = await giveUp();
+      clock = new Date("2026-10-16T21:00:00Z");
+      const after = await giveUp();
+      assert.equal(before.body.day, dayNumber("2026-10-16"));
+      assert.equal(after.body.day, dayNumber("2026-10-17"));
+    });
+
+    it("answers 404 to other methods", async () => {
+      const { status, body } = await giveUp({ method: "GET" });
+      assert.deepEqual([status, body.error], [404, "not_found"]);
+    });
+
+    it("fails with a JSON error while the stored pet is not in the roster", async () => {
+      await db.pool.query(
+        "update daily_answers set pet_id = 'removed-pet' where day = $1",
+        [BACKFILL_END],
+      );
+      try {
+        const { status, body } = await giveUp();
+        assert.deepEqual([status, body.error], [500, "answer_missing"]);
+        assert.equal(body.answer, undefined);
+      } finally {
+        await db.pool.query(
+          "update daily_answers set pet_id = $2 where day = $1",
+          [BACKFILL_END, backfill[BACKFILL_END]],
+        );
+      }
+    });
+  });
 });

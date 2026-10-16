@@ -79,6 +79,24 @@ export function createApp({
     });
   });
 
+  // Stateless and open to anyone by decision (spec #38): reveals today's answer
+  app.post("/api/give-up", async (_req, res) => {
+    const date = todayIn(now(), timeZone);
+    const day = dayNumber(date);
+    const answerId = await ensureAnswer(
+      pool,
+      roster.map((pet) => pet.id),
+      date,
+      random,
+    );
+    const answer = roster.find((pet) => pet.id === answerId);
+    if (!answer) {
+      res.status(500).json({ error: "answer_missing", day });
+      return;
+    }
+    res.json({ day, answer: answer.name });
+  });
+
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "not_found" });
   });

@@ -5,6 +5,7 @@ import { dateToString } from "./date.ts";
 const LOCAL_STORAGE_USED_GUESSES_STRING: string = "usedGuesses";
 const LOCAL_STORAGE_VICTORY_STRING: string = "victory"; // no longer stored: victory comes from the server
 const LOCAL_STORAGE_DAY_STRING: string = "day";
+const LOCAL_STORAGE_GAVE_UP_STRING: string = "gaveUp";
 const LOCAL_LAST_PLAYED_STRING: string = "lastPlayed";
 
 // The part of the browser Storage that Game State uses
@@ -21,7 +22,10 @@ export interface GameState {
   // Server Day Number the guesses were graded on, null until a response says
   getDay(): number | null;
   setDay(day: number): void;
-  // Forgets guesses and day (a newer day was seen)
+  // Whether the player gave up today (the answer was revealed)
+  getGaveUp(): boolean;
+  setGaveUp(): void;
+  // Forgets guesses, day and give-up (a newer day was seen, or the player reset)
   reset(): void;
 }
 
@@ -93,6 +97,7 @@ export function createGameState(
     storage.removeItem(LOCAL_STORAGE_VICTORY_STRING);
     storage.removeItem(LOCAL_STORAGE_USED_GUESSES_STRING);
     storage.removeItem(LOCAL_STORAGE_DAY_STRING);
+    storage.removeItem(LOCAL_STORAGE_GAVE_UP_STRING);
   }
   storage.setItem(LOCAL_LAST_PLAYED_STRING, JSON.stringify(today));
 
@@ -124,7 +129,16 @@ export function createGameState(
       storage.setItem(LOCAL_STORAGE_DAY_STRING, JSON.stringify(day));
     },
 
+    getGaveUp(): boolean {
+      return readJson(storage, LOCAL_STORAGE_GAVE_UP_STRING) === true;
+    },
+
+    setGaveUp(): void {
+      storage.setItem(LOCAL_STORAGE_GAVE_UP_STRING, "true");
+    },
+
     reset(): void {
+      storage.removeItem(LOCAL_STORAGE_GAVE_UP_STRING);
       storage.removeItem(LOCAL_STORAGE_USED_GUESSES_STRING);
       storage.removeItem(LOCAL_STORAGE_DAY_STRING);
     },
