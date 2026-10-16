@@ -47,7 +47,8 @@ jobs:
       - name: Compile, type-check and run unit tests
         run: npm test
 
-  e2e:
+  # Needs Docker (Testcontainers Postgres), which the runner has
+  integration-e2e:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -56,6 +57,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - name: Integration tests
+        run: npm run test:integration
       - name: Cache Playwright browser
         id: playwright-cache
         uses: actions/cache@v6
@@ -72,7 +75,7 @@ jobs:
         run: npm run test:e2e
 
   deploy:
-    needs: [build, unit, e2e]
+    needs: [build, unit, integration-e2e]
     if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
@@ -89,7 +92,7 @@ jobs:
         uses: actions/deploy-pages@v5
 
   deploy-home:
-    needs: [build, unit, e2e]
+    needs: [build, unit, integration-e2e]
     if: github.ref == 'refs/heads/prod' && github.event_name != 'pull_request'
     runs-on: [self-hosted, home-server]
     concurrency:

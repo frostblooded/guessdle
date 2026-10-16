@@ -17,6 +17,6 @@
     "verbatimModuleSyntax": true,
     "types": ["node"]
   },
-  "include": ["tests/**/*.ts"],
+  "include": ["tests/**/*.ts", "src/server/**/*.ts"],
   "exclude": ["tests/e2e"]
 }

@@ -32,7 +32,7 @@ function allowedFile(urlPath) {
   }
 }
 
-createServer(async (req, res) => {
+async function serveStatic(req, res) {
   const file = allowedFile(new URL(req.url, "http://localhost").pathname);
   const body = file === null ? null : await readFile(file).catch(() => null);
   if (body === null)
@@ -44,4 +44,15 @@ createServer(async (req, res) => {
     "Content-Type": TYPES[extname(file)] ?? "application/octet-stream",
   });
   res.end(body);
-}).listen(PORT, "0.0.0.0");
+}
+
+// With DATABASE_URL the Express API (src/server) runs in this process; the e2e suite leaves it unset.
+let handler = serveStatic;
+if (process.env.DATABASE_URL) {
+  const { connect } = await import("../src/server/main.ts");
+  const { createApp } = await import("../src/server/app.ts");
+  const app = createApp({ pool: await connect(process.env.DATABASE_URL) });
+  app.use(serveStatic);
+  handler = app;
+}
+createServer(handler).listen(PORT, "0.0.0.0");

@@ -1,4 +1,5 @@
 # Dev: docker compose up --watch  (http://localhost:8080)
+# Just Postgres for `npm start`: docker compose -f deploy/compose.yaml up -d db
 services:
   dev:
     build:
@@ -7,6 +8,11 @@ services:
       target: dev
     ports:
       - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://petdle:petdle@db:5432/petdle
+    depends_on:
+      db:
+        condition: service_healthy
     develop:
       watch:
         - action: sync
@@ -20,3 +26,22 @@ services:
           path: ../package.json
         - action: rebuild
           path: ../package-lock.json
+
+  # Also reachable from the host for `npm start`: DATABASE_URL=postgres://petdle:petdle@localhost:5432/petdle
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: petdle
+      POSTGRES_PASSWORD: petdle
+      POSTGRES_DB: petdle
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - dev-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "petdle"]
+      interval: 2s
+      retries: 30
+
+volumes:
+  dev-db:

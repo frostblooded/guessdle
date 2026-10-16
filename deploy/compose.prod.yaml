@@ -1,4 +1,5 @@
 # Prod on the home server: ./start.sh. The host's cloudflared tunnel points at http://guessdle-server:8080.
+# Secrets come from the untracked deploy/.env on the server (keys in docs/deploy.md).
 services:
   web:
     build:
@@ -8,10 +9,49 @@ services:
     container_name: guessdle-server
     networks:
       - tunnel
+      - internal
+    depends_on:
+      - api
     restart: unless-stopped
 
-# Network shared with cloudflared (created by the immich stack, so immich must be up first)
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: api
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://petdle:${POSTGRES_PASSWORD}@db:5432/petdle
+    networks:
+      - internal
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: petdle
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: petdle
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "petdle"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  db-data:
+
 networks:
+  # web, api and db only; nothing on it is published to the host
+  internal:
+  # Network shared with cloudflared (created by the immich stack, so immich must be up first)
   tunnel:
     name: immich_default
     external: true

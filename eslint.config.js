@@ -2,7 +2,9 @@ import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist/", "node_modules/", "test-results/"] },
+  {
+    ignores: ["dist/", "node_modules/", "test-results/", ".claude/worktrees/"],
+  },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   // shortcut: no `globals` package; Node globals in .mjs would trip no-undef, so it is off there.

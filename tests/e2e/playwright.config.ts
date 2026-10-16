@@ -16,7 +16,8 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
     command: "npm start",
-    env: { PORT: String(PORT) },
+    // Empty DATABASE_URL: static pages only, no Postgres needed (and no .env pickup)
+    env: { PORT: String(PORT), DATABASE_URL: "" },
     cwd: "../..",
     url: URL,
     reuseExistingServer: !process.env["CI"],

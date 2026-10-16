@@ -3,16 +3,17 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node scripts/server.mjs",
+    "start": "node --env-file-if-exists=.env scripts/server.mjs",
     "build": "esbuild src/script.ts --bundle --sourcemap --target=es2020 --loader:.svg=file --outdir=dist",
     "build:prod": "node scripts/build-prod.mjs",
     "watch": "npm run build -- --watch",
     "test:e2e": "npm run build && npm run typecheck && tsc -p tests/e2e && playwright test -c tests/e2e",
-    "test": "npm run typecheck && tsc -p tsconfig.test.json && node --test \"tests/**/*.test.ts\"",
+    "test": "npm run typecheck && tsc -p tsconfig.test.json && node --test \"tests/*.test.ts\"",
     "typecheck": "tsc",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:integration": "tsc -p tsconfig.test.json && node --test --test-concurrency=1 --test-timeout=120000 \"tests/integration/*.test.ts\""
   },
   "engines": {
     "node": ">=24"
@@ -20,16 +21,22 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.64.0",
+    "@testcontainers/postgresql": "^12.2.1",
+    "@types/express": "^5.0.6",
     "@types/node": "^26.6.5",
+    "@types/pg": "^8.23.1",
     "@types/seedrandom": "^3.0.8",
     "esbuild": "^0.28.2",
     "eslint": "^10.12.0",
     "prettier": "^3.9.10",
+    "testcontainers": "^12.2.1",
     "typescript": "~6.0",
     "typescript-eslint": "^8.71.2"
   },
   "dependencies": {
     "@tarekraafat/autocomplete.js": "^10.2.10",
+    "express": "^5.3.0",
+    "pg": "^8.23.1",
     "seedrandom": "^3.0.5"
   }
 }
