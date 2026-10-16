@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// Own port so the tests never reuse a dev server started with `npm start`
-const PORT = 8081;
+// Own port so the tests never reuse a dev server started with `npm start`; E2E_PORT lets parallel runs (agents, worktrees) avoid each other
+const PORT = Number(process.env["E2E_PORT"] ?? 8081);
 const URL = `http://127.0.0.1:${PORT}`;
 
 export default defineConfig({

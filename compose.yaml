@@ -23,6 +23,9 @@ services:
         condition: service_healthy
       mailpit:
         condition: service_started
+    # Uploads (and the imported photos) survive `down` and rebuilds
+    volumes:
+      - dev-uploads:/app/uploads
     develop:
       watch:
         - action: sync
@@ -31,6 +34,7 @@ services:
           ignore:
             - node_modules/
             - dist/
+            - uploads/
             - .git/
         - action: rebuild
           path: ./package.json
@@ -62,3 +66,4 @@ services:
 
 volumes:
   dev-db:
+  dev-uploads:

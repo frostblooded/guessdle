@@ -12,6 +12,11 @@ Read during review. Judgement calls only; tooling covers the rest (`npm run lint
 - Client calls to the API go through `src/game/transport.ts`; status-to-result mapping lives there once.
 - When a few values travel together through several functions, bundle them into one type (`GameContext` in `src/server/user-game.ts`).
 
+## Editor pages
+
+- A background refresh (status, counts, lists) never re-renders inputs the user may be typing in; only the first load and the user's own save write field values.
+- A new e2e test waits for `#loading-state` to be hidden before it interacts.
+
 ## Security-sensitive code
 
 Check each of these when the diff touches `src/server/auth.ts`, sessions, or any `/api` route:
@@ -21,3 +26,4 @@ Check each of these when the diff touches `src/server/auth.ts`, sessions, or any
 - Every `/api/admin/*` route checks the admin flag on the request, not a cached value.
 - Responses reveal the Daily Answer only after a win or give-up.
 - Changes to shared state (answers, user rows) take the advisory or row lock.
+- A URL or id taken from the request body that points at stored data (an upload, an entry) is checked to belong to the acting user or the game before it is saved or deleted.

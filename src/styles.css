@@ -377,6 +377,20 @@ a {
   color: var(--muted);
 }
 
+/* Page title with its actions (Edit game) beside it, wrapping under it on a narrow phone */
+.title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2) var(--s4);
+  margin-bottom: var(--s3);
+}
+
+.title-row h1 {
+  margin: 0;
+}
+
 .fine-print {
   font-size: var(--text-sm);
   color: var(--muted);
