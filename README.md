@@ -50,10 +50,7 @@ The server's existing Cloudflare Tunnel (service `http://guessdle-server:8080`) 
 
 ## Adding a pet
 
-1. Add the photo to `photos/`.
-2. Add an entry to `GUESS_DATA` in `src/game/roster.ts` with a unique lowercase-slug `id` (e.g. `"mochi"`). Guesses are stored by id, so never change an id once shipped. `npm test` fails on a duplicate or malformed id.
-
-Stored answers refer to pet ids, so adding a pet or reordering the roster does not change past or stored days. A pet removed from the roster breaks the stored days that use it (flagged in the admin panel).
+Entries and photos live in the database; photos are uploads (`POST /api/uploads`). The original `photos/*.jpg` were moved there once with `scripts/import-photos.mjs` (issue #71; restore the folder from git history before that commit to rerun it).
 
 ## Deployment
 

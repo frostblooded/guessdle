@@ -13,7 +13,7 @@ const SERVED = [
   ["/dist/script.css", "text/css"],
   ["/dist/script.js.map", "application/json"],
   ["/favicon.ico", "image/x-icon"],
-  ["/photos/ati.jpg", "image/jpeg"],
+  ["/howto/ati.jpg", "image/jpeg"],
 ] as const;
 
 const NOT_SERVED = [
@@ -25,8 +25,8 @@ const NOT_SERVED = [
   "/Login",
   "/admin/x",
   "/how-to-play.htm",
-  "/photos/missing.jpg",
-  "/photos/",
+  "/howto/missing.jpg",
+  "/howto/",
   "/package.json",
   "/scripts/server.mjs",
   "/src/script.ts",
@@ -37,11 +37,11 @@ const NOT_SERVED = [
   "/docs/adr/0001-typescript-built-in-ci.md",
   "/.git/config",
   "/node_modules/typescript/package.json",
-  "/photos/../package.json",
-  "/photos/%2e%2e/package.json",
-  "/photos/..%2fpackage.json",
-  "/photos/%2e%2e%2fpackage.json",
-  "/photos/%ZZ",
+  "/howto/../package.json",
+  "/howto/%2e%2e/package.json",
+  "/howto/..%2fpackage.json",
+  "/howto/%2e%2e%2fpackage.json",
+  "/howto/%ZZ",
 ] as const;
 
 for (const [path, type] of SERVED) {

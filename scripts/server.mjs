@@ -9,7 +9,7 @@ const PORT = process.env.PORT ?? 8080;
 // Clean URLs (/login) map to <name>.html; deploy/nginx.conf does the same with try_files
 const PAGES = new Set(["login", "verify", "admin", "how-to-play"]);
 const ALLOWED =
-  /^\/(index\.html|login\.html|verify\.html|admin\.html|how-to-play\.html|favicon\.ico|(dist|photos|uploads)\/.+)$/;
+  /^\/(index\.html|login\.html|verify\.html|admin\.html|how-to-play\.html|favicon\.ico|(dist|howto|uploads)\/.+)$/;
 
 const TYPES = {
   ".html": "text/html; charset=utf-8",

@@ -5,4 +5,4 @@ tests/test-results
 tests/playwright-report
 tests/fixtures
 package-lock.json
-photos
+howto

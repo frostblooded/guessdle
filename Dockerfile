@@ -41,5 +41,5 @@ FROM nginxinc/nginx-unprivileged:alpine AS prod
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/*.html /app/favicon.ico /usr/share/nginx/html/
 COPY --from=build /app/dist /usr/share/nginx/html/dist
-COPY --from=build /app/photos /usr/share/nginx/html/photos
+COPY --from=build /app/howto /usr/share/nginx/html/howto
 EXPOSE 8080
