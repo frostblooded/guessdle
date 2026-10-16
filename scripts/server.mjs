@@ -51,9 +51,15 @@ let handler = serveStatic;
 if (process.env.DATABASE_URL) {
   const { connect } = await import("../src/server/main.ts");
   const { createApp } = await import("../src/server/app.ts");
+  const { adminEmailsFromEnv, googleConfigFromEnv } =
+    await import("../src/server/auth.ts");
   const app = createApp({
     pool: await connect(process.env.DATABASE_URL),
     timeZone: process.env.SERVER_TIMEZONE || undefined,
+    google: googleConfigFromEnv(process.env),
+    adminEmails: adminEmailsFromEnv(process.env.ADMIN_EMAILS),
+    // Only the e2e suite sets NODE_ENV=test; the stub login never exists elsewhere
+    testLogin: process.env.NODE_ENV === "test",
   });
   app.use(serveStatic);
   handler = app;

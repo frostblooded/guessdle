@@ -2,6 +2,7 @@
 import { join } from "node:path";
 import pg from "pg";
 import { createApp } from "./app.ts";
+import { adminEmailsFromEnv, googleConfigFromEnv } from "./auth.ts";
 import { migrate } from "./migrate.ts";
 
 export const MIGRATIONS_DIR = join(import.meta.dirname, "../../db/migrations");
@@ -22,8 +23,11 @@ if (import.meta.main) {
     throw new Error("DATABASE_URL is required");
   }
   const pool = await connect(url);
-  createApp({ pool, timeZone: process.env["SERVER_TIMEZONE"] }).listen(
-    Number(process.env["PORT"] ?? 3000),
-    "0.0.0.0",
-  );
+  createApp({
+    pool,
+    timeZone: process.env["SERVER_TIMEZONE"],
+    google: googleConfigFromEnv(process.env),
+    adminEmails: adminEmailsFromEnv(process.env["ADMIN_EMAILS"]),
+    secureCookies: true,
+  }).listen(Number(process.env["PORT"] ?? 3000), "0.0.0.0");
 }

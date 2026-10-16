@@ -1,6 +1,12 @@
 import autoComplete from "@tarekraafat/autocomplete.js";
 import "../styles.css";
 import "@tarekraafat/autocomplete.js/dist/css/autoComplete.css";
+import {
+  fetchUser,
+  signOut,
+  type AccountFetch,
+  type AccountUser,
+} from "./account.ts";
 import { correctnessClass } from "./game/correctness.ts";
 import { findPetId, type GradedAttribute } from "./game/game.ts";
 import {
@@ -107,6 +113,31 @@ function initButtons(): void {
       clearBoard();
     };
   initHelpDialog();
+  document.querySelector<HTMLButtonElement>("#logout-button")!.onclick =
+    (): void => {
+      void handleLogout();
+    };
+  void fetchUser(fetchLike).then(showAccount);
+}
+
+const fetchLike: AccountFetch = (url, init) => fetch(url, init);
+
+function showAccount(user: AccountUser | null): void {
+  const name: HTMLElement =
+    document.querySelector<HTMLElement>("#account-name")!;
+  name.textContent = user === null ? "" : user.name;
+  name.hidden = user === null;
+  document.querySelector<HTMLElement>("#login-link")!.hidden = user !== null;
+  document.querySelector<HTMLElement>("#logout-button")!.hidden = user === null;
+}
+
+// Signing out also forgets the local game, so the next person starts clean
+async function handleLogout(): Promise<void> {
+  if (await signOut(fetchLike)) {
+    play.reset();
+    clearBoard();
+    showAccount(null);
+  }
 }
 
 // Empties the board and shows the guess input again

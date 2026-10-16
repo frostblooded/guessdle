@@ -193,6 +193,14 @@ button {
   }
 }
 
+#account {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+}
+
 #theme-button {
   position: absolute;
   top: 10px;

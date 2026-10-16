@@ -338,9 +338,15 @@ describe("stored daily answers and anonymous grading", () => {
         body: JSON.stringify({ ids: [] }),
         type: "text/plain",
       });
-      assert.deepEqual([text.status, text.body.error], [400, "invalid"]);
+      assert.deepEqual(
+        [text.status, text.body.error],
+        [415, "unsupported_media_type"],
+      );
       const none = await post(null, { body: "", type: null });
-      assert.deepEqual([none.status, none.body.error], [400, "invalid"]);
+      assert.deepEqual(
+        [none.status, none.body.error],
+        [415, "unsupported_media_type"],
+      );
       const big = await post(null, {
         body: JSON.stringify({ ids: ["x".repeat(11_000)] }),
       });
@@ -372,9 +378,12 @@ describe("stored daily answers and anonymous grading", () => {
   });
 
   describe("POST /api/give-up", () => {
-    const giveUp = async (
-      init: RequestInit = { method: "POST" },
-    ): Promise<Reply> => {
+    const jsonPost: RequestInit = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    };
+    const giveUp = async (init: RequestInit = jsonPost): Promise<Reply> => {
       const res = await fetch(`${url}/api/give-up`, init);
       return { status: res.status, body: (await res.json()) as Body };
     };
@@ -391,8 +400,8 @@ describe("stored daily answers and anonymous grading", () => {
       assert.deepEqual(Object.keys(body).sort(), ["answer", "day"]);
     });
 
-    it("is stateless: needs no body or content type, same reply every time", async () => {
-      const first = await giveUp();
+    it("is stateless: ignores the body, same reply every time", async () => {
+      const first = await giveUp(jsonPost);
       const second = await giveUp({
         method: "POST",
         headers: { "Content-Type": "application/json" },

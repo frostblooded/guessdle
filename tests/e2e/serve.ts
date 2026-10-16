@@ -3,6 +3,7 @@
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 
 const container = await new PostgreSqlContainer("postgres:17-alpine").start();
+process.env["NODE_ENV"] = "test";
 process.env["DATABASE_URL"] = container.getConnectionUri();
 const server = "../../scripts/server.mjs";
 await import(server);
