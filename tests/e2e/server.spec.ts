@@ -30,7 +30,7 @@ const NOT_SERVED = [
   "/package.json",
   "/scripts/server.mjs",
   "/src/script.ts",
-  "/src/game/roster.ts",
+  "/src/game/game.ts",
   "/dist/",
   "/dist/../package.json",
   "/tests/e2e/server.spec.ts",

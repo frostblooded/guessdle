@@ -240,7 +240,7 @@ describe("Sessions and CSRF protection", () => {
 
     it("rejects a non-JSON content type with 415", async () => {
       for (const type of ["text/plain", "application/x-www-form-urlencoded"]) {
-        const res = await post("/api/grade", {
+        const res = await post("/api/games/petdle/grade", {
           headers: { "Content-Type": type },
           body: JSON.stringify({ ids: [] }),
         });
@@ -250,7 +250,11 @@ describe("Sessions and CSRF protection", () => {
     });
 
     it("rejects a request with no content type", async () => {
-      for (const path of ["/api/grade", "/api/give-up", "/api/auth/logout"]) {
+      for (const path of [
+        "/api/games/petdle/grade",
+        "/api/games/petdle/give-up",
+        "/api/auth/logout",
+      ]) {
         assert.equal((await post(path, {})).status, 415, path);
       }
     });
@@ -286,7 +290,7 @@ describe("Sessions and CSRF protection", () => {
     });
 
     it("accepts the page's own Origin", async () => {
-      const res = await post("/api/grade", {
+      const res = await post("/api/games/petdle/grade", {
         headers: { "Content-Type": "application/json", Origin: url },
         body: JSON.stringify({ ids: [] }),
       });
@@ -301,7 +305,7 @@ describe("Sessions and CSRF protection", () => {
     });
 
     it("rejects a foreign Origin even when the content type is wrong too", async () => {
-      const res = await post("/api/grade", {
+      const res = await post("/api/games/petdle/grade", {
         headers: { "Content-Type": "text/plain", Origin: "https://evil.test" },
         body: "x",
       });

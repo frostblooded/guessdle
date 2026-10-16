@@ -1,24 +1,20 @@
 // Stored Daily Answers: one row per calendar date in the server time zone.
 import type pg from "pg";
-import { ANSWER_SKIP_PERIOD } from "../game/roster.ts";
+import type { GameRow } from "./games.ts";
+import { skipOf } from "./games.ts";
 
-// Day Number 0
-export const ANSWER_START = "2025-08-15";
-
-const LOCK_KEY = 5_150_002; // arbitrary; serialises answer generation across API replicas
+const LOCK_KEY = 5_150_002; // arbitrary; serialises answer generation per game across API replicas
 const DAY_MS = 86_400_000;
 
 const utcMs = (date: string): number => Date.parse(`${date}T00:00:00Z`);
 
-// Whole calendar days from the start date to `date` ("YYYY-MM-DD")
-export function dayNumber(date: string): number {
-  return Math.round((utcMs(date) - utcMs(ANSWER_START)) / DAY_MS);
+// Whole calendar days from the game's start date to `date` ("YYYY-MM-DD")
+export function dayNumber(date: string, start: string): number {
+  return Math.round((utcMs(date) - utcMs(start)) / DAY_MS);
 }
 
-export function dateOfDay(day: number): string {
-  return new Date(utcMs(ANSWER_START) + day * DAY_MS)
-    .toISOString()
-    .slice(0, 10);
+export function dateOfDay(day: number, start: string): string {
+  return new Date(utcMs(start) + day * DAY_MS).toISOString().slice(0, 10);
 }
 
 // The calendar date ("YYYY-MM-DD") it is right now in `timeZone`
@@ -32,13 +28,13 @@ export function todayIn(now: Date, timeZone: string): string {
 }
 
 // One day's answer: uniform over the roster minus the previous `skipPeriod`
-// answers (clamped so at least one pet stays allowed).
-export function drawAnswer(
-  ids: readonly string[],
-  previous: readonly string[],
+// answers (clamped so at least one entry stays allowed).
+export function drawAnswer<T>(
+  ids: readonly T[],
+  previous: readonly T[],
   skipPeriod: number,
   random: () => number,
-): string {
+): T {
   if (ids.length === 0) {
     throw new Error("empty roster");
   }
@@ -50,16 +46,20 @@ export function drawAnswer(
 
 type Client = Pick<pg.PoolClient, "query">;
 
-// Runs `work` in a transaction holding the answer lock, so generation, overrides
-// and re-draws never interleave.
+// Runs `work` in a transaction holding the game's answer lock, so generation,
+// overrides and re-draws never interleave.
 async function locked<T>(
   pool: pg.Pool,
+  game: GameRow,
   work: (client: Client) => Promise<T>,
 ): Promise<T> {
   const client = await pool.connect();
   try {
     await client.query("begin");
-    await client.query("select pg_advisory_xact_lock($1)", [LOCK_KEY]);
+    await client.query("select pg_advisory_xact_lock($1, $2)", [
+      LOCK_KEY,
+      game.id,
+    ]);
     const out = await work(client);
     await client.query("commit");
     return out;
@@ -71,47 +71,58 @@ async function locked<T>(
   }
 }
 
-// The previous `ANSWER_SKIP_PERIOD` stored answers, oldest first (only those
-// before `before` when given), and the Day Number of the newest, -1 if none.
+// The game's previous `skip period` stored answers (entry ids), oldest first
+// (only those before `before` when given), and the Day Number of the newest, -1
+// if none.
 async function history(
   client: Client,
+  game: GameRow,
   before: string | null,
-): Promise<{ previous: string[]; lastDay: number }> {
-  const recent = await client.query<{ day: string; pet_id: string }>(
-    "select to_char(day, 'YYYY-MM-DD') as day, pet_id from daily_answers where $1::date is null or day < $1 order by day desc limit $2",
-    [before, ANSWER_SKIP_PERIOD],
+): Promise<{ previous: number[]; lastDay: number }> {
+  const recent = await client.query<{ day: string; entry_id: number }>(
+    `select to_char(day, 'YYYY-MM-DD') as day, entry_id::int from daily_answers
+     where game_id = $1 and ($2::date is null or day < $2) order by day desc limit $3`,
+    [game.id, before, skipOf(game)],
   );
   return {
-    previous: recent.rows.map((row) => row.pet_id).reverse(),
-    lastDay: recent.rows[0] ? dayNumber(recent.rows[0].day) : -1,
+    previous: recent.rows.map((row) => row.entry_id).reverse(),
+    lastDay: recent.rows[0]
+      ? dayNumber(recent.rows[0].day, game.startDate)
+      : -1,
   };
 }
 
 // Draws the next answer after `previous` and appends it there
 function drawNext(
-  ids: readonly string[],
-  previous: string[],
+  game: GameRow,
+  ids: readonly number[],
+  previous: number[],
   random: () => number,
-): string {
-  const petId = drawAnswer(ids, previous, ANSWER_SKIP_PERIOD, random);
-  previous.push(petId);
-  return petId;
+): number {
+  const entryId = drawAnswer(ids, previous, skipOf(game), random);
+  previous.push(entryId);
+  return entryId;
 }
 
 // Generates every missing day up to Day Number `target`, in order, each avoiding the
 // previous stored answers (overrides included). The one generation path for
-// players and the admin peek.
+// players and the answers peek.
 async function fillThrough(
   client: Client,
-  ids: readonly string[],
+  game: GameRow,
+  ids: readonly number[],
   target: number,
   random: () => number,
 ): Promise<void> {
-  const { previous, lastDay } = await history(client, null);
+  const { previous, lastDay } = await history(client, game, null);
   for (let day = lastDay + 1; day <= target; day++) {
     await client.query(
-      "insert into daily_answers (day, pet_id, source) values ($1, $2, 'generated')",
-      [dateOfDay(day), drawNext(ids, previous, random)],
+      "insert into daily_answers (game_id, day, entry_id, source) values ($1, $2, $3, 'generated')",
+      [
+        game.id,
+        dateOfDay(day, game.startDate),
+        drawNext(game, ids, previous, random),
+      ],
     );
   }
 }
@@ -120,126 +131,153 @@ async function fillThrough(
 // history before it; overrides stay and count as history.
 async function redrawFrom(
   client: Client,
-  ids: readonly string[],
+  game: GameRow,
+  ids: readonly number[],
   fromDate: string,
   random: () => number,
 ): Promise<void> {
-  const { previous } = await history(client, fromDate);
+  const { previous } = await history(client, game, fromDate);
   const later = await client.query<{
     day: string;
-    pet_id: string;
+    entry_id: number;
     source: string;
   }>(
-    "select to_char(day, 'YYYY-MM-DD') as day, pet_id, source from daily_answers where day >= $1 order by day",
-    [fromDate],
+    `select to_char(day, 'YYYY-MM-DD') as day, entry_id::int, source from daily_answers
+     where game_id = $1 and day >= $2 order by day`,
+    [game.id, fromDate],
   );
   for (const row of later.rows) {
     if (row.source === "override") {
-      previous.push(row.pet_id);
+      previous.push(row.entry_id);
     } else {
       await client.query(
-        "update daily_answers set pet_id = $2 where day = $1",
-        [row.day, drawNext(ids, previous, random)],
+        "update daily_answers set entry_id = $3 where game_id = $1 and day = $2",
+        [game.id, row.day, drawNext(game, ids, previous, random)],
       );
     }
   }
 }
 
-// The pet id stored for `date`. If it is missing, first generates every
-// missing day up to it, in order, in one transaction under an advisory lock, so
-// concurrent first requests store one answer. Null only for a date before the start.
+// The entry id stored for `date`. If it is missing, first generates every
+// missing day up to it, in order, in one transaction under the game's advisory
+// lock, so concurrent first requests store one answer. Null only for a date
+// before the start.
 export async function ensureAnswer(
   pool: pg.Pool,
-  ids: readonly string[],
+  game: GameRow,
+  ids: readonly number[],
   date: string,
   random: () => number,
-): Promise<string | null> {
-  const select = "select pet_id from daily_answers where day = $1";
-  const stored = await pool.query<{ pet_id: string }>(select, [date]);
+): Promise<number | null> {
+  const select =
+    "select entry_id::int from daily_answers where game_id = $1 and day = $2";
+  const stored = await pool.query<{ entry_id: number }>(select, [
+    game.id,
+    date,
+  ]);
   if (stored.rows[0]) {
-    return stored.rows[0].pet_id;
+    return stored.rows[0].entry_id;
   }
-  return locked(pool, async (client) => {
-    await fillThrough(client, ids, dayNumber(date), random);
-    const result = await client.query<{ pet_id: string }>(select, [date]);
-    return result.rows[0]?.pet_id ?? null;
+  return locked(pool, game, async (client) => {
+    await fillThrough(
+      client,
+      game,
+      ids,
+      dayNumber(date, game.startDate),
+      random,
+    );
+    const result = await client.query<{ entry_id: number }>(select, [
+      game.id,
+      date,
+    ]);
+    return result.rows[0]?.entry_id ?? null;
   });
 }
 
 export interface StoredDay {
   date: string;
-  petId: string;
+  entryId: number;
   source: "generated" | "override";
-  // The previous `ANSWER_SKIP_PERIOD` stored answers, oldest first
-  previous: string[];
+  // The previous `skip period` stored answers, oldest first
+  previous: number[];
 }
 
-// Admin peek: stored days from..to (dates, inclusive), generating whatever is
+// Answers peek: stored days from..to (dates, inclusive), generating whatever is
 // missing up to `to` first.
 export async function peekDays(
   pool: pg.Pool,
-  ids: readonly string[],
+  game: GameRow,
+  ids: readonly number[],
   from: string,
   to: string,
   random: () => number,
 ): Promise<StoredDay[]> {
-  await ensureAnswer(pool, ids, to, random);
+  await ensureAnswer(pool, game, ids, to, random);
   const { rows } = await pool.query<{
     date: string;
-    pet_id: string;
+    entry_id: number;
     source: "generated" | "override";
-    previous: string[];
+    previous: number[];
   }>(
-    `select to_char(day, 'YYYY-MM-DD') as date, pet_id, source,
-       array(select p.pet_id from daily_answers p
-             where p.day < d.day order by p.day desc limit $3) as previous
-     from daily_answers d where day between $1 and $2 order by day`,
-    [from, to, ANSWER_SKIP_PERIOD],
+    `select to_char(day, 'YYYY-MM-DD') as date, entry_id::int, source,
+       array(select p.entry_id::int from daily_answers p
+             where p.game_id = d.game_id and p.day < d.day order by p.day desc limit $4) as previous
+     from daily_answers d where game_id = $1 and day between $2 and $3 order by day`,
+    [game.id, from, to, skipOf(game)],
   );
   return rows.map((row) => ({
     date: row.date,
-    petId: row.pet_id,
+    entryId: row.entry_id,
     source: row.source,
     previous: row.previous.reverse(),
   }));
 }
 
-// Overrides `date` (today or later; the caller checks) with `petId`. An unstored
+// Overrides `date` (today or later; the caller checks) with `entryId`. An unstored
 // day fills the gap first. Later non-override days are re-drawn.
 export function setOverride(
   pool: pg.Pool,
-  ids: readonly string[],
+  game: GameRow,
+  ids: readonly number[],
   date: string,
-  petId: string,
+  entryId: number,
   random: () => number,
 ): Promise<void> {
-  return locked(pool, async (client) => {
-    await fillThrough(client, ids, dayNumber(date) - 1, random);
+  return locked(pool, game, async (client) => {
+    const day = dayNumber(date, game.startDate);
+    await fillThrough(client, game, ids, day - 1, random);
     await client.query(
-      `insert into daily_answers (day, pet_id, source) values ($1, $2, 'override')
-       on conflict (day) do update set pet_id = excluded.pet_id, source = 'override'`,
-      [date, petId],
+      `insert into daily_answers (game_id, day, entry_id, source) values ($1, $2, $3, 'override')
+       on conflict (game_id, day) do update set entry_id = excluded.entry_id, source = 'override'`,
+      [game.id, date, entryId],
     );
-    await redrawFrom(client, ids, dateOfDay(dayNumber(date) + 1), random);
+    await redrawFrom(
+      client,
+      game,
+      ids,
+      dateOfDay(day + 1, game.startDate),
+      random,
+    );
   });
 }
 
 // Turns an override back into a generated answer; false when `date` is not an override.
 export function clearOverride(
   pool: pg.Pool,
-  ids: readonly string[],
+  game: GameRow,
+  ids: readonly number[],
   date: string,
   random: () => number,
 ): Promise<boolean> {
-  return locked(pool, async (client) => {
+  return locked(pool, game, async (client) => {
     const { rowCount } = await client.query(
-      "update daily_answers set source = 'generated' where day = $1 and source = 'override'",
-      [date],
+      "update daily_answers set source = 'generated' where game_id = $1 and day = $2 and source = 'override'",
+      [game.id, date],
     );
     if (rowCount === 0) {
       return false;
     }
-    await redrawFrom(client, ids, date, random);
+    await redrawFrom(client, game, ids, date, random);
     return true;
   });
 }

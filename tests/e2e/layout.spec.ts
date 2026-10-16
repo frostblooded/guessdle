@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { GUESS_DATA } from "../../src/game/roster.ts";
+import { GUESS_DATA } from "./roster.ts";
 import { findAnswerName, submitGuess } from "./helpers.ts";
 
 // Phones (small to large, portrait and landscape) and a small tablet

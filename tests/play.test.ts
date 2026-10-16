@@ -4,7 +4,7 @@ import { gradeIds } from "../src/game/game.ts";
 import type { StateStorage } from "../src/game/game-state.ts";
 import { createPlay } from "../src/game/play.ts";
 import type { Fetch } from "../src/game/transport.ts";
-import { GUESS_DATA } from "../src/game/roster.ts";
+import { ATTRIBUTES, GUESS_DATA, SLUG } from "./roster-fixture.ts";
 
 class MemoryStorage implements StateStorage {
   readonly items: Map<string, string> = new Map();
@@ -27,7 +27,7 @@ const MONDAY = new Date(2025, 9, 6, 12);
 class FakeServer {
   day: number = 100;
   down: boolean = false;
-  requests: string[][] = [];
+  requests: number[][] = [];
 
   giveUps: number = 0;
 
@@ -37,7 +37,7 @@ class FakeServer {
     if (this.down) {
       throw new Error("offline");
     }
-    if (url === "/api/give-up") {
+    if (url === `/api/games/${SLUG}/give-up`) {
       this.giveUps++;
       return {
         ok: true,
@@ -45,10 +45,10 @@ class FakeServer {
         json: async () => ({ day: this.day, answer: answer.name }),
       };
     }
-    assert.equal(url, "/api/grade");
-    const ids = (JSON.parse(init!.body) as { ids: string[] }).ids;
+    assert.equal(url, `/api/games/${SLUG}/grade`);
+    const ids = (JSON.parse(init!.body) as { ids: number[] }).ids;
     this.requests.push(ids);
-    const graded = gradeIds(GUESS_DATA, answer, ids);
+    const graded = gradeIds(ATTRIBUTES, GUESS_DATA, answer, ids);
     if (graded.kind !== "graded") {
       return {
         ok: false,
@@ -73,6 +73,7 @@ let storage: MemoryStorage;
 let server: FakeServer;
 const open = () =>
   createPlay({
+    slug: SLUG,
     roster: GUESS_DATA,
     storage,
     now: () => MONDAY,
@@ -126,7 +127,7 @@ describe("submit", () => {
 
   it("rejects an unknown id and a repeat without calling the server", async () => {
     const play = open();
-    assert.deepEqual(await play.submit("nope"), { kind: "invalid" });
+    assert.deepEqual(await play.submit(999), { kind: "invalid" });
     await play.submit(one!.id);
     server.requests = [];
     assert.deepEqual(await play.submit(one!.id), { kind: "duplicate" });
@@ -211,26 +212,6 @@ describe("load", () => {
     assert.equal(loaded?.answer, answer.name);
   });
 
-  it("upgrades display names stored before ids and drops unknown ones", async () => {
-    storage.setItem("lastPlayed", JSON.stringify("2025-10-6"));
-    storage.setItem(
-      "usedGuesses",
-      JSON.stringify([two!.name, "Gone Pet", one!.id]),
-    );
-    const play = open();
-    assert.deepEqual(play.getUsedGuesses(), [two!.id, one!.id]);
-    const loaded = await play.load();
-    assert.deepEqual(
-      loaded?.rows.map((row) => row[1]!.value),
-      [two!.name, one!.name],
-    );
-    assert.deepEqual(JSON.parse(storage.getItem("usedGuesses")!), [
-      two!.id,
-      one!.id,
-    ]);
-    assert.equal(storage.getItem("day"), "100");
-  });
-
   it("clears other-day name state without asking the server", async () => {
     storage.setItem("lastPlayed", JSON.stringify("2025-10-5"));
     storage.setItem("usedGuesses", JSON.stringify([two!.name]));
@@ -259,6 +240,7 @@ describe("load", () => {
 
 const withHook = (onNewDay: () => void) =>
   createPlay({
+    slug: SLUG,
     roster: GUESS_DATA,
     storage,
     now: () => MONDAY,
@@ -363,6 +345,7 @@ describe("giveUp", () => {
   it("is forgotten when the local date changes", async () => {
     await open().giveUp();
     const next = createPlay({
+      slug: SLUG,
       roster: GUESS_DATA,
       storage,
       now: () => new Date(2025, 9, 7, 12),

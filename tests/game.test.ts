@@ -1,64 +1,88 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { Correctness } from "../src/game/correctness.ts";
-import { findPetId, gradeGuess, gradeIds } from "../src/game/game.ts";
-import { GUESS_DATA } from "../src/game/roster.ts";
+import {
+  findEntryId,
+  gradeGuess,
+  gradeIds,
+  type Entry,
+  type GameAttribute,
+} from "../src/game/game.ts";
 
-const first = GUESS_DATA[0]!;
-const second = GUESS_DATA[1]!;
-const third = GUESS_DATA[2]!;
+const ATTRIBUTES: GameAttribute[] = [
+  { name: "Colors", type: "list" },
+  { name: "Owner", type: "text" },
+];
+const entry = (
+  id: number,
+  name: string,
+  colors: string[],
+  owner: string,
+): Entry => ({ id, name, photo: `/p/${id}.webp`, values: [colors, owner] });
+
+const first = entry(1, "Ati", ["Black", "Orange"], "Niki");
+const second = entry(2, "Bela", ["Orange", "Grey"], "Beti");
+const third = entry(3, "Cookie", ["Red"], "Niki");
+const ROSTER = [first, second, third];
 
 describe("gradeGuess", () => {
-  it("lists every Attribute except the id in roster key order", () => {
-    const row = gradeGuess(first, second);
+  it("lists the photo, the name, then each attribute in order", () => {
+    const row = gradeGuess(ATTRIBUTES, first, second);
     assert.deepEqual(
-      row.map((cell) => cell.key),
-      Object.keys(second).filter((key) => key !== "id"),
-    );
-    assert.deepEqual(
-      row.map((cell) => cell.value),
-      Object.entries(second)
-        .filter(([key]) => key !== "id")
-        .map(([, value]) => value),
+      row.map((cell) => [cell.key, cell.value]),
+      [
+        ["photo", "/p/2.webp"],
+        ["name", "Bela"],
+        ["Colors", ["Orange", "Grey"]],
+        ["Owner", "Beti"],
+      ],
     );
   });
 
-  it("grades every Attribute of the answer itself as correct", () => {
-    for (const cell of gradeGuess(first, first)) {
+  it("grades every column of the answer itself as correct", () => {
+    for (const cell of gradeGuess(ATTRIBUTES, first, first)) {
       assert.equal(cell.correctness, Correctness.Correct, cell.key);
     }
   });
 
-  it("grades each Attribute with the shared Correctness rules", () => {
-    const a = {
-      id: "a",
-      photo: "a",
-      name: "A",
-      colors: ["Red", "Blue"],
-      owners: ["X"],
-    };
-    const b = {
-      id: "b",
-      photo: "b",
-      name: "B",
-      colors: ["Blue", "Green"],
-      owners: ["X"],
-    };
+  it("grades Text by exact match and List by set overlap", () => {
     const byKey = Object.fromEntries(
-      gradeGuess(a, b).map((c) => [c.key, c.correctness]),
+      gradeGuess(ATTRIBUTES, first, second).map((c) => [c.key, c.correctness]),
     );
     assert.deepEqual(byKey, {
       photo: Correctness.Incorrect,
       name: Correctness.Incorrect,
-      colors: Correctness.PartiallyCorrect,
-      owners: Correctness.Correct,
+      Colors: Correctness.PartiallyCorrect,
+      Owner: Correctness.Incorrect,
     });
+    assert.equal(
+      gradeGuess(ATTRIBUTES, first, third)[3]!.correctness,
+      Correctness.Correct,
+    );
+  });
+
+  it("grades empty against empty as correct and against a value as incorrect", () => {
+    const empty = entry(4, "Empty", [], "");
+    const row = gradeGuess(ATTRIBUTES, empty, empty);
+    assert.equal(row[2]!.correctness, Correctness.Correct);
+    assert.equal(row[3]!.correctness, Correctness.Correct);
+    const against = gradeGuess(ATTRIBUTES, first, empty);
+    assert.equal(against[2]!.correctness, Correctness.Incorrect);
+    assert.equal(against[3]!.correctness, Correctness.Incorrect);
+  });
+
+  it("marks only the answer's own photo cell correct, even with equal photos", () => {
+    const twin = { ...second, id: 9, photo: first.photo };
+    assert.equal(
+      gradeGuess(ATTRIBUTES, first, twin)[0]!.correctness,
+      Correctness.Incorrect,
+    );
   });
 });
 
 describe("gradeIds", () => {
   it("grades guesses in the order given, without victory on wrong ones", () => {
-    const result = gradeIds(GUESS_DATA, first, [second.id, third.id]);
+    const result = gradeIds(ATTRIBUTES, ROSTER, first, [2, 3]);
     assert.equal(result.kind, "graded");
     if (result.kind !== "graded") {
       return;
@@ -66,48 +90,48 @@ describe("gradeIds", () => {
     assert.equal(result.victory, false);
     assert.deepEqual(
       result.rows.map((row) => row[1]!.value),
-      [second.name, third.name],
+      ["Bela", "Cookie"],
     );
   });
 
   it("reports victory when the answer is among the guesses", () => {
-    const result = gradeIds(GUESS_DATA, first, [second.id, first.id]);
+    const result = gradeIds(ATTRIBUTES, ROSTER, first, [2, 1]);
     assert.equal(result.kind === "graded" && result.victory, true);
   });
 
   it("accepts an empty list", () => {
-    assert.deepEqual(gradeIds(GUESS_DATA, first, []), {
+    assert.deepEqual(gradeIds(ATTRIBUTES, ROSTER, first, []), {
       kind: "graded",
       rows: [],
       victory: false,
     });
   });
 
-  it("rejects an id not in the roster, a display name or another case", () => {
-    for (const input of ["not-a-pet", "", first.name, first.id.toUpperCase()]) {
-      assert.deepEqual(gradeIds(GUESS_DATA, second, [input]), {
+  it("rejects an id not in the roster", () => {
+    for (const input of [99, 0, -1]) {
+      assert.deepEqual(gradeIds(ATTRIBUTES, ROSTER, second, [input]), {
         kind: "invalid",
       });
     }
   });
 
   it("rejects a repeated id", () => {
-    assert.deepEqual(gradeIds(GUESS_DATA, first, [second.id, second.id]), {
+    assert.deepEqual(gradeIds(ATTRIBUTES, ROSTER, first, [2, 2]), {
       kind: "duplicate",
     });
   });
 
   it("reports invalid before duplicate when both occur", () => {
-    assert.deepEqual(gradeIds(GUESS_DATA, first, ["x", second.id, second.id]), {
+    assert.deepEqual(gradeIds(ATTRIBUTES, ROSTER, first, [99, 2, 2]), {
       kind: "invalid",
     });
   });
 });
 
-describe("findPetId", () => {
-  it("finds a pet id from typed text, ignoring case", () => {
-    assert.equal(findPetId(GUESS_DATA, third.name.toUpperCase()), third.id);
-    assert.equal(findPetId(GUESS_DATA, "Nobody"), null);
-    assert.equal(findPetId(GUESS_DATA, ""), null);
+describe("findEntryId", () => {
+  it("finds an entry id from typed text, ignoring case", () => {
+    assert.equal(findEntryId(ROSTER, "COOKIE"), 3);
+    assert.equal(findEntryId(ROSTER, "Nobody"), null);
+    assert.equal(findEntryId(ROSTER, ""), null);
   });
 });

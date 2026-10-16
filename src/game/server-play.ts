@@ -6,7 +6,7 @@ import { call, failureOf, type Fetch } from "./transport.ts";
 // The server's view of today's game
 interface GameResponse {
   day: number;
-  ids: string[];
+  ids: number[];
   rows: GradedAttribute[][];
   victory: boolean;
   gaveUp: boolean;
@@ -14,16 +14,19 @@ interface GameResponse {
 }
 
 export interface ServerPlayDeps {
+  slug: string;
   fetch: Fetch;
   // Called when a response shows the server is on a newer day than the page
   onNewDay?: () => void;
 }
 
 export function createServerPlay({
+  slug,
   fetch,
   onNewDay = (): void => {},
 }: ServerPlayDeps): Play {
-  let ids: string[] = [];
+  const base = `/api/games/${slug}/state`;
+  let ids: number[] = [];
   let finished: boolean = false;
   let day: number | null = null;
 
@@ -41,7 +44,7 @@ export function createServerPlay({
 
   const play: Play = {
     async load(): Promise<Loaded | null> {
-      const res = await call(fetch, "/api/game");
+      const res = await call(fetch, base);
       if (res?.status !== 200) {
         return null;
       }
@@ -55,11 +58,11 @@ export function createServerPlay({
       };
     },
 
-    async submit(id: string): Promise<SubmitResult> {
+    async submit(id: number): Promise<SubmitResult> {
       if (finished) {
         return { kind: "finished" };
       }
-      const res = await call(fetch, "/api/game/guess", { id });
+      const res = await call(fetch, `${base}/guess`, { id });
       const failure = failureOf(res);
       if (failure !== null) {
         return { kind: failure };
@@ -90,7 +93,7 @@ export function createServerPlay({
       if (finished) {
         return { kind: "finished" };
       }
-      const res = await call(fetch, "/api/game/give-up", {});
+      const res = await call(fetch, `${base}/give-up`, {});
       const failure = failureOf(res);
       if (failure !== null) {
         return { kind: failure };
@@ -108,7 +111,7 @@ export function createServerPlay({
     },
 
     async reset(): Promise<boolean> {
-      const res = await call(fetch, "/api/game/reset", {});
+      const res = await call(fetch, `${base}/reset`, {});
       if (res?.status !== 200) {
         return false;
       }
@@ -116,7 +119,7 @@ export function createServerPlay({
       return true;
     },
 
-    getUsedGuesses: (): string[] => ids,
+    getUsedGuesses: (): number[] => ids,
   };
   return play;
 }

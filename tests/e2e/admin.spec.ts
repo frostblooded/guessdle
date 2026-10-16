@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { GUESS_DATA } from "../../src/game/roster.ts";
+import { GUESS_DATA } from "./roster.ts";
 
 // Only future days are overridden here: today's answer is shared with the other specs
 const stubLogin = (page: Page, admin: boolean): Promise<unknown> =>
@@ -9,7 +9,7 @@ const stubLogin = (page: Page, admin: boolean): Promise<unknown> =>
       admin,
     },
   });
-const nameOf = (id: string): string =>
+const nameOf = (id: number): string =>
   GUESS_DATA.find((pet) => pet.id === id)!.name;
 
 test("a non-admin has no panel and gets 403 from its endpoints", async ({
@@ -19,7 +19,9 @@ test("a non-admin has no panel and gets 403 from its endpoints", async ({
   await page.goto("/");
   await page.locator("#user-menu-button").click();
   await expect(page.locator("#admin-link")).toBeHidden();
-  expect((await page.request.get("/api/admin/answers")).status()).toBe(403);
+  expect((await page.request.get("/api/games/petdle/answers")).status()).toBe(
+    403,
+  );
 
   // The admin page itself says 403 and offers no panel
   await page.goto("/admin");
@@ -52,6 +54,8 @@ test("an admin sees the Admin link in the account menu", async ({ page }) => {
 test("the admin tabs are a keyboard-operable tablist", async ({ page }) => {
   await stubLogin(page, true);
   await page.goto("/admin");
+  // The tab handlers are wired once the sign-in check has finished
+  await expect(page.locator("#admin-days tr").first()).toBeVisible();
   await expect(page.locator("#tab-answers")).toHaveAttribute(
     "aria-selected",
     "true",
@@ -100,7 +104,7 @@ test("an admin peeks, overrides with warnings, edits and clears", async ({
   await target.locator("button").click();
   await expect(page.locator("#override-warning")).toBeVisible();
   const chosen = GUESS_DATA.find((pet) => pet.name === previousPet)!;
-  await page.locator("#override-pet").selectOption(chosen.id);
+  await page.locator("#override-pet").selectOption(String(chosen.id));
   await expect(page.locator("#override-notice")).toBeVisible();
   await page.locator("#override-save").click();
   await expect(target).toContainText(nameOf(chosen.id));
@@ -113,7 +117,7 @@ test("an admin peeks, overrides with warnings, edits and clears", async ({
   const fresh = GUESS_DATA.find(
     (pet) => !before.slice(0, 3).includes(pet.name),
   )!;
-  await page.locator("#override-pet").selectOption(fresh.id);
+  await page.locator("#override-pet").selectOption(String(fresh.id));
   await expect(page.locator("#override-notice")).toBeHidden();
   await page.locator("#override-save").click();
   await expect(target).toContainText(fresh.name);

@@ -1,16 +1,17 @@
-// If an answer is chosen, it can't be chosen again for this amount of days
-export const ANSWER_SKIP_PERIOD: number = 5;
-
-export interface Pet {
-  // Stable slug the API and stored guesses use; never change it once shipped
+// Petdle's roster as migration 005 stores it (entry ids 1..19 in this order),
+// for e2e tests that need names, colors and owners.
+interface RawPet {
   id: string;
   photo: string;
   name: string;
   colors: string[];
   owners: string[];
 }
+export interface Pet extends Omit<RawPet, "id"> {
+  id: number;
+}
 
-export const GUESS_DATA: Pet[] = [
+const RAW: RawPet[] = [
   {
     id: "ati",
     photo: "photos/ati.jpg",
@@ -145,3 +146,9 @@ export const GUESS_DATA: Pet[] = [
     owners: ["Didi"],
   },
 ];
+
+export const GUESS_DATA: Pet[] = RAW.map((pet, i) => ({
+  ...pet,
+  id: i + 1,
+  photo: "/" + pet.photo,
+}));

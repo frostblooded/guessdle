@@ -1,24 +1,20 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-  ANSWER_START,
-  dayNumber,
-  drawAnswer,
-  todayIn,
-} from "../src/server/answers.ts";
+import { dayNumber, drawAnswer, todayIn } from "../src/server/answers.ts";
 
+const START = "2025-08-15";
 const IDS = ["a", "b", "c", "d", "e", "f", "g", "h"];
 
 describe("dayNumber", () => {
   it("is 0 on the start date and counts calendar days", () => {
-    assert.equal(dayNumber(ANSWER_START), 0);
-    assert.equal(dayNumber("2025-08-16"), 1);
-    assert.equal(dayNumber("2026-08-15"), 365);
-    assert.equal(dayNumber("2026-10-16"), 427);
+    assert.equal(dayNumber(START, START), 0);
+    assert.equal(dayNumber("2025-08-16", START), 1);
+    assert.equal(dayNumber("2026-08-15", START), 365);
+    assert.equal(dayNumber("2026-10-16", START), 427);
   });
 
   it("is negative before the start date", () => {
-    assert.equal(dayNumber("2025-08-14"), -1);
+    assert.equal(dayNumber("2025-08-14", START), -1);
   });
 });
 

@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
-import { GUESS_DATA } from "../../src/game/roster.ts";
+import { GUESS_DATA } from "./roster.ts";
 import { findAnswerName, submitGuess } from "./helpers.ts";
 
 const MESSAGE = "Too many requests, wait a moment";
@@ -40,7 +40,8 @@ for (const [kind, respond] of [
     page,
   }) => {
     await page.goto("/");
-    await page.route("**/api/grade", respond);
+    await expect(page.locator("#loading-state")).toBeHidden();
+    await page.route("**/api/games/petdle/grade", respond);
     await input(page).fill(wrongName);
     await page.locator("#submit-new-guess-button").click();
 
@@ -48,7 +49,7 @@ for (const [kind, respond] of [
     await expect(input(page)).toHaveValue(wrongName);
     await expect(rows(page)).toHaveCount(0);
 
-    await page.unroute("**/api/grade");
+    await page.unroute("**/api/games/petdle/grade");
     await page.locator("#submit-new-guess-button").click();
     await expect(rows(page)).toHaveCount(1);
     await expect(input(page)).toHaveValue("");
@@ -60,7 +61,8 @@ for (const [kind, respond] of [
   }) => {
     await signIn(page);
     await page.goto("/");
-    await page.route("**/api/game/guess", respond);
+    await expect(page.locator("#loading-state")).toBeHidden();
+    await page.route("**/api/games/petdle/state/guess", respond);
     await input(page).fill(wrongName);
     await page.locator("#submit-new-guess-button").click();
 
@@ -68,7 +70,7 @@ for (const [kind, respond] of [
     await expect(input(page)).toHaveValue(wrongName);
     await expect(rows(page)).toHaveCount(0);
 
-    await page.unroute("**/api/game/guess");
+    await page.unroute("**/api/games/petdle/state/guess");
     await page.locator("#submit-new-guess-button").click();
     await expect(rows(page)).toHaveCount(1);
     await expect(notice(page)).toBeHidden();
@@ -78,7 +80,9 @@ for (const [kind, respond] of [
     page,
   }) => {
     await page.goto("/");
-    await page.route("**/api/give-up", respond);
+    // The buttons work once the game has loaded
+    await expect(page.locator("#loading-state")).toBeHidden();
+    await page.route("**/api/games/petdle/give-up", respond);
     await page.locator("#give-up-button").click();
 
     await expect(notice(page)).toHaveText(MESSAGE);
@@ -93,11 +97,11 @@ test("merge: a 429 on sign-in shows the message and keeps the local guess", asyn
   await page.goto("/");
   await submitGuess(page, wrongName);
   await signIn(page);
-  await page.route("**/api/game/merge", nginx429);
+  await page.route("**/api/games/petdle/state/merge", nginx429);
   await page.reload();
 
   await expect(notice(page)).toHaveText(MESSAGE);
   expect(
-    await page.evaluate(() => localStorage.getItem("usedGuesses")),
+    await page.evaluate(() => localStorage.getItem("game:petdle:usedGuesses")),
   ).not.toBeNull();
 });

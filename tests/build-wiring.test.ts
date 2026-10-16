@@ -100,7 +100,7 @@ describe("build output is wired through the pages and the deploy", () => {
       .filter((f) => f.endsWith(".js"))
       .map((f) => readFileSync(join(out, f), "utf8"))
       .join("");
-    assert.match(js, /\/api\/grade/);
+    assert.match(js, /[/]grade/);
     assert.ok(!js.includes("seedrandom"), "seeded random is not bundled");
     assert.ok(!js.includes("2026-10-16"), "no backfilled answers");
     assert.ok(!js.includes("daily_answers"));

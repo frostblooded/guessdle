@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { GUESS_DATA } from "../../src/game/roster.ts";
+import { GUESS_DATA } from "./roster.ts";
 import { confirmReset, findAnswerName, submitGuess } from "./helpers.ts";
 
 // The browser's own (fake) clock; the server decides the Daily Answer's day
@@ -17,11 +17,13 @@ const victory = (page: Page): Locator => page.locator("#victory-title");
 async function openOnDay(page: Page, now: Date = DAY): Promise<void> {
   await page.clock.install({ time: now });
   await page.goto("/");
+  // The game loads after the page does; the form works once it has
+  await expect(page.locator("#loading-state")).toBeHidden();
 }
 
 let answerName: string;
 let wrongName: string;
-let wrongId: string;
+let wrongId: number;
 
 test.beforeEach(async ({ page, request }) => {
   answerName = await findAnswerName(request);
@@ -138,6 +140,7 @@ test("guesses and victory survive a reload on the same day", async ({
   await submitGuess(page, answerName);
 
   await page.reload();
+  await expect(page.locator("#loading-state")).toBeHidden();
 
   await expect(rows(page)).toHaveCount(2);
   await expect(victory(page)).toContainText(answerName);
@@ -153,6 +156,7 @@ test("the next day shows a fresh board", async ({ page }) => {
 
   await page.clock.setSystemTime(NEXT_DAY);
   await page.reload();
+  await expect(page.locator("#loading-state")).toBeHidden();
 
   await expect(rows(page)).toHaveCount(0);
   await expect(victory(page)).toHaveCount(0);
@@ -165,21 +169,21 @@ test("the next day shows a fresh board", async ({ page }) => {
 test("a failed request keeps the typed guess and adds no row", async ({
   page,
 }) => {
-  await page.route("**/api/grade", (route) => route.abort());
+  await page.route("**/api/games/petdle/grade", (route) => route.abort());
   await input(page).fill(wrongName);
   await page.locator("#submit-new-guess-button").click();
 
   await expect(rows(page)).toHaveCount(0);
   await expect(input(page)).toHaveValue(wrongName);
 
-  await page.unroute("**/api/grade");
+  await page.unroute("**/api/games/petdle/grade");
   await page.locator("#submit-new-guess-button").click();
   await expect(rows(page)).toHaveCount(1);
   await expect(input(page)).toHaveValue("");
 });
 
 test("a server error response keeps the typed guess too", async ({ page }) => {
-  await page.route("**/api/grade", (route) =>
+  await page.route("**/api/games/petdle/grade", (route) =>
     route.fulfill({
       status: 429,
       contentType: "application/json",
@@ -193,7 +197,7 @@ test("a server error response keeps the typed guess too", async ({ page }) => {
   await expect(input(page)).toHaveValue(wrongName);
 });
 
-test.describe("upgrading state stored by an older version", () => {
+test.describe("state stored in the browser", () => {
   const seed = async (
     page: Page,
     items: Record<string, string>,
@@ -201,36 +205,24 @@ test.describe("upgrading state stored by an older version", () => {
     await page.addInitScript((entries) => {
       if (!localStorage.getItem("seeded")) {
         for (const [key, value] of Object.entries(entries)) {
-          localStorage.setItem(key, value);
+          localStorage.setItem(`game:petdle:${key}`, value);
         }
         localStorage.setItem("seeded", "1");
       }
     }, items);
   };
 
-  test("today's guesses stored by name are graded and kept as ids", async ({
-    page,
-  }) => {
-    await seed(page, {
-      lastPlayed: JSON.stringify(LOCAL_TODAY),
-      usedGuesses: JSON.stringify([wrongName, "Gone Pet"]),
-    });
-    await page.reload();
-
-    await expect(rows(page)).toHaveCount(1);
-    await expect(rows(page).first()).toContainText(wrongName);
-    expect(await page.evaluate(() => localStorage.getItem("usedGuesses"))).toBe(
-      JSON.stringify([wrongId]),
-    );
-  });
-
   test("a stored victory is re-derived from the guesses", async ({ page }) => {
     await seed(page, {
       lastPlayed: JSON.stringify(LOCAL_TODAY),
-      usedGuesses: JSON.stringify([wrongName, answerName]),
+      usedGuesses: JSON.stringify([
+        wrongId,
+        GUESS_DATA.find((pet) => pet.name === answerName)!.id,
+      ]),
       victory: "true",
     });
     await page.reload();
+    await expect(page.locator("#loading-state")).toBeHidden();
 
     await expect(rows(page)).toHaveCount(2);
     await expect(page.locator("#victory-answer-name")).toHaveText(answerName);
@@ -239,9 +231,10 @@ test.describe("upgrading state stored by an older version", () => {
   test("another day's guesses are cleared", async ({ page }) => {
     await seed(page, {
       lastPlayed: JSON.stringify("2025-8-17"),
-      usedGuesses: JSON.stringify([wrongName]),
+      usedGuesses: JSON.stringify([wrongId]),
     });
     await page.reload();
+    await expect(page.locator("#loading-state")).toBeHidden();
 
     await expect(rows(page)).toHaveCount(0);
   });
@@ -255,6 +248,7 @@ test.describe("upgrading state stored by an older version", () => {
       day: "3",
     });
     await page.reload();
+    await expect(page.locator("#loading-state")).toBeHidden();
 
     await expect(rows(page)).toHaveCount(0);
     await submitGuess(page, wrongName);
@@ -368,6 +362,7 @@ test.describe("give up", () => {
     await expect(giveUpTitle(page)).toBeVisible();
 
     await page.reload();
+    await expect(page.locator("#loading-state")).toBeHidden();
 
     await expect(page.locator("#give-up-answer-name")).toHaveText(answerName);
     await expect(rows(page)).toHaveCount(1);
@@ -376,14 +371,14 @@ test.describe("give up", () => {
   });
 
   test("a failed request changes nothing", async ({ page }) => {
-    await page.route("**/api/give-up", (route) => route.abort());
+    await page.route("**/api/games/petdle/give-up", (route) => route.abort());
     await giveUpButton(page).click();
 
     await expect(giveUpTitle(page)).toHaveCount(0);
     await expect(input(page)).toBeVisible();
     await expect(resetButton(page)).toBeHidden();
 
-    await page.unroute("**/api/give-up");
+    await page.unroute("**/api/games/petdle/give-up");
     await giveUpButton(page).click();
     await expect(giveUpTitle(page)).toBeVisible();
   });
@@ -391,7 +386,7 @@ test.describe("give up", () => {
   test("a rate limited request shows nothing and can be retried", async ({
     page,
   }) => {
-    await page.route("**/api/give-up", (route) =>
+    await page.route("**/api/games/petdle/give-up", (route) =>
       route.fulfill({
         status: 429,
         contentType: "application/json",
@@ -417,6 +412,7 @@ test.describe("give up", () => {
 
     await page.clock.setSystemTime(NEXT_DAY);
     await page.reload();
+    await expect(page.locator("#loading-state")).toBeHidden();
 
     await expect(giveUpTitle(page)).toHaveCount(0);
     await expect(input(page)).toBeVisible();
@@ -468,13 +464,16 @@ test.describe("reset", () => {
     await confirmReset(page);
 
     await page.reload();
+    await expect(page.locator("#loading-state")).toBeHidden();
 
     await expect(rows(page)).toHaveCount(0);
     await expect(victory(page)).toHaveCount(0);
     await expect(input(page)).toBeVisible();
     await expect(resetButton(page)).toBeHidden();
     expect(
-      await page.evaluate(() => localStorage.getItem("usedGuesses")),
+      await page.evaluate(() =>
+        localStorage.getItem("game:petdle:usedGuesses"),
+      ),
     ).toBeNull();
   });
 
@@ -568,7 +567,7 @@ test.describe("day rollover in an open tab", () => {
     await submitGuess(page, wrongName);
     await expect(rows(page)).toHaveCount(1);
 
-    await serverMovesToNextDay(page, "**/api/grade");
+    await serverMovesToNextDay(page, "**/api/games/petdle/grade");
     await submitGuess(page, wrongName);
 
     // Only the new day's guess is shown
@@ -580,8 +579,9 @@ test.describe("day rollover in an open tab", () => {
     await submitGuess(page, answerName);
     await expect(victory(page)).toBeVisible();
 
-    await serverMovesToNextDay(page, "**/api/grade");
+    await serverMovesToNextDay(page, "**/api/games/petdle/grade");
     await page.reload();
+    await expect(page.locator("#loading-state")).toBeHidden();
 
     await expect(victory(page)).toHaveCount(0);
     await expect(rows(page)).toHaveCount(0);
@@ -593,7 +593,7 @@ test.describe("day rollover in an open tab", () => {
     page,
   }) => {
     await submitGuess(page, wrongName);
-    await serverMovesToNextDay(page, "**/api/give-up");
+    await serverMovesToNextDay(page, "**/api/games/petdle/give-up");
 
     await giveUpButton(page).click();
 
@@ -609,8 +609,9 @@ test.describe("day rollover in an open tab", () => {
     await giveUpButton(page).click();
     await expect(giveUpTitle(page)).toBeVisible();
 
-    await serverMovesToNextDay(page, "**/api/give-up");
+    await serverMovesToNextDay(page, "**/api/games/petdle/give-up");
     await page.reload();
+    await expect(page.locator("#loading-state")).toBeHidden();
 
     await expect(giveUpTitle(page)).toHaveCount(0);
     await expect(input(page)).toBeVisible();

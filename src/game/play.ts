@@ -1,14 +1,13 @@
 // Anonymous play: the browser keeps pet ids, the server grades them.
-import { isAnswerRow, type GradedAttribute } from "./game.ts";
+import { isAnswerRow, type EntryRef, type GradedAttribute } from "./game.ts";
 import {
   createGameState,
   type GameState,
   type StateStorage,
 } from "./game-state.ts";
-import type { Pet } from "./roster.ts";
 import { call, failureOf, type Failure, type Fetch } from "./transport.ts";
 
-// POST /api/grade; `answer` (the pet's name) is present only on victory
+// POST /api/games/:slug/grade; `answer` (the entry's name) is present only on victory
 interface GradeResponse {
   day: number;
   rows: GradedAttribute[][];
@@ -16,7 +15,7 @@ interface GradeResponse {
   answer?: string;
 }
 
-// POST /api/give-up
+// POST /api/games/:slug/give-up
 interface GiveUpResponse {
   day: number;
   answer: string;
@@ -57,19 +56,20 @@ export interface Play {
   // Graded rows of the guesses stored for today, oldest first; null if the
   // server could not be reached (the stored guesses stay)
   load(): Promise<Loaded | null>;
-  // Takes a pet id
-  submit(id: string): Promise<SubmitResult>;
+  // Takes an entry id
+  submit(id: number): Promise<SubmitResult>;
   // Reveals the answer and finishes the game
   giveUp(): Promise<GiveUpResult>;
   // Forgets today's guesses and finished state, so the player can replay;
   // false if it could not be done
   reset(): boolean | Promise<boolean>;
-  // Pet ids
-  getUsedGuesses(): string[];
+  // Entry ids
+  getUsedGuesses(): number[];
 }
 
 export interface PlayDeps {
-  roster: readonly Pet[];
+  slug: string;
+  roster: readonly EntryRef[];
   storage: StateStorage;
   now: () => Date;
   fetch: Fetch;
@@ -79,6 +79,7 @@ export interface PlayDeps {
 }
 
 export function createPlay({
+  slug,
   roster,
   storage,
   now,
@@ -88,17 +89,7 @@ export function createPlay({
   const state: GameState = createGameState(storage, now);
   // Won or gave up; not stored, it is re-derived on load
   let finished: boolean = false;
-  // Before ids, guesses were stored by display name: upgrade them, drop unknowns
-  const stored: string[] = state.getUsedGuesses();
-  const upgraded: string[] = stored.flatMap((entry: string): string[] => {
-    const pet: Pet | undefined = roster.find(
-      (item: Pet): boolean => item.id === entry || item.name === entry,
-    );
-    return pet ? [pet.id] : [];
-  });
-  if (upgraded.join() !== stored.join()) {
-    state.setUsedGuesses(upgraded);
-  }
+  const base: string = `/api/games/${slug}`;
 
   // The parsed body of a successful POST, or why there is none
   async function post<T>(url: string, body: unknown): Promise<T | Failure> {
@@ -121,11 +112,11 @@ export function createPlay({
 
   const play: Play = {
     async load(): Promise<Loaded | null> {
-      const ids: string[] = state.getUsedGuesses();
+      const ids: number[] = state.getUsedGuesses();
       const gaveUp: boolean = state.getGaveUp();
       const loaded: Loaded = { rows: [], victory: false };
       if (ids.length > 0) {
-        const res = await post<GradeResponse>("/api/grade", { ids });
+        const res = await post<GradeResponse>(`${base}/grade`, { ids });
         if (typeof res === "string") {
           return null;
         }
@@ -140,7 +131,7 @@ export function createPlay({
         }
       }
       if (gaveUp) {
-        const res = await post<GiveUpResponse>("/api/give-up", {});
+        const res = await post<GiveUpResponse>(`${base}/give-up`, {});
         if (typeof res === "string") {
           return null;
         }
@@ -155,18 +146,18 @@ export function createPlay({
       return loaded;
     },
 
-    async submit(id: string): Promise<SubmitResult> {
+    async submit(id: number): Promise<SubmitResult> {
       if (finished) {
         return { kind: "finished" };
       }
-      if (!roster.some((pet: Pet): boolean => pet.id === id)) {
+      if (!roster.some((entry: EntryRef): boolean => entry.id === id)) {
         return { kind: "invalid" };
       }
-      const used: string[] = state.getUsedGuesses();
+      const used: number[] = state.getUsedGuesses();
       if (used.includes(id)) {
         return { kind: "duplicate" };
       }
-      const res = await post<GradeResponse>("/api/grade", {
+      const res = await post<GradeResponse>(`${base}/grade`, {
         ids: [...used, id],
       });
       if (typeof res === "string") {
@@ -192,7 +183,7 @@ export function createPlay({
       if (finished) {
         return { kind: "finished" };
       }
-      const res = await post<GiveUpResponse>("/api/give-up", {});
+      const res = await post<GiveUpResponse>(`${base}/give-up`, {});
       if (typeof res === "string") {
         return { kind: res };
       }

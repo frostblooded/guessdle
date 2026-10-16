@@ -1,13 +1,19 @@
 // What every route group needs from createApp, plus the request-input helpers.
 import type { Request, Response } from "express";
 import type pg from "pg";
-import type { Pet } from "../../game/roster.ts";
-import { ensureAnswer } from "../answers.ts";
+import type { Entry } from "../../game/game.ts";
+import { dayNumber, ensureAnswer, todayIn } from "../answers.ts";
+import { requestUser, type SessionUser } from "../auth.ts";
+import {
+  findGame,
+  loadRoster,
+  MIN_ENTRIES,
+  type GameRow,
+  type Roster,
+} from "../games.ts";
 
 export interface AppContext {
   pool: pg.Pool;
-  roster: readonly Pet[];
-  petIds: string[];
   now: () => Date;
   random: () => number;
   timeZone: string;
@@ -24,22 +30,76 @@ export const paramOf = (req: Request, name: string): unknown =>
   req.params[name];
 
 export const isIdList = (
-  { roster }: AppContext,
+  { entries }: Roster,
   value: unknown,
-): value is string[] =>
+): value is number[] =>
   Array.isArray(value) &&
-  value.length <= roster.length &&
-  value.every((id: unknown) => typeof id === "string");
+  value.length <= entries.length &&
+  value.every((id: unknown) => Number.isInteger(id));
+
+export interface LoadedGame {
+  game: GameRow;
+  roster: Roster;
+  // The signed-in user, when the route looked them up
+  user: SessionUser | null;
+}
+
+export const isPlayable = (game: GameRow, roster: Roster): boolean =>
+  game.status !== "draft" && roster.entries.length >= MIN_ENTRIES;
+
+export const canManage = (game: GameRow, user: SessionUser | null): boolean =>
+  user !== null && (user.admin || game.ownerId === user.id);
+
+// Resolves `:slug` and applies visibility: a draft or a game with fewer than 2
+// active entries is a 404 for everyone but its owner and admins. Sends the 404
+// and returns undefined otherwise.
+export async function loadGame(
+  { pool, now }: AppContext,
+  req: Request,
+  res: Response,
+): Promise<LoadedGame | undefined> {
+  const game = await findGame(pool, String(paramOf(req, "slug")));
+  if (game) {
+    const roster = await loadRoster(pool, game);
+    const playable = isPlayable(game, roster);
+    // Signed-in players are looked up anyway; anonymous ones skip the query
+    const user =
+      playable && !req.headers.cookie
+        ? null
+        : await requestUser(pool, req, now());
+    if (playable || canManage(game, user)) {
+      return { game, roster, user };
+    }
+  }
+  res.status(404).json({ error: "not_found" });
+  return undefined;
+}
+
+// Today's date and Day Number in the game's calendar
+export function todayOf(
+  { now, timeZone }: AppContext,
+  game: GameRow,
+): { date: string; day: number } {
+  const date = todayIn(now(), timeZone);
+  return { date, day: dayNumber(date, game.startDate) };
+}
 
 // Today's answer, or a 500 sent and undefined
 export async function todaysAnswer(
-  { pool, roster, petIds, random }: AppContext,
+  { pool, random }: AppContext,
   res: Response,
+  { game, roster }: LoadedGame,
   date: string,
   day: number,
-): Promise<Pet | undefined> {
-  const answerId = await ensureAnswer(pool, petIds, date, random);
-  const answer = roster.find((pet) => pet.id === answerId);
+): Promise<Entry | undefined> {
+  const answerId = await ensureAnswer(
+    pool,
+    game,
+    roster.entries.map((entry) => entry.id),
+    date,
+    random,
+  );
+  const answer = roster.all.find((entry) => entry.id === answerId);
   if (!answer) {
     res.status(500).json({ error: "answer_missing", day });
   }

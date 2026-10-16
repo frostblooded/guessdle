@@ -1,7 +1,13 @@
 import autoComplete from "@tarekraafat/autocomplete.js";
 import "@tarekraafat/autocomplete.js/dist/css/autoComplete.css";
 import { correctnessClass } from "./game/correctness.ts";
-import { findPetId, type GradedAttribute } from "./game/game.ts";
+import {
+  findEntryId,
+  type EntryRef,
+  type GameAttribute,
+  type GradedAttribute,
+} from "./game/game.ts";
+import { gameStorage } from "./game/game-state.ts";
 import { mergeLocalGame } from "./game/merge.ts";
 import { createServerPlay } from "./game/server-play.ts";
 import {
@@ -11,7 +17,6 @@ import {
   type Play,
   type SubmitResult,
 } from "./game/play.ts";
-import { GUESS_DATA, type Pet } from "./game/roster.ts";
 import { browserFetch, initShell } from "./shell.ts";
 import type {
   AutoCompleteItem,
@@ -21,31 +26,72 @@ import type {
 
 const now = (): Date => new Date();
 
-const GUESS_DATA_NAMES: string[] = GUESS_DATA.map(
-  (item: Pet): string => item.name,
-);
+// The Play page plays Petdle until the gallery routes games by slug
+const SLUG = "petdle";
+
+let roster: EntryRef[] = [];
 
 // Renders the header at once; resolves to the signed-in user (or null)
 const userPromise = initShell(browserFetch);
 
-const anonymousPlay: Play = createPlay({
-  roster: GUESS_DATA,
-  storage: localStorage,
-  now,
-  fetch: browserFetch,
-  onNewDay: clearBoard,
-});
-// Signed-in players use the server-stored game instead
-let play: Play = anonymousPlay;
+let play: Play;
 
 let autoCompleteJs: autoComplete | null = null;
 
-window.onload = function (): void {
+// The game's attributes and entries, or null when it could not be loaded
+async function loadGame(): Promise<{
+  attributes: GameAttribute[];
+  entries: EntryRef[];
+} | null> {
+  try {
+    const res = await fetch(`/api/games/${SLUG}`);
+    return res.ok
+      ? ((await res.json()) as {
+          attributes: GameAttribute[];
+          entries: EntryRef[];
+        })
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function showColumnTitles(attributes: GameAttribute[]): void {
+  document.querySelector("#guess-results-titles-row")!.replaceChildren(
+    ...["Photo", "Name", ...attributes.map((a) => a.name)].map((title) => {
+      const cell = document.createElement("div");
+      cell.className = "guess-result-title cell";
+      cell.textContent = title;
+      return cell;
+    }),
+  );
+}
+
+window.onload = async function (): Promise<void> {
+  const game = await loadGame();
+  if (game === null) {
+    document.querySelector("#board")!.removeAttribute("aria-busy");
+    document.querySelector<HTMLElement>("#loading-state")!.hidden = true;
+    showNotice("Could not load the game. Check your connection and refresh.");
+    return;
+  }
+  roster = game.entries;
+  showColumnTitles(game.attributes);
+  const storage = gameStorage(localStorage, SLUG);
+  // Signed-in players use the server-stored game instead
+  play = createPlay({
+    slug: SLUG,
+    roster,
+    storage,
+    now,
+    fetch: browserFetch,
+    onNewDay: clearBoard,
+  });
   autoCompleteJs = new autoComplete({
     selector: "#new-guess-input",
     placeHolder: "Guess a pet...",
     data: {
-      src: GUESS_DATA_NAMES,
+      src: roster.map((item: EntryRef): string => item.name),
       filter: filterOutGuesses,
     },
     resultsList: {
@@ -70,11 +116,17 @@ window.onload = function (): void {
 // Who is signed in decides where the game lives, so ask before loading it
 async function start(): Promise<void> {
   if ((await userPromise) !== null) {
-    const merged = await mergeLocalGame(localStorage, now, browserFetch);
+    const merged = await mergeLocalGame(
+      SLUG,
+      gameStorage(localStorage, SLUG),
+      now,
+      browserFetch,
+    );
     if (merged === "rate_limited") {
       showNotice(RATE_LIMITED);
     }
     play = createServerPlay({
+      slug: SLUG,
       fetch: browserFetch,
       onNewDay: clearBoard,
     });
@@ -99,8 +151,8 @@ function initNewGuessSubmit(): void {
   newGuessInput.addEventListener("open", (_event: Event): void => {
     // Hack to fix a bug on mobile where if you click on the autocomplete list item, the autocomplete list opens again immediately
     const isValidGuess: boolean =
-      GUESS_DATA.findIndex(
-        (item: Pet): boolean => item.name === newGuessInput.value,
+      roster.findIndex(
+        (item: EntryRef): boolean => item.name === newGuessInput.value,
       ) !== -1;
 
     if (isValidGuess) {
@@ -186,10 +238,10 @@ function showBanner(kind: "victory" | "give-up", answerName: string): void {
   const banner = document.createElement("div");
   banner.id = kind === "victory" ? "victory-title" : "give-up-title";
   banner.className = `banner banner-${kind}`;
-  const photo = GUESS_DATA.find((pet: Pet) => pet.name === answerName)?.photo;
-  if (photo !== undefined) {
+  const photo = roster.find((entry) => entry.name === answerName)?.photo;
+  if (photo) {
     const image = document.createElement("img");
-    image.src = "/" + photo;
+    image.src = photo;
     image.alt = "";
     banner.append(image);
   }
@@ -243,13 +295,13 @@ function addGuessResultElement(row: GradedAttribute[]): void {
   const resultElement: HTMLDivElement = document.createElement("div");
   resultElement.setAttribute("class", "guess-result-row row");
 
-  for (const { key, value, correctness } of row) {
+  for (const [i, { value, correctness }] of row.entries()) {
     const resultCell: HTMLDivElement = document.createElement("div");
     resultCell.setAttribute("class", "guess-result-cell cell");
 
-    if (key === "photo") {
+    if (i === 0) {
       const image: HTMLImageElement = document.createElement("img");
-      image.src = "/" + (value as string);
+      image.src = value as string;
       image.alt = "";
       resultCell.appendChild(image);
     } else {
@@ -275,7 +327,7 @@ let submitting: boolean = false;
 
 async function handleSubmitSelection(): Promise<void> {
   const newGuessInput: HTMLInputElement = getNewGuessInput();
-  const id: string | null = findPetId(GUESS_DATA, newGuessInput.value);
+  const id: number | null = findEntryId(roster, newGuessInput.value);
   if (id === null || submitting) {
     return;
   }
@@ -323,9 +375,9 @@ function handleResultsList(list: HTMLElement, data: AutoCompleteResults): void {
 
 function filterOutGuesses(list: AutoCompleteItem[]): AutoCompleteItem[] {
   // Filter out already used guesses
-  const usedIds: string[] = play.getUsedGuesses();
+  const usedIds: number[] = play.getUsedGuesses();
   return list.filter((item: AutoCompleteItem): boolean => {
-    const id: string | null = findPetId(GUESS_DATA, item.value);
+    const id: number | null = findEntryId(roster, item.value);
     return id === null || !usedIds.includes(id);
   });
 }

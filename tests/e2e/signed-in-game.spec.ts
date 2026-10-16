@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { GUESS_DATA } from "../../src/game/roster.ts";
+import { GUESS_DATA } from "./roster.ts";
 import {
   confirmReset,
   findAnswerName,
@@ -48,10 +48,10 @@ test("the guess is stored on the server, not in the browser", async ({
   await page.goto("/");
   await submitGuess(page, wrong!);
 
-  expect(await page.evaluate(() => localStorage.getItem("usedGuesses"))).toBe(
-    null,
-  );
-  const game = await (await page.request.get("/api/game")).json();
+  expect(
+    await page.evaluate(() => localStorage.getItem("game:petdle:usedGuesses")),
+  ).toBe(null);
+  const game = await (await page.request.get("/api/games/petdle/state")).json();
   expect(game.ids).toHaveLength(1);
 });
 
@@ -129,10 +129,10 @@ test("anonymous guesses are adopted into the account on login", async ({
   await stubLogin(page, newEmail());
   await page.reload();
   await expect(page.locator(".guess-result-row")).toHaveCount(2);
-  expect(await page.evaluate(() => localStorage.getItem("usedGuesses"))).toBe(
-    null,
-  );
-  const game = await (await page.request.get("/api/game")).json();
+  expect(
+    await page.evaluate(() => localStorage.getItem("game:petdle:usedGuesses")),
+  ).toBe(null);
+  const game = await (await page.request.get("/api/games/petdle/state")).json();
   expect(game.ids).toHaveLength(2);
 });
 
@@ -156,10 +156,12 @@ test("an account with progress keeps it and discards leftover local guesses", as
   await stubLogin(phone, email);
   await phone.reload();
   await expect(phone.locator(".guess-result-row")).toHaveCount(1);
-  expect(await phone.evaluate(() => localStorage.getItem("usedGuesses"))).toBe(
-    null,
-  );
-  const game = await (await phone.request.get("/api/game")).json();
+  expect(
+    await phone.evaluate(() => localStorage.getItem("game:petdle:usedGuesses")),
+  ).toBe(null);
+  const game = await (
+    await phone.request.get("/api/games/petdle/state")
+  ).json();
   expect(game.ids).toHaveLength(1);
   await other.close();
 });
@@ -173,7 +175,7 @@ test("an anonymous give-up is adopted on login", async ({ page, request }) => {
   await stubLogin(page, newEmail());
   await page.reload();
   await expect(page.locator("#give-up-answer-name")).toHaveText(answer);
-  const game = await (await page.request.get("/api/game")).json();
+  const game = await (await page.request.get("/api/games/petdle/state")).json();
   expect(game.gaveUp).toBe(true);
 });
 
@@ -193,5 +195,7 @@ test("a signed-in player can reset mid-game, stored on the server", async ({
 
   await page.reload();
   await expect(page.locator(".guess-result-row")).toHaveCount(0);
-  expect((await (await page.request.get("/api/game")).json()).ids).toEqual([]);
+  expect(
+    (await (await page.request.get("/api/games/petdle/state")).json()).ids,
+  ).toEqual([]);
 });
