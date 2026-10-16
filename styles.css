@@ -68,7 +68,8 @@ button {
 
   @media (max-width: 1000px) {
     font-size: 3em;
-    margin: 20px 0 20px 0;
+    /* Top margin clears the absolutely positioned theme and help buttons */
+    margin: 60px 0 20px 0;
   }
 }
 

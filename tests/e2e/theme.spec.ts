@@ -147,3 +147,11 @@ test.describe("light OS preference", () => {
     );
   });
 });
+
+test("theme button does not overlap the title on a phone", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 640 });
+  await page.goto("/");
+  const button = await themeButton(page).boundingBox();
+  const title = await page.locator("#page-title").boundingBox();
+  expect(button!.y + button!.height).toBeLessThanOrEqual(title!.y);
+});
