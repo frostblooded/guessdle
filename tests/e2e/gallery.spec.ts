@@ -27,12 +27,23 @@ test("a failed gallery load says so", async ({ page }) => {
 test("an unknown game slug shows the not-found state with a way back", async ({
   page,
 }) => {
-  await page.goto("/g/no-such-game");
+  const response = await page.goto("/g/no-such-game");
+  expect(response?.status()).toBe(404);
   await expect(page.locator("#not-found")).toBeVisible();
   await expect(page.locator("h1:visible")).toHaveText("Game not found");
   await expect(page.locator("#board")).toBeHidden();
   await page.getByRole("link", { name: "See all games" }).click();
   await expect(page).toHaveURL(/\/$/);
+});
+
+test("a game page carries its link-preview tags", async ({ page }) => {
+  const response = await page.goto("/g/petdle");
+  expect(response?.status()).toBe(200);
+  await expect(page.locator("meta[property='og:title']")).toHaveAttribute(
+    "content",
+    / - Guessdle$/,
+  );
+  await expect(page.locator("meta[name=robots]")).toHaveCount(0);
 });
 
 test("old un-namespaced browser state is wiped, per-game keys are kept", async ({
