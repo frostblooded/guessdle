@@ -12,7 +12,8 @@ const PNG = Buffer.from(
 );
 
 let counter = 0;
-const unique = (): string => `${Date.now().toString(36)}${counter++}`;
+const unique = (): string =>
+  `${Date.now().toString(36)}${counter++}${Math.random().toString(36).slice(2, 6)}`;
 
 const stubLogin = (page: Page, admin = false): Promise<unknown> =>
   page.request.post("/api/test/login", {

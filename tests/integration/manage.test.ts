@@ -147,8 +147,8 @@ describe("creating and editing a game", () => {
       const clash = await create(ann, { name: "B", slug: "mine" });
       assert.equal(clash.status, 409);
       assert.equal(clash.body.error, "slug_taken");
-      const petdle = await create(ann, { name: "B", slug: "petdle" });
-      assert.equal(petdle.status, 409);
+      const first = await create(ann, { name: "B", slug: "petdle" });
+      assert.equal(first.status, 409);
     });
 
     it("rejects reserved and malformed typed slugs", async () => {
