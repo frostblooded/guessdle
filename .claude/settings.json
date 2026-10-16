@@ -13,6 +13,16 @@
           }
         ]
       }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/kill-orphans.mjs"
+          }
+        ]
+      }
     ]
   },
   "worktree": {
