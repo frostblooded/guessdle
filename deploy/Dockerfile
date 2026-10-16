@@ -21,6 +21,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY src/server ./src/server
+COPY src/game ./src/game
 COPY db ./db
 USER node
 EXPOSE 3000

@@ -51,7 +51,10 @@ let handler = serveStatic;
 if (process.env.DATABASE_URL) {
   const { connect } = await import("../src/server/main.ts");
   const { createApp } = await import("../src/server/app.ts");
-  const app = createApp({ pool: await connect(process.env.DATABASE_URL) });
+  const app = createApp({
+    pool: await connect(process.env.DATABASE_URL),
+    timeZone: process.env.SERVER_TIMEZONE || undefined,
+  });
   app.use(serveStatic);
   handler = app;
 }

@@ -71,34 +71,42 @@ describe("used guesses", () => {
   });
 });
 
-describe("victory", () => {
-  it("starts false", () => {
-    assert.equal(state.getIsVictory(), false);
+describe("server day", () => {
+  it("starts unknown", () => {
+    assert.equal(state.getDay(), null);
   });
 
-  it("is true after setIsVictory and survives a new instance", () => {
-    state.setIsVictory();
-    assert.equal(state.getIsVictory(), true);
-    assert.equal(createGameState(storage, () => today).getIsVictory(), true);
+  it("keeps the day number across a new instance on the same day", () => {
+    state.setDay(427);
+    assert.equal(createGameState(storage, () => today).getDay(), 427);
   });
 
-  it("reads corrupt JSON as false", () => {
-    storage.setItem("victory", "tru");
-    assert.equal(state.getIsVictory(), false);
-  });
-
-  it("reads any stored value other than true as false", () => {
-    for (const value of ["false", "1", '"true"', "null"]) {
-      storage.setItem("victory", value);
-      assert.equal(state.getIsVictory(), false, value);
+  it("reads corrupt or non-integer values as unknown", () => {
+    for (const value of ["{bad", '"427"', "null", "1.5", "-1", "[1]"]) {
+      storage.setItem("day", value);
+      assert.equal(state.getDay(), null, value);
     }
+  });
+
+  it("is cleared together with the guesses by reset", () => {
+    state.addUsedGuess("oreo");
+    state.setDay(3);
+    state.reset();
+    assert.deepEqual(state.getUsedGuesses(), []);
+    assert.equal(state.getDay(), null);
+  });
+
+  it("is cleared with the guesses on the next local day", () => {
+    state.setDay(3);
+    today = TUESDAY;
+    assert.equal(createGameState(storage, () => today).getDay(), null);
   });
 });
 
 describe("last played and the new-day reset", () => {
   const play = (): void => {
     state.addUsedGuess("Oreo");
-    state.setIsVictory();
+    state.setDay(5);
   };
   const open = (): GameState => createGameState(storage, () => today);
 
@@ -106,7 +114,7 @@ describe("last played and the new-day reset", () => {
     play();
     const reopened = open();
     assert.deepEqual(reopened.getUsedGuesses(), ["Oreo"]);
-    assert.equal(reopened.getIsVictory(), true);
+    assert.equal(reopened.getDay(), 5);
   });
 
   it("keeps state when reopened later the same day, even just before midnight", () => {
@@ -120,7 +128,7 @@ describe("last played and the new-day reset", () => {
     today = TUESDAY;
     const reopened = open();
     assert.deepEqual(reopened.getUsedGuesses(), []);
-    assert.equal(reopened.getIsVictory(), false);
+    assert.equal(reopened.getDay(), null);
   });
 
   it("clears state when last played is a past month or year", () => {
@@ -134,7 +142,7 @@ describe("last played and the new-day reset", () => {
     play();
     const reopened = open();
     assert.deepEqual(reopened.getUsedGuesses(), []);
-    assert.equal(reopened.getIsVictory(), false);
+    assert.equal(reopened.getDay(), null);
   });
 
   it("clears state when last played is corrupt or the wrong type", () => {
@@ -145,9 +153,16 @@ describe("last played and the new-day reset", () => {
     }
   });
 
+  it("drops the victory flag older versions stored", () => {
+    storage.setItem("lastPlayed", JSON.stringify("2025-10-5"));
+    storage.setItem("victory", "true");
+    open();
+    assert.equal(storage.getItem("victory"), null);
+  });
+
   it("starts empty on a fresh storage", () => {
     assert.deepEqual(state.getUsedGuesses(), []);
-    assert.equal(state.getIsVictory(), false);
+    assert.equal(state.getDay(), null);
   });
 
   it("marks today as played so a later open the same day keeps state", () => {
@@ -174,26 +189,26 @@ describe("blocked storage", () => {
   it("opens empty without throwing", () => {
     const blockedState = createGameState(blocked, () => today);
     assert.deepEqual(blockedState.getUsedGuesses(), []);
-    assert.equal(blockedState.getIsVictory(), false);
+    assert.equal(blockedState.getDay(), null);
   });
 
-  it("keeps guesses and victory for this page view", () => {
+  it("keeps guesses and day for this page view", () => {
     const blockedState = createGameState(blocked, () => today);
     blockedState.addUsedGuess("Oreo");
     blockedState.addUsedGuess("Milo");
-    blockedState.setIsVictory();
+    blockedState.setDay(9);
     assert.deepEqual(blockedState.getUsedGuesses(), ["Oreo", "Milo"]);
-    assert.equal(blockedState.getIsVictory(), true);
+    assert.equal(blockedState.getDay(), 9);
   });
 });
 
 describe("storage keys", () => {
   it("writes the keys returning players already have stored", () => {
     state.addUsedGuess("Oreo");
-    state.setIsVictory();
+    state.setDay(7);
     assert.deepEqual(Object.fromEntries(storage.items), {
       usedGuesses: '["Oreo"]',
-      victory: "true",
+      day: "7",
       lastPlayed: '"2025-10-6"',
     });
   });

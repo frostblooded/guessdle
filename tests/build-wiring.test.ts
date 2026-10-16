@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -54,6 +54,21 @@ describe("build output is wired through the page and the deploy", () => {
     assert.ok(!prodHtml.includes('"dist/script.js"'));
     assert.ok(!prodHtml.includes('"dist/script.css"'));
     assert.ok(!prodHtml.includes("styles.css"), "styles live in the bundle");
+  });
+
+  it("the prod bundle holds no answer or Answer Sequence code, only the grade call", () => {
+    const out: string = mkdtempSync(join(tmpdir(), "petdle-prod-"));
+    execFileSync("node", ["scripts/build-prod.mjs", out], {
+      cwd: join(import.meta.dirname, ".."),
+    });
+    const js: string = readdirSync(out)
+      .filter((f) => f.endsWith(".js"))
+      .map((f) => readFileSync(join(out, f), "utf8"))
+      .join("");
+    assert.match(js, /\/api\/grade/);
+    assert.ok(!js.includes("seedrandom"), "seeded random is not bundled");
+    assert.ok(!js.includes("2026-10-16"), "no backfilled answers");
+    assert.ok(!js.includes("daily_answers"));
   });
 
   it("nginx revalidates by default and caches dist/ forever", () => {

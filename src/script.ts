@@ -1,15 +1,14 @@
 import autoComplete from "@tarekraafat/autocomplete.js";
-import seedrandom from "seedrandom";
 import "../styles.css";
 import "@tarekraafat/autocomplete.js/dist/css/autoComplete.css";
 import { correctnessClass } from "./game/correctness.ts";
+import { findPetId, type GradedAttribute } from "./game/game.ts";
 import {
-  createGame,
-  findPetId,
-  type Game,
-  type GradedAttribute,
-  type GuessResult,
-} from "./game/game.ts";
+  createPlay,
+  type Loaded,
+  type Play,
+  type SubmitResult,
+} from "./game/play.ts";
 import { GUESS_DATA, type Pet } from "./game/roster.ts";
 import { initTheme } from "./theme.ts";
 import type {
@@ -22,11 +21,11 @@ const GUESS_DATA_NAMES: string[] = GUESS_DATA.map(
   (item: Pet): string => item.name,
 );
 
-const game: Game = createGame({
+const play: Play = createPlay({
   roster: GUESS_DATA,
   storage: localStorage,
   now: (): Date => new Date(),
-  makeRandom: (seed: string): (() => number) => seedrandom(seed),
+  fetch: (url, init) => fetch(url, init),
 });
 
 let autoCompleteJs: autoComplete | null = null;
@@ -53,10 +52,9 @@ window.onload = function (): void {
     },
   });
 
-  loadInitialUsedGuessesElements();
   initButtons();
-  initVictoryTitle();
   initNewGuessSubmit();
+  void loadInitialUsedGuessesElements();
 };
 
 function getNewGuessInput(): HTMLInputElement {
@@ -69,7 +67,7 @@ function initNewGuessSubmit(): void {
   newGuessInput.onkeydown = (event: KeyboardEvent): void => {
     // When enter is pressed
     if (event.keyCode === 13) {
-      handleSubmitSelection();
+      void handleSubmitSelection();
     }
   };
 
@@ -86,12 +84,6 @@ function initNewGuessSubmit(): void {
   });
 }
 
-function initVictoryTitle(): void {
-  if (game.getIsVictory()) {
-    addVictoryTitle();
-  }
-}
-
 function initButtons(): void {
   initTheme(
     document.documentElement,
@@ -101,7 +93,7 @@ function initButtons(): void {
   const submitNewGuessButton: HTMLButtonElement =
     document.querySelector<HTMLButtonElement>("#submit-new-guess-button")!;
   submitNewGuessButton.onclick = (): void => {
-    handleSubmitSelection();
+    void handleSubmitSelection();
   };
   initHelpDialog();
 }
@@ -139,9 +131,17 @@ function initHelpDialog(): void {
     };
 }
 
-function loadInitialUsedGuessesElements(): void {
-  for (const row of game.getRows()) {
+async function loadInitialUsedGuessesElements(): Promise<void> {
+  const loaded: Loaded | null = await play.load();
+  if (loaded === null) {
+    return;
+  }
+
+  for (const row of loaded.rows) {
     addGuessResultElement(row);
+  }
+  if (loaded.victory && loaded.answer !== undefined) {
+    addVictoryTitle(loaded.answer);
   }
 }
 
@@ -176,15 +176,24 @@ function handleAutocompleteSelection(event: AutoCompleteSelectionEvent): void {
   newGuessInput.value = event.detail.selection.value;
 }
 
-function handleSubmitSelection(): void {
+let submitting: boolean = false;
+
+async function handleSubmitSelection(): Promise<void> {
   const newGuessInput: HTMLInputElement = getNewGuessInput();
   const id: string | null = findPetId(GUESS_DATA, newGuessInput.value);
-  if (id === null) {
+  if (id === null || submitting) {
     return;
   }
 
-  const result: GuessResult = game.submit(id);
-  if (result.kind === "invalid") {
+  submitting = true;
+  let result: SubmitResult;
+  try {
+    result = await play.submit(id);
+  } finally {
+    submitting = false;
+  }
+  // The typed guess stays when the server could not grade it, to retry
+  if (result.kind === "invalid" || result.kind === "error") {
     return;
   }
 
@@ -194,14 +203,16 @@ function handleSubmitSelection(): void {
     return;
   }
 
-  if (result.isAnswer) {
-    addVictoryTitle();
+  if (result.isAnswer && result.answer !== undefined) {
+    addVictoryTitle(result.answer);
   }
   addGuessResultElement(result.row);
 }
 
-function addVictoryTitle(): void {
-  const answerName: string = game.getAnswerName();
+function addVictoryTitle(answerName: string): void {
+  if (document.querySelector("#victory-title")) {
+    return;
+  }
 
   const victoryTitle: HTMLSpanElement = document.createElement("span");
   victoryTitle.id = "victory-title";
@@ -226,7 +237,7 @@ function handleResultsList(list: HTMLElement, data: AutoCompleteResults): void {
 
 function filterOutGuesses(list: AutoCompleteItem[]): AutoCompleteItem[] {
   // Filter out already used guesses
-  const usedIds: string[] = game.getUsedGuesses();
+  const usedIds: string[] = play.getUsedGuesses();
   return list.filter((item: AutoCompleteItem): boolean => {
     const id: string | null = findPetId(GUESS_DATA, item.value);
     return id === null || !usedIds.includes(id);

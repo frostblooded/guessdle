@@ -3,7 +3,8 @@ import { dateToString } from "./date.ts";
 // Game State: what the browser remembers about today.
 
 const LOCAL_STORAGE_USED_GUESSES_STRING: string = "usedGuesses";
-const LOCAL_STORAGE_VICTORY_STRING: string = "victory";
+const LOCAL_STORAGE_VICTORY_STRING: string = "victory"; // no longer stored: victory comes from the server
+const LOCAL_STORAGE_DAY_STRING: string = "day";
 const LOCAL_LAST_PLAYED_STRING: string = "lastPlayed";
 
 // The part of the browser Storage that Game State uses
@@ -17,8 +18,11 @@ export interface GameState {
   getUsedGuesses(): string[];
   addUsedGuess(guess: string): void;
   setUsedGuesses(guesses: string[]): void;
-  getIsVictory(): boolean;
-  setIsVictory(): void;
+  // Server Day Number the guesses were graded on, null until a response says
+  getDay(): number | null;
+  setDay(day: number): void;
+  // Forgets guesses and day (a newer day was seen)
+  reset(): void;
 }
 
 // Blocked storage (private mode, disabled cookies) throws. Writes are kept in
@@ -88,6 +92,7 @@ export function createGameState(
   if (readJson(storage, LOCAL_LAST_PLAYED_STRING) !== today) {
     storage.removeItem(LOCAL_STORAGE_VICTORY_STRING);
     storage.removeItem(LOCAL_STORAGE_USED_GUESSES_STRING);
+    storage.removeItem(LOCAL_STORAGE_DAY_STRING);
   }
   storage.setItem(LOCAL_LAST_PLAYED_STRING, JSON.stringify(today));
 
@@ -108,12 +113,20 @@ export function createGameState(
       );
     },
 
-    getIsVictory(): boolean {
-      return readJson(storage, LOCAL_STORAGE_VICTORY_STRING) === true;
+    getDay(): number | null {
+      const value: unknown = readJson(storage, LOCAL_STORAGE_DAY_STRING);
+      return Number.isInteger(value) && (value as number) >= 0
+        ? (value as number)
+        : null;
     },
 
-    setIsVictory(): void {
-      storage.setItem(LOCAL_STORAGE_VICTORY_STRING, JSON.stringify(true));
+    setDay(day: number): void {
+      storage.setItem(LOCAL_STORAGE_DAY_STRING, JSON.stringify(day));
+    },
+
+    reset(): void {
+      storage.removeItem(LOCAL_STORAGE_USED_GUESSES_STRING);
+      storage.removeItem(LOCAL_STORAGE_DAY_STRING);
     },
   };
 }

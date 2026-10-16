@@ -1,7 +1,6 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { GUESS_DATA } from "../../src/game/roster.ts";
+import { findAnswerName, submitGuess } from "./helpers.ts";
 
 // Phones (small to large, portrait and landscape) and a small tablet
 const VIEWPORTS = [
@@ -15,18 +14,10 @@ const VIEWPORTS = [
   { name: "768x1024 tablet", width: 768, height: 1024 },
 ] as const;
 
-const GOLDEN: { answers: number[] } = JSON.parse(
-  readFileSync(
-    join(import.meta.dirname, "..", "fixtures", "answer-sequence.golden.json"),
-    "utf8",
-  ),
-);
-const DAY_NUMBER = 3;
-const DAY = new Date(2025, 7, 15 + DAY_NUMBER, 12);
-const answerName: string = GUESS_DATA[GOLDEN.answers[DAY_NUMBER]!]!.name;
+const DAY = new Date(2025, 7, 18, 12);
 
 // Worst cases for layout: the longest name and the pets with the most colors and owners
-const others = GUESS_DATA.filter((pet) => pet.name !== answerName);
+const others = GUESS_DATA;
 const byLongest = (key: (p: (typeof GUESS_DATA)[number]) => number) =>
   [...others].sort((a, b) => key(b) - key(a))[0]!.name;
 const WORST_GUESSES: string[] = [
@@ -129,11 +120,6 @@ async function expectNoProblems(page: Page): Promise<void> {
   expect(await page.evaluate(findLayoutProblems)).toEqual([]);
 }
 
-async function submitGuess(page: Page, name: string): Promise<void> {
-  await page.locator("#new-guess-input").fill(name);
-  await page.locator("#submit-new-guess-button").click();
-}
-
 for (const { name, width, height } of VIEWPORTS) {
   test.describe(`layout at ${name}`, () => {
     test.use({ viewport: { width, height } });
@@ -157,8 +143,10 @@ for (const { name, width, height } of VIEWPORTS) {
       await expectNoProblems(page);
     });
 
-    test("victory", async ({ page }) => {
-      await submitGuess(page, WORST_GUESSES[0]!);
+    test("victory", async ({ page, request }) => {
+      const answerName = await findAnswerName(request);
+      const wrong = WORST_GUESSES.find((guess) => guess !== answerName)!;
+      await submitGuess(page, wrong);
       await submitGuess(page, answerName);
       await expect(page.locator("#victory-title")).toBeVisible();
       await expectNoProblems(page);

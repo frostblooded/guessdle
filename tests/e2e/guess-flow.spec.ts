@@ -1,23 +1,11 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { GUESS_DATA } from "../../src/game/roster.ts";
+import { findAnswerName, submitGuess } from "./helpers.ts";
 
-interface Golden {
-  answers: number[];
-}
-
-const GOLDEN: Golden = JSON.parse(
-  readFileSync(
-    join(import.meta.dirname, "..", "fixtures", "answer-sequence.golden.json"),
-    "utf8",
-  ),
-);
-
-// Day Number 0 is ANSWER_START_DATE (2025-08-15), so answers[n] is the Daily Answer for that day + n.
-const DAY_NUMBER = 3;
-const DAY = new Date(2025, 7, 15 + DAY_NUMBER, 12);
-const NEXT_DAY = new Date(2025, 7, 15 + DAY_NUMBER + 1, 12);
+// The browser's own (fake) clock; the server decides the Daily Answer's day
+const DAY = new Date(2025, 7, 18, 12);
+const NEXT_DAY = new Date(2025, 7, 19, 12);
+const LOCAL_TODAY = "2025-8-18";
 
 const names: string[] = GUESS_DATA.map((pet) => pet.name);
 
@@ -26,23 +14,19 @@ const rows = (page: Page): Locator => page.locator(".guess-result-row");
 const suggestions = (page: Page): Locator => page.locator("[role=option]");
 const victory = (page: Page): Locator => page.locator("#victory-title");
 
-async function submitGuess(page: Page, name: string): Promise<void> {
-  await input(page).fill(name);
-  await page.locator("#submit-new-guess-button").click();
-}
-
 async function openOnDay(page: Page, now: Date = DAY): Promise<void> {
   await page.clock.install({ time: now });
   await page.goto("/");
 }
 
-const answerName: string = names[GOLDEN.answers[DAY_NUMBER]!]!;
-const nextAnswerName: string = names[GOLDEN.answers[DAY_NUMBER + 1]!]!;
-const wrongName: string = names.find(
-  (name) => name !== answerName && name !== nextAnswerName,
-)!;
+let answerName: string;
+let wrongName: string;
+let wrongId: string;
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page, request }) => {
+  answerName = await findAnswerName(request);
+  wrongName = names.find((name) => name !== answerName)!;
+  wrongId = GUESS_DATA.find((pet) => pet.name === wrongName)!.id;
   await openOnDay(page);
 });
 
@@ -138,10 +122,13 @@ test("used guesses are removed from the autocomplete list", async ({
 
   await input(page).fill(wrongName);
   await page.locator("#submit-new-guess-button").click();
+  await expect(rows(page)).toHaveCount(1);
   await input(page).pressSequentially(prefix);
 
   await expect(suggestions(page)).toHaveCount(remaining);
-  await expect(suggestions(page).filter({ hasText: wrongName })).toHaveCount(0);
+  await expect(
+    suggestions(page).filter({ hasText: new RegExp(`^${wrongName}$`) }),
+  ).toHaveCount(0);
 });
 
 test("guesses and victory survive a reload on the same day", async ({
@@ -159,9 +146,7 @@ test("guesses and victory survive a reload on the same day", async ({
   await expect(rows(page).last()).toContainText(wrongName);
 });
 
-test("the next day shows a fresh board with the new Daily Answer", async ({
-  page,
-}) => {
+test("the next day shows a fresh board", async ({ page }) => {
   await submitGuess(page, wrongName);
   await submitGuess(page, answerName);
   await expect(victory(page)).toBeVisible();
@@ -172,38 +157,108 @@ test("the next day shows a fresh board with the new Daily Answer", async ({
   await expect(rows(page)).toHaveCount(0);
   await expect(victory(page)).toHaveCount(0);
 
-  await submitGuess(page, nextAnswerName);
+  await submitGuess(page, answerName);
 
-  await expect(page.locator("#victory-answer-name")).toHaveText(nextAnswerName);
+  await expect(page.locator("#victory-answer-name")).toHaveText(answerName);
 });
 
-test.describe("before the start date", () => {
-  const BEFORE_START = new Date(2025, 7, 14, 12);
+test("a failed request keeps the typed guess and adds no row", async ({
+  page,
+}) => {
+  await page.route("**/api/grade", (route) => route.abort());
+  await input(page).fill(wrongName);
+  await page.locator("#submit-new-guess-button").click();
 
-  async function openWithRandom(page: Page, value: number): Promise<void> {
-    await page.addInitScript(`Math.random = () => ${value};`);
-    await openOnDay(page, BEFORE_START);
-  }
+  await expect(rows(page)).toHaveCount(0);
+  await expect(input(page)).toHaveValue(wrongName);
 
-  test("the Daily Answer falls back to a random pet", async ({ page }) => {
-    await openWithRandom(page, 0);
-    await submitGuess(page, names[0]!);
-    await expect(page.locator("#victory-answer-name")).toHaveText(names[0]!);
+  await page.unroute("**/api/grade");
+  await page.locator("#submit-new-guess-button").click();
+  await expect(rows(page)).toHaveCount(1);
+  await expect(input(page)).toHaveValue("");
+});
 
-    await page.evaluate("localStorage.clear()");
-    await openWithRandom(page, 0.999);
-    await submitGuess(page, names.at(-1)!);
-    await expect(page.locator("#victory-answer-name")).toHaveText(
-      names.at(-1)!,
+test("a server error response keeps the typed guess too", async ({ page }) => {
+  await page.route("**/api/grade", (route) =>
+    route.fulfill({
+      status: 429,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "rate_limited" }),
+    }),
+  );
+  await input(page).fill(wrongName);
+  await page.locator("#submit-new-guess-button").click();
+
+  await expect(rows(page)).toHaveCount(0);
+  await expect(input(page)).toHaveValue(wrongName);
+});
+
+test.describe("upgrading state stored by an older version", () => {
+  const seed = async (
+    page: Page,
+    items: Record<string, string>,
+  ): Promise<void> => {
+    await page.addInitScript((entries) => {
+      if (!localStorage.getItem("seeded")) {
+        for (const [key, value] of Object.entries(entries)) {
+          localStorage.setItem(key, value);
+        }
+        localStorage.setItem("seeded", "1");
+      }
+    }, items);
+  };
+
+  test("today's guesses stored by name are graded and kept as ids", async ({
+    page,
+  }) => {
+    await seed(page, {
+      lastPlayed: JSON.stringify(LOCAL_TODAY),
+      usedGuesses: JSON.stringify([wrongName, "Gone Pet"]),
+    });
+    await page.reload();
+
+    await expect(rows(page)).toHaveCount(1);
+    await expect(rows(page).first()).toContainText(wrongName);
+    expect(await page.evaluate(() => localStorage.getItem("usedGuesses"))).toBe(
+      JSON.stringify([wrongId]),
     );
   });
 
-  test("a wrong guess still adds a graded row", async ({ page }) => {
-    await openWithRandom(page, 0);
-    await submitGuess(page, names[1]!);
+  test("a stored victory is re-derived from the guesses", async ({ page }) => {
+    await seed(page, {
+      lastPlayed: JSON.stringify(LOCAL_TODAY),
+      usedGuesses: JSON.stringify([wrongName, answerName]),
+      victory: "true",
+    });
+    await page.reload();
 
+    await expect(rows(page)).toHaveCount(2);
+    await expect(page.locator("#victory-answer-name")).toHaveText(answerName);
+  });
+
+  test("another day's guesses are cleared", async ({ page }) => {
+    await seed(page, {
+      lastPlayed: JSON.stringify("2025-8-17"),
+      usedGuesses: JSON.stringify([wrongName]),
+    });
+    await page.reload();
+
+    await expect(rows(page)).toHaveCount(0);
+  });
+
+  test("guesses graded on an earlier server day are cleared", async ({
+    page,
+  }) => {
+    await seed(page, {
+      lastPlayed: JSON.stringify(LOCAL_TODAY),
+      usedGuesses: JSON.stringify([wrongId]),
+      day: "3",
+    });
+    await page.reload();
+
+    await expect(rows(page)).toHaveCount(0);
+    await submitGuess(page, wrongName);
     await expect(rows(page)).toHaveCount(1);
-    await expect(victory(page)).toHaveCount(0);
   });
 });
 

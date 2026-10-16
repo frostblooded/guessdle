@@ -22,5 +22,8 @@ if (import.meta.main) {
     throw new Error("DATABASE_URL is required");
   }
   const pool = await connect(url);
-  createApp({ pool }).listen(Number(process.env["PORT"] ?? 3000), "0.0.0.0");
+  createApp({ pool, timeZone: process.env["SERVER_TIMEZONE"] }).listen(
+    Number(process.env["PORT"] ?? 3000),
+    "0.0.0.0",
+  );
 }

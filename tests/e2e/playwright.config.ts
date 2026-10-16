@@ -15,12 +15,12 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: "npm start",
-    // Empty DATABASE_URL: static pages only, no Postgres needed (and no .env pickup)
-    env: { PORT: String(PORT), DATABASE_URL: "" },
+    // Not npm start: serve.ts starts the Postgres container first (and skips .env)
+    command: "node tests/e2e/serve.ts",
+    env: { PORT: String(PORT) },
     cwd: "../..",
     url: URL,
     reuseExistingServer: !process.env["CI"],
-    timeout: 30_000,
+    timeout: 180_000,
   },
 });
