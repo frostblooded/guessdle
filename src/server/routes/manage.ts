@@ -2,15 +2,24 @@
 import express from "express";
 import type { Express, Request, Response } from "express";
 import { slugBase, slugError } from "../../game/slug.ts";
-import { todayIn } from "../answers.ts";
+import { releaseEntry, todayIn } from "../answers.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
 import type { AttributeType } from "../../game/game.ts";
+import {
+  deleteEntry,
+  listEntries,
+  MAX_ENTRY_NAME,
+  MAX_LIST_ITEMS,
+  saveEntry,
+  type EntryInput,
+} from "../entries.ts";
 import {
   createGame,
   editAttributes,
   listAttributes,
   listOwned,
   MAX_ATTRIBUTE_NAME,
+  MAX_VALUE_LENGTH,
   updateGame,
   type AttributeEdit,
   type GamePatch,
@@ -43,6 +52,8 @@ export function manageRoutes(
 ): void {
   const { pool, now } = ctx;
   const json = express.json({ limit: "10kb" });
+  // An entry carries up to 10 attributes of 20 items
+  const bigJson = express.json({ limit: "64kb" });
   const writes = rateLimit(pool, now, limit);
 
   const needUser = async (
@@ -212,6 +223,111 @@ export function manageRoutes(
     `${attrBase}/:id`,
     writes,
     attributeRoute((req) => ({ remove: idOf(req) })),
+  );
+
+  const entryBase = "/api/games/:slug/entries";
+  // The entry fields in the body, checked; undefined when any is malformed
+  const entryInput = async (
+    body: Record<string, unknown>,
+    current: string,
+  ): Promise<EntryInput | undefined> => {
+    const { name, photo, values } = body;
+    const out: EntryInput = {};
+    if (name !== undefined) {
+      if (
+        typeof name !== "string" ||
+        name.trim() === "" ||
+        name.trim().length > MAX_ENTRY_NAME
+      ) {
+        return undefined;
+      }
+      out.name = name.trim();
+    }
+    if (photo !== undefined) {
+      if (
+        typeof photo !== "string" ||
+        (photo !== "" &&
+          photo !== current &&
+          !(await isStoredUpload(pool, photo)))
+      ) {
+        return undefined;
+      }
+      out.photo = photo;
+    }
+    if (values !== undefined) {
+      if (typeof values !== "object" || values === null) {
+        return undefined;
+      }
+      out.values = {};
+      for (const [id, raw] of Object.entries(values)) {
+        const list: unknown = Array.isArray(raw) ? raw : [raw];
+        const items = (list as unknown[]).map((v) =>
+          typeof v === "string" ? v.trim() : null,
+        );
+        if (
+          items.length > MAX_LIST_ITEMS ||
+          items.some((v) => v === null || v.length > MAX_VALUE_LENGTH)
+        ) {
+          return undefined;
+        }
+        out.values[id] = items.filter((v): v is string => v !== "");
+      }
+    }
+    return out;
+  };
+  const ENTRY_FAILURES = {
+    invalid: [400, "invalid"],
+    exists: [409, "entry_exists"],
+    not_found: [404, "not_found"],
+  } as const;
+  // Creates (no :id) or changes an entry, then answers with the entry list
+  const entryRoute = manageRoute(async ({ game }, _user, req, res) => {
+    const raw = req.params["id"];
+    const id = raw === undefined ? undefined : idOf(req);
+    const current =
+      id === undefined
+        ? undefined
+        : (await listEntries(pool, game)).find((e) => e.id === id);
+    const input = await entryInput(bodyOf(req), current?.photo ?? "");
+    if (!input || (id === undefined && !input.name)) {
+      invalid(res);
+      return;
+    }
+    const out = await saveEntry(pool, game, id, input);
+    if (typeof out === "string") {
+      invalid(res, ENTRY_FAILURES[out][1], ENTRY_FAILURES[out][0]);
+      return;
+    }
+    await removeUpload(pool, uploadsDir, out.replacedPhoto);
+    res.json(await listEntries(pool, game));
+  });
+  app.get(
+    entryBase,
+    manageRoute(async ({ game }, _user, _req, res) => {
+      res.json(await listEntries(pool, game));
+    }),
+  );
+  app.post(entryBase, writes, bigJson, entryRoute);
+  app.patch(`${entryBase}/:id`, writes, bigJson, entryRoute);
+  app.delete(
+    `${entryBase}/:id`,
+    writes,
+    manageRoute(async ({ game, roster }, _user, req, res) => {
+      const id = idOf(req);
+      if (!(await deleteEntry(pool, game, id))) {
+        invalid(res, "not_found", 404);
+        return;
+      }
+      await releaseEntry(
+        pool,
+        game,
+        roster.entries.map((e) => e.id).filter((e) => e !== id),
+        todayIn(now(), ctx.timeZone),
+        id,
+        ctx.random,
+      );
+      res.json(await listEntries(pool, game));
+    }),
   );
 
   app.patch(

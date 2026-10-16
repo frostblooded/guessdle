@@ -37,6 +37,7 @@ const ERRORS: Record<string, string> = {
   invalid: "Check the values and try again.",
   reserved: "That address is reserved. Pick another one.",
   attribute_exists: "Another attribute already has that name.",
+  entry_exists: "Another entry already has that name.",
   slug_taken: "That address is already taken. Pick another one.",
   rate_limited: "Too many changes in a short time. Wait a minute and retry.",
   unauthorized: "Your session ended. Sign in again.",

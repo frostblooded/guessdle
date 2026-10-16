@@ -1,6 +1,7 @@
-// The game editor: top tabs, of which Details and Attributes exist so far.
+// The game editor: top tabs, of which Details, Attributes and Entries exist so far.
 import { statusNotice, type Details } from "../game/editor.ts";
 import { api, errorText, signInThen, type Reply } from "../manage-client.ts";
+import { initEntries } from "./edit-entries.ts";
 import { browserFetch, initShell } from "../shell.ts";
 
 const $ = <T extends HTMLElement>(selector: string): T =>
@@ -118,8 +119,12 @@ void initShell(browserFetch).then(async (user) => {
     }
   };
 
-  const tabs = ["details", "attributes"];
+  const tabs = ["details", "attributes", "entries"];
+  let refreshEntries = async (): Promise<void> => {};
   const show = (tab: string): void => {
+    if (tab === "entries") {
+      void refreshEntries();
+    }
     for (const t of tabs) {
       $(`#tab-${t}`).setAttribute("aria-selected", String(t === tab));
       $(t === "details" ? "#details-form" : `#panel-${t}`).hidden = t !== tab;
@@ -214,4 +219,10 @@ void initShell(browserFetch).then(async (user) => {
     });
   };
   await attributes("GET", `${API}/attributes`);
+  refreshEntries = await initEntries(API, async () => {
+    const fresh = await api<Details>("GET", `${API}/details`);
+    if (fresh?.status === 200) {
+      render(fresh.data);
+    }
+  });
 });

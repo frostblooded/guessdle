@@ -50,7 +50,12 @@
           >
             Attributes
           </button>
-          <button type="button" role="tab" aria-selected="false" disabled>
+          <button
+            type="button"
+            role="tab"
+            aria-selected="false"
+            id="tab-entries"
+          >
             Entries
           </button>
           <button type="button" role="tab" aria-selected="false" disabled>
@@ -80,6 +85,57 @@
             <button class="btn btn-primary" type="submit">Add</button>
           </form>
           <p id="attr-error" class="alert alert-error" role="alert"></p>
+        </section>
+        <section id="panel-entries" class="card" hidden>
+          <p class="lede">
+            Each entry is a row on the board. A game needs at least 2 entries
+            before anyone can play it.
+          </p>
+          <ul id="entry-list" class="attr-list"></ul>
+          <form id="entry-form" novalidate>
+            <label class="field-label" for="entry-name">Name</label>
+            <input
+              type="text"
+              id="entry-name"
+              maxlength="60"
+              autocomplete="off"
+            />
+            <p class="field-label">Photo</p>
+            <img id="entry-photo-preview" class="cover-preview" alt="" hidden />
+            <div class="button-row">
+              <input
+                type="file"
+                id="entry-photo"
+                accept="image/jpeg,image/png,image/webp"
+                class="sr-only"
+              />
+              <label class="btn btn-secondary btn-sm" for="entry-photo"
+                >Choose photo</label
+              >
+              <button
+                id="entry-photo-remove"
+                class="btn btn-quiet btn-sm"
+                type="button"
+              >
+                Remove photo
+              </button>
+            </div>
+            <div id="entry-fields"></div>
+            <p id="entry-error" class="alert alert-error" role="alert"></p>
+            <div class="button-row">
+              <button id="entry-submit" class="btn btn-primary" type="submit">
+                Add entry
+              </button>
+              <button
+                id="entry-cancel"
+                class="btn btn-quiet"
+                type="button"
+                hidden
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
         </section>
         <form id="details-form" class="card" novalidate>
           <label class="field-label" for="edit-name">Name</label>

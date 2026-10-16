@@ -1097,3 +1097,15 @@ textarea {
 .attr-row input[type="text"] {
   flex: 1 1 10rem;
 }
+
+.entry-thumb {
+  width: 2.5rem;
+  height: 2.5rem;
+  object-fit: cover;
+  border-radius: var(--radius, 4px);
+}
+
+.entry-name {
+  flex: 1 1 8rem;
+  align-self: center;
+}
