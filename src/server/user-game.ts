@@ -13,7 +13,15 @@ export interface GameView {
   answer?: string;
 }
 
-export type Refusal = "invalid" | "duplicate" | "finished" | "not_finished";
+export type Refusal =
+  | "invalid"
+  | "duplicate"
+  | "finished"
+  | "not_finished"
+  // merge: the account already has rows for the day
+  | "has_progress"
+  // merge: the payload is for another day
+  | "stale_day";
 export type GameOutcome = { kind: "ok"; view: GameView } | { kind: Refusal };
 
 type Q = Pick<pg.Pool, "query">;

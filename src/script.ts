@@ -9,6 +9,7 @@ import {
 } from "./account.ts";
 import { correctnessClass } from "./game/correctness.ts";
 import { findPetId, type GradedAttribute } from "./game/game.ts";
+import { mergeLocalGame } from "./game/merge.ts";
 import { createServerPlay } from "./game/server-play.ts";
 import {
   createPlay,
@@ -73,6 +74,11 @@ async function start(): Promise<void> {
   const user: AccountUser | null = await fetchUser(fetchLike);
   showAccount(user);
   if (user !== null) {
+    await mergeLocalGame(
+      localStorage,
+      (): Date => new Date(),
+      (url, init) => fetch(url, init),
+    );
     play = createServerPlay({
       fetch: (url, init) => fetch(url, init),
       onNewDay: clearBoard,

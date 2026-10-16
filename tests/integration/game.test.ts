@@ -411,4 +411,193 @@ describe("signed-in Game State on the server", () => {
       assert.equal(res.status, 400);
     });
   });
+
+  describe("merge", () => {
+    const merge = (cookie: string, body: unknown) =>
+      post("/api/game/merge", cookie, body);
+
+    it("requires a session", async () => {
+      const res = await fetch(`${url}/api/game/merge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ day: 427, ids: [] }),
+      });
+      assert.equal(res.status, 401);
+    });
+
+    it("adopts local guesses in order when the account has no rows", async () => {
+      const cookie = await login("a@x.test");
+      const ids = [OTHERS[2], OTHERS[0], OTHERS[1]];
+      const { status, body } = await merge(cookie, { day: 427, ids });
+      assert.equal(status, 200);
+      assert.deepEqual(body.ids, ids);
+      assert.equal(body.rows.length, 3);
+      assert.equal(body.victory, false);
+      assert.equal(body.gaveUp, false);
+      assert.equal(body.answer, undefined);
+      assert.deepEqual((await get("/api/game", cookie)).body, body);
+    });
+
+    it("adopts a give-up and reveals the answer", async () => {
+      const cookie = await login("a@x.test");
+      const { body } = await merge(cookie, {
+        day: 427,
+        ids: [OTHERS[0]],
+        gaveUp: true,
+      });
+      assert.equal(body.gaveUp, true);
+      assert.equal(typeof body.answer, "string");
+      assert.deepEqual(body.ids, [OTHERS[0]]);
+    });
+
+    it("adopts a give-up with no guesses", async () => {
+      const cookie = await login("a@x.test");
+      const { status, body } = await merge(cookie, {
+        day: 427,
+        ids: [],
+        gaveUp: true,
+      });
+      assert.equal(status, 200);
+      assert.equal(body.gaveUp, true);
+    });
+
+    it("answers 409 and keeps the server state when the account has guesses", async () => {
+      const cookie = await login("a@x.test");
+      await post("/api/game/guess", cookie, { id: OTHERS[0] });
+      const { status, body } = await merge(cookie, {
+        day: 427,
+        ids: [OTHERS[1], OTHERS[2]],
+      });
+      assert.equal(status, 409);
+      assert.equal(body.error, "has_progress");
+      assert.deepEqual((await get("/api/game", cookie)).body.ids, [OTHERS[0]]);
+    });
+
+    it("answers 409 when the account only has a give-up", async () => {
+      const cookie = await login("a@x.test");
+      await post("/api/game/give-up", cookie);
+      const { status } = await merge(cookie, { day: 427, ids: [OTHERS[0]] });
+      assert.equal(status, 409);
+      assert.deepEqual((await get("/api/game", cookie)).body.ids, []);
+    });
+
+    it("cannot re-adopt the same local history", async () => {
+      const cookie = await login("a@x.test");
+      const payload = { day: 427, ids: [OTHERS[0], OTHERS[1]] };
+      assert.equal((await merge(cookie, payload)).status, 200);
+      assert.equal((await merge(cookie, payload)).status, 409);
+      assert.equal((await merge(await login("a@x.test"), payload)).status, 409);
+      assert.deepEqual((await get("/api/game", cookie)).body.ids, payload.ids);
+    });
+
+    it("lets exactly one of concurrent merges win", async () => {
+      const cookie = await login("a@x.test");
+      const results = await Promise.all(
+        [OTHERS[0], OTHERS[1], OTHERS[2], OTHERS[3]].map((id) =>
+          merge(cookie, { day: 427, ids: [id] }),
+        ),
+      );
+      assert.equal(results.filter((r) => r.status === 200).length, 1);
+      assert.equal(results.filter((r) => r.status === 409).length, 3);
+      assert.equal((await get("/api/game", cookie)).body.ids.length, 1);
+    });
+
+    it("rejects a stale or missing day and stores nothing", async () => {
+      const cookie = await login("a@x.test");
+      for (const day of [426, 428, "427", null, undefined]) {
+        const { status, body } = await merge(cookie, {
+          day,
+          ids: [OTHERS[0]],
+        });
+        assert.equal(status, 409, String(day));
+        assert.equal(body.error, "stale_day");
+        assert.equal(body.day, 427);
+      }
+      assert.deepEqual((await get("/api/game", cookie)).body.ids, []);
+    });
+
+    it("rejects ids outside the roster and stores nothing", async () => {
+      const cookie = await login("a@x.test");
+      const { status, body } = await merge(cookie, {
+        day: 427,
+        ids: [OTHERS[0], "not-a-pet"],
+      });
+      assert.equal(status, 400);
+      assert.equal(body.error, "invalid");
+      assert.deepEqual((await get("/api/game", cookie)).body.ids, []);
+    });
+
+    it("rejects malformed payloads", async () => {
+      const cookie = await login("a@x.test");
+      for (const bad of [
+        { day: 427 },
+        { day: 427, ids: "x" },
+        { day: 427, ids: [1] },
+        { day: 427, ids: [], gaveUp: "yes" },
+        { day: 427, ids: [...GUESS_DATA.map((p) => p.id), OTHERS[0]] },
+      ]) {
+        const { status, body } = await merge(cookie, bad);
+        assert.equal(status, 400, JSON.stringify(bad).slice(0, 40));
+        assert.equal(body.error, "invalid");
+      }
+    });
+
+    it("drops duplicates, keeping first occurrence order", async () => {
+      const cookie = await login("a@x.test");
+      const { status, body } = await merge(cookie, {
+        day: 427,
+        ids: [OTHERS[1], OTHERS[0], OTHERS[1], OTHERS[0], OTHERS[2]],
+      });
+      assert.equal(status, 200);
+      assert.deepEqual(body.ids, [OTHERS[1], OTHERS[0], OTHERS[2]]);
+    });
+
+    it("ignores guesses after the answer and reveals the win", async () => {
+      const cookie = await login("a@x.test");
+      const { status, body } = await merge(cookie, {
+        day: 427,
+        ids: [OTHERS[0], ANSWER, OTHERS[1]],
+        gaveUp: true,
+      });
+      assert.equal(status, 200);
+      assert.deepEqual(body.ids, [OTHERS[0], ANSWER]);
+      assert.equal(body.victory, true);
+      assert.equal(body.gaveUp, false);
+      assert.equal(typeof body.answer, "string");
+      const more = await post("/api/game/guess", cookie, { id: OTHERS[1] });
+      assert.equal(more.body.error, "finished");
+    });
+
+    it("an empty merge stores nothing and leaves the account free to merge", async () => {
+      const cookie = await login("a@x.test");
+      const empty = await merge(cookie, { day: 427, ids: [] });
+      assert.equal(empty.status, 200);
+      assert.deepEqual(empty.body.ids, []);
+      assert.equal(
+        (await merge(cookie, { day: 427, ids: [OTHERS[0]] })).status,
+        200,
+      );
+    });
+
+    it("keeps accounts apart", async () => {
+      const a = await login("a@x.test");
+      const b = await login("b@x.test");
+      await merge(a, { day: 427, ids: [OTHERS[0]] });
+      assert.equal(
+        (await merge(b, { day: 427, ids: [OTHERS[1]] })).status,
+        200,
+      );
+      assert.deepEqual((await get("/api/game", a)).body.ids, [OTHERS[0]]);
+    });
+
+    it("rejects a non-JSON merge", async () => {
+      const cookie = await login("a@x.test");
+      const res = await fetch(`${url}/api/game/merge`, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain", Cookie: cookie },
+        body: "{}",
+      });
+      assert.equal(res.status, 415);
+    });
+  });
 });

@@ -249,6 +249,8 @@ export function createApp({
     duplicate: 409,
     finished: 409,
     not_finished: 409,
+    has_progress: 409,
+    stale_day: 409,
   };
   const changeRoute = (
     action: (
@@ -311,6 +313,47 @@ export function createApp({
         "insert into user_give_ups (user_id, day) values ($1, $2)",
         [user.id, date],
       );
+      return null;
+    }),
+  );
+  // Adopts anonymous local history; the user-row lock in changeGame makes the
+  // "no rows yet" check and the inserts one atomic step.
+  app.post(
+    "/api/game/merge",
+    json,
+    changeRoute(async ({ user, date, day, body, answer }, current, q) => {
+      const { ids, gaveUp } = body;
+      if (
+        !Array.isArray(ids) ||
+        ids.length > roster.length ||
+        !ids.every((id: unknown) => typeof id === "string") ||
+        (gaveUp !== undefined && typeof gaveUp !== "boolean") ||
+        !ids.every((id: string) => roster.some((pet) => pet.id === id))
+      ) {
+        return "invalid";
+      }
+      if (body["day"] !== day) {
+        return "stale_day";
+      }
+      if (current.ids.length > 0 || current.gaveUp) {
+        return "has_progress";
+      }
+      // Keep first occurrences in order, stop after the answer
+      const keep = [...new Set(ids as string[])];
+      const end = keep.indexOf(answer.id);
+      const adopted = end === -1 ? keep : keep.slice(0, end + 1);
+      for (const id of adopted) {
+        await q.query(
+          "insert into user_guesses (user_id, day, pet_id) values ($1, $2, $3)",
+          [user.id, date, id],
+        );
+      }
+      if (gaveUp === true && end === -1) {
+        await q.query(
+          "insert into user_give_ups (user_id, day) values ($1, $2)",
+          [user.id, date],
+        );
+      }
       return null;
     }),
   );
