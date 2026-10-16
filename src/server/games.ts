@@ -248,7 +248,7 @@ export async function editAttributes(
   client: Q,
   game: GameRow,
   edit: AttributeEdit,
-): Promise<"ok" | "noop" | "limit" | "exists" | "not_found"> {
+): Promise<"ok" | "noop" | "invalid" | "attribute_exists" | "not_found"> {
   const attrs = await listAttributes(client, game);
   const taken = (name: string, except?: number): boolean =>
     attrs.some(
@@ -258,7 +258,7 @@ export async function editAttributes(
   if ("add" in edit) {
     const { name, type } = edit.add;
     if (taken(name) || attrs.length >= MAX_ATTRIBUTES) {
-      return taken(name) ? "exists" : "limit";
+      return taken(name) ? "attribute_exists" : "invalid";
     }
     await client.query(
       `insert into attributes (game_id, name, type, position)
@@ -277,7 +277,7 @@ export async function editAttributes(
       const name = edit.change.name ?? attr.name;
       const type = edit.change.type ?? attr.type;
       if (taken(name, id)) {
-        return "exists";
+        return "attribute_exists";
       }
       changed = name !== attr.name || type !== attr.type;
       if (type === "text" && attr.type === "list") {

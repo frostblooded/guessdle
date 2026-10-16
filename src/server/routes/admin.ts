@@ -8,7 +8,7 @@ import { findGame, type GameRow } from "../games.ts";
 import { uploadRefs } from "../upload-refs.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
 import { deleteUser, listUsers, setAdmin } from "../users.ts";
-import { bodyOf, paramOf, queryOf, type AppContext } from "./context.ts";
+import { bodyOf, fail, paramOf, queryOf, type AppContext } from "./context.ts";
 
 const MAX_USER_ID = 2147483647;
 
@@ -32,11 +32,11 @@ export function adminRoutes(
       res.set("Cache-Control", "no-store");
       const user = await requestUser(pool, req, now());
       if (!user) {
-        res.status(401).json({ error: "unauthorized" });
+        fail(res, "unauthorized");
         return;
       }
       if (!user.admin) {
-        res.status(403).json({ error: "forbidden" });
+        fail(res, "forbidden");
         return;
       }
       await handler({ req, res, actor: user });
@@ -75,14 +75,14 @@ export function adminRoutes(
     adminRoute(async ({ req, res }) => {
       const game = await findGame(pool, String(paramOf(req, "slug")));
       if (!game) {
-        res.status(404).json({ error: "not_found" });
+        fail(res, "not_found");
         return;
       }
       const out = await act(game, req);
       if (out === "ok") {
         res.json({ ok: true });
       } else {
-        res.status(out === "invalid" ? 400 : 409).json({ error: out });
+        fail(res, out);
       }
     });
   const lifecycle = gameLifecycle(pool, ctx.mail);
@@ -115,14 +115,12 @@ export function adminRoutes(
     adminRoute(async ({ req, res, actor }) => {
       const id = String(paramOf(req, "id"));
       if (!/^[1-9]\d{0,9}$/.test(id) || Number(id) > MAX_USER_ID) {
-        res.status(400).json({ error: "invalid" });
+        fail(res, "invalid");
         return;
       }
       const result = await deleteUser(refs, actor.id, Number(id));
       if (result !== "ok") {
-        res
-          .status(result === "self" ? 409 : 404)
-          .json({ error: result === "self" ? "self_deletion" : result });
+        fail(res, result);
         return;
       }
       res.json({ ok: true });
@@ -139,16 +137,14 @@ export function adminRoutes(
         Number(id) > MAX_USER_ID ||
         typeof admin !== "boolean"
       ) {
-        res.status(400).json({ error: "invalid" });
+        fail(res, "invalid");
         return;
       }
       const result = await setAdmin(pool, actor.id, Number(id), admin);
       if (result === "ok") {
         res.json({ ok: true });
       } else {
-        res
-          .status(result === "not_found" ? 404 : 409)
-          .json({ error: result === "self" ? "self_demotion" : result });
+        fail(res, result);
       }
     }),
   );

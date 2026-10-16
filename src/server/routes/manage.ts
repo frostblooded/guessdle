@@ -29,6 +29,7 @@ import { uploadRefs } from "../upload-refs.ts";
 import {
   bodyOf,
   canManage,
+  fail,
   loadGame,
   type AppContext,
   type LoadedGame,
@@ -36,10 +37,6 @@ import {
 
 // Starting values, tune after launch (docs/deploy.md)
 export const DEFAULT_WRITE_LIMIT: RateLimit = { max: 60, windowMs: 60_000 };
-
-const invalid = (res: Response, error = "invalid", status = 400): void => {
-  res.status(status).json({ error });
-};
 
 export function manageRoutes(
   app: Express,
@@ -61,7 +58,7 @@ export function manageRoutes(
   ): Promise<SessionUser | undefined> => {
     const user = await requestUser(pool, req, now());
     if (!user) {
-      res.status(401).json({ error: "unauthorized" });
+      fail(res, "unauthorized");
     }
     return user ?? undefined;
   };
@@ -87,7 +84,7 @@ export function manageRoutes(
         return;
       }
       if (!canManage(loaded.game, user)) {
-        res.status(403).json({ error: "forbidden" });
+        fail(res, "forbidden");
         return;
       }
       await handler(loaded, user, req, res);
@@ -112,13 +109,13 @@ export function manageRoutes(
     const { name, slug } = bodyOf(req);
     const title = nameIn(name, MAX_NAME);
     if (title === undefined) {
-      invalid(res);
+      fail(res, "invalid");
       return;
     }
     if (slug !== undefined) {
       const error = typeof slug === "string" ? slugError(slug) : "invalid";
       if (error) {
-        invalid(res, error);
+        fail(res, error);
         return;
       }
     }
@@ -130,7 +127,7 @@ export function manageRoutes(
       typeof slug === "string" ? { typed: slug } : { base: slugBase(title) },
     );
     if (created === "slug_taken") {
-      invalid(res, "slug_taken", 409);
+      fail(res, "slug_taken");
       return;
     }
     res.status(201).json({ slug: created });
@@ -160,17 +157,12 @@ export function manageRoutes(
     const raw = String(req.params["id"]);
     return /^\d{1,15}$/.test(raw) ? Number(raw) : -1;
   };
-  const FAILURES = {
-    limit: [400, "invalid"],
-    exists: [409, "attribute_exists"],
-    not_found: [404, "not_found"],
-  } as const;
   // Applies the edit `build` reads from the request, then answers with the attributes
   const attributeRoute = (build: (req: Request) => AttributeEdit | undefined) =>
     manageRoute(async ({ game }, _user, req, res) => {
       const edit = build(req);
       if (!edit) {
-        invalid(res);
+        fail(res, "invalid");
         return;
       }
       const out = await lifecycle.edit(
@@ -180,7 +172,7 @@ export function manageRoutes(
         (r) => r === "ok",
       );
       if (out !== "ok" && out !== "noop") {
-        invalid(res, FAILURES[out][1], FAILURES[out][0]);
+        fail(res, out);
         return;
       }
       res.json(await listAttributes(pool, game));
@@ -222,11 +214,6 @@ export function manageRoutes(
   );
 
   const entryBase = "/api/games/:slug/entries";
-  const ENTRY_FAILURES = {
-    invalid: [400, "invalid"],
-    exists: [409, "entry_exists"],
-    not_found: [404, "not_found"],
-  } as const;
   // Creates (no :id) or changes an entry, then answers with the entry list
   const entryRoute = manageRoute(async ({ game }, user, req, res) => {
     const raw = req.params["id"];
@@ -247,7 +234,7 @@ export function manageRoutes(
           game.ownerId,
         )))
     ) {
-      invalid(res);
+      fail(res, "invalid");
       return;
     }
     const out = await lifecycle.edit(
@@ -257,7 +244,7 @@ export function manageRoutes(
       (r) => typeof r !== "string",
     );
     if (typeof out === "string") {
-      invalid(res, ENTRY_FAILURES[out][1], ENTRY_FAILURES[out][0]);
+      fail(res, out);
       return;
     }
     await refs.release([out.replacedPhoto]);
@@ -284,7 +271,7 @@ export function manageRoutes(
           Boolean,
         ))
       ) {
-        invalid(res, "not_found", 404);
+        fail(res, "not_found");
         return;
       }
       await releaseEntry(
@@ -304,7 +291,7 @@ export function manageRoutes(
     manageRoute(async ({ game }, _user, req, res) => {
       const out = await lifecycle.move(game, move);
       if (out !== "ok") {
-        invalid(res, out, 409);
+        fail(res, out);
         return;
       }
       const fresh = await loadGame(ctx, req, res);
@@ -332,7 +319,7 @@ export function manageRoutes(
       const { game, roster } = loaded;
       const body = bodyOf(req);
       if (body["slug"] !== undefined && body["slug"] !== game.slug) {
-        invalid(res, "slug_immutable");
+        fail(res, "slug_immutable");
         return;
       }
       const patch = parseGamePatch(
@@ -349,7 +336,7 @@ export function manageRoutes(
             game.ownerId,
           )))
       ) {
-        invalid(res);
+        fail(res, "invalid");
         return;
       }
       const replaced = await lifecycle.edit(

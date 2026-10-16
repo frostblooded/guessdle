@@ -1,6 +1,7 @@
 // What every route group needs from createApp, plus the request-input helpers.
 import type { Request, Response } from "express";
 import type pg from "pg";
+import { FAILURES, type FailureCode } from "../../game/failures.ts";
 import type { Entry } from "../../game/game.ts";
 import { dayNumber, ensureAnswer, todayIn } from "../answers.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
@@ -31,6 +32,11 @@ export const queryOf = (req: Request): Record<string, unknown> =>
   req.query as Record<string, unknown>;
 export const paramOf = (req: Request, name: string): unknown =>
   req.params[name];
+
+// Sends a failure code with the status the table gives it
+export const fail = (res: Response, code: FailureCode): void => {
+  res.status(FAILURES[code].status).json({ error: code });
+};
 
 export const isIdList = (
   { entries }: Roster,
@@ -74,7 +80,7 @@ export async function loadGame(
       return { game, roster, user };
     }
   }
-  res.status(404).json({ error: "not_found" });
+  fail(res, "not_found");
   return undefined;
 }
 

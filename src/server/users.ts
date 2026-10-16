@@ -20,7 +20,8 @@ export async function listUsers(pool: pg.Pool): Promise<AdminUser[]> {
   return rows;
 }
 
-export type SetAdminResult = "ok" | "not_found" | "self" | "last_admin";
+export type SetAdminResult =
+  "ok" | "not_found" | "self_demotion" | "last_admin";
 
 // Demotions serialise on an advisory lock, so two admins demoting each other
 // at once cannot both pass the last-admin check.
@@ -36,7 +37,7 @@ export async function setAdmin(
     await client.query("select pg_advisory_xact_lock($1)", [LOCK_KEY]);
     let result: SetAdminResult = "ok";
     if (!admin && actorId === targetId) {
-      result = "self";
+      result = "self_demotion";
     } else if (
       !admin &&
       (
@@ -72,9 +73,9 @@ export async function deleteUser(
   refs: UploadRefs,
   actorId: number,
   targetId: number,
-): Promise<"ok" | "not_found" | "self"> {
+): Promise<"ok" | "not_found" | "self_deletion"> {
   if (actorId === targetId) {
-    return "self";
+    return "self_deletion";
   }
   return (await refs.dropUser(targetId)) ? "ok" : "not_found";
 }

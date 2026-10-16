@@ -1,4 +1,5 @@
 // Browser side of creating and editing games: JSON calls, the sign-in detour and error texts.
+import { failureText } from "./game/failures.ts";
 
 export interface Reply<T = Record<string, unknown>> {
   status: number;
@@ -33,28 +34,7 @@ export async function api<T = Record<string, unknown>>(
 export const signInThen = (path: string): void =>
   location.replace(`/login?next=${encodeURIComponent(path)}`);
 
-const ERRORS: Record<string, string> = {
-  invalid: "Check the values and try again.",
-  too_few_entries: "Add at least 2 entries before submitting.",
-  invalid_state: "This game's status changed. Reload the page.",
-  reserved: "That address is reserved. Pick another one.",
-  attribute_exists: "Another attribute already has that name.",
-  entry_exists: "Another entry already has that name.",
-  slug_taken: "That address is already taken. Pick another one.",
-  rate_limited: "Too many changes in a short time. Wait a minute and retry.",
-  unauthorized: "Your session ended. Sign in again.",
-  forbidden: "You cannot change this game.",
-  not_found: "This game no longer exists.",
-  unsupported: "Use a JPEG, PNG or WebP image.",
-  too_large: "That image is over 5 MB.",
-  corrupt: "That image could not be read.",
-  quota_exceeded: "You have used all your upload space.",
-};
-
 export const errorText = (reply: Reply | null): string =>
   reply === null
     ? "Could not reach the server. Check your connection and try again."
-    : (ERRORS[String(reply.data["error"])] ??
-      (reply.status === 429
-        ? ERRORS["rate_limited"]!
-        : "Something went wrong. Try again."));
+    : failureText(reply.data["error"], reply.status);

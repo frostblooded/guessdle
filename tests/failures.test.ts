@@ -1,0 +1,51 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import {
+  FAILURES,
+  failureText,
+  type FailureCode,
+} from "../src/game/failures.ts";
+import { slugError } from "../src/game/slug.ts";
+
+// Codes the server can send from the manage, upload and admin routes
+const SERVER_CODES: FailureCode[] = [
+  "invalid",
+  "too_few_entries",
+  "invalid_state",
+  "reserved",
+  "attribute_exists",
+  "entry_exists",
+  "slug_taken",
+  "slug_immutable",
+  "rate_limited",
+  "unauthorized",
+  "forbidden",
+  "not_found",
+  "unsupported",
+  "too_large",
+  "corrupt",
+  "quota_exceeded",
+  "self_deletion",
+  "self_demotion",
+  "last_admin",
+];
+
+describe("failure table", () => {
+  it("gives every server code an HTTP error status and a client message", () => {
+    for (const code of SERVER_CODES) {
+      const { status, text } = FAILURES[code];
+      assert.ok(status >= 400 && status < 600, code);
+      assert.ok(text.length > 0, code);
+      assert.equal(failureText(code, status), text);
+    }
+  });
+  it("covers every code slugError can return", () => {
+    for (const slug of ["x", "api"]) {
+      assert.ok(slugError(slug)! in FAILURES);
+    }
+  });
+  it("falls back for unknown codes and an unreachable server", () => {
+    assert.match(failureText(undefined, 500), /Something went wrong/);
+    assert.match(failureText(undefined, 429), /Too many/);
+  });
+});

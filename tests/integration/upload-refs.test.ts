@@ -134,7 +134,7 @@ describe("upload references", () => {
   it("deleteUser refuses self and unknown users and keeps their files", async () => {
     const me = await user("me@x.test");
     const mine = await file(me);
-    assert.equal(await deleteUser(refs, me, me), "self");
+    assert.equal(await deleteUser(refs, me, me), "self_deletion");
     assert.equal(await deleteUser(refs, me, me + 999), "not_found");
     assert.deepEqual(await left(), [mine.slice(9)]);
   });

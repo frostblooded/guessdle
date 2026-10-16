@@ -16,9 +16,7 @@ import {
   recordUpload,
   usedBytes,
 } from "../upload-store.ts";
-import { queryOf, type AppContext } from "./context.ts";
-
-const STATUS = { unsupported: 415, too_large: 413, corrupt: 422 } as const;
+import { fail, queryOf, type AppContext } from "./context.ts";
 
 // Starting values, tune after launch (docs/deploy.md)
 export const DEFAULT_UPLOAD_LIMIT: RateLimit = { max: 60, windowMs: 3600_000 };
@@ -39,7 +37,7 @@ export function uploadRoutes(
       if (await requestUser(pool, req, now())) {
         next();
       } else {
-        res.status(401).json({ error: "unauthorized" });
+        fail(res, "unauthorized");
       }
     } catch (err) {
       next(err);
@@ -54,7 +52,7 @@ export function uploadRoutes(
     try {
       const user = (await requestUser(pool, req, now()))!;
       if ((await usedBytes(pool, user.id)) >= quotaBytes) {
-        res.status(403).json({ error: "quota_exceeded" });
+        fail(res, "quota_exceeded");
       } else {
         next();
       }
@@ -71,7 +69,7 @@ export function uploadRoutes(
     // A body over the cap fails in the parser; name it for the client
     (err: unknown, _req: Request, res: Response, next: NextFunction): void => {
       if ((err as { status?: unknown }).status === 413) {
-        res.status(413).json({ error: "too_large" });
+        fail(res, "too_large");
       } else {
         next(err);
       }
@@ -79,7 +77,7 @@ export function uploadRoutes(
     async (req: Request, res: Response) => {
       const kind = queryOf(req)["kind"];
       if (!isImageKind(kind)) {
-        res.status(400).json({ error: "invalid" });
+        fail(res, "invalid");
         return;
       }
       // express.raw leaves {} when there is no body
@@ -93,7 +91,7 @@ export function uploadRoutes(
         const user = (await requestUser(pool, req, now()))!;
         // The exact check: the pre-check above only stops users already full
         if ((await usedBytes(pool, user.id)) + webp.length > quotaBytes) {
-          res.status(403).json({ error: "quota_exceeded" });
+          fail(res, "quota_exceeded");
           return;
         }
         const url = await storeWebp(uploadsDir, webp);
@@ -106,7 +104,7 @@ export function uploadRoutes(
         res.json({ url });
       } catch (err) {
         if (err instanceof ImageError) {
-          res.status(STATUS[err.code]).json({ error: err.code });
+          fail(res, err.code);
           return;
         }
         throw err;

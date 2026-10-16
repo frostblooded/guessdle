@@ -46,7 +46,7 @@ export async function saveEntry(
 ): Promise<
   | { id: number; replacedPhoto: string | null }
   | "invalid"
-  | "exists"
+  | "entry_exists"
   | "not_found"
 > {
   const current = (
@@ -67,7 +67,7 @@ export async function saveEntry(
     [game.id, id ?? 0, name],
   );
   if (clash.rowCount) {
-    return "exists";
+    return "entry_exists";
   }
   const attrs = await listAttributes(tx, game);
   for (const [attrId, items] of Object.entries(input.values ?? {})) {

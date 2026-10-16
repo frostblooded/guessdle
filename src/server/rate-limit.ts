@@ -1,6 +1,7 @@
 import type { RequestHandler } from "express";
 import type pg from "pg";
 import { requestUser } from "./auth.ts";
+import { FAILURES } from "../game/failures.ts";
 
 export interface RateLimit {
   max: number;
@@ -38,7 +39,7 @@ export function rateLimit(
       }
       if (++w.count > max) {
         res
-          .status(429)
+          .status(FAILURES.rate_limited.status)
           .set(
             "Retry-After",
             String(Math.ceil((w.start + windowMs - time) / 1000)),
