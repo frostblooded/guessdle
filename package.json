@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "node --env-file-if-exists=.env scripts/server.mjs",
-    "build": "esbuild src/script.ts --bundle --sourcemap --target=es2020 --loader:.svg=file --outdir=dist",
+    "build": "node scripts/build.mjs",
     "build:prod": "node scripts/build-prod.mjs",
     "watch": "npm run build -- --watch",
     "test:e2e": "npm run build && npm run typecheck && tsc -p tests/e2e && playwright test -c tests/e2e",

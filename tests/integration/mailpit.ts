@@ -58,4 +58,4 @@ export async function mailTo(apiUrl: string, address: string): Promise<Found> {
 
 // The sign-in token inside a mail's link
 export const tokenIn = (text: string): string =>
-  /[?&]login=([\w-]+)/.exec(text)![1]!;
+  /[?&]token=([\w-]+)/.exec(text)![1]!;

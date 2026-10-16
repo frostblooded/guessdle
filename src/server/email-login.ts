@@ -55,7 +55,7 @@ export async function requestLoginLink(
   await mailer.send({
     to: email,
     subject: "Your Petdle sign-in link",
-    text: `Open this link to sign in to Petdle:\n\n${publicUrl}/?login=${token}\n\nIt works once and expires in ${TOKEN_MINUTES} minutes. If you did not ask for it, ignore this email.\n`,
+    text: `Open this link to sign in to Petdle:\n\n${publicUrl}/verify?token=${token}\n\nIt works once and expires in ${TOKEN_MINUTES} minutes. If you did not ask for it, ignore this email.\n`,
   });
   return "sent";
 }

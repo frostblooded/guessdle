@@ -118,7 +118,7 @@ describe("email magic-link sign-in", () => {
       assert.equal(sent[0]!.to, "ann@x.test");
       assert.match(
         sent[0]!.text,
-        new RegExp(`${PUBLIC_URL}/\\?login=[\\w-]{43}`),
+        new RegExp(`${PUBLIC_URL}/verify\\?token=[\\w-]{43}`),
       );
       assert.match(sent[0]!.text, /15 minutes/);
     });
@@ -310,7 +310,7 @@ describe("email magic-link sign-in", () => {
       const token = await link("ann@x.test");
       for (const path of [
         `/api/auth/email/verify?token=${token}`,
-        `/?login=${token}`,
+        `/verify?token=${token}`,
       ]) {
         const res = await fetch(`${url}${path}`);
         assert.equal(res.headers.get("set-cookie"), null);

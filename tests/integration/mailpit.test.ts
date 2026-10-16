@@ -23,7 +23,7 @@ describe("SMTP delivery through nodemailer", () => {
     await mail.mailer.send({
       to: "ann@x.test",
       subject: "Hello",
-      text: "Open https://site.test/?login=abc_DEF-123 now",
+      text: "Open https://site.test/verify?token=abc_DEF-123 now",
     });
     const got = await mailTo(mailpit.apiUrl, "ann@x.test");
     assert.equal(got.Subject, "Hello");

@@ -1,8 +1,8 @@
 # Theme: CSS variables, `data-theme`, and an inline head script
 
-Light, dark and auto (follow the OS) are one palette of CSS custom properties in `styles.css`. Dark values are set by `@media (prefers-color-scheme: dark)` on `:root:not([data-theme="light"])` and by `:root[data-theme="dark"]`. The choice lives in `localStorage` under `theme` (`theme.ts`), separate from Game State, which resets daily. A button cycles auto, light, dark.
+Light, dark and auto (follow the OS) are one palette of CSS custom properties in `src/styles.css`. Since the multi-page redesign (ADR 0012) each token is a single `light-dark()` value, and `data-theme` only forces `color-scheme` to `light` or `dark` (auto leaves it `light dark`). The choice lives in `localStorage` under `theme` (`theme.ts`), separate from Game State, which resets daily. A button cycles auto, light, dark.
 
-A small inline script in `index.html` copies a stored `light`/`dark` to `data-theme` before first paint.
+A small inline script in every HTML page copies a stored `light`/`dark` to `data-theme` before first paint.
 
 ## Considered options
 

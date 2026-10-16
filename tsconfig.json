@@ -19,5 +19,12 @@
     "allowUnusedLabels": false,
     "types": []
   },
-  "files": ["src/autocomplete.d.ts", "src/script.ts"]
+  "files": [
+    "src/autocomplete.d.ts",
+    "src/script.ts",
+    "src/pages/login.ts",
+    "src/pages/verify.ts",
+    "src/pages/admin.ts",
+    "src/pages/how-to-play.ts"
+  ]
 }

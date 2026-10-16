@@ -8,17 +8,42 @@ import { describe, it } from "node:test";
 const read = (path: string): string =>
   readFileSync(join(import.meta.dirname, "..", path), "utf8");
 
-describe("build output is wired through the page and the deploy", () => {
-  const html: string = read("index.html");
+const PAGES: Record<string, string> = {
+  "index.html": "script",
+  "login.html": "login",
+  "verify.html": "verify",
+  "admin.html": "admin",
+  "how-to-play.html": "how-to-play",
+};
 
-  for (const asset of ["dist/script.js", "dist/script.css"]) {
-    it(`index.html loads ${asset}`, () => {
-      assert.ok(
-        html.includes(`"${asset}"`),
-        `${asset} not referenced in index.html`,
-      );
+describe("build output is wired through the pages and the deploy", () => {
+  for (const [page, bundle] of Object.entries(PAGES)) {
+    it(`${page} loads the shared stylesheet and dist/${bundle}.js`, () => {
+      const html: string = read(page);
+      for (const asset of ["styles.css", `${bundle}.js`]) {
+        assert.ok(
+          html.includes(`"/dist/${asset}"`),
+          `/dist/${asset} not referenced in ${page}`,
+        );
+      }
     });
   }
+
+  it("the 404 page links the shared stylesheet and no script", () => {
+    const html: string = read("404.html");
+    assert.ok(html.includes('"/dist/styles.css"'));
+    assert.ok(!html.includes("<script src"));
+    assert.ok(!html.includes('type="module"'));
+  });
+
+  it("the header and footer are rendered by the shell, not repeated per page", () => {
+    for (const page of Object.keys(PAGES)) {
+      const html: string = read(page);
+      assert.match(html, /<header id="site-header"[^>]*><\/header>/, page);
+      assert.match(html, /<footer id="site-footer"[^>]*><\/footer>/, page);
+      assert.match(html, /<main id="main"/, page);
+    }
+  });
 
   it("Pages serves redirect.html as index and 404, all to one URL", () => {
     const deploy: string = read(".github/workflows/deploy.yml");
@@ -38,22 +63,32 @@ describe("build output is wired through the page and the deploy", () => {
     assert.ok(read(".gitignore").split(/\r?\n/).includes("/dist"));
   });
 
-  it("prod build hashes bundle names and rewrites index.html to match", () => {
+  it("prod build hashes bundle names and rewrites every page to match", () => {
     const out: string = mkdtempSync(join(tmpdir(), "petdle-prod-"));
     execFileSync("node", ["scripts/build-prod.mjs", out], {
       cwd: join(import.meta.dirname, ".."),
     });
-    const prodHtml: string = readFileSync(join(out, "index.html"), "utf8");
-    const refs: string[] = [
-      ...prodHtml.matchAll(/"dist\/(script-[A-Z0-9]+\.(?:js|css))"/g),
-    ].map((m) => m[1]!);
-    assert.equal(refs.length, 2, "one hashed js and one hashed css");
-    for (const ref of refs) {
-      assert.ok(existsSync(join(out, ref)), ref);
+    for (const [page, bundle] of Object.entries(PAGES)) {
+      const prodHtml: string = readFileSync(join(out, page), "utf8");
+      const refs: string[] = [
+        ...prodHtml.matchAll(/"\/dist\/([\w-]+-[A-Z0-9]{8}\.(?:js|css))"/g),
+      ].map((m) => m[1]!);
+      assert.ok(
+        refs.some((r) => r.startsWith(`${bundle}-`)),
+        page,
+      );
+      assert.ok(
+        refs.some((r) => r.startsWith("styles-")),
+        page,
+      );
+      for (const ref of refs) {
+        assert.ok(existsSync(join(out, ref)), ref);
+      }
+      assert.ok(!prodHtml.includes(`"/dist/${bundle}.js"`), page);
+      assert.ok(!prodHtml.includes('"/dist/styles.css"'), page);
     }
-    assert.ok(!prodHtml.includes('"dist/script.js"'));
-    assert.ok(!prodHtml.includes('"dist/script.css"'));
-    assert.ok(!prodHtml.includes("styles.css"), "styles live in the bundle");
+    const notFound: string = readFileSync(join(out, "404.html"), "utf8");
+    assert.match(notFound, /"\/dist\/styles-[A-Z0-9]{8}\.css"/);
   });
 
   it("the prod bundle holds no answer or Answer Sequence code, only the grade call", () => {
@@ -69,6 +104,14 @@ describe("build output is wired through the page and the deploy", () => {
     assert.ok(!js.includes("seedrandom"), "seeded random is not bundled");
     assert.ok(!js.includes("2026-10-16"), "no backfilled answers");
     assert.ok(!js.includes("daily_answers"));
+  });
+
+  it("nginx serves the clean page URLs from the HTML files", () => {
+    const conf: string = read("deploy/nginx.conf");
+    assert.match(
+      conf,
+      /location \/ \{[^}]*try_files \$uri \$uri\/index\.html \$uri\.html =404;/,
+    );
   });
 
   it("nginx revalidates by default and caches dist/ forever", () => {

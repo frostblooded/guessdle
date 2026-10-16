@@ -8,12 +8,12 @@ RUN npm ci
 FROM deps AS dev
 COPY . .
 EXPOSE 8080
-CMD ["sh", "-c", "npm run build -- --watch=forever & exec node scripts/server.mjs"]
+CMD ["sh", "-c", "npm run build -- --watch & exec node scripts/server.mjs"]
 
 FROM deps AS build
 COPY . .
-# build:prod writes the hashed-name index.html into dist/; it replaces the dev one here
-RUN npm run build:prod && mv dist/index.html index.html
+# build:prod writes the hashed-name HTML pages into dist/; they replace the dev ones here
+RUN npm run build:prod && mv dist/*.html .
 
 # API: Express + migrations, run straight from TypeScript (Node type stripping)
 FROM node:24-alpine AS api
@@ -37,7 +37,7 @@ CMD ["/opt/backup/loop.sh"]
 # Prod (default target): only the files the page loads
 FROM nginxinc/nginx-unprivileged:alpine AS prod
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/index.html /app/404.html /app/styles.css /app/favicon.ico /usr/share/nginx/html/
+COPY --from=build /app/*.html /app/favicon.ico /usr/share/nginx/html/
 COPY --from=build /app/dist /usr/share/nginx/html/dist
 COPY --from=build /app/photos /usr/share/nginx/html/photos
 EXPOSE 8080

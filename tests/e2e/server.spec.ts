@@ -3,7 +3,12 @@ import { expect, test } from "@playwright/test";
 const SERVED = [
   ["/", "text/html"],
   ["/index.html", "text/html"],
-  ["/styles.css", "text/css"],
+  ["/login", "text/html"],
+  ["/verify", "text/html"],
+  ["/admin", "text/html"],
+  ["/how-to-play", "text/html"],
+  ["/login.html", "text/html"],
+  ["/dist/styles.css", "text/css"],
   ["/dist/script.js", "text/javascript"],
   ["/dist/script.css", "text/css"],
   ["/dist/script.js.map", "application/json"],
@@ -13,6 +18,13 @@ const SERVED = [
 
 const NOT_SERVED = [
   "/missing.html",
+  "/styles.css",
+  "/src/styles.css",
+  "/404.html",
+  "/login/",
+  "/Login",
+  "/admin/x",
+  "/how-to-play.htm",
   "/photos/missing.jpg",
   "/photos/",
   "/package.json",
