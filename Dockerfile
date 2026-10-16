@@ -23,6 +23,8 @@ RUN npm ci --omit=dev
 COPY src/server ./src/server
 COPY src/game ./src/game
 COPY db ./db
+# The game shell the API injects link-preview meta into (hashed asset names from build:prod)
+COPY --from=build /app/game.html ./
 # A named volume copies this owner, so the node user can write uploads
 RUN mkdir uploads && chown node uploads
 USER node
