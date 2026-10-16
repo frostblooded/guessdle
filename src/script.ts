@@ -26,7 +26,7 @@ import type {
 
 const now = (): Date => new Date();
 
-// The Play page plays Petdle until the gallery routes games by slug
+// The Play page plays game 1 until the gallery routes games by slug
 const SLUG = "petdle";
 
 let roster: EntryRef[] = [];

@@ -118,7 +118,7 @@ test("unknown paths get the styled 404 with a way home", async ({ page }) => {
   const response = await page.goto("/nope/nothing");
   expect(response!.status()).toBe(404);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("404");
-  await page.getByRole("link", { name: "Back to PETDLE" }).click();
+  await page.getByRole("link", { name: "Back to GUESSDLE" }).click();
   await expect(page).toHaveURL(/\/$/);
 });
 

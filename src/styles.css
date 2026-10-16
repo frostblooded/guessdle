@@ -1,4 +1,4 @@
-/* Petdle design system. Light and dark come from light-dark(); the theme button
+/* Guessdle design system. Light and dark come from light-dark(); the theme button
    (ADR 0006) only flips color-scheme: auto follows the OS, data-theme forces one. */
 
 :root {

@@ -16,7 +16,7 @@ describe("SMTP delivery through nodemailer", () => {
     const mail = mailConfigFromEnv({
       SMTP_HOST: "127.0.0.1",
       SMTP_PORT: String(mailpit.smtpPort),
-      SMTP_FROM: "Petdle <petdle@x.test>",
+      SMTP_FROM: "Guessdle <guessdle@x.test>",
       PUBLIC_URL: "https://site.test/",
     })!;
     assert.equal(mail.publicUrl, "https://site.test");

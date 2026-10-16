@@ -12,7 +12,7 @@ const PAW =
 const HEADER = `
   <a class="skip-link" href="#main">Skip to content</a>
   <div class="bar">
-    <a class="brand" href="/">${PAW}<span>Petdle</span></a>
+    <a class="brand" href="/">${PAW}<span>Guessdle</span></a>
     <nav class="nav" aria-label="Main">
       <a href="/">Play</a>
       <a href="/how-to-play">How to play</a>
@@ -25,7 +25,7 @@ const HEADER = `
 
 const FOOTER = `
   <div class="footer-inner">
-    <p>Petdle: one new pet to guess every day.</p>
+    <p>Guessdle: new games to guess every day.</p>
     <nav aria-label="Footer">
       <a href="/">Play</a>
       <a href="/how-to-play">How to play</a>
