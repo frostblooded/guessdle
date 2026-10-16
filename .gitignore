@@ -1,5 +1,6 @@
 /node_modules
 /dist
+/.claude/worktrees
 /tests/test-results
 /tests/playwright-report
 /test-results

@@ -1,6 +1,8 @@
 {
   "permissions": {
-    "allow": ["Bash(npx tsc)"]
+    "allow": [
+      "Bash(npx tsc)"
+    ]
   },
   "hooks": {
     "PostToolUse": [
@@ -14,5 +16,8 @@
         ]
       }
     ]
+  },
+  "worktree": {
+    "bgIsolation": "none"
   }
 }
