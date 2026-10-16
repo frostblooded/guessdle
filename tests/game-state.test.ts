@@ -4,7 +4,7 @@ import {
   createGameState,
   type GameState,
   type StateStorage,
-} from "../game-state.ts";
+} from "../src/game-state.ts";
 
 class MemoryStorage implements StateStorage {
   readonly items: Map<string, string> = new Map();

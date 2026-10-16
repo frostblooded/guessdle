@@ -3,21 +3,21 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, it } from "node:test";
 import seedrandom from "seedrandom";
-import { Correctness } from "../correctness.ts";
-import { ANSWER_START_DATE } from "../answer-sequence.ts";
+import { Correctness } from "../src/correctness.ts";
+import { ANSWER_START_DATE } from "../src/answer-sequence.ts";
 import {
   computeAnswerIdx,
   createGame,
   gradeGuess,
   submitGuess,
   type GuessResult,
-} from "../game.ts";
+} from "../src/game.ts";
 import {
   createGameState,
   type GameState,
   type StateStorage,
-} from "../game-state.ts";
-import { GUESS_DATA } from "../roster.ts";
+} from "../src/game-state.ts";
+import { GUESS_DATA } from "../src/roster.ts";
 
 const golden: { answers: number[] } = JSON.parse(
   readFileSync(

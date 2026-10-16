@@ -6,7 +6,7 @@ A Wordle-style daily guessing game. Guess the pet of the day from a fixed roster
 
 ## How it works
 
-- Static front-end: `index.html`, `script.ts` and the ES modules it imports, bundled by esbuild into `dist/`, `styles.css`.
+- Static front-end: `index.html`, `src/script.ts` and the ES modules it imports, bundled by esbuild into `dist/`, `styles.css`.
 - No backend. The daily answer is derived from the date with a seeded RNG, so every player sees the same pet.
 - Progress is kept in `localStorage` and resets each day.
 - A small Node server (`server.mjs`) serves the static files for local development.
@@ -51,7 +51,7 @@ The server's existing Cloudflare Tunnel (service `http://guessdle-server:8080`) 
 ## Adding a pet
 
 1. Add the photo to `photos/`.
-2. Add an entry to `GUESS_DATA` in `roster.ts`.
+2. Add an entry to `GUESS_DATA` in `src/roster.ts`.
 
 Warning: changing `GUESS_DATA` (order or length), `START_DATE`, or the skip logic changes the answer for every day, including today.
 

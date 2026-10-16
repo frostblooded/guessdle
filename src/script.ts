@@ -1,6 +1,6 @@
 import autoComplete from "@tarekraafat/autocomplete.js";
 import seedrandom from "seedrandom";
-import "./styles.css";
+import "../styles.css";
 import "@tarekraafat/autocomplete.js/dist/css/autoComplete.css";
 import { correctnessClass } from "./correctness.ts";
 import {

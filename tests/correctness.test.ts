@@ -4,7 +4,7 @@ import {
   Correctness,
   correctnessClass,
   gradeCorrectness,
-} from "../correctness.ts";
+} from "../src/correctness.ts";
 
 describe("gradeCorrectness: single-value attribute", () => {
   it("is Correct when the names match", () => {

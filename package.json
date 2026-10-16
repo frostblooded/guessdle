@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "build": "esbuild script.ts --bundle --sourcemap --target=es2020 --loader:.svg=file --outdir=dist",
+    "build": "esbuild src/script.ts --bundle --sourcemap --target=es2020 --loader:.svg=file --outdir=dist",
     "build:prod": "node build-prod.mjs",
     "watch": "npm run build -- --watch",
     "test:e2e": "npm run build && npm run typecheck && tsc -p tests/e2e && playwright test -c tests/e2e",

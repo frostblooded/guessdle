@@ -7,7 +7,7 @@ import {
   THEME_STORAGE_KEY,
   writeThemeMode,
   type ThemeStorage,
-} from "../theme.ts";
+} from "../src/theme.ts";
 
 function memoryStorage(
   initial?: string,

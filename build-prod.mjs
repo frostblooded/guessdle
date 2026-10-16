@@ -8,7 +8,7 @@ import { basename, join } from "node:path";
 const outdir = process.argv[2] ?? "dist";
 
 const { metafile } = await build({
-  entryPoints: ["script.ts"],
+  entryPoints: ["src/script.ts"],
   bundle: true,
   minify: true,
   target: "es2020",
