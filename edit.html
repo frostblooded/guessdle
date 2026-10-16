@@ -42,7 +42,12 @@
           >
             Details
           </button>
-          <button type="button" role="tab" aria-selected="false" disabled>
+          <button
+            type="button"
+            role="tab"
+            aria-selected="false"
+            id="tab-attributes"
+          >
             Attributes
           </button>
           <button type="button" role="tab" aria-selected="false" disabled>
@@ -53,6 +58,29 @@
           </button>
         </div>
         <p id="status-notice" class="alert alert-warn" role="status"></p>
+        <section id="panel-attributes" class="card" hidden>
+          <p class="lede">
+            Each attribute is a column on the board. Removing one deletes its
+            values from every entry.
+          </p>
+          <ul id="attr-list" class="attr-list"></ul>
+          <form id="attr-form" class="attr-row" novalidate>
+            <input
+              type="text"
+              id="attr-name"
+              maxlength="40"
+              placeholder="New attribute"
+              aria-label="New attribute name"
+              autocomplete="off"
+            />
+            <select id="attr-type" aria-label="New attribute type">
+              <option value="text">Text</option>
+              <option value="list">List</option>
+            </select>
+            <button class="btn btn-primary" type="submit">Add</button>
+          </form>
+          <p id="attr-error" class="alert alert-error" role="alert"></p>
+        </section>
         <form id="details-form" class="card" novalidate>
           <label class="field-label" for="edit-name">Name</label>
           <input type="text" id="edit-name" maxlength="60" autocomplete="off" />

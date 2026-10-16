@@ -4,7 +4,17 @@ import type { Express, Request, Response } from "express";
 import { slugBase, slugError } from "../../game/slug.ts";
 import { todayIn } from "../answers.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
-import { createGame, listOwned, updateGame, type GamePatch } from "../games.ts";
+import type { AttributeType } from "../../game/game.ts";
+import {
+  createGame,
+  editAttributes,
+  listAttributes,
+  listOwned,
+  MAX_ATTRIBUTE_NAME,
+  updateGame,
+  type AttributeEdit,
+  type GamePatch,
+} from "../games.ts";
 import { rateLimit, type RateLimit } from "../rate-limit.ts";
 import { isStoredUpload, removeUpload } from "../upload-store.ts";
 import {
@@ -133,6 +143,75 @@ export function manageRoutes(
     manageRoute(async (loaded, _user, _req, res) => {
       res.json(detailsOf(loaded));
     }),
+  );
+
+  const attrBase = "/api/games/:slug/attributes";
+  const typeOf = (v: unknown): AttributeType | undefined =>
+    v === "text" || v === "list" ? v : undefined;
+  const nameOf = (v: unknown): string | undefined =>
+    typeof v === "string" &&
+    v.trim() !== "" &&
+    v.trim().length <= MAX_ATTRIBUTE_NAME
+      ? v.trim()
+      : undefined;
+  const idOf = (req: Request): number => {
+    const raw = String(req.params["id"]);
+    return /^\d{1,15}$/.test(raw) ? Number(raw) : -1;
+  };
+  const FAILURES = {
+    limit: [400, "invalid"],
+    exists: [409, "attribute_exists"],
+    not_found: [404, "not_found"],
+  } as const;
+  // Applies the edit `build` reads from the request, then answers with the attributes
+  const attributeRoute = (build: (req: Request) => AttributeEdit | undefined) =>
+    manageRoute(async ({ game }, _user, req, res) => {
+      const edit = build(req);
+      if (!edit) {
+        invalid(res);
+        return;
+      }
+      const out = await editAttributes(pool, game, edit);
+      if (out !== "ok") {
+        invalid(res, FAILURES[out][1], FAILURES[out][0]);
+        return;
+      }
+      res.json(await listAttributes(pool, game));
+    });
+
+  app.get(
+    attrBase,
+    manageRoute(async ({ game }, _user, _req, res) => {
+      res.json(await listAttributes(pool, game));
+    }),
+  );
+  app.post(
+    attrBase,
+    writes,
+    json,
+    attributeRoute((req) => {
+      const { name, type } = bodyOf(req);
+      const [n, t] = [nameOf(name), typeOf(type)];
+      return n && t ? { add: { name: n, type: t } } : undefined;
+    }),
+  );
+  app.patch(
+    `${attrBase}/:id`,
+    writes,
+    json,
+    attributeRoute((req) => {
+      const { name, type } = bodyOf(req);
+      const change = { id: idOf(req), name: nameOf(name), type: typeOf(type) };
+      return (name === undefined || change.name) &&
+        (type === undefined || change.type)
+        ? { change }
+        : undefined;
+    }),
+  );
+  app.delete(
+    `${attrBase}/:id`,
+    writes,
+    attributeRoute((req) => ({ remove: idOf(req) })),
   );
 
   app.patch(

@@ -1079,3 +1079,21 @@ textarea {
 #details-form .btn-primary {
   margin-top: var(--s3);
 }
+
+.attr-list {
+  display: grid;
+  gap: var(--s2);
+  margin: 0 0 var(--s3);
+  padding: 0;
+  list-style: none;
+}
+
+.attr-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+
+.attr-row input[type="text"] {
+  flex: 1 1 10rem;
+}

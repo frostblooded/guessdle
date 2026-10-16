@@ -1,12 +1,18 @@
-// The game editor: top tabs, of which Details exists so far.
+// The game editor: top tabs, of which Details and Attributes exist so far.
 import { statusNotice, type Details } from "../game/editor.ts";
-import { api, errorText, signInThen } from "../manage-client.ts";
+import { api, errorText, signInThen, type Reply } from "../manage-client.ts";
 import { browserFetch, initShell } from "../shell.ts";
 
 const $ = <T extends HTMLElement>(selector: string): T =>
   document.querySelector<T>(selector)!;
 
 // /g/<slug>/edit
+interface Attribute {
+  id: number;
+  name: string;
+  type: "text" | "list";
+}
+
 const SLUG = decodeURIComponent(location.pathname.split("/")[2] ?? "");
 const API = `/api/games/${encodeURIComponent(SLUG)}`;
 
@@ -111,4 +117,101 @@ void initShell(browserFetch).then(async (user) => {
       error.textContent = errorText(up);
     }
   };
+
+  const tabs = ["details", "attributes"];
+  const show = (tab: string): void => {
+    for (const t of tabs) {
+      $(`#tab-${t}`).setAttribute("aria-selected", String(t === tab));
+      $(t === "details" ? "#details-form" : `#panel-${t}`).hidden = t !== tab;
+    }
+  };
+  for (const t of tabs) {
+    $(`#tab-${t}`).onclick = (): void => show(t);
+  }
+  show("details");
+
+  const attrError = $("#attr-error");
+  const attrList = $("#attr-list");
+  const drawAttributes = (attrs: Attribute[]): void => {
+    attrList.replaceChildren(
+      ...attrs.map((attr) => {
+        const row = document.createElement("li");
+        row.className = "attr-row";
+        const name = document.createElement("input");
+        name.type = "text";
+        name.maxLength = 40;
+        name.value = attr.name;
+        name.setAttribute("aria-label", `Name of ${attr.name}`);
+        name.onchange = (): void => void change(attr.id, { name: name.value });
+        const type = document.createElement("select");
+        type.setAttribute("aria-label", `Type of ${attr.name}`);
+        for (const [value, label] of [
+          ["text", "Text"],
+          ["list", "List"],
+        ]) {
+          type.append(new Option(label, value, false, value === attr.type));
+        }
+        type.onchange = (): void => void change(attr.id, { type: type.value });
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "btn btn-quiet btn-sm";
+        remove.textContent = "Remove";
+        remove.setAttribute("aria-label", `Remove ${attr.name}`);
+        remove.onclick = (): void => {
+          if (
+            confirm(
+              `Remove "${attr.name}"? Its values are deleted from every entry.`,
+            )
+          ) {
+            void change(attr.id, null);
+          }
+        };
+        row.append(name, type, remove);
+        return row;
+      }),
+    );
+  };
+  // Runs an attribute call (null body on an id removes it); redraws the list and the status
+  const attributes = async (
+    method: "GET" | "POST" | "PATCH" | "DELETE",
+    path: string,
+    body?: unknown,
+  ): Promise<void> => {
+    attrError.textContent = "";
+    const out = await api<Attribute[]>(method, path, body);
+    if (out?.status === 200) {
+      drawAttributes(out.data);
+      const fresh = await api<Details>("GET", `${API}/details`);
+      if (fresh?.status === 200) {
+        render(fresh.data);
+      }
+    } else {
+      attrError.textContent = errorText(out as Reply | null);
+      // Show what the server actually has after a refused edit
+      const now = await api<Attribute[]>("GET", `${API}/attributes`);
+      if (now?.status === 200) {
+        drawAttributes(now.data);
+      }
+    }
+  };
+  const change = (
+    id: number,
+    body: Record<string, unknown> | null,
+  ): Promise<void> =>
+    body === null
+      ? attributes("DELETE", `${API}/attributes/${id}`)
+      : attributes("PATCH", `${API}/attributes/${id}`, body);
+  $<HTMLFormElement>("#attr-form").onsubmit = (event: SubmitEvent): void => {
+    event.preventDefault();
+    const name = $<HTMLInputElement>("#attr-name");
+    void attributes("POST", `${API}/attributes`, {
+      name: name.value,
+      type: $<HTMLSelectElement>("#attr-type").value,
+    }).then(() => {
+      if (attrError.textContent === "") {
+        name.value = "";
+      }
+    });
+  };
+  await attributes("GET", `${API}/attributes`);
 });

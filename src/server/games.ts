@@ -210,3 +210,122 @@ export async function updateGame(
   );
   return next.coverUrl === game.coverUrl ? null : game.coverUrl;
 }
+
+// Abuse caps (spec #66); entry value caps live with entry editing
+export const MAX_ATTRIBUTES = 10;
+export const MAX_ATTRIBUTE_NAME = 40;
+export const MAX_VALUE_LENGTH = 200;
+
+export interface AttributeRow {
+  id: number;
+  name: string;
+  type: AttributeType;
+}
+
+export async function listAttributes(
+  q: Q,
+  game: GameRow,
+): Promise<AttributeRow[]> {
+  const { rows } = await q.query<AttributeRow>(
+    "select id::int, name, type from attributes where game_id = $1 order by position, id",
+    [game.id],
+  );
+  return rows;
+}
+
+export type AttributeEdit =
+  | { add: { name: string; type: AttributeType } }
+  | {
+      change: {
+        id: number;
+        name?: string | undefined;
+        type?: AttributeType | undefined;
+      };
+    }
+  | { remove: number };
+
+// Adds, renames, retypes or removes an attribute. Removing hard-deletes its values; Text to
+// List keeps the value as a one-item list, List to Text joins the items with ", ". A real
+// change sends an approved or rejected game back to pending.
+export async function editAttributes(
+  pool: pg.Pool,
+  game: GameRow,
+  edit: AttributeEdit,
+): Promise<"ok" | "limit" | "exists" | "not_found"> {
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    // Serializes edits of one game so the cap and the name check hold
+    await client.query("select 1 from games where id = $1 for update", [
+      game.id,
+    ]);
+    const attrs = await listAttributes(client, game);
+    const taken = (name: string, except?: number): boolean =>
+      attrs.some(
+        (a) => a.id !== except && a.name.toLowerCase() === name.toLowerCase(),
+      );
+    let changed = true;
+    if ("add" in edit) {
+      const { name, type } = edit.add;
+      if (taken(name) || attrs.length >= MAX_ATTRIBUTES) {
+        await client.query("rollback");
+        return taken(name) ? "exists" : "limit";
+      }
+      await client.query(
+        `insert into attributes (game_id, name, type, position)
+         values ($1, $2, $3, coalesce((select max(position) + 1 from attributes where game_id = $1), 0))`,
+        [game.id, name, type],
+      );
+    } else {
+      const id = "remove" in edit ? edit.remove : edit.change.id;
+      const attr = attrs.find((a) => a.id === id);
+      if (!attr) {
+        await client.query("rollback");
+        return "not_found";
+      }
+      if ("remove" in edit) {
+        await client.query("delete from attributes where id = $1", [id]);
+      } else {
+        const name = edit.change.name ?? attr.name;
+        const type = edit.change.type ?? attr.type;
+        if (taken(name, id)) {
+          await client.query("rollback");
+          return "exists";
+        }
+        changed = name !== attr.name || type !== attr.type;
+        if (type === "text" && attr.type === "list") {
+          await client.query(
+            `update entry_values v set value = j.joined
+             from (select entry_id, left(string_agg(value, ', ' order by position), $2) as joined
+                   from entry_values where attribute_id = $1 group by entry_id) j
+             where v.attribute_id = $1 and v.entry_id = j.entry_id and v.position = 0`,
+            [id, MAX_VALUE_LENGTH],
+          );
+          await client.query(
+            "delete from entry_values where attribute_id = $1 and position > 0",
+            [id],
+          );
+        }
+        await client.query(
+          "update attributes set name = $2, type = $3 where id = $1",
+          [id, name, type],
+        );
+      }
+    }
+    if (changed) {
+      await client.query(
+        `update games set updated_at = now(),
+           status = case when status in ('approved', 'rejected') then 'pending' else status end
+         where id = $1`,
+        [game.id],
+      );
+    }
+    await client.query("commit");
+    return "ok";
+  } catch (err) {
+    await client.query("rollback");
+    throw err;
+  } finally {
+    client.release();
+  }
+}

@@ -7,7 +7,7 @@ export interface Reply<T = Record<string, unknown>> {
 
 // JSON request, or raw bytes when `body` is a File; null when the server could not be reached
 export async function api<T = Record<string, unknown>>(
-  method: "GET" | "POST" | "PATCH",
+  method: "GET" | "POST" | "PATCH" | "DELETE",
   path: string,
   body?: unknown,
 ): Promise<Reply<T> | null> {
@@ -15,12 +15,13 @@ export async function api<T = Record<string, unknown>>(
     const raw = body instanceof Blob;
     const res = await fetch(path, {
       method,
-      ...(body !== undefined && {
+      // The CSRF guard wants JSON or raw bytes on every mutating call, DELETE included
+      ...(method !== "GET" && {
         headers: {
           "Content-Type": raw ? "application/octet-stream" : "application/json",
         },
-        body: raw ? body : JSON.stringify(body),
       }),
+      ...(body !== undefined && { body: raw ? body : JSON.stringify(body) }),
     });
     return { status: res.status, data: (await res.json()) as T };
   } catch {
@@ -35,6 +36,7 @@ export const signInThen = (path: string): void =>
 const ERRORS: Record<string, string> = {
   invalid: "Check the values and try again.",
   reserved: "That address is reserved. Pick another one.",
+  attribute_exists: "Another attribute already has that name.",
   slug_taken: "That address is already taken. Pick another one.",
   rate_limited: "Too many changes in a short time. Wait a minute and retry.",
   unauthorized: "Your session ended. Sign in again.",
