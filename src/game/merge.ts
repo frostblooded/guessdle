@@ -4,7 +4,8 @@ import type { FetchLike } from "./play.ts";
 
 // merged: adopted; discarded: the server's state wins or the local day is
 // stale; error: could not decide, local state kept for the next load
-export type MergeOutcome = "nothing" | "merged" | "discarded" | "error";
+export type MergeOutcome =
+  "nothing" | "merged" | "discarded" | "rate_limited" | "error";
 
 export async function mergeLocalGame(
   storage: StateStorage,
@@ -31,6 +32,9 @@ export async function mergeLocalGame(
     if (res.status === 200) {
       state.reset();
       return "merged";
+    }
+    if (res.status === 429) {
+      return "rate_limited";
     }
     if (res.status === 409 || res.status === 400) {
       state.reset();

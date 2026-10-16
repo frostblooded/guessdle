@@ -12,6 +12,7 @@ import {
   type GameView,
   type Refusal,
 } from "./user-game.ts";
+import { DEFAULT_RATE_LIMIT, rateLimit, type RateLimit } from "./rate-limit.ts";
 import {
   clearSessionCookie,
   csrfGuard,
@@ -41,6 +42,8 @@ export interface AppDeps {
   secureCookies?: boolean;
   // Mounts POST /api/test/login for e2e; only the test environment sets it
   testLogin?: boolean;
+  // Per-user (anonymous: per-IP) request budget per window
+  limit?: RateLimit;
 }
 
 // The API only; callers add static files (dev server) or sit behind nginx (prod)
@@ -54,12 +57,15 @@ export function createApp({
   adminEmails = [],
   secureCookies = false,
   testLogin = false,
+  limit = DEFAULT_RATE_LIMIT,
 }: AppDeps): Express {
   if (testLogin && process.env["NODE_ENV"] === "production") {
     throw new Error("The test login route cannot run in production");
   }
   const app = express();
-  app.use("/api", csrfGuard);
+  // One hop: nginx (or nothing in dev) sets X-Forwarded-For to the real client IP
+  app.set("trust proxy", 1);
+  app.use("/api", rateLimit(pool, now, limit), csrfGuard);
   app.get("/api/health", async (_req, res) => {
     try {
       await pool.query("select 1");

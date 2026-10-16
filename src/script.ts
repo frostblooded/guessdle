@@ -74,11 +74,14 @@ async function start(): Promise<void> {
   const user: AccountUser | null = await fetchUser(fetchLike);
   showAccount(user);
   if (user !== null) {
-    await mergeLocalGame(
+    const merged = await mergeLocalGame(
       localStorage,
       (): Date => new Date(),
       (url, init) => fetch(url, init),
     );
+    if (merged === "rate_limited") {
+      showNotice(RATE_LIMITED);
+    }
     play = createServerPlay({
       fetch: (url, init) => fetch(url, init),
       onNewDay: clearBoard,
@@ -182,8 +185,18 @@ function setFinished(finished: boolean): void {
   document.querySelector<HTMLElement>("#reset-button")!.hidden = !finished;
 }
 
+const RATE_LIMITED = "Too many requests, wait a moment";
+
+// A short message above the guess box; null hides it
+function showNotice(text: string | null): void {
+  const notice = document.querySelector<HTMLElement>("#notice")!;
+  notice.textContent = text ?? "";
+  notice.hidden = text === null;
+}
+
 async function handleGiveUp(): Promise<void> {
   const result: GiveUpResult = await play.giveUp();
+  showNotice(result.kind === "rate_limited" ? RATE_LIMITED : null);
   if (result.kind === "gaveUp") {
     addGiveUpTitle(result.answer);
     setFinished(true);
@@ -303,8 +316,10 @@ async function handleSubmitSelection(): Promise<void> {
   } finally {
     submitting = false;
   }
+  showNotice(result.kind === "rate_limited" ? RATE_LIMITED : null);
   // The typed guess stays when the server could not grade it, to retry
   if (
+    result.kind === "rate_limited" ||
     result.kind === "invalid" ||
     result.kind === "error" ||
     result.kind === "finished"

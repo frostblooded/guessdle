@@ -4,6 +4,7 @@ import pg from "pg";
 import { createApp } from "./app.ts";
 import { adminEmailsFromEnv, googleConfigFromEnv } from "./auth.ts";
 import { migrate } from "./migrate.ts";
+import { rateLimitFromEnv } from "./rate-limit.ts";
 
 export const MIGRATIONS_DIR = join(import.meta.dirname, "../../db/migrations");
 
@@ -29,5 +30,6 @@ if (import.meta.main) {
     google: googleConfigFromEnv(process.env),
     adminEmails: adminEmailsFromEnv(process.env["ADMIN_EMAILS"]),
     secureCookies: true,
+    limit: rateLimitFromEnv(process.env),
   }).listen(Number(process.env["PORT"] ?? 3000), "0.0.0.0");
 }

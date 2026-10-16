@@ -284,3 +284,8 @@ body .autoComplete_wrapper > ul > li {
 body .autoComplete_wrapper > ul > li mark {
   color: var(--accent);
 }
+
+#notice {
+  margin: 0 0 10px;
+  text-align: center;
+}

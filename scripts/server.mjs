@@ -53,10 +53,12 @@ if (process.env.DATABASE_URL) {
   const { createApp } = await import("../src/server/app.ts");
   const { adminEmailsFromEnv, googleConfigFromEnv } =
     await import("../src/server/auth.ts");
+  const { rateLimitFromEnv } = await import("../src/server/rate-limit.ts");
   const app = createApp({
     pool: await connect(process.env.DATABASE_URL),
     timeZone: process.env.SERVER_TIMEZONE || undefined,
     google: googleConfigFromEnv(process.env),
+    limit: rateLimitFromEnv(process.env),
     adminEmails: adminEmailsFromEnv(process.env.ADMIN_EMAILS),
     // Only the e2e suite sets NODE_ENV=test; the stub login never exists elsewhere
     testLogin: process.env.NODE_ENV === "test",

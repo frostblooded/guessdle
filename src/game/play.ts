@@ -40,6 +40,8 @@ export type SubmitResult =
   | { kind: "invalid" }
   | { kind: "duplicate" }
   | { kind: "error" }
+  // Too many requests (API JSON or nginx plain text); nothing changed, retry later
+  | { kind: "rate_limited" }
   // The game is over (won or gave up); reset to play again
   | { kind: "finished" }
   | {
@@ -53,6 +55,7 @@ export type GiveUpResult =
   | { kind: "gaveUp"; answer: string }
   | { kind: "finished" }
   | { kind: "error" }
+  | { kind: "rate_limited" }
   // The server is on a newer day: the game started over and nothing was revealed
   | { kind: "newday" };
 
@@ -70,6 +73,8 @@ export interface Play {
   // Pet ids
   getUsedGuesses(): string[];
 }
+
+const LIMITED = "rate_limited" as const;
 
 export interface PlayDeps {
   roster: readonly Pet[];
@@ -103,13 +108,19 @@ export function createPlay({
     state.setUsedGuesses(upgraded);
   }
 
-  async function post<T>(url: string, body: unknown): Promise<T | null> {
+  async function post<T>(
+    url: string,
+    body: unknown,
+  ): Promise<T | null | typeof LIMITED> {
     try {
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+      if (res.status === 429) {
+        return LIMITED;
+      }
       return res.ok ? ((await res.json()) as T) : null;
     } catch {
       return null;
@@ -135,8 +146,8 @@ export function createPlay({
       const gaveUp: boolean = state.getGaveUp();
       const loaded: Loaded = { rows: [], victory: false };
       if (ids.length > 0) {
-        const res: GradeResponse | null = await post("/api/grade", { ids });
-        if (res === null) {
+        const res = await post<GradeResponse>("/api/grade", { ids });
+        if (res === null || res === LIMITED) {
           return null;
         }
         if (isNewDay(res.day)) {
@@ -150,8 +161,8 @@ export function createPlay({
         }
       }
       if (gaveUp) {
-        const res: GiveUpResponse | null = await post("/api/give-up", {});
-        if (res === null) {
+        const res = await post<GiveUpResponse>("/api/give-up", {});
+        if (res === null || res === LIMITED) {
           return null;
         }
         if (isNewDay(res.day)) {
@@ -176,9 +187,12 @@ export function createPlay({
       if (used.includes(id)) {
         return { kind: "duplicate" };
       }
-      const res: GradeResponse | null = await post("/api/grade", {
+      const res = await post<GradeResponse>("/api/grade", {
         ids: [...used, id],
       });
+      if (res === LIMITED) {
+        return { kind: "rate_limited" };
+      }
       if (res === null) {
         return { kind: "error" };
       }
@@ -205,7 +219,10 @@ export function createPlay({
       if (finished) {
         return { kind: "finished" };
       }
-      const res: GiveUpResponse | null = await post("/api/give-up", {});
+      const res = await post<GiveUpResponse>("/api/give-up", {});
+      if (res === LIMITED) {
+        return { kind: "rate_limited" };
+      }
       if (res === null) {
         return { kind: "error" };
       }

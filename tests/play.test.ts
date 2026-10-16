@@ -145,10 +145,27 @@ describe("submit", () => {
   it("treats a server rejection as an error", async () => {
     server.fetch = async () => ({
       ok: false,
-      status: 429,
-      json: async () => ({ error: "rate_limited" }),
+      status: 500,
+      json: async () => ({ error: "server_error" }),
     });
     assert.deepEqual(await open().submit(one!.id), { kind: "error" });
+  });
+
+  it("reports a rate limit, JSON or nginx plain text, and keeps state", async () => {
+    await open().submit(one!.id);
+    for (const json of [
+      async () => ({ error: "rate_limited" }),
+      async (): Promise<never> => {
+        throw new SyntaxError("not json");
+      },
+    ]) {
+      server.fetch = async () => ({ ok: false, status: 429, json });
+      const play = open();
+      assert.deepEqual(await play.submit(two!.id), { kind: "rate_limited" });
+      assert.deepEqual(await play.giveUp(), { kind: "rate_limited" });
+      assert.deepEqual(play.getUsedGuesses(), [one!.id]);
+      assert.equal(storage.getItem("gaveUp"), null);
+    }
   });
 
   it("starts over when the server is on a newer day than the stored guesses", async () => {
@@ -293,8 +310,8 @@ describe("giveUp", () => {
   it("treats a server rejection as an error", async () => {
     server.fetch = async () => ({
       ok: false,
-      status: 429,
-      json: async () => ({ error: "rate_limited" }),
+      status: 500,
+      json: async () => ({ error: "server_error" }),
     });
     assert.deepEqual(await open().giveUp(), { kind: "error" });
   });

@@ -14,6 +14,7 @@ class FakeServer {
   gaveUp: boolean = false;
   down: boolean = false;
   status: number | null = null; // forces an error response
+  plain: boolean = false; // the error body is not JSON, like nginx's 429
   calls: string[] = [];
 
   view() {
@@ -39,7 +40,12 @@ class FakeServer {
     const reply = (status: number, body: unknown) => ({
       ok: status < 400,
       status,
-      json: async () => body,
+      json: async (): Promise<unknown> => {
+        if (this.plain && status === this.status) {
+          throw new SyntaxError("not json");
+        }
+        return body;
+      },
     });
     if (this.status !== null) {
       return reply(this.status, { error: "rate_limited" });
@@ -167,10 +173,23 @@ describe("submit", () => {
     server.down = true;
     assert.deepEqual(await play.submit(one!.id), { kind: "error" });
     server.down = false;
-    server.status = 429;
+    server.status = 500;
     assert.deepEqual(await play.submit(one!.id), { kind: "error" });
     server.status = null;
     assert.equal((await play.submit(one!.id)).kind, "accepted");
+  });
+
+  it("reports a rate limit, with or without a JSON body, and keeps state", async () => {
+    const play = open();
+    await play.submit(one!.id);
+    server.status = 429;
+    assert.deepEqual(await play.submit(two!.id), { kind: "rate_limited" });
+    assert.deepEqual(await play.giveUp(), { kind: "rate_limited" });
+    server.plain = true;
+    assert.deepEqual(await play.submit(two!.id), { kind: "rate_limited" });
+    server.status = null;
+    assert.deepEqual(play.getUsedGuesses(), [one!.id]);
+    assert.equal((await play.submit(two!.id)).kind, "accepted");
   });
 
   it("clears the page when the server moved to a newer day", async () => {

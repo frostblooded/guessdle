@@ -47,7 +47,11 @@ export function createServerPlay({
               body: JSON.stringify(body),
             },
       );
-      return { status: res.status, data: await res.json() };
+      // nginx's 429 is plain text
+      return {
+        status: res.status,
+        data: res.status === 429 ? null : await res.json(),
+      };
     } catch {
       return null;
     }
@@ -89,6 +93,9 @@ export function createServerPlay({
       if (res === null) {
         return { kind: "error" };
       }
+      if (res.status === 429) {
+        return { kind: "rate_limited" };
+      }
       if (res.status === 200) {
         const game = res.data as GameResponse;
         adopt(game);
@@ -120,6 +127,9 @@ export function createServerPlay({
       const res = await call("/api/game/give-up", {});
       if (res === null) {
         return { kind: "error" };
+      }
+      if (res.status === 429) {
+        return { kind: "rate_limited" };
       }
       if (res.status === 200) {
         const game = res.data as GameResponse;

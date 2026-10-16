@@ -90,9 +90,17 @@ describe("mergeLocalGame", () => {
     assert.deepEqual(createGameState(storage, now).getUsedGuesses(), []);
   });
 
-  it("keeps local state when the server is unreachable or limits", async () => {
+  it("keeps local state and reports a rate limit", async () => {
+    const storage = seeded(["a"], 427);
+    assert.equal(
+      await mergeLocalGame(storage, now, reply(429)),
+      "rate_limited",
+    );
+    assert.deepEqual(createGameState(storage, now).getUsedGuesses(), ["a"]);
+  });
+
+  it("keeps local state when the server is unreachable or fails", async () => {
     for (const f of [
-      reply(429),
       reply(500),
       async () => {
         throw new Error("offline");
