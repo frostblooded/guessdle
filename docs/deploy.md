@@ -13,7 +13,7 @@
 
 ## Email sign-in (production)
 
-- Production sends through a dedicated Gmail account: `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587` with `SMTP_SECURE=false` (STARTTLS, which the mailer requires for any non-local host; port 465 with `SMTP_SECURE=true` also works), `SMTP_USER=<account>@gmail.com`, `SMTP_PASS` a 16-character Google App Password (needs 2-Step Verification on the account; the normal password does not work), `SMTP_FROM="Petdle <account>@gmail.com"` (Gmail rewrites other From addresses).
+- Production sends through a dedicated Gmail account: `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587` with `SMTP_SECURE=false` (STARTTLS, which the mailer requires for any non-local host; port 465 with `SMTP_SECURE=true` also works), `SMTP_USER=<account>@gmail.com`, `SMTP_PASS` a 16-character Google App Password (needs 2-Step Verification on the account; the normal password does not work), `SMTP_FROM="Guessdle <account>@gmail.com"` (Gmail rewrites other From addresses).
 - Gmail allows roughly 500 recipients a day; the per-address limits (1/minute, 5/hour) and nginx limits keep sign-in mail well under it for a small game.
 - Deliverability: mail from Gmail itself passes SPF and DKIM. If `SMTP_FROM` moves to your own domain, publish SPF and DKIM records for it, or sign-in links land in spam.
 - Links expire after 15 minutes and work once. Check delivery with `docker compose -f deploy/compose.prod.yaml logs api` (send failures log and answer 503).

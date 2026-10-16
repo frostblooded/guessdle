@@ -59,6 +59,6 @@ for (const path of NOT_SERVED) {
 
     expect(response.status()).toBe(404);
     expect(response.headers()["content-type"]).toContain("text/html");
-    expect(await response.text()).toContain("Back to PETDLE");
+    expect(await response.text()).toContain("Back to GUESSDLE");
   });
 }

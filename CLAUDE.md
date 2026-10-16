@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-"Petdle": a Wordle-style daily guessing game where players guess a pet from a fixed roster. Multi-page static front-end (`*.html` in the repo root, `src/script.ts` for Play, `src/pages/*.ts` for the other pages, `src/styles.css`; ADR 0012) served by a Node server (`scripts/server.mjs`) that also mounts the Express API (`src/server/`) backed by Postgres (ADRs 0008-0010). Strict TypeScript, ES modules bundled by esbuild into `dist/` (gitignored, ADR 0001); `tsc` only type-checks (Node 24, see `.nvmrc`). ESLint (`npm run lint`, typescript-eslint) lints; Prettier formats. `typescript` is pinned `~6.0` because typescript-eslint does not support 7 yet. Libs come from npm (`@tarekraafat/autocomplete.js`, `express`, `pg`).
+"Guessdle": a site of Wordle-style daily guessing games where players guess an entry from a fixed roster. Multi-page static front-end (`*.html` in the repo root, `src/script.ts` for Play, `src/pages/*.ts` for the other pages, `src/styles.css`; ADR 0012) served by a Node server (`scripts/server.mjs`) that also mounts the Express API (`src/server/`) backed by Postgres (ADRs 0008-0010). Strict TypeScript, ES modules bundled by esbuild into `dist/` (gitignored, ADR 0001); `tsc` only type-checks (Node 24, see `.nvmrc`). ESLint (`npm run lint`, typescript-eslint) lints; Prettier formats. `typescript` is pinned `~6.0` because typescript-eslint does not support 7 yet. Libs come from npm (`@tarekraafat/autocomplete.js`, `express`, `pg`).
 
 ## Commands
 

@@ -37,7 +37,7 @@ test("request a link, read it from the inbox, open it and be signed in", async (
   await expect(page.locator("#sent-address")).toHaveText(email);
 
   const mail = await mailTo(publishedMailpitUrl(), email);
-  expect(mail.Subject).toBe("Your Petdle sign-in link");
+  expect(mail.Subject).toBe("Your Guessdle sign-in link");
   expect(mail.Text).toMatch(/\/verify\?token=/);
   await page.goto(`/verify?token=${tokenIn(mail.Text)}`);
 

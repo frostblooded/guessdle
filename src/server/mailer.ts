@@ -31,7 +31,7 @@ export function mailConfigFromEnv(
     ...(user ? { auth: { user, pass: env["SMTP_PASS"] ?? "" } } : {}),
   });
   const from =
-    env["SMTP_FROM"] || user || `petdle@${new URL(publicUrl).hostname}`;
+    env["SMTP_FROM"] || user || `guessdle@${new URL(publicUrl).hostname}`;
   return {
     publicUrl,
     mailer: {

@@ -1,7 +1,7 @@
 // Admin page: Answers (peek and override Daily Answers), Users and Backups tabs.
 import type { EntryRef } from "./game/game.ts";
 
-// The answers tab edits Petdle until the game editor exists
+// The answers tab edits game 1 until the game editor exists
 const GAME = "petdle";
 
 interface AnswerDay {

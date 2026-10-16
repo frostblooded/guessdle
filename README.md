@@ -1,4 +1,4 @@
-# Petdle
+# Guessdle
 
 [![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg?style=flat-square)](https://github.com/prettier/prettier)
 
@@ -32,8 +32,8 @@ After editing a `.ts` file, rebuild before refreshing (`npm run typecheck` runs 
 
 ```sh
 docker compose up --watch  # dev: live rebuild, http://localhost:8080
-docker build -t petdle .   # prod image (nginx, non-root)
-docker run -p 8080:8080 petdle
+docker build -t guessdle .   # prod image (nginx, non-root)
+docker run -p 8080:8080 guessdle
 ```
 
 `scripts/server.mjs` binds all interfaces (needed inside the container), so `npm start` is reachable from your LAN too.
