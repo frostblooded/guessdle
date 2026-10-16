@@ -9,6 +9,7 @@ import {
 } from "./account.ts";
 import { correctnessClass } from "./game/correctness.ts";
 import { findPetId, type GradedAttribute } from "./game/game.ts";
+import { createServerPlay } from "./game/server-play.ts";
 import {
   createPlay,
   type GiveUpResult,
@@ -28,13 +29,15 @@ const GUESS_DATA_NAMES: string[] = GUESS_DATA.map(
   (item: Pet): string => item.name,
 );
 
-const play: Play = createPlay({
+const anonymousPlay: Play = createPlay({
   roster: GUESS_DATA,
   storage: localStorage,
   now: (): Date => new Date(),
   fetch: (url, init) => fetch(url, init),
   onNewDay: clearBoard,
 });
+// Signed-in players use the server-stored game instead
+let play: Play = anonymousPlay;
 
 let autoCompleteJs: autoComplete | null = null;
 
@@ -62,8 +65,21 @@ window.onload = function (): void {
 
   initButtons();
   initNewGuessSubmit();
-  void loadInitialUsedGuessesElements();
+  void start();
 };
+
+// Who is signed in decides where the game lives, so ask before loading it
+async function start(): Promise<void> {
+  const user: AccountUser | null = await fetchUser(fetchLike);
+  showAccount(user);
+  if (user !== null) {
+    play = createServerPlay({
+      fetch: (url, init) => fetch(url, init),
+      onNewDay: clearBoard,
+    });
+  }
+  await loadInitialUsedGuessesElements();
+}
 
 function getNewGuessInput(): HTMLInputElement {
   return document.querySelector<HTMLInputElement>("#new-guess-input")!;
@@ -109,15 +125,13 @@ function initButtons(): void {
     };
   document.querySelector<HTMLButtonElement>("#reset-button")!.onclick =
     (): void => {
-      play.reset();
-      clearBoard();
+      void handleReset();
     };
   initHelpDialog();
   document.querySelector<HTMLButtonElement>("#logout-button")!.onclick =
     (): void => {
       void handleLogout();
     };
-  void fetchUser(fetchLike).then(showAccount);
 }
 
 const fetchLike: AccountFetch = (url, init) => fetch(url, init);
@@ -132,8 +146,15 @@ function showAccount(user: AccountUser | null): void {
 }
 
 // Signing out also forgets the local game, so the next person starts clean
+async function handleReset(): Promise<void> {
+  if (await play.reset()) {
+    clearBoard();
+  }
+}
+
 async function handleLogout(): Promise<void> {
   if (await signOut(fetchLike)) {
+    play = anonymousPlay;
     play.reset();
     clearBoard();
     showAccount(null);

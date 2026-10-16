@@ -64,8 +64,9 @@ export interface Play {
   submit(id: string): Promise<SubmitResult>;
   // Reveals the answer and finishes the game
   giveUp(): Promise<GiveUpResult>;
-  // Forgets today's guesses and finished state, so the player can replay
-  reset(): void;
+  // Forgets today's guesses and finished state, so the player can replay;
+  // false if it could not be done
+  reset(): boolean | Promise<boolean>;
   // Pet ids
   getUsedGuesses(): string[];
 }
@@ -217,9 +218,10 @@ export function createPlay({
       return { kind: "gaveUp", answer: res.answer };
     },
 
-    reset(): void {
+    reset(): boolean {
       state.reset();
       finished = false;
+      return true;
     },
 
     getUsedGuesses: state.getUsedGuesses,

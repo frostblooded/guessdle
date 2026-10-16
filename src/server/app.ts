@@ -1,11 +1,17 @@
 import express from "express";
-import type { ErrorRequestHandler, Express, Response } from "express";
+import type { ErrorRequestHandler, Express, Request, Response } from "express";
 import { Passport } from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import type pg from "pg";
 import { gradeIds } from "../game/game.ts";
 import { GUESS_DATA, type Pet } from "../game/roster.ts";
 import { dayNumber, ensureAnswer, todayIn } from "./answers.ts";
+import {
+  changeGame,
+  readGame,
+  type GameView,
+  type Refusal,
+} from "./user-game.ts";
 import {
   clearSessionCookie,
   csrfGuard,
@@ -203,6 +209,127 @@ export function createApp({
     }
     res.json({ day, answer: answer.name });
   });
+
+  // Signed-in Game State. Every route needs a session and today's answer.
+  interface GameCtx {
+    user: SessionUser;
+    answer: Pet;
+    date: string;
+    day: number;
+    body: Record<string, unknown>;
+    res: Response;
+  }
+  const gameRoute =
+    (handler: (ctx: GameCtx) => Promise<void>) =>
+    async (req: Request, res: Response): Promise<void> => {
+      res.set("Cache-Control", "no-store");
+      const date = todayIn(now(), timeZone);
+      const day = dayNumber(date);
+      const user = await userForSession(pool, sessionToken(req), now());
+      if (!user) {
+        res.status(401).json({ error: "unauthorized" });
+        return;
+      }
+      const answerId = await ensureAnswer(
+        pool,
+        roster.map((pet) => pet.id),
+        date,
+        random,
+      );
+      const answer = roster.find((pet) => pet.id === answerId);
+      if (!answer) {
+        res.status(500).json({ error: "answer_missing", day });
+        return;
+      }
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      await handler({ user, answer, date, day, body, res });
+    };
+  const refusalStatus: Record<Refusal, number> = {
+    invalid: 400,
+    duplicate: 409,
+    finished: 409,
+    not_finished: 409,
+  };
+  const changeRoute = (
+    action: (
+      ctx: GameCtx,
+      current: GameView,
+      q: Pick<pg.Pool, "query">,
+    ) => Promise<Refusal | null>,
+  ): ReturnType<typeof gameRoute> =>
+    gameRoute(async (ctx) => {
+      const { user, answer, date, day, res } = ctx;
+      const out = await changeGame(
+        pool,
+        roster,
+        answer,
+        user.id,
+        date,
+        day,
+        (current, q) => action(ctx, current, q),
+      );
+      if (out.kind === "ok") {
+        res.json(out.view);
+      } else {
+        res.status(refusalStatus[out.kind]).json({ error: out.kind, day });
+      }
+    });
+
+  app.get(
+    "/api/game",
+    gameRoute(async ({ user, answer, date, day, res }) => {
+      res.json(await readGame(pool, roster, answer, user.id, date, day));
+    }),
+  );
+  const json = express.json({ limit: "10kb" });
+  app.post(
+    "/api/game/guess",
+    json,
+    changeRoute(async ({ user, date, body }, current, q) => {
+      const id = body["id"];
+      if (typeof id !== "string" || !roster.some((pet) => pet.id === id)) {
+        return "invalid";
+      }
+      if (current.victory || current.gaveUp) {
+        return "finished";
+      }
+      const { rowCount } = await q.query(
+        "insert into user_guesses (user_id, day, pet_id) values ($1, $2, $3) on conflict do nothing",
+        [user.id, date, id],
+      );
+      return rowCount === 1 ? null : "duplicate";
+    }),
+  );
+  app.post(
+    "/api/game/give-up",
+    json,
+    changeRoute(async ({ user, date }, current, q) => {
+      if (current.victory || current.gaveUp) {
+        return "finished";
+      }
+      await q.query(
+        "insert into user_give_ups (user_id, day) values ($1, $2)",
+        [user.id, date],
+      );
+      return null;
+    }),
+  );
+  app.post(
+    "/api/game/reset",
+    json,
+    changeRoute(async ({ user, date }, current, q) => {
+      if (!current.victory && !current.gaveUp) {
+        return "not_finished";
+      }
+      for (const table of ["user_guesses", "user_give_ups"]) {
+        await q.query(`delete from ${table} where user_id = $1 and day = $2`, [
+          user.id,
+          date,
+        ]);
+      }
+      return null;
+    }),
+  );
 
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "not_found" });
