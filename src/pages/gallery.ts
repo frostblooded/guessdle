@@ -51,7 +51,7 @@ async function show(): Promise<void> {
     }
     const cards = (await res.json()) as Card[];
     document.querySelector("#gallery")!.replaceChildren(
-      // The API lists Petdle first
+      // The API lists the original game first
       ...cards.map((card, i) =>
         cardElement(card, i === 0 && card.slug === "petdle"),
       ),

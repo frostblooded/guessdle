@@ -43,6 +43,7 @@ test.describe("dark OS preference, auto mode", () => {
     );
     await expect(themeButton(page)).toHaveText("Theme: auto");
 
+    await expect(page.locator("#loading-state")).toBeHidden();
     await page.locator("#new-guess-input").fill("a");
     const option = page.locator("[role=option]").first();
     await expect(option).toBeVisible();
@@ -79,6 +80,7 @@ test.describe("light OS preference", () => {
   test("page is light and everything is readable", async ({ page }) => {
     await page.goto("/g/petdle");
     expect(await background(page)).toBe(LIGHT_BG);
+    await expect(page.locator("#loading-state")).toBeHidden();
     await page.locator("#new-guess-input").fill("a");
     await expect(page.locator("[role=option]").first()).toBeVisible();
     for (const selector of [

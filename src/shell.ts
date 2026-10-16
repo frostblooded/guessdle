@@ -55,7 +55,9 @@ function markCurrentPage(): void {
   for (const link of document.querySelectorAll<HTMLAnchorElement>(
     ".nav a, .footer-inner a",
   )) {
-    if (link.pathname === location.pathname) {
+    // Games live under /g/, so a game page marks the Games link
+    const here = location.pathname.startsWith("/g/") ? "/" : location.pathname;
+    if (link.pathname === here) {
       link.setAttribute("aria-current", "page");
     }
   }
