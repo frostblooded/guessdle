@@ -1136,3 +1136,73 @@ textarea {
   flex: 1 1 8rem;
   align-self: center;
 }
+
+/* Editor layout: a wide page; status and actions in one bar; two columns on desktop */
+
+.editor-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2) var(--s4);
+  margin-bottom: var(--s3);
+}
+
+.editor-bar .alert {
+  flex: 1 1 18rem;
+  margin: 0;
+}
+
+.editor-actions {
+  margin-left: auto;
+}
+
+.details-grid {
+  display: grid;
+  gap: var(--s4);
+}
+
+.details-foot,
+.details-main {
+  min-width: 0;
+}
+
+.details-foot .alert {
+  margin-bottom: var(--s3);
+}
+
+@media (min-width: 48rem) {
+  .details-grid {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    align-items: start;
+  }
+
+  .details-foot {
+    grid-column: 1 / -1;
+  }
+
+  .details-side .field-label:first-child {
+    margin-top: 0;
+  }
+
+  #panel-entries {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0 var(--s5);
+    align-items: start;
+  }
+
+  #panel-entries > .lede {
+    grid-column: 1 / -1;
+  }
+
+  /* The form stays in view while a long entry list scrolls */
+  #entry-form {
+    position: sticky;
+    top: var(--s4);
+  }
+
+  #panel-attributes #attr-form,
+  #panel-attributes .attr-list {
+    max-width: 40rem;
+  }
+}

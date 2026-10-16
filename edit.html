@@ -22,10 +22,12 @@
   </head>
   <body>
     <header id="site-header" class="site-header"></header>
-    <main id="main" class="page page-narrow">
-      <div class="page-head">
+    <main id="main" class="page page-wide">
+      <div class="page-head title-row">
         <h1 id="edit-title">Edit game</h1>
-        <p><a id="view-link" href="/">View game</a></p>
+        <a id="view-link" class="btn btn-secondary btn-sm" href="/"
+          >View game</a
+        >
       </div>
       <p id="loading-state" class="empty-state">Loading…</p>
       <section id="edit-blocked" class="card center" hidden>
@@ -33,6 +35,28 @@
         <a class="btn btn-primary" href="/my-games">My games</a>
       </section>
       <div id="editor" hidden>
+        <div class="editor-bar">
+          <p id="status-notice" class="alert alert-warn" role="status"></p>
+          <p id="flow-error" class="alert alert-error" role="alert"></p>
+          <div class="button-row editor-actions">
+            <button
+              id="submit-button"
+              type="button"
+              class="btn btn-primary"
+              hidden
+            >
+              Submit for approval
+            </button>
+            <button
+              id="unpublish-button"
+              type="button"
+              class="btn btn-secondary"
+              hidden
+            >
+              Unpublish
+            </button>
+          </div>
+        </div>
         <div class="tabs" role="tablist" aria-label="Editor sections">
           <button
             type="button"
@@ -65,26 +89,6 @@
             id="tab-answers"
           >
             Answers
-          </button>
-        </div>
-        <p id="status-notice" class="alert alert-warn" role="status"></p>
-        <p id="flow-error" class="alert alert-error" role="alert"></p>
-        <div class="button-row">
-          <button
-            id="submit-button"
-            type="button"
-            class="btn btn-primary"
-            hidden
-          >
-            Submit for approval
-          </button>
-          <button
-            id="unpublish-button"
-            type="button"
-            class="btn btn-secondary"
-            hidden
-          >
-            Unpublish
           </button>
         </div>
         <section id="panel-attributes" class="card" hidden>
@@ -223,49 +227,62 @@
             </form>
           </div>
         </section>
-        <form id="details-form" class="card" novalidate>
-          <label class="field-label" for="edit-name">Name</label>
-          <input type="text" id="edit-name" maxlength="60" autocomplete="off" />
-          <label class="field-label" for="edit-description">Description</label>
-          <textarea id="edit-description" maxlength="500" rows="3"></textarea>
-          <label class="field-label" for="edit-slug">Web address</label>
-          <input type="text" id="edit-slug" readonly />
-          <p class="field-label">Cover image</p>
-          <img id="cover-preview" class="cover-preview" alt="" hidden />
-          <div class="button-row">
+        <form id="details-form" class="card details-grid" novalidate>
+          <div class="details-main">
+            <label class="field-label" for="edit-name">Name</label>
             <input
-              type="file"
-              id="cover-file"
-              accept="image/jpeg,image/png,image/webp"
-              class="sr-only"
+              type="text"
+              id="edit-name"
+              maxlength="60"
+              autocomplete="off"
             />
-            <label class="btn btn-secondary btn-sm" for="cover-file"
-              >Choose image</label
+            <label class="field-label" for="edit-description"
+              >Description</label
             >
-            <button
-              id="cover-remove"
-              class="btn btn-quiet btn-sm"
-              type="button"
-              hidden
+            <textarea id="edit-description" maxlength="500" rows="3"></textarea>
+            <label class="field-label" for="edit-slug">Web address</label>
+            <input type="text" id="edit-slug" readonly />
+          </div>
+          <div class="details-side">
+            <p class="field-label">Cover image</p>
+            <img id="cover-preview" class="cover-preview" alt="" hidden />
+            <div class="button-row">
+              <input
+                type="file"
+                id="cover-file"
+                accept="image/jpeg,image/png,image/webp"
+                class="sr-only"
+              />
+              <label class="btn btn-secondary btn-sm" for="cover-file"
+                >Choose image</label
+              >
+              <button
+                id="cover-remove"
+                class="btn btn-quiet btn-sm"
+                type="button"
+                hidden
+              >
+                Remove
+              </button>
+            </div>
+            <label class="field-label" for="edit-skip"
+              >Skip period (days before an entry can repeat)</label
             >
-              Remove
+            <input
+              type="number"
+              id="edit-skip"
+              min="0"
+              step="1"
+              placeholder="Default: 5"
+            />
+          </div>
+          <div class="details-foot">
+            <p id="edit-error" class="alert alert-error" role="alert"></p>
+            <p id="edit-saved" class="alert" role="status"></p>
+            <button id="save-button" class="btn btn-primary" type="submit">
+              Save
             </button>
           </div>
-          <label class="field-label" for="edit-skip"
-            >Skip period (days before an entry can repeat)</label
-          >
-          <input
-            type="number"
-            id="edit-skip"
-            min="0"
-            step="1"
-            placeholder="Default: 5"
-          />
-          <p id="edit-error" class="alert alert-error" role="alert"></p>
-          <p id="edit-saved" class="alert" role="status"></p>
-          <button id="save-button" class="btn btn-primary" type="submit">
-            Save
-          </button>
         </form>
       </div>
     </main>
