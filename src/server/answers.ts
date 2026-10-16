@@ -312,3 +312,23 @@ export function releaseEntry(
     }
   });
 }
+
+// After the skip period changed: re-draws every stored generated day after `today`
+// under the game's new rule. Today and the past stay as players saw them.
+export function redrawFuture(
+  pool: pg.Pool,
+  game: GameRow,
+  ids: readonly number[],
+  today: string,
+  random: () => number,
+): Promise<void> {
+  return locked(pool, game, (client) =>
+    redrawFrom(
+      client,
+      game,
+      ids,
+      dateOfDay(dayNumber(today, game.startDate) + 1, game.startDate),
+      random,
+    ),
+  );
+}

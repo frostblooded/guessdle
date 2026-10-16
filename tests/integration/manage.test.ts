@@ -246,6 +246,41 @@ describe("creating and editing a game", () => {
       assert.equal(now.body.slug, "ann-game");
     });
 
+    it("a skip period change re-draws only future generated days", async () => {
+      await setStatus("ann-game", "draft", 4);
+      await db.pool.query(
+        "update games set start_date = '2026-10-10' where slug = 'ann-game'",
+      );
+      // Day 6 is today. Every stored day holds the same entry, which the new rule forbids repeating
+      await db.pool.query(
+        `insert into daily_answers (game_id, day, entry_id, source)
+         select g.id, date '2026-10-10' + d, e.id, case when d = 8 then 'override' else 'generated' end
+         from games g, generate_series(0, 10) d,
+           lateral (select min(id) as id from entries where game_id = g.id) e
+         where g.slug = 'ann-game'`,
+      );
+      await db.pool.query(
+        `update daily_answers set entry_id = (select max(id) from entries where game_id = daily_answers.game_id)
+         where day = '2026-10-18'`,
+      );
+      assert.equal((await patch(ann, { skipPeriod: 3 })).status, 200);
+      const { rows } = await db.pool.query(
+        `select to_char(day, 'YYYY-MM-DD') as day, entry_id::int, source from daily_answers
+         where game_id = (select id from games where slug = 'ann-game') order by day`,
+      );
+      const ids = rows.map((r) => r.entry_id);
+      const [first, last] = [ids[0], ids[8]];
+      assert.deepEqual(ids.slice(0, 7), Array(7).fill(first), "past and today");
+      assert.equal(rows[8].source, "override");
+      assert.equal(ids[8], last);
+      for (const day of [7, 9, 10]) {
+        assert.ok(
+          !ids.slice(day - 3, day).includes(ids[day]),
+          `day ${day} repeats within the skip period`,
+        );
+      }
+    });
+
     it("never changes the slug, even for an admin", async () => {
       for (const who of [ann, root]) {
         const res = await patch(who, { slug: "other-slug" });

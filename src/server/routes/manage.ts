@@ -2,7 +2,7 @@
 import express from "express";
 import type { Express, Request, Response } from "express";
 import { slugBase, slugError } from "../../game/slug.ts";
-import { releaseEntry, todayIn } from "../answers.ts";
+import { redrawFuture, releaseEntry, todayIn } from "../answers.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
 import type { AttributeType } from "../../game/game.ts";
 import {
@@ -20,6 +20,7 @@ import {
   listOwned,
   MAX_ATTRIBUTE_NAME,
   MAX_VALUE_LENGTH,
+  skipOf,
   updateGame,
   type AttributeEdit,
   type GamePatch,
@@ -392,6 +393,16 @@ export function manageRoutes(
         patch.coverUrl = coverUrl;
       }
       const replaced = await updateGame(pool, game, patch);
+      const edited = { ...game, ...patch };
+      if (skipOf(edited) !== skipOf(game) && roster.entries.length > 0) {
+        await redrawFuture(
+          pool,
+          edited,
+          roster.entries.map((e) => e.id),
+          todayIn(now(), ctx.timeZone),
+          ctx.random,
+        );
+      }
       await removeUpload(pool, uploadsDir, replaced);
       const fresh = await loadGame(ctx, req, res);
       if (fresh) {

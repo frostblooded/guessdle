@@ -1,6 +1,7 @@
-// The game editor: top tabs, of which Details, Attributes and Entries exist so far.
+// The game editor: top tabs, Details, Attributes, Entries and Answers.
 import { statusNotice, type Details } from "../game/editor.ts";
 import { api, errorText, signInThen, type Reply } from "../manage-client.ts";
+import { initAnswers } from "./edit-answers.ts";
 import { initEntries } from "./edit-entries.ts";
 import { browserFetch, initShell } from "../shell.ts";
 
@@ -126,10 +127,14 @@ void initShell(browserFetch).then(async (user) => {
     }
   };
 
-  const tabs = ["details", "attributes", "entries"];
+  const refreshAnswers = initAnswers(API);
+  const tabs = ["details", "attributes", "entries", "answers"];
   const show = (tab: string): void => {
     if (tab === "entries") {
       void refreshEntries();
+    }
+    if (tab === "answers") {
+      void refreshAnswers();
     }
     for (const t of tabs) {
       $(`#tab-${t}`).setAttribute("aria-selected", String(t === tab));

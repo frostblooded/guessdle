@@ -241,11 +241,6 @@ for (const { name, width, height } of VIEWPORTS) {
         data: { email: `root-${width}@example.test`, admin: true },
       });
       await page.goto("/admin");
-      await expect(page.locator("#admin-days tr").first()).toBeVisible();
-      await expectNoProblems(page);
-      await page.locator("#admin-days tr").nth(1).locator("button").click();
-      await expectNoProblems(page);
-      await page.locator("#tab-users").click();
       await expect(page.locator("#admin-users tr").first()).toBeVisible();
       await expectNoProblems(page);
       await page.locator("#tab-backup").click();

@@ -7,7 +7,7 @@ export interface Reply<T = Record<string, unknown>> {
 
 // JSON request, or raw bytes when `body` is a File; null when the server could not be reached
 export async function api<T = Record<string, unknown>>(
-  method: "GET" | "POST" | "PATCH" | "DELETE",
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   path: string,
   body?: unknown,
 ): Promise<Reply<T> | null> {

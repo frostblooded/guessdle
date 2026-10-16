@@ -1,7 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { GUESS_DATA } from "./roster.ts";
 
-// Only future days are overridden here: today's answer is shared with the other specs
 const stubLogin = (page: Page, admin: boolean): Promise<unknown> =>
   page.request.post("/api/test/login", {
     data: {
@@ -9,8 +7,6 @@ const stubLogin = (page: Page, admin: boolean): Promise<unknown> =>
       admin,
     },
   });
-const nameOf = (id: number): string =>
-  GUESS_DATA.find((pet) => pet.id === id)!.name;
 
 test("a non-admin has no panel and gets 403 from its endpoints", async ({
   page,
@@ -19,16 +15,13 @@ test("a non-admin has no panel and gets 403 from its endpoints", async ({
   await page.goto("/");
   await page.locator("#user-menu-button").click();
   await expect(page.locator("#admin-link")).toBeHidden();
-  expect((await page.request.get("/api/games/petdle/answers")).status()).toBe(
-    403,
-  );
+  expect((await page.request.get("/api/admin/users")).status()).toBe(403);
 
   // The admin page itself says 403 and offers no panel
   await page.goto("/admin");
   await expect(page.locator("#gate-forbidden")).toBeVisible();
   await expect(page.locator("#gate-forbidden")).toContainText("403");
   await expect(page.locator("#admin-app")).toBeHidden();
-  await expect(page.locator("#admin-days tr")).toHaveCount(0);
 });
 
 test("a signed-out visitor is asked to sign in on the admin page", async ({
@@ -55,82 +48,19 @@ test("the admin tabs are a keyboard-operable tablist", async ({ page }) => {
   await stubLogin(page, true);
   await page.goto("/admin");
   // The tab handlers are wired once the sign-in check has finished
-  await expect(page.locator("#admin-days tr").first()).toBeVisible();
-  await expect(page.locator("#tab-answers")).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-  await page.locator("#tab-answers").focus();
+  await expect(page.locator("#admin-users tr").first()).toBeVisible();
+  await expect(page.locator("#tab-answers")).toHaveCount(0);
+  await page.locator("#tab-users").focus();
   await page.keyboard.press("ArrowRight");
-  await expect(page.locator("#tab-users")).toHaveAttribute(
+  await expect(page.locator("#tab-backup")).toHaveAttribute(
     "aria-selected",
     "true",
   );
-  await expect(page.locator("#tab-users")).toBeFocused();
-  await expect(page.locator("#users-panel")).toBeVisible();
-  await expect(page.locator("#answers-panel")).toBeHidden();
+  await expect(page.locator("#tab-backup")).toBeFocused();
+  await expect(page.locator("#backup-panel")).toBeVisible();
+  await expect(page.locator("#users-panel")).toBeHidden();
   await page.keyboard.press("ArrowLeft");
-  await expect(page.locator("#answers-panel")).toBeVisible();
-});
-
-test("an admin peeks, overrides with warnings, edits and clears", async ({
-  page,
-}) => {
-  await stubLogin(page, true);
-  await page.goto("/admin");
-
-  // Today and the next six days; today is badged and not locked
-  const rows = page.locator("#admin-days tr");
-  await expect(rows).toHaveCount(7);
-  await expect(rows.first()).toContainText("today");
-  await expect(rows.first().locator("button")).toBeVisible();
-
-  // Yesterday is shown locked
-  const today = (await page.locator("#admin-from").inputValue()).split("-");
-  const yesterday = new Date(
-    Date.UTC(+today[0]!, +today[1]! - 1, +today[2]! - 1),
-  )
-    .toISOString()
-    .slice(0, 10);
-  await page.locator("#admin-from").fill(yesterday);
-  await page.locator("#admin-range button").click();
-  await expect(rows).toHaveCount(8);
-  await expect(rows.first()).toContainText("locked");
-  await expect(rows.first().locator("button")).toHaveCount(0);
-
-  // Override day +2 with the pet that appeared the day before: warning and notice
-  const target = rows.nth(3);
-  const previousPet = await rows.nth(2).locator("td").nth(1).innerText();
-  await target.locator("button").click();
-  await expect(page.locator("#override-warning")).toBeVisible();
-  const chosen = GUESS_DATA.find((pet) => pet.name === previousPet)!;
-  await page.locator("#override-pet").selectOption(String(chosen.id));
-  await expect(page.locator("#override-notice")).toBeVisible();
-  await page.locator("#override-save").click();
-  await expect(target).toContainText(nameOf(chosen.id));
-  await expect(target).toContainText("override");
-  await expect(target.locator("button")).toHaveText("EDIT / CLEAR");
-
-  // Editing to a pet absent from the days before shows no notice
-  await target.locator("button").click();
-  const before = await rows.locator("td:nth-child(2)").allInnerTexts();
-  const fresh = GUESS_DATA.find(
-    (pet) => !before.slice(0, 3).includes(pet.name),
-  )!;
-  await page.locator("#override-pet").selectOption(String(fresh.id));
-  await expect(page.locator("#override-notice")).toBeHidden();
-  await page.locator("#override-save").click();
-  await expect(target).toContainText(fresh.name);
-
-  // Clearing returns the day to an autogenerated answer
-  await target.locator("button").click();
-  await page.locator("#override-clear").click();
-  await expect(target).toContainText("autogenerated");
-  await expect(target.locator("button")).toHaveText("OVERRIDE");
-
-  // The page survives a reload
-  await page.reload();
-  await expect(page.locator("#admin-days tr")).toHaveCount(7);
+  await expect(page.locator("#users-panel")).toBeVisible();
 });
 
 test("an admin promotes and demotes a user; self-demotion is disabled and refused", async ({
@@ -149,7 +79,6 @@ test("an admin promotes and demotes a user; self-demotion is disabled and refuse
     data: { email: me, admin: true },
   });
   await page.goto("/admin");
-  await page.locator("#tab-users").click();
 
   const row = (email: string): ReturnType<Page["locator"]> =>
     page.locator(`#admin-users tr[data-email="${email}"]`);
@@ -177,8 +106,5 @@ test("an admin promotes and demotes a user; self-demotion is disabled and refuse
   await expect(row(player)).toContainText("player");
   expect((await playerPage.request.get("/api/admin/users")).status()).toBe(403);
 
-  // Back on the Answers tab the day list is still there
-  await page.locator("#tab-answers").click();
-  await expect(page.locator("#admin-days tr")).toHaveCount(7);
   await playerPage.close();
 });
