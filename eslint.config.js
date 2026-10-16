@@ -10,6 +10,15 @@ export default tseslint.config(
   // shortcut: no `globals` package; Node globals in .mjs would trip no-undef, so it is off there.
   { files: ["**/*.mjs"], rules: { "no-undef": "off" } },
   {
+    files: ["src/**/*.ts"],
+    rules: {
+      "max-lines": [
+        "error",
+        { max: 400, skipBlankLines: true, skipComments: true },
+      ],
+    },
+  },
+  {
     files: ["**/*.ts"],
     rules: {
       curly: ["error", "all"],

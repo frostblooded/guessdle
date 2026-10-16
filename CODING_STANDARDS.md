@@ -1,7 +1,23 @@
 # Coding standards
 
-Read during review. Judgement calls only; tooling covers the rest (`npm run lint` enforces braces and explicit types on function parameters, class members and properties only; variables, arrow parameters and destructuring are left to inference).
+Read during review. Judgement calls only; tooling covers the rest (`npm run lint` enforces braces, explicit types on function parameters, class members and properties, and `src/**/*.ts` files under 400 lines; `npm run dup` fails on duplicated code in `src/`).
 
 ## Indentation
 
 2 spaces.
+
+## Structure
+
+- One route group per module in `src/server/routes/`, each taking the shared `AppContext`. Parse request input through the helpers in `routes/context.ts`, not inline casts.
+- Client calls to the API go through `src/game/transport.ts`; status-to-result mapping lives there once.
+- When a few values travel together through several functions, bundle them into one type (`GameContext` in `src/server/user-game.ts`).
+
+## Security-sensitive code
+
+Check each of these when the diff touches `src/server/auth.ts`, sessions, or any `/api` route:
+
+- The OAuth flow verifies `state`; only email-verified Google accounts sign in.
+- Mutating routes pass the JSON-only and Origin guard.
+- Every `/api/admin/*` route checks the admin flag on the request, not a cached value.
+- Responses reveal the Daily Answer only after a win or give-up.
+- Changes to shared state (answers, user rows) take the advisory or row lock.

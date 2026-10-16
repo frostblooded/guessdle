@@ -1,5 +1,6 @@
 # Dev: docker compose up --watch  (http://localhost:8080)
 # Just Postgres for `npm start`: docker compose up -d db
+name: petdle
 services:
   dev:
     build:

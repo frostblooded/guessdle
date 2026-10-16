@@ -44,6 +44,8 @@ jobs:
         run: npm run format:check
       - name: Lint
         run: npm run lint
+      - name: Duplicate code
+        run: npm run dup
       - name: Compile, type-check and run unit tests
         run: npm test
 
