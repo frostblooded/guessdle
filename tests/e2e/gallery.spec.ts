@@ -65,3 +65,21 @@ test("old un-namespaced browser state is wiped, per-game keys are kept", async (
     ]),
   ).toEqual([null, null, "[2]"]);
 });
+
+test("an admin gets an Edit link on the original game, a visitor does not", async ({
+  page,
+}) => {
+  await page.goto("/g/petdle");
+  await expect(page.locator("#loading-state")).toBeHidden();
+  await expect(page.locator("#edit-link")).toBeHidden();
+
+  await page.request.post("/api/test/login", {
+    data: { email: `edit-${Date.now()}@example.test`, admin: true },
+  });
+  await page.goto("/g/petdle");
+  await expect(page.locator("#loading-state")).toBeHidden();
+  await expect(page.locator("#edit-link")).toHaveAttribute(
+    "href",
+    "/g/petdle/edit",
+  );
+});

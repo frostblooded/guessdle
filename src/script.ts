@@ -40,7 +40,12 @@ let autoCompleteJs: autoComplete | null = null;
 
 // The game's attributes and entries, or null when it could not be loaded
 async function loadGame(): Promise<
-  | { name: string; attributes: GameAttribute[]; entries: EntryRef[] }
+  | {
+      name: string;
+      canEdit: boolean;
+      attributes: GameAttribute[];
+      entries: EntryRef[];
+    }
   | "missing"
   | null
 > {
@@ -52,6 +57,7 @@ async function loadGame(): Promise<
     return res.ok
       ? ((await res.json()) as {
           name: string;
+          canEdit: boolean;
           attributes: GameAttribute[];
           entries: EntryRef[];
         })
@@ -92,6 +98,11 @@ window.onload = async function (): Promise<void> {
   roster = game.entries;
   document.querySelector("#game-title")!.textContent = game.name;
   document.title = `${game.name} - Guessdle`;
+  if (game.canEdit) {
+    const edit = document.querySelector<HTMLAnchorElement>("#edit-link")!;
+    edit.href = `/g/${encodeURIComponent(SLUG)}/edit`;
+    edit.hidden = false;
+  }
   showColumnTitles(game.attributes);
   const storage = gameStorage(localStorage, SLUG);
   // Signed-in players use the server-stored game instead

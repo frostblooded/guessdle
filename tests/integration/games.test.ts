@@ -116,6 +116,14 @@ describe("games in the database", () => {
       ]);
     });
 
+    it("tells the page whether the viewer may edit: admins yes, others and anonymous no", async () => {
+      const admin = await login("root@example.com", true);
+      const user = await login("ann@example.com");
+      assert.equal((await request("GET", G)).body.canEdit, false);
+      assert.equal((await request("GET", G, user)).body.canEdit, false);
+      assert.equal((await request("GET", G, admin)).body.canEdit, true);
+    });
+
     it("keeps every pet's values in order", async () => {
       const { rows } = await db.pool.query(
         `select a.name as attr, array_agg(v.value order by v.position) as vals

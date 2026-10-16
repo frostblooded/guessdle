@@ -329,6 +329,19 @@ a {
     flex-basis: 100%;
   }
 
+  /* Keep brand, theme and account on one row on a 360px phone, even with wider fonts */
+  .bar {
+    column-gap: var(--s2);
+  }
+
+  .brand {
+    font-size: 1rem;
+  }
+
+  .tools .btn-sm {
+    padding-inline: var(--s2);
+  }
+
   .wide,
   .user-name {
     display: none;

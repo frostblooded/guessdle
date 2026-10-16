@@ -19,6 +19,7 @@ import {
 } from "../user-game.ts";
 import {
   bodyOf,
+  canManage,
   isIdList,
   loadGame,
   todayOf,
@@ -43,8 +44,9 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
     if (!loaded) {
       return;
     }
-    const { game, roster } = loaded;
+    const { game, roster, user } = loaded;
     res.json({
+      canEdit: canManage(game, user),
       slug: game.slug,
       name: game.name,
       description: game.description,
