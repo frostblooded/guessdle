@@ -155,11 +155,11 @@ describe("game attributes", () => {
     assert.equal((await change(color.id, { type: "bad" })).status, 400);
     assert.equal((await change(999999, {})).status, 404);
     assert.equal((await request("DELETE", `${A}/nope`, ann)).status, 404);
-    const petdle = await db.pool.query(
+    const foreign = await db.pool.query(
       "select id from attributes order by id limit 1",
     );
     assert.equal(
-      (await request("DELETE", `${A}/${petdle.rows[0].id}`, ann)).status,
+      (await request("DELETE", `${A}/${foreign.rows[0].id}`, ann)).status,
       404,
     );
   });
