@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 import { gradeIds } from "../src/game/game.ts";
 import type { StateStorage } from "../src/game/game-state.ts";
-import { createPlay, type FetchLike } from "../src/game/play.ts";
+import { createPlay } from "../src/game/play.ts";
+import type { Fetch } from "../src/game/transport.ts";
 import { GUESS_DATA } from "../src/game/roster.ts";
 
 class MemoryStorage implements StateStorage {
@@ -30,9 +31,9 @@ class FakeServer {
 
   giveUps: number = 0;
 
-  fetch: FetchLike = async (url, init) => {
-    assert.equal(init.method, "POST");
-    assert.equal(init.headers["Content-Type"], "application/json");
+  fetch: Fetch = async (url, init) => {
+    assert.equal(init?.method, "POST");
+    assert.equal(init?.headers["Content-Type"], "application/json");
     if (this.down) {
       throw new Error("offline");
     }
@@ -45,7 +46,7 @@ class FakeServer {
       };
     }
     assert.equal(url, "/api/grade");
-    const ids = (JSON.parse(init.body) as { ids: string[] }).ids;
+    const ids = (JSON.parse(init!.body) as { ids: string[] }).ids;
     this.requests.push(ids);
     const graded = gradeIds(GUESS_DATA, answer, ids);
     if (graded.kind !== "graded") {

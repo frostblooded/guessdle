@@ -1,5 +1,4 @@
 // Anonymous play: the browser keeps pet ids, the server grades them.
-import { Correctness } from "./correctness.ts";
 import type { GradedAttribute } from "./game.ts";
 import {
   createGameState,
@@ -7,12 +6,13 @@ import {
   type StateStorage,
 } from "./game-state.ts";
 import type { Pet } from "./roster.ts";
-
-// The part of fetch that play uses
-export type FetchLike = (
-  url: string,
-  init: { method: "POST"; headers: Record<string, string>; body: string },
-) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>;
+import {
+  call,
+  failureOf,
+  isAnswerRow,
+  type Failure,
+  type Fetch,
+} from "./transport.ts";
 
 // POST /api/grade; `answer` (the pet's name) is present only on victory
 interface GradeResponse {
@@ -74,13 +74,11 @@ export interface Play {
   getUsedGuesses(): string[];
 }
 
-const LIMITED = "rate_limited" as const;
-
 export interface PlayDeps {
   roster: readonly Pet[];
   storage: StateStorage;
   now: () => Date;
-  fetch: FetchLike;
+  fetch: Fetch;
   // Called when a response shows the server is on a newer day and the stored
   // game was forgotten, so the page can clear what it shows
   onNewDay?: () => void;
@@ -108,23 +106,10 @@ export function createPlay({
     state.setUsedGuesses(upgraded);
   }
 
-  async function post<T>(
-    url: string,
-    body: unknown,
-  ): Promise<T | null | typeof LIMITED> {
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (res.status === 429) {
-        return LIMITED;
-      }
-      return res.ok ? ((await res.json()) as T) : null;
-    } catch {
-      return null;
-    }
+  // The parsed body of a successful POST, or why there is none
+  async function post<T>(url: string, body: unknown): Promise<T | Failure> {
+    const res = await call(fetch, url, body);
+    return failureOf(res) ?? (res!.ok ? (res!.data as T) : "error");
   }
 
   // True if the response is from a newer day than the stored game, which is
@@ -147,7 +132,7 @@ export function createPlay({
       const loaded: Loaded = { rows: [], victory: false };
       if (ids.length > 0) {
         const res = await post<GradeResponse>("/api/grade", { ids });
-        if (res === null || res === LIMITED) {
+        if (typeof res === "string") {
           return null;
         }
         if (isNewDay(res.day)) {
@@ -162,7 +147,7 @@ export function createPlay({
       }
       if (gaveUp) {
         const res = await post<GiveUpResponse>("/api/give-up", {});
-        if (res === null || res === LIMITED) {
+        if (typeof res === "string") {
           return null;
         }
         if (isNewDay(res.day)) {
@@ -190,11 +175,8 @@ export function createPlay({
       const res = await post<GradeResponse>("/api/grade", {
         ids: [...used, id],
       });
-      if (res === LIMITED) {
-        return { kind: "rate_limited" };
-      }
-      if (res === null) {
-        return { kind: "error" };
+      if (typeof res === "string") {
+        return { kind: res };
       }
       if (isNewDay(res.day)) {
         return play.submit(id);
@@ -202,10 +184,7 @@ export function createPlay({
       state.addUsedGuess(id);
       state.setDay(res.day);
       const row: GradedAttribute[] = res.rows[res.rows.length - 1]!;
-      const isAnswer: boolean = row.every(
-        (cell: GradedAttribute): boolean =>
-          cell.correctness === Correctness.Correct,
-      );
+      const isAnswer: boolean = isAnswerRow(row);
       finished = isAnswer;
       return {
         kind: "accepted",
@@ -220,11 +199,8 @@ export function createPlay({
         return { kind: "finished" };
       }
       const res = await post<GiveUpResponse>("/api/give-up", {});
-      if (res === LIMITED) {
-        return { kind: "rate_limited" };
-      }
-      if (res === null) {
-        return { kind: "error" };
+      if (typeof res === "string") {
+        return { kind: res };
       }
       if (isNewDay(res.day)) {
         return { kind: "newday" };

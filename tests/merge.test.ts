@@ -50,7 +50,7 @@ describe("mergeLocalGame", () => {
     const storage = seeded(["a", "b"], 427, true);
     let sent: { url: string; body: unknown } | null = null;
     const out = await mergeLocalGame(storage, now, async (url, init) => {
-      sent = { url, body: JSON.parse(init.body) };
+      sent = { url, body: JSON.parse(init!.body) };
       return reply(200)();
     });
     assert.equal(out, "merged");

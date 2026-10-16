@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 import { gradeIds } from "../src/game/game.ts";
 import { GUESS_DATA } from "../src/game/roster.ts";
-import { createServerPlay, type ServerFetch } from "../src/game/server-play.ts";
+import { createServerPlay } from "../src/game/server-play.ts";
+import type { Fetch } from "../src/game/transport.ts";
 
 const answer = GUESS_DATA[0]!;
 const [, one, two] = GUESS_DATA;
@@ -31,7 +32,7 @@ class FakeServer {
     };
   }
 
-  fetch: ServerFetch = async (url, init) => {
+  fetch: Fetch = async (url, init) => {
     const method = init?.method ?? "GET";
     this.calls.push(`${method} ${url}`);
     if (this.down) {

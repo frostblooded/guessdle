@@ -71,6 +71,33 @@ async function locked<T>(
   }
 }
 
+// The previous `ANSWER_SKIP_PERIOD` stored answers, oldest first (only those
+// before `before` when given), and the Day Number of the newest, -1 if none.
+async function history(
+  client: Client,
+  before: string | null,
+): Promise<{ previous: string[]; lastDay: number }> {
+  const recent = await client.query<{ day: string; pet_id: string }>(
+    "select to_char(day, 'YYYY-MM-DD') as day, pet_id from daily_answers where $1::date is null or day < $1 order by day desc limit $2",
+    [before, ANSWER_SKIP_PERIOD],
+  );
+  return {
+    previous: recent.rows.map((row) => row.pet_id).reverse(),
+    lastDay: recent.rows[0] ? dayNumber(recent.rows[0].day) : -1,
+  };
+}
+
+// Draws the next answer after `previous` and appends it there
+function drawNext(
+  ids: readonly string[],
+  previous: string[],
+  random: () => number,
+): string {
+  const petId = drawAnswer(ids, previous, ANSWER_SKIP_PERIOD, random);
+  previous.push(petId);
+  return petId;
+}
+
 // Generates every missing day up to Day Number `target`, in order, each avoiding the
 // previous stored answers (overrides included). The one generation path for
 // players and the admin peek.
@@ -80,19 +107,12 @@ async function fillThrough(
   target: number,
   random: () => number,
 ): Promise<void> {
-  const recent = await client.query<{ day: string; pet_id: string }>(
-    "select to_char(day, 'YYYY-MM-DD') as day, pet_id from daily_answers order by day desc limit $1",
-    [ANSWER_SKIP_PERIOD],
-  );
-  const previous = recent.rows.map((row) => row.pet_id).reverse();
-  const lastDay = recent.rows[0] ? dayNumber(recent.rows[0].day) : -1;
+  const { previous, lastDay } = await history(client, null);
   for (let day = lastDay + 1; day <= target; day++) {
-    const petId = drawAnswer(ids, previous, ANSWER_SKIP_PERIOD, random);
     await client.query(
       "insert into daily_answers (day, pet_id, source) values ($1, $2, 'generated')",
-      [dateOfDay(day), petId],
+      [dateOfDay(day), drawNext(ids, previous, random)],
     );
-    previous.push(petId);
   }
 }
 
@@ -104,11 +124,7 @@ async function redrawFrom(
   fromDate: string,
   random: () => number,
 ): Promise<void> {
-  const before = await client.query<{ pet_id: string }>(
-    "select pet_id from daily_answers where day < $1 order by day desc limit $2",
-    [fromDate, ANSWER_SKIP_PERIOD],
-  );
-  const previous = before.rows.map((row) => row.pet_id).reverse();
+  const { previous } = await history(client, fromDate);
   const later = await client.query<{
     day: string;
     pet_id: string;
@@ -118,15 +134,14 @@ async function redrawFrom(
     [fromDate],
   );
   for (const row of later.rows) {
-    let petId = row.pet_id;
-    if (row.source !== "override") {
-      petId = drawAnswer(ids, previous, ANSWER_SKIP_PERIOD, random);
+    if (row.source === "override") {
+      previous.push(row.pet_id);
+    } else {
       await client.query(
         "update daily_answers set pet_id = $2 where day = $1",
-        [row.day, petId],
+        [row.day, drawNext(ids, previous, random)],
       );
     }
-    previous.push(petId);
   }
 }
 
