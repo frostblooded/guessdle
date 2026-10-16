@@ -943,3 +943,29 @@ td button:disabled {
   color: var(--success);
   font-weight: 700;
 }
+
+.tag {
+  display: inline-block;
+  margin-right: var(--s1);
+  padding: 0 var(--s2);
+  border-radius: 999px;
+  background-color: var(--surface-2);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.tag[data-tag="today"] {
+  background-color: var(--success-bg);
+  color: var(--success);
+}
+
+.tag[data-tag="override"] {
+  background-color: var(--warn-bg);
+  color: var(--warn);
+}
+
+.tag[data-tag="admin"] {
+  background-color: var(--danger-bg);
+  color: var(--danger);
+}
