@@ -5,3 +5,5 @@
 /tests/playwright-report
 /test-results
 .env
+/backups
+*.dump

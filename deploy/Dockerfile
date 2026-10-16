@@ -27,6 +27,13 @@ USER node
 EXPOSE 3000
 CMD ["node", "src/server/main.ts"]
 
+# Backup sidecar: pg_dump, pruning and weekly restore test (docs/backup-runbook.md)
+FROM postgres:17-alpine AS backup
+RUN apk add --no-cache jq && mkdir /backups && chown postgres /backups
+COPY --chmod=755 deploy/backup /opt/backup
+USER postgres
+CMD ["/opt/backup/loop.sh"]
+
 # Prod (default target): only the files the page loads
 FROM nginxinc/nginx-unprivileged:alpine AS prod
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
