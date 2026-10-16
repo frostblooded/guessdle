@@ -31,7 +31,7 @@ After editing a `.ts` file, rebuild before refreshing (`npm run typecheck` runs 
 ## Docker
 
 ```sh
-docker compose -f deploy/compose.yaml up --watch  # dev: live rebuild, http://localhost:8080
+docker compose up --watch  # dev: live rebuild, http://localhost:8080
 docker build -t petdle .   # prod image (nginx, non-root)
 docker run -p 8080:8080 petdle
 ```

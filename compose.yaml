@@ -1,9 +1,9 @@
 # Dev: docker compose up --watch  (http://localhost:8080)
-# Just Postgres for `npm start`: docker compose -f deploy/compose.yaml up -d db
+# Just Postgres for `npm start`: docker compose up -d db
 services:
   dev:
     build:
-      context: ..
+      context: .
       dockerfile: Dockerfile
       target: dev
     ports:
@@ -16,16 +16,16 @@ services:
     develop:
       watch:
         - action: sync
-          path: ..
+          path: .
           target: /app
           ignore:
             - node_modules/
             - dist/
             - .git/
         - action: rebuild
-          path: ../package.json
+          path: ./package.json
         - action: rebuild
-          path: ../package-lock.json
+          path: ./package-lock.json
 
   # Also reachable from the host for `npm start`: DATABASE_URL=postgres://petdle:petdle@localhost:5432/petdle
   db:

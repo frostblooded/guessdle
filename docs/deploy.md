@@ -13,5 +13,5 @@
 
 ## Local development
 
-- `docker compose -f deploy/compose.yaml up -d db`, copy `.env.example` to `.env`, then `npm run build && npm start`: one Node process serves the page and `/api`. For Google sign-in locally, add the three `GOOGLE_*` keys to `.env` with callback `http://localhost:8080/api/auth/google/callback`. Without `DATABASE_URL` only static files are served.
+- `docker compose up -d db`, copy `.env.example` to `.env`, then `npm run build && npm start`: one Node process serves the page and `/api`. For Google sign-in locally, add the three `GOOGLE_*` keys to `.env` with callback `http://localhost:8080/api/auth/google/callback`. Without `DATABASE_URL` only static files are served.
 - `npm run test:integration` needs Docker (Testcontainers starts Postgres itself).
