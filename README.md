@@ -7,9 +7,9 @@ A Wordle-style daily guessing game. Guess the pet of the day from a fixed roster
 ## How it works
 
 - Static front-end: `index.html`, `src/script.ts` and the ES modules it imports, bundled by esbuild into `dist/`, `styles.css`.
-- No backend. The daily answer is derived from the date with a seeded RNG, so every player sees the same pet.
-- Progress is kept in `localStorage` and resets each day.
-- A small Node server (`scripts/server.mjs`) serves the static files for local development.
+- Express API (`src/server/`) on Postgres. The daily answer is drawn at random on first request and stored per day, graded server-side and never sent to the browser until a win or give-up (ADRs 0008-0010).
+- Anonymous progress is kept in `localStorage`; signing in with Google stores it on the server. Both reset each day.
+- `scripts/server.mjs` serves the static files and mounts the API for local development (needs Postgres, see `docs/deploy.md`).
 
 ## Requirements
 
@@ -53,7 +53,7 @@ The server's existing Cloudflare Tunnel (service `http://guessdle-server:8080`) 
 1. Add the photo to `photos/`.
 2. Add an entry to `GUESS_DATA` in `src/game/roster.ts` with a unique lowercase-slug `id` (e.g. `"mochi"`). Guesses are stored by id, so never change an id once shipped. `npm test` fails on a duplicate or malformed id.
 
-Warning: changing `GUESS_DATA` (order or length), `START_DATE`, or the skip logic changes the answer for every day, including today.
+Stored answers refer to pet ids, so adding a pet or reordering the roster does not change past or stored days. A pet removed from the roster breaks the stored days that use it (flagged in the admin panel).
 
 ## Deployment
 

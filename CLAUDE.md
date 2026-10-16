@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-"Petdle": a Wordle-style daily guessing game where players guess a pet from a fixed roster. Static front-end (`index.html`, `src/script.ts`, `styles.css`) served by a tiny Node server (`scripts/server.mjs`). Strict TypeScript, ES modules bundled by esbuild into `dist/` (gitignored, ADR 0001); `tsc` only type-checks (Node 24, see `.nvmrc`). ESLint (`npm run lint`, typescript-eslint) lints; Prettier formats. `typescript` is pinned `~6.0` because typescript-eslint does not support 7 yet. Libs come from npm (`@tarekraafat/autocomplete.js`, `express`, `pg`).
+"Petdle": a Wordle-style daily guessing game where players guess a pet from a fixed roster. Static front-end (`index.html`, `src/script.ts`, `styles.css`) served by a Node server (`scripts/server.mjs`) that also mounts the Express API (`src/server/`) backed by Postgres (ADRs 0008-0010). Strict TypeScript, ES modules bundled by esbuild into `dist/` (gitignored, ADR 0001); `tsc` only type-checks (Node 24, see `.nvmrc`). ESLint (`npm run lint`, typescript-eslint) lints; Prettier formats. `typescript` is pinned `~6.0` because typescript-eslint does not support 7 yet. Libs come from npm (`@tarekraafat/autocomplete.js`, `express`, `pg`).
 
 ## Commands
 
@@ -24,6 +24,8 @@ Scripts are in `package.json`.
   - Anonymous play (`src/game/play.ts`): the browser keeps pet ids in `localStorage` and `POST /api/grade` grades them; `POST /api/give-up` (stateless, open to anyone by decision) reveals the answer. Every response carries the Day Number; a client seeing a newer day than its stored one resets itself (`onNewDay`). After a win or give-up the input is replaced by a reset button that clears local state.
   - `POST /api/grade {ids}` (`src/server/app.ts`) grades pet ids statelessly with `gradeIds` (`src/game/game.ts`) and returns `{day, rows, victory, answer?}`; `answer` (a name) only on victory. `createPlay` (`src/game/play.ts`) is what `script.ts` uses: it keeps ids in `localStorage` (`createGameState`, `src/game/game-state.ts`: a missing or other-day `lastPlayed` clears them; the server `day` clears them too), upgrades legacy name-keyed state, and posts them to the API. Blocked storage falls back to memory. `initTheme` (`src/theme.ts`) wires the theme button.
   - `npm run test:e2e` starts a Testcontainers Postgres via `tests/e2e/serve.ts` (needs Docker); the Daily Answer is random there, tests learn it through the API.
+  - Signed-in play: Google OAuth (`src/server/auth.ts`), Postgres sessions, `GET /api/game` and `POST /api/game/guess|give-up|merge|reset` store pet ids per user and day (`src/server/user-game.ts`, `src/game/server-play.ts`); victory is derived on read. `merge` adopts leftover anonymous guesses on login (`src/game/merge.ts`). Admin routes (`/api/admin/answers|users|backup`, `src/admin.ts` panel) peek and override answers (today or future only; later generated days are re-drawn), promote or demote users (no self or last-admin demotion) and show backup age. Rate limits in nginx and `src/server/rate-limit.ts`. `/api/test/login` exists only with `NODE_ENV=test`. Migrations: `db/migrations/*.sql`, applied at startup. Deploy, env keys, backups: `docs/deploy.md`.
+  - `npm run test:integration` runs the HTTP API against Testcontainers Postgres (needs Docker).
 - Cell result classes: `correct` / `partially-correct` (arrays sharing an element) / `incorrect`, styled in `styles.css`.
 
 ## Agent skills

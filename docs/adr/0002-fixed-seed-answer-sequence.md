@@ -1,6 +1,6 @@
 # The answer sequence uses a fixed seed derived from START_DATE
 
-Superseded (spec #38, ticket #42): Daily Answers are stored server-side. The seeded replay, `seedrandom` and the golden fixture are removed; the last replay was exported once into `db/backfill/answers.json`.
+Superseded by [ADR 0008](0008-server-stored-daily-answers.md) (spec #38, ticket #42): Daily Answers are stored server-side. The seeded replay, `seedrandom` and the golden fixture are removed; the last replay was exported once into `db/backfill/answers.json`.
 
 `generateAnswerIdx` replays every day from `START_DATE` to today, picking each day's Daily Answer uniformly from the roster minus the previous Skip Period answers. The RNG is seeded once, with `START_DATE`, before the replay. The seed is not today's date.
 
