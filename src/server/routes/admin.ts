@@ -4,6 +4,7 @@ import type { Express, Request, Response } from "express";
 import {
   approveGame,
   deleteGame,
+  listAllGames,
   listQueue,
   MAX_REASON,
   rejectGame,
@@ -12,8 +13,8 @@ import { readBackupStatus } from "../backup.ts";
 import { findGame, type GameRow } from "../games.ts";
 import { removeUpload } from "../upload-store.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
-import { listUsers, setAdmin } from "../users.ts";
-import { bodyOf, paramOf, type AppContext } from "./context.ts";
+import { deleteUser, listUsers, setAdmin } from "../users.ts";
+import { bodyOf, paramOf, queryOf, type AppContext } from "./context.ts";
 
 const MAX_USER_ID = 2147483647;
 
@@ -64,6 +65,14 @@ export function adminRoutes(
       res.json({ games: await listQueue(pool) });
     }),
   );
+  app.get(
+    "/api/admin/games",
+    adminRoute(async ({ req, res }) => {
+      const q = queryOf(req)["q"];
+      const search = typeof q === "string" ? q.slice(0, 100) : "";
+      res.json({ games: await listAllGames(pool, search) });
+    }),
+  );
   // Approve, reject (with a reason) or delete the game at :slug
   const gameRoute = (
     act: (
@@ -108,6 +117,27 @@ export function adminRoutes(
         await removeUpload(pool, uploadsDir, url);
       }
       return "ok";
+    }),
+  );
+  app.delete(
+    "/api/admin/users/:id",
+    adminRoute(async ({ req, res, actor }) => {
+      const id = String(paramOf(req, "id"));
+      if (!/^[1-9]\d{0,9}$/.test(id) || Number(id) > MAX_USER_ID) {
+        res.status(400).json({ error: "invalid" });
+        return;
+      }
+      const { result, urls } = await deleteUser(pool, actor.id, Number(id));
+      if (result !== "ok") {
+        res
+          .status(result === "self" ? 409 : 404)
+          .json({ error: result === "self" ? "self_deletion" : result });
+        return;
+      }
+      for (const url of urls) {
+        await removeUpload(pool, uploadsDir, url);
+      }
+      res.json({ ok: true });
     }),
   );
   app.put(

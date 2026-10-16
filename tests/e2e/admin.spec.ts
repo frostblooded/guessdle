@@ -84,7 +84,8 @@ test("an admin promotes and demotes a user; self-demotion is disabled and refuse
     page.locator(`#admin-users tr[data-email="${email}"]`);
   await expect(row(player)).toContainText("player");
   await expect(row(me)).toContainText("admin");
-  await expect(row(me).locator("button")).toBeDisabled();
+  await expect(row(me).locator(".role-toggle")).toBeDisabled();
+  await expect(row(me).locator(".user-delete")).toBeDisabled();
 
   // The server refuses self-demotion too
   const users = (await (await page.request.get("/api/admin/users")).json()) as {

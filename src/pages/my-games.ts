@@ -31,7 +31,28 @@ function row(game: Mine): HTMLLIElement {
   const note = document.createElement("span");
   note.className = "fine-print";
   note.textContent = `${game.entryCount} entries${game.rejectReason ? `. Rejected: ${game.rejectReason}` : ""}`;
-  item.append(title, status, note, edit, play);
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "btn btn-quiet btn-sm";
+  remove.textContent = "Delete";
+  remove.setAttribute("aria-label", `Delete ${game.name}`);
+  remove.onclick = async (): Promise<void> => {
+    if (
+      !confirm(
+        `Delete "${game.name}"? Its entries, photos and players' progress are gone for good.`,
+      )
+    ) {
+      return;
+    }
+    const out = await api("DELETE", `/api/games/${slug}`);
+    if (out?.status === 200) {
+      item.remove();
+      show("#mine-empty", document.querySelector("#mine li") === null);
+    } else {
+      show("#mine-error", true);
+    }
+  };
+  item.append(title, status, note, edit, play, remove);
   return item;
 }
 

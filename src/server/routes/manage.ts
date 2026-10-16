@@ -2,7 +2,12 @@
 import express from "express";
 import type { Express, Request, Response } from "express";
 import { slugBase, slugError } from "../../game/slug.ts";
-import { mailAdminsPending, submitGame, unpublishGame } from "../approval.ts";
+import {
+  deleteGame,
+  mailAdminsPending,
+  submitGame,
+  unpublishGame,
+} from "../approval.ts";
 import { redrawFuture, releaseEntry, todayIn } from "../answers.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
 import type { AttributeType } from "../../game/game.ts";
@@ -322,6 +327,17 @@ export function manageRoutes(
     writes,
     json,
     flowRoute(unpublishGame),
+  );
+
+  app.delete(
+    "/api/games/:slug",
+    writes,
+    manageRoute(async ({ game }, _user, _req, res) => {
+      for (const url of await deleteGame(pool, game)) {
+        await removeUpload(pool, uploadsDir, url);
+      }
+      res.json({ ok: true });
+    }),
   );
 
   app.patch(

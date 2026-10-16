@@ -29,6 +29,15 @@ test("the Entries tab adds, edits and deletes entries and counts what is missing
     "needs 2 more entries",
   );
 
+  // Opening the tab refreshes the lists. Hold that refresh back so it lands while the form is filled in (the old flake: it wiped the form)
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route("**/entries", async (route) => {
+    if (route.request().method() === "GET") {
+      await held;
+    }
+    await route.continue();
+  });
   await page.locator("#tab-entries").click();
   await expect(page.locator("#panel-entries")).toBeVisible();
   await expect(page.locator("#details-form")).toBeHidden();
@@ -41,6 +50,15 @@ test("the Entries tab adds, edits and deletes entries and counts what is missing
   });
   await expect(page.locator("#entry-photo-preview")).toBeVisible();
   await page.getByLabel("Color (one per line)").fill("Red\nBlue");
+  const refreshed = page.waitForResponse(
+    (r) => r.url().endsWith("/entries") && r.request().method() === "GET",
+  );
+  release();
+  await refreshed;
+  // Let the page handle the refreshed lists, then check the form survived
+  await page.evaluate(() => new Promise((r) => setTimeout(r, 50)));
+  await page.unroute("**/entries");
+  await expect(page.locator("#entry-name")).toHaveValue("Rex");
   await page.getByRole("button", { name: "Add entry" }).click();
   await expect(page.locator("#entry-list li")).toHaveCount(1);
   await expect(page.locator("#entry-list img")).toBeVisible();

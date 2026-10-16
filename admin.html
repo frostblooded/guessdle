@@ -74,7 +74,50 @@
           >
             Queue
           </button>
+          <button
+            type="button"
+            role="tab"
+            id="tab-games"
+            aria-selected="false"
+            aria-controls="games-panel"
+            tabindex="-1"
+          >
+            All games
+          </button>
         </div>
+        <section
+          id="games-panel"
+          class="card"
+          role="tabpanel"
+          aria-labelledby="tab-games"
+          hidden
+        >
+          <h2>All games</h2>
+          <label for="games-search" class="field-label"
+            >Search by name, address or owner</label
+          >
+          <input id="games-search" type="search" maxlength="100" />
+          <p
+            id="games-message"
+            class="alert alert-warn"
+            role="status"
+            hidden
+          ></p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Game</th>
+                  <th>Owner</th>
+                  <th>Status</th>
+                  <th>Entries</th>
+                  <th><span class="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody id="all-games"></tbody>
+            </table>
+          </div>
+        </section>
         <section
           id="queue-panel"
           class="card"

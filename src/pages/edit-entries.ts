@@ -43,6 +43,7 @@ export async function initEntries(
   // The entry being edited (null: adding) and the photo URL the form will save
   let editing: Entry | null = null;
   let photo = "";
+  let loaded = false;
 
   const reset = (entry: Entry | null): void => {
     editing = entry;
@@ -193,10 +194,15 @@ export async function initEntries(
       return;
     }
     error.textContent = "";
+    // Opening the tab refreshes while the user may already be typing: keep the form unless the attributes changed
+    const sameForm = JSON.stringify(attributes) === JSON.stringify(attrs.data);
     attributes = attrs.data;
     entries = got.data;
     draw();
-    reset(null);
+    if (!loaded || !sameForm) {
+      reset(null);
+    }
+    loaded = true;
   };
   await refresh();
   return refresh;

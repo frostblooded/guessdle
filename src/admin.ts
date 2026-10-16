@@ -1,4 +1,5 @@
 // Admin page: Users, Backups and Queue tabs (answers live in each game's editor).
+import { initAllGames } from "./admin-games.ts";
 import { initQueue } from "./admin-queue.ts";
 
 interface AdminUser {
@@ -101,8 +102,29 @@ export function initAdmin(): void {
           }
           await showUsers();
         };
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "user-delete";
+        remove.textContent = "DELETE";
+        remove.disabled = user.id === data.self;
+        remove.onclick = async (): Promise<void> => {
+          if (
+            !confirm(
+              `Delete ${user.email}, all their games and uploads? This cannot be undone.`,
+            )
+          ) {
+            return;
+          }
+          const res = await call("DELETE", `/api/admin/users/${user.id}`);
+          if (!res.ok) {
+            usersMessage.textContent = "Could not delete that user.";
+            usersMessage.hidden = false;
+            return;
+          }
+          await showUsers();
+        };
         const action = document.createElement("td");
-        action.append(toggle);
+        action.append(toggle, " ", remove);
         row.append(action);
         return row;
       }),
@@ -138,15 +160,20 @@ export function initAdmin(): void {
   const queuePanel = $<HTMLElement>("#queue-panel");
   const showQueue = initQueue();
 
+  const gamesPanel = $<HTMLElement>("#games-panel");
+  const showGames = initAllGames();
+
   const tabs = {
     users: $<HTMLElement>("#tab-users"),
     backup: $<HTMLElement>("#tab-backup"),
     queue: $<HTMLElement>("#tab-queue"),
+    games: $<HTMLElement>("#tab-games"),
   };
   const selectTab = (name: keyof typeof tabs): void => {
     usersPanel.hidden = name !== "users";
     backupPanel.hidden = name !== "backup";
     queuePanel.hidden = name !== "queue";
+    gamesPanel.hidden = name !== "games";
     for (const [key, tab] of Object.entries(tabs)) {
       tab.ariaSelected = String(key === name);
       tab.tabIndex = key === name ? 0 : -1;
@@ -155,7 +182,9 @@ export function initAdmin(): void {
       ? showUsers()
       : name === "queue"
         ? showQueue()
-        : showBackup());
+        : name === "games"
+          ? showGames()
+          : showBackup());
   };
   for (const [name, tab] of Object.entries(tabs)) {
     tab.onclick = (): void => selectTab(name as keyof typeof tabs);
