@@ -179,4 +179,46 @@ describe("game shell with link-preview meta", () => {
     await makeGame("approved", 2);
     assert.equal((await fetch(`${url}/g/${SLUG}/edit`)).status, 404);
   });
+
+  it("agrees with the API on who sees a game, for every status, entry count and role", async () => {
+    const cookies = {
+      anon: undefined,
+      stranger: await login("stranger@example.com"),
+      owner: await login("owner@example.com"),
+      admin: await login("boss@example.com", true),
+    };
+    const get = async (path: string, who: keyof typeof cookies) =>
+      (
+        await fetch(`${url}${path}`, {
+          headers: cookies[who] ? { Cookie: cookies[who] } : {},
+        })
+      ).status;
+    for (const status of ["draft", "pending", "approved", "rejected"]) {
+      for (const entries of [0, 1, 2]) {
+        await db.pool.query("delete from games where slug = $1", [SLUG]);
+        await makeGame(status, entries, {}, "owner@example.com");
+        const playable = status !== "draft" && entries >= 2;
+        for (const who of ["anon", "stranger", "owner", "admin"] as const) {
+          const manager = who === "owner" || who === "admin";
+          const tag = `${status}/${entries}/${who}`;
+          const visible = playable || manager ? 200 : 404;
+          assert.equal(await get(`/g/${SLUG}`, who), visible, tag);
+          assert.equal(await get(`/api/games/${SLUG}`, who), visible, tag);
+          // Editing routes hide first (404), then ask for a sign-in, then refuse
+          const edit =
+            visible === 404 ? 404 : manager ? 200 : who === "anon" ? 401 : 403;
+          // An empty roster cannot draw answers (the editor never asks), so only details is probed there
+          for (const path of entries === 0
+            ? ["details"]
+            : ["details", "answers"]) {
+            assert.equal(
+              await get(`/api/games/${SLUG}/${path}`, who),
+              edit,
+              tag + path,
+            );
+          }
+        }
+      }
+    }
+  });
 });

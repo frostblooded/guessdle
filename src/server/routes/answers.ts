@@ -1,4 +1,5 @@
 // Per-game Daily Answer peek and Overrides: owner and admin only.
+import type { LoadedGame } from "../access.ts";
 import express from "express";
 import type { Express, Request, Response } from "express";
 import {
@@ -9,16 +10,13 @@ import {
   setOverride,
   todayIn,
 } from "../answers.ts";
-import { requestUser } from "../auth.ts";
 import type { GameRow } from "../games.ts";
 import {
   bodyOf,
-  canManage,
-  loadGame,
+  guardGame,
   paramOf,
   queryOf,
   type AppContext,
-  type LoadedGame,
 } from "./context.ts";
 
 const MAX_RANGE_DAYS = 366;
@@ -61,16 +59,8 @@ export function answersRoutes(app: Express, ctx: AppContext): void {
     (handler: (answers: AnswersCtx) => Promise<void>) =>
     async (req: Request, res: Response): Promise<void> => {
       res.set("Cache-Control", "no-store");
-      if (!(await requestUser(pool, req, now()))) {
-        res.status(401).json({ error: "unauthorized" });
-        return;
-      }
-      const loaded = await loadGame(ctx, req, res);
+      const loaded = await guardGame(ctx, req, res, "edit");
       if (!loaded) {
-        return;
-      }
-      if (!canManage(loaded.game, loaded.user)) {
-        res.status(403).json({ error: "forbidden" });
         return;
       }
       const today = todayIn(now(), timeZone);

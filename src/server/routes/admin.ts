@@ -4,11 +4,19 @@ import type { Express, Request, Response } from "express";
 import { listAllGames, listQueue, MAX_REASON } from "../approval.ts";
 import { gameLifecycle, type MoveResult } from "../lifecycle.ts";
 import { readBackupStatus } from "../backup.ts";
-import { findGame, type GameRow } from "../games.ts";
+import type { GameRow } from "../games.ts";
+import { resolveAdmin } from "../access.ts";
 import { uploadRefs } from "../upload-refs.ts";
-import { requestUser, type SessionUser } from "../auth.ts";
+import type { SessionUser } from "../auth.ts";
 import { deleteUser, listUsers, setAdmin } from "../users.ts";
-import { bodyOf, fail, paramOf, queryOf, type AppContext } from "./context.ts";
+import {
+  bodyOf,
+  fail,
+  guardGame,
+  paramOf,
+  queryOf,
+  type AppContext,
+} from "./context.ts";
 
 const MAX_USER_ID = 2147483647;
 
@@ -30,16 +38,12 @@ export function adminRoutes(
     (handler: (admin: AdminCtx) => Promise<void>) =>
     async (req: Request, res: Response): Promise<void> => {
       res.set("Cache-Control", "no-store");
-      const user = await requestUser(pool, req, now());
-      if (!user) {
-        fail(res, "unauthorized");
+      const actor = await resolveAdmin(pool, now, req);
+      if (typeof actor === "string") {
+        fail(res, actor);
         return;
       }
-      if (!user.admin) {
-        fail(res, "forbidden");
-        return;
-      }
-      await handler({ req, res, actor: user });
+      await handler({ req, res, actor });
     };
 
   app.get(
@@ -73,12 +77,11 @@ export function adminRoutes(
     act: (game: GameRow, req: Request) => Promise<MoveResult | "invalid">,
   ) =>
     adminRoute(async ({ req, res }) => {
-      const game = await findGame(pool, String(paramOf(req, "slug")));
-      if (!game) {
-        fail(res, "not_found");
+      const loaded = await guardGame(ctx, req, res, "admin");
+      if (!loaded) {
         return;
       }
-      const out = await act(game, req);
+      const out = await act(loaded.game, req);
       if (out === "ok") {
         res.json({ ok: true });
       } else {

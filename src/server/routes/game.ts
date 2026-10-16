@@ -4,6 +4,7 @@ import type { Express, Request, Response } from "express";
 import type pg from "pg";
 import { gradeIds } from "../../game/game.ts";
 import { listGallery } from "../games.ts";
+import { canManage, type LoadedGame } from "../access.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
 import {
   addGuess,
@@ -19,13 +20,11 @@ import {
 } from "../user-game.ts";
 import {
   bodyOf,
-  canManage,
   isIdList,
   loadGame,
   todayOf,
   todaysAnswer,
   type AppContext,
-  type LoadedGame,
 } from "./context.ts";
 
 export function gameRoutes(app: Express, ctx: AppContext): void {

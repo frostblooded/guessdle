@@ -1,4 +1,5 @@
 // Creating a game and editing its details (spec #66): owner and admin only.
+import type { LoadedGame } from "../access.ts";
 import express from "express";
 import type { Express, Request, Response } from "express";
 import { slugBase, slugError } from "../../game/slug.ts";
@@ -28,11 +29,10 @@ import { rateLimit, type RateLimit } from "../rate-limit.ts";
 import { uploadRefs } from "../upload-refs.ts";
 import {
   bodyOf,
-  canManage,
   fail,
+  guardGame,
   loadGame,
   type AppContext,
-  type LoadedGame,
 } from "./context.ts";
 
 // Starting values, tune after launch (docs/deploy.md)
@@ -63,7 +63,7 @@ export function manageRoutes(
     return user ?? undefined;
   };
 
-  // requireOwnerOrAdmin: a hidden game is a 404 for everyone else (loadGame), then 401 / 403
+  // Owner or admin only (guardGame "edit"): 404 for a hidden game first, then 401 / 403
   const manageRoute =
     (
       handler: (
@@ -75,19 +75,10 @@ export function manageRoutes(
     ) =>
     async (req: Request, res: Response): Promise<void> => {
       res.set("Cache-Control", "no-store");
-      const loaded = await loadGame(ctx, req, res);
-      if (!loaded) {
-        return;
+      const loaded = await guardGame(ctx, req, res, "edit");
+      if (loaded) {
+        await handler(loaded, loaded.user, req, res);
       }
-      const user = await needUser(req, res);
-      if (!user) {
-        return;
-      }
-      if (!canManage(loaded.game, user)) {
-        fail(res, "forbidden");
-        return;
-      }
-      await handler(loaded, user, req, res);
     };
 
   const detailsOf = ({ game, roster }: LoadedGame) => ({

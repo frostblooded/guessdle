@@ -2,9 +2,8 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Express, Request } from "express";
-import { requestUser } from "../auth.ts";
-import { findGame, loadRoster } from "../games.ts";
-import { canManage, isPlayable, paramOf, type AppContext } from "./context.ts";
+import { isPlayable, resolveGame } from "../access.ts";
+import { paramOf, type AppContext } from "./context.ts";
 
 const escapeHtml = (text: string): string =>
   text.replace(
@@ -26,18 +25,13 @@ export function shellRoutes(
   // The slug is not a path here (the shell is read from a fixed file). Express has already decoded it once; decoding again threw on e.g. /g/%25zz
   app.get(/^\/g\/([^/]+)$/, async (req: Request, res) => {
     const slug = String(paramOf(req, "0"));
-    const game = await findGame(pool, slug);
-    const roster = game && (await loadRoster(pool, game));
-    const user =
-      game && roster && (!isPlayable(game, roster) || req.headers.cookie)
-        ? await requestUser(pool, req, now())
-        : null;
-    const visible =
-      game && roster && (isPlayable(game, roster) || canManage(game, user));
+    const loaded = await resolveGame(pool, now, req, slug, "play");
+    const visible = typeof loaded !== "string";
 
     const origin = `${req.protocol}://${req.get("host")}`;
     const tags: string[] = [];
     if (visible) {
+      const { game, roster } = loaded;
       const title = `${game.name} - Guessdle`;
       tags.push(
         `<title>${escapeHtml(title)}</title>`,

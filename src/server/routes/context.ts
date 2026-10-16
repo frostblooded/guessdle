@@ -4,15 +4,14 @@ import type pg from "pg";
 import { FAILURES, type FailureCode } from "../../game/failures.ts";
 import type { Entry } from "../../game/game.ts";
 import { dayNumber, ensureAnswer, todayIn } from "../answers.ts";
-import { requestUser, type SessionUser } from "../auth.ts";
-import type { MailConfig } from "../mailer.ts";
 import {
-  findGame,
-  loadRoster,
-  MIN_ENTRIES,
-  type GameRow,
-  type Roster,
-} from "../games.ts";
+  resolveGame,
+  type LoadedGame,
+  type Need,
+  type Resolved,
+} from "../access.ts";
+import type { MailConfig } from "../mailer.ts";
+import type { GameRow, Roster } from "../games.ts";
 
 export interface AppContext {
   pool: pg.Pool;
@@ -46,43 +45,33 @@ export const isIdList = (
   value.length <= entries.length &&
   value.every((id: unknown) => Number.isInteger(id));
 
-export interface LoadedGame {
-  game: GameRow;
-  roster: Roster;
-  // The signed-in user, when the route looked them up
-  user: SessionUser | null;
-}
-
-export const isPlayable = (game: GameRow, roster: Roster): boolean =>
-  game.status !== "draft" && roster.entries.length >= MIN_ENTRIES;
-
-export const canManage = (game: GameRow, user: SessionUser | null): boolean =>
-  user !== null && (user.admin || game.ownerId === user.id);
-
-// Resolves `:slug` and applies visibility: a draft or a game with fewer than 2
-// active entries is a 404 for everyone but its owner and admins. Sends the 404
-// and returns undefined otherwise.
-export async function loadGame(
+// Resolves `:slug` for what the viewer wants to do (access.ts) and sends the 404/401/403 itself.
+export async function guardGame<N extends Need>(
   { pool, now }: AppContext,
   req: Request,
   res: Response,
-): Promise<LoadedGame | undefined> {
-  const game = await findGame(pool, String(paramOf(req, "slug")));
-  if (game) {
-    const roster = await loadRoster(pool, game);
-    const playable = isPlayable(game, roster);
-    // Signed-in players are looked up anyway; anonymous ones skip the query
-    const user =
-      playable && !req.headers.cookie
-        ? null
-        : await requestUser(pool, req, now());
-    if (playable || canManage(game, user)) {
-      return { game, roster, user };
-    }
+  need: N,
+): Promise<Resolved<N> | undefined> {
+  const out = await resolveGame(
+    pool,
+    now,
+    req,
+    String(paramOf(req, "slug")),
+    need,
+  );
+  if (typeof out === "string") {
+    fail(res, out);
+    return undefined;
   }
-  fail(res, "not_found");
-  return undefined;
+  return out;
 }
+
+// Play access: a draft or a game with fewer than 2 active entries is a 404 for all but its owner and admins
+export const loadGame = (
+  ctx: AppContext,
+  req: Request,
+  res: Response,
+): Promise<LoadedGame | undefined> => guardGame(ctx, req, res, "play");
 
 // Today's date and Day Number in the game's calendar
 export function todayOf(
