@@ -2,20 +2,15 @@ import autoComplete from "@tarekraafat/autocomplete.js";
 import seedrandom from "seedrandom";
 import "./styles.css";
 import "@tarekraafat/autocomplete.js/dist/css/autoComplete.css";
+import { correctnessClass } from "./correctness.ts";
 import {
-  type AttributeValue,
-  correctnessClass,
-  gradeCorrectness,
-} from "./correctness.ts";
-import { computeAnswerIdx, type GuessResult, submitGuess } from "./game.ts";
-import { createGameState, type GameState } from "./game-state.ts";
+  createGame,
+  type Game,
+  type GradedAttribute,
+  type GuessResult,
+} from "./game.ts";
 import { GUESS_DATA, type Pet } from "./roster.ts";
-import {
-  nextThemeMode,
-  readThemeMode,
-  type ThemeMode,
-  writeThemeMode,
-} from "./theme.ts";
+import { initTheme } from "./theme.ts";
 import type {
   AutoCompleteItem,
   AutoCompleteResults,
@@ -26,10 +21,12 @@ const GUESS_DATA_NAMES: string[] = GUESS_DATA.map(
   (item: Pet): string => item.name,
 );
 
-const gameState: GameState = createGameState(
-  localStorage,
-  (): Date => new Date(),
-);
+const game: Game = createGame({
+  roster: GUESS_DATA,
+  storage: localStorage,
+  now: (): Date => new Date(),
+  makeRandom: (seed: string): (() => number) => seedrandom(seed),
+});
 
 let autoCompleteJs: autoComplete | null = null;
 
@@ -55,20 +52,14 @@ window.onload = function (): void {
     },
   });
 
-  initGame();
   loadInitialUsedGuessesElements();
   initButtons();
   initVictoryTitle();
   initNewGuessSubmit();
-  gameState.setLastPlayed();
 };
 
 function getNewGuessInput(): HTMLInputElement {
   return document.querySelector<HTMLInputElement>("#new-guess-input")!;
-}
-
-function initGame(): void {
-  gameState.resetIfNewDay();
 }
 
 function initNewGuessSubmit(): void {
@@ -95,47 +86,17 @@ function initNewGuessSubmit(): void {
 }
 
 function initVictoryTitle(): void {
-  if (gameState.getIsVictory()) {
+  if (game.getIsVictory()) {
     addVictoryTitle();
   }
 }
 
-let cachedAnswerIdx: number | null = null;
-
-function getAnswerIdx(): number {
-  cachedAnswerIdx ??= computeAnswerIdx(
-    GUESS_DATA.length,
-    new Date(),
-    (seed: string): (() => number) => seedrandom(seed),
-  );
-  return cachedAnswerIdx;
-}
-
-function applyThemeMode(mode: ThemeMode): void {
-  if (mode === "auto") {
-    delete document.documentElement.dataset["theme"];
-  } else {
-    document.documentElement.dataset["theme"] = mode;
-  }
-  const button: HTMLButtonElement =
-    document.querySelector<HTMLButtonElement>("#theme-button")!;
-  button.textContent = `Theme: ${mode}`;
-  button.setAttribute("aria-label", `Theme: ${mode}. Click to change.`);
-}
-
-function initThemeButton(): void {
-  let mode: ThemeMode = readThemeMode(localStorage);
-  applyThemeMode(mode);
-  document.querySelector<HTMLButtonElement>("#theme-button")!.onclick =
-    (): void => {
-      mode = nextThemeMode(mode);
-      writeThemeMode(localStorage, mode);
-      applyThemeMode(mode);
-    };
-}
-
 function initButtons(): void {
-  initThemeButton();
+  initTheme(
+    document.documentElement,
+    document.querySelector<HTMLButtonElement>("#theme-button")!,
+    localStorage,
+  );
   const submitNewGuessButton: HTMLButtonElement =
     document.querySelector<HTMLButtonElement>("#submit-new-guess-button")!;
   submitNewGuessButton.onclick = (): void => {
@@ -178,37 +139,26 @@ function initHelpDialog(): void {
 }
 
 function loadInitialUsedGuessesElements(): void {
-  const usedGuesses: string[] = gameState.getUsedGuesses();
-  for (const usedGuess of usedGuesses) {
-    addGuessResultElement(usedGuess);
+  for (const row of game.getRows()) {
+    addGuessResultElement(row);
   }
 }
 
-function addGuessResultElement(name: string): void {
+function addGuessResultElement(row: GradedAttribute[]): void {
   const resultElement: HTMLDivElement = document.createElement("div");
   resultElement.setAttribute("class", "guess-result-row row");
 
-  const answerData: Pet = GUESS_DATA[getAnswerIdx()]!;
-  const resultData: Pet = GUESS_DATA.find(
-    (item: Pet): boolean => item.name === name,
-  )!;
-
-  for (const key in resultData) {
-    const attr = key as keyof Pet;
-    const val: AttributeValue = resultData[attr];
-    const formattedVal: string = getFormattedCellVal(val);
-
+  for (const { key, value, correctness } of row) {
     const resultCell: HTMLDivElement = document.createElement("div");
     resultCell.setAttribute("class", "guess-result-cell cell");
 
     if (key === "photo") {
       const image: HTMLImageElement = document.createElement("img");
-      image.src = val as string;
+      image.src = value as string;
       resultCell.appendChild(image);
     } else {
-      const answerVal: AttributeValue = answerData[attr];
-      resultCell.textContent = formattedVal;
-      addGuessResultCellClasses(val, answerVal, resultCell);
+      resultCell.textContent = Array.isArray(value) ? value.join(", ") : value;
+      resultCell.classList.add(correctnessClass(correctness));
     }
 
     resultElement.appendChild(resultCell);
@@ -220,22 +170,6 @@ function addGuessResultElement(name: string): void {
   guessResultsContainer.prepend(resultElement);
 }
 
-function getFormattedCellVal(val: AttributeValue): string {
-  if (val instanceof Array) {
-    return val.join(", ");
-  }
-
-  return val;
-}
-
-function addGuessResultCellClasses(
-  val: AttributeValue,
-  answerVal: AttributeValue,
-  resultCell: HTMLElement,
-): void {
-  resultCell.classList.add(correctnessClass(gradeCorrectness(val, answerVal)));
-}
-
 function handleAutocompleteSelection(event: AutoCompleteSelectionEvent): void {
   const newGuessInput: HTMLInputElement = getNewGuessInput();
   newGuessInput.value = event.detail.selection.value;
@@ -243,12 +177,7 @@ function handleAutocompleteSelection(event: AutoCompleteSelectionEvent): void {
 
 function handleSubmitSelection(): void {
   const newGuessInput: HTMLInputElement = getNewGuessInput();
-  const result: GuessResult = submitGuess(
-    gameState,
-    GUESS_DATA,
-    getAnswerIdx(),
-    newGuessInput.value,
-  );
+  const result: GuessResult = game.submit(newGuessInput.value);
   if (result.kind === "invalid") {
     return;
   }
@@ -262,11 +191,11 @@ function handleSubmitSelection(): void {
   if (result.isAnswer) {
     addVictoryTitle();
   }
-  addGuessResultElement(result.name);
+  addGuessResultElement(result.row);
 }
 
 function addVictoryTitle(): void {
-  const answerName: string = GUESS_DATA[getAnswerIdx()]!.name;
+  const answerName: string = game.getAnswerName();
 
   const victoryTitle: HTMLSpanElement = document.createElement("span");
   victoryTitle.id = "victory-title";
@@ -291,7 +220,7 @@ function handleResultsList(list: HTMLElement, data: AutoCompleteResults): void {
 
 function filterOutGuesses(list: AutoCompleteItem[]): AutoCompleteItem[] {
   // Filter out already used guesses
-  const usedGuesses: string[] = gameState.getUsedGuesses();
+  const usedGuesses: string[] = game.getUsedGuesses();
   return list.filter((item: AutoCompleteItem): boolean => {
     return !usedGuesses.includes(item.value);
   });

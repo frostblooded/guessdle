@@ -18,9 +18,37 @@ export interface GameState {
   addUsedGuess(guess: string): void;
   getIsVictory(): boolean;
   setIsVictory(): void;
-  // Clears guesses and victory unless last played is today. Missing or invalid last played counts as another day.
-  resetIfNewDay(): void;
-  setLastPlayed(): void;
+}
+
+// Blocked storage (private mode, disabled cookies) throws. Writes are kept in
+// memory too, so the state still works for this page view.
+function tolerantStorage(storage: StateStorage): StateStorage {
+  const memory: Map<string, string> = new Map();
+  return {
+    getItem(key: string): string | null {
+      try {
+        return storage.getItem(key);
+      } catch {
+        return memory.get(key) ?? null;
+      }
+    },
+    setItem(key: string, value: string): void {
+      memory.set(key, value);
+      try {
+        storage.setItem(key, value);
+      } catch {
+        // kept in memory
+      }
+    },
+    removeItem(key: string): void {
+      memory.delete(key);
+      try {
+        storage.removeItem(key);
+      } catch {
+        // dropped from memory
+      }
+    },
+  };
 }
 
 // Corrupt JSON or a value of the wrong shape reads as missing
@@ -37,10 +65,13 @@ function readJson(storage: StateStorage, key: string): unknown {
   }
 }
 
+// Clears guesses and victory unless last played is today (a missing or invalid
+// last played counts as another day), then marks today as played.
 export function createGameState(
-  storage: StateStorage,
+  rawStorage: StateStorage,
   now: () => Date,
 ): GameState {
+  const storage: StateStorage = tolerantStorage(rawStorage);
   const getUsedGuesses = (): string[] => {
     const value: unknown = readJson(storage, LOCAL_STORAGE_USED_GUESSES_STRING);
     if (!Array.isArray(value)) {
@@ -51,6 +82,13 @@ export function createGameState(
       (item: unknown): item is string => typeof item === "string",
     );
   };
+
+  const today: string = dateToString(now());
+  if (readJson(storage, LOCAL_LAST_PLAYED_STRING) !== today) {
+    storage.removeItem(LOCAL_STORAGE_VICTORY_STRING);
+    storage.removeItem(LOCAL_STORAGE_USED_GUESSES_STRING);
+  }
+  storage.setItem(LOCAL_LAST_PLAYED_STRING, JSON.stringify(today));
 
   return {
     getUsedGuesses,
@@ -68,23 +106,6 @@ export function createGameState(
 
     setIsVictory(): void {
       storage.setItem(LOCAL_STORAGE_VICTORY_STRING, JSON.stringify(true));
-    },
-
-    resetIfNewDay(): void {
-      const lastPlayed: unknown = readJson(storage, LOCAL_LAST_PLAYED_STRING);
-      if (lastPlayed === dateToString(now())) {
-        return;
-      }
-
-      storage.removeItem(LOCAL_STORAGE_VICTORY_STRING);
-      storage.removeItem(LOCAL_STORAGE_USED_GUESSES_STRING);
-    },
-
-    setLastPlayed(): void {
-      storage.setItem(
-        LOCAL_LAST_PLAYED_STRING,
-        JSON.stringify(dateToString(now())),
-      );
     },
   };
 }

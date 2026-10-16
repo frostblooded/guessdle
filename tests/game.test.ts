@@ -3,8 +3,15 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, it } from "node:test";
 import seedrandom from "seedrandom";
+import { Correctness } from "../correctness.ts";
 import { ANSWER_START_DATE } from "../answer-sequence.ts";
-import { computeAnswerIdx, submitGuess } from "../game.ts";
+import {
+  computeAnswerIdx,
+  createGame,
+  gradeGuess,
+  submitGuess,
+  type GuessResult,
+} from "../game.ts";
 import {
   createGameState,
   type GameState,
@@ -63,6 +70,11 @@ class MemoryStorage implements StateStorage {
   }
 }
 
+const summary = (result: GuessResult): unknown =>
+  result.kind === "accepted"
+    ? { kind: result.kind, name: result.name, isAnswer: result.isAnswer }
+    : result;
+
 describe("submitGuess", () => {
   const first: string = GUESS_DATA[0]!.name;
   const second: string = GUESS_DATA[1]!.name;
@@ -83,7 +95,7 @@ describe("submitGuess", () => {
   });
 
   it("records a wrong guess without victory", () => {
-    assert.deepEqual(submitGuess(state, GUESS_DATA, 1, first), {
+    assert.deepEqual(summary(submitGuess(state, GUESS_DATA, 1, first)), {
       kind: "accepted",
       name: first,
       isAnswer: false,
@@ -93,7 +105,7 @@ describe("submitGuess", () => {
   });
 
   it("records the right guess as victory", () => {
-    assert.deepEqual(submitGuess(state, GUESS_DATA, 0, first), {
+    assert.deepEqual(summary(submitGuess(state, GUESS_DATA, 0, first)), {
       kind: "accepted",
       name: first,
       isAnswer: true,
@@ -102,7 +114,8 @@ describe("submitGuess", () => {
   });
 
   it("matches case-insensitively and records the proper name", () => {
-    assert.deepEqual(submitGuess(state, GUESS_DATA, 0, first.toUpperCase()), {
+    const result = submitGuess(state, GUESS_DATA, 0, first.toUpperCase());
+    assert.deepEqual(summary(result), {
       kind: "accepted",
       name: first,
       isAnswer: true,
@@ -122,5 +135,91 @@ describe("submitGuess", () => {
     submitGuess(state, GUESS_DATA, 5, first);
     submitGuess(state, GUESS_DATA, 5, second);
     assert.deepEqual(state.getUsedGuesses(), [first, second]);
+  });
+});
+
+describe("gradeGuess", () => {
+  it("lists every Attribute in roster key order", () => {
+    const row = gradeGuess(GUESS_DATA, 0, GUESS_DATA[1]!);
+    assert.deepEqual(
+      row.map((cell) => cell.key),
+      Object.keys(GUESS_DATA[1]!),
+    );
+    assert.deepEqual(
+      row.map((cell) => cell.value),
+      Object.values(GUESS_DATA[1]!),
+    );
+  });
+
+  it("grades every Attribute of the answer itself as correct", () => {
+    for (const cell of gradeGuess(GUESS_DATA, 0, GUESS_DATA[0]!)) {
+      assert.equal(cell.correctness, Correctness.Correct, cell.key);
+    }
+  });
+
+  it("grades each Attribute with the shared Correctness rules", () => {
+    const roster = [
+      { photo: "a", name: "A", colors: ["Red", "Blue"], owners: ["X"] },
+      { photo: "b", name: "B", colors: ["Blue", "Green"], owners: ["X"] },
+    ];
+    const byKey = Object.fromEntries(
+      gradeGuess(roster, 0, roster[1]!).map((c) => [c.key, c.correctness]),
+    );
+    assert.deepEqual(byKey, {
+      photo: Correctness.Incorrect,
+      name: Correctness.Incorrect,
+      colors: Correctness.PartiallyCorrect,
+      owners: Correctness.Correct,
+    });
+  });
+});
+
+describe("createGame", () => {
+  const today = new Date(2025, 9, 6, 12);
+  const open = (storage = new MemoryStorage()) =>
+    createGame({ roster: GUESS_DATA, storage, now: () => today, makeRandom });
+  const answerName =
+    GUESS_DATA[computeAnswerIdx(GUESS_DATA.length, today, makeRandom)]!.name;
+
+  it("names the Daily Answer", () => {
+    assert.equal(open().getAnswerName(), answerName);
+  });
+
+  it("wins when the Daily Answer is guessed", () => {
+    const game = open();
+    const result = game.submit(answerName);
+    assert.equal(result.kind === "accepted" && result.isAnswer, true);
+    assert.equal(game.getIsVictory(), true);
+  });
+
+  it("returns graded rows for past guesses after a reopen, oldest first", () => {
+    const storage = new MemoryStorage();
+    const wrong = GUESS_DATA.filter((pet) => pet.name !== answerName).slice(
+      0,
+      2,
+    );
+    const game = open(storage);
+    for (const pet of wrong) {
+      game.submit(pet.name);
+    }
+    const rows = open(storage).getRows();
+    assert.deepEqual(
+      rows.map((row) => row[1]!.value),
+      wrong.map((pet) => pet.name),
+    );
+    assert.deepEqual(
+      game.getUsedGuesses(),
+      wrong.map((pet) => pet.name),
+    );
+  });
+
+  it("skips stored names that are no longer in the roster", () => {
+    const storage = new MemoryStorage();
+    open(storage).submit(GUESS_DATA[0]!.name);
+    storage.setItem(
+      "usedGuesses",
+      JSON.stringify(["Gone Pet", GUESS_DATA[0]!.name]),
+    );
+    assert.equal(open(storage).getRows().length, 1);
   });
 });
