@@ -97,13 +97,13 @@ test("an admin promotes and demotes a user; self-demotion is disabled and refuse
   });
   expect(refused.status()).toBe(409);
 
-  await row(player).locator("button").click();
+  await row(player).locator(".role-toggle").click();
   await expect(row(player)).toContainText("admin");
-  await expect(row(player).locator("button")).toHaveText("DEMOTE");
+  await expect(row(player).locator(".role-toggle")).toHaveText("DEMOTE");
   // Effective on the promoted user's next request
   expect((await playerPage.request.get("/api/admin/users")).status()).toBe(200);
 
-  await row(player).locator("button").click();
+  await row(player).locator(".role-toggle").click();
   await expect(row(player)).toContainText("player");
   expect((await playerPage.request.get("/api/admin/users")).status()).toBe(403);
 
