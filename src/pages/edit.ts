@@ -64,6 +64,13 @@ void initShell(browserFetch).then(async (user) => {
     blocked(errorText(reply));
     return;
   }
+  // Wired before the page shows, so nothing the user does first is lost
+  const refreshEntries = await initEntries(API, async () => {
+    const fresh = await api<Details>("GET", `${API}/details`);
+    if (fresh?.status === 200) {
+      render(fresh.data);
+    }
+  });
   $("#loading-state").hidden = true;
   $("#editor").hidden = false;
   render(reply.data);
@@ -120,7 +127,6 @@ void initShell(browserFetch).then(async (user) => {
   };
 
   const tabs = ["details", "attributes", "entries"];
-  let refreshEntries = async (): Promise<void> => {};
   const show = (tab: string): void => {
     if (tab === "entries") {
       void refreshEntries();
@@ -219,10 +225,4 @@ void initShell(browserFetch).then(async (user) => {
     });
   };
   await attributes("GET", `${API}/attributes`);
-  refreshEntries = await initEntries(API, async () => {
-    const fresh = await api<Details>("GET", `${API}/details`);
-    if (fresh?.status === 200) {
-      render(fresh.data);
-    }
-  });
 });
