@@ -168,7 +168,9 @@ button {
   color: white;
   text-align: center;
   align-content: center;
-  min-width: 70px;
+  /* Grid tracks may shrink below the content, so long words wrap instead of widening the page */
+  min-width: 0;
+  overflow-wrap: anywhere;
 
   img {
     width: 100%;
