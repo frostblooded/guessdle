@@ -9,6 +9,10 @@ services:
       target: dev
     ports:
       - "8080:8080"
+    # .env (optional) supplies GOOGLE_* and ADMIN_EMAILS; the DATABASE_URL below wins over its localhost one
+    env_file:
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: postgres://petdle:petdle@db:5432/petdle
     depends_on:
