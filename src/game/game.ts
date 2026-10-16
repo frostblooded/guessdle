@@ -42,7 +42,7 @@ export function computeAnswerIdx(
 // One Attribute of a guessed pet, graded against the Daily Answer. Rows list
 // Attributes in roster key order, which is the table column order.
 export interface GradedAttribute {
-  key: keyof Pet;
+  key: Exclude<keyof Pet, "id">;
   value: AttributeValue;
   correctness: Correctness;
 }
@@ -53,13 +53,13 @@ export function gradeGuess(
   guess: Pet,
 ): GradedAttribute[] {
   const answer: Pet = roster[answerIdx]!;
-  return (Object.keys(guess) as (keyof Pet)[]).map(
-    (key: keyof Pet): GradedAttribute => ({
+  return (Object.keys(guess) as (keyof Pet)[])
+    .filter((key: keyof Pet): key is GradedAttribute["key"] => key !== "id")
+    .map((key: GradedAttribute["key"]): GradedAttribute => ({
       key,
       value: guess[key],
       correctness: gradeCorrectness(guess[key], answer[key]),
-    }),
-  );
+    }));
 }
 
 export type GuessResult =
@@ -67,29 +67,39 @@ export type GuessResult =
   | { kind: "duplicate" }
   | {
       kind: "accepted";
-      name: string;
+      id: string;
       isAnswer: boolean;
       row: GradedAttribute[];
     };
 
-// Matches the input to a pet (case-insensitive) and records an accepted guess in `state`.
+// The id of the pet whose name is the typed text (case-insensitive), or null
+export function findPetId(
+  roster: readonly Pet[],
+  input: string,
+): string | null {
+  const lower: string = input.toLowerCase();
+  return (
+    roster.find((pet: Pet): boolean => pet.name.toLowerCase() === lower)?.id ??
+    null
+  );
+}
+
+// Records an accepted guess, given by pet id, in `state`.
 export function submitGuess(
   state: GameState,
   roster: readonly Pet[],
   answerIdx: number,
-  input: string,
+  id: string,
 ): GuessResult {
   const guessIdx: number = roster.findIndex(
-    (pet: Pet): boolean => pet.name.toLowerCase() === input.toLowerCase(),
+    (pet: Pet): boolean => pet.id === id,
   );
   if (guessIdx === -1) {
     return { kind: "invalid" };
   }
 
-  // Use the proper name in case the casing of the input was different
   const guess: Pet = roster[guessIdx]!;
-  const name: string = guess.name;
-  if (state.getUsedGuesses().includes(name)) {
+  if (state.getUsedGuesses().includes(id)) {
     return { kind: "duplicate" };
   }
 
@@ -97,19 +107,21 @@ export function submitGuess(
   if (isAnswer) {
     state.setIsVictory();
   }
-  state.addUsedGuess(name);
+  state.addUsedGuess(id);
   return {
     kind: "accepted",
-    name,
+    id,
     isAnswer,
     row: gradeGuess(roster, answerIdx, guess),
   };
 }
 
 export interface Game {
-  submit(input: string): GuessResult;
+  // Takes a pet id
+  submit(id: string): GuessResult;
   // Graded rows of the guesses already made today, oldest first
   getRows(): GradedAttribute[][];
+  // Pet ids
   getUsedGuesses(): string[];
   getIsVictory(): boolean;
   getAnswerName(): string;
@@ -130,6 +142,17 @@ export function createGame({
   makeRandom,
 }: GameDeps): Game {
   const state: GameState = createGameState(storage, now);
+  // Before ids, guesses were stored by display name: upgrade them, drop unknowns
+  const stored: string[] = state.getUsedGuesses();
+  const upgraded: string[] = stored.flatMap((entry: string): string[] => {
+    const pet: Pet | undefined = roster.find(
+      (item: Pet): boolean => item.id === entry || item.name === entry,
+    );
+    return pet ? [pet.id] : [];
+  });
+  if (upgraded.join() !== stored.join()) {
+    state.setUsedGuesses(upgraded);
+  }
   let answerIdx: number | null = null;
   const getAnswerIdx = (): number => {
     answerIdx ??= computeAnswerIdx(roster.length, now(), makeRandom);
@@ -137,14 +160,14 @@ export function createGame({
   };
 
   return {
-    submit: (input: string): GuessResult =>
-      submitGuess(state, roster, getAnswerIdx(), input),
+    submit: (id: string): GuessResult =>
+      submitGuess(state, roster, getAnswerIdx(), id),
 
-    // Names stored by an older roster are skipped
+    // Ids stored by an older roster are dropped on load
     getRows: (): GradedAttribute[][] =>
-      state.getUsedGuesses().flatMap((name: string): GradedAttribute[][] => {
+      state.getUsedGuesses().flatMap((id: string): GradedAttribute[][] => {
         const pet: Pet | undefined = roster.find(
-          (item: Pet): boolean => item.name === name,
+          (item: Pet): boolean => item.id === id,
         );
         return pet ? [gradeGuess(roster, getAnswerIdx(), pet)] : [];
       }),

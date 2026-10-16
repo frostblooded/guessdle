@@ -51,7 +51,7 @@ The server's existing Cloudflare Tunnel (service `http://guessdle-server:8080`) 
 ## Adding a pet
 
 1. Add the photo to `photos/`.
-2. Add an entry to `GUESS_DATA` in `src/roster.ts`.
+2. Add an entry to `GUESS_DATA` in `src/game/roster.ts` with a unique lowercase-slug `id` (e.g. `"mochi"`). Guesses are stored by id, so never change an id once shipped. `npm test` fails on a duplicate or malformed id.
 
 Warning: changing `GUESS_DATA` (order or length), `START_DATE`, or the skip logic changes the answer for every day, including today.
 

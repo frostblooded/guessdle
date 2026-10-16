@@ -5,6 +5,7 @@ import "@tarekraafat/autocomplete.js/dist/css/autoComplete.css";
 import { correctnessClass } from "./game/correctness.ts";
 import {
   createGame,
+  findPetId,
   type Game,
   type GradedAttribute,
   type GuessResult,
@@ -177,7 +178,12 @@ function handleAutocompleteSelection(event: AutoCompleteSelectionEvent): void {
 
 function handleSubmitSelection(): void {
   const newGuessInput: HTMLInputElement = getNewGuessInput();
-  const result: GuessResult = game.submit(newGuessInput.value);
+  const id: string | null = findPetId(GUESS_DATA, newGuessInput.value);
+  if (id === null) {
+    return;
+  }
+
+  const result: GuessResult = game.submit(id);
   if (result.kind === "invalid") {
     return;
   }
@@ -220,8 +226,9 @@ function handleResultsList(list: HTMLElement, data: AutoCompleteResults): void {
 
 function filterOutGuesses(list: AutoCompleteItem[]): AutoCompleteItem[] {
   // Filter out already used guesses
-  const usedGuesses: string[] = game.getUsedGuesses();
+  const usedIds: string[] = game.getUsedGuesses();
   return list.filter((item: AutoCompleteItem): boolean => {
-    return !usedGuesses.includes(item.value);
+    const id: string | null = findPetId(GUESS_DATA, item.value);
+    return id === null || !usedIds.includes(id);
   });
 }

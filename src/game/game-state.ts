@@ -16,6 +16,7 @@ export interface StateStorage {
 export interface GameState {
   getUsedGuesses(): string[];
   addUsedGuess(guess: string): void;
+  setUsedGuesses(guesses: string[]): void;
   getIsVictory(): boolean;
   setIsVictory(): void;
 }
@@ -97,6 +98,13 @@ export function createGameState(
       storage.setItem(
         LOCAL_STORAGE_USED_GUESSES_STRING,
         JSON.stringify([...getUsedGuesses(), guess]),
+      );
+    },
+
+    setUsedGuesses(guesses: string[]): void {
+      storage.setItem(
+        LOCAL_STORAGE_USED_GUESSES_STRING,
+        JSON.stringify(guesses),
       );
     },
 
