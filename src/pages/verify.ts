@@ -1,5 +1,6 @@
 import { completeLogin } from "../login.ts";
 import { VERIFY_MESSAGES } from "../login-logic.ts";
+import { takeReturnTo } from "../return-to.ts";
 import { browserFetch, initShell } from "../shell.ts";
 
 const show = (selector: string, visible: boolean): void => {
@@ -10,7 +11,7 @@ void initShell(browserFetch);
 void completeLogin(browserFetch).then((result) => {
   if (result === "ok") {
     // Play merges any local guesses into the new account on load
-    location.replace("/");
+    location.replace(takeReturnTo(localStorage));
     return;
   }
   const retryable = result === "error" || result === "rate_limited";

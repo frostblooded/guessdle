@@ -43,6 +43,7 @@ const USER_MENU = `
     </button>
     <div id="user-menu-panel" class="menu" hidden>
       <p class="menu-label">Signed in as <strong id="menu-email"></strong></p>
+      <a href="/my-games">My games</a>
       <a id="admin-link" href="/admin" hidden>Admin</a>
       <button id="logout-button" type="button">Sign out</button>
     </div>

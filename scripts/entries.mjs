@@ -7,6 +7,9 @@ export const ENTRY_POINTS = {
   verify: "src/pages/verify.ts",
   admin: "src/pages/admin.ts",
   "how-to-play": "src/pages/how-to-play.ts",
+  create: "src/pages/create.ts",
+  "my-games": "src/pages/my-games.ts",
+  edit: "src/pages/edit.ts",
   styles: "src/styles.css",
 };
 

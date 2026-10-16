@@ -2,6 +2,7 @@
 import type pg from "pg";
 import type { AttributeValue } from "../game/correctness.ts";
 import type { AttributeType, Entry, GameAttribute } from "../game/game.ts";
+import { slugError } from "../game/slug.ts";
 
 type Q = Pick<pg.Pool, "query">;
 
@@ -17,6 +18,7 @@ export interface GameRow {
   coverUrl: string;
   ownerId: number | null;
   status: GameStatus;
+  rejectReason: string;
   // Day Number 0 ("YYYY-MM-DD")
   startDate: string;
   skipPeriod: number | null;
@@ -31,7 +33,7 @@ export const skipOf = (game: GameRow): number =>
 export async function findGame(q: Q, slug: string): Promise<GameRow | null> {
   const { rows } = await q.query<GameRow>(
     `select id::int, slug, name, description, cover_url as "coverUrl",
-       owner_id::int as "ownerId", status,
+       owner_id::int as "ownerId", status, reject_reason as "rejectReason",
        to_char(start_date, 'YYYY-MM-DD') as "startDate",
        skip_period as "skipPeriod"
      from games where slug = $1`,
@@ -119,4 +121,92 @@ export async function listGallery(q: Q): Promise<GalleryCard[]> {
     [MIN_ENTRIES],
   );
   return rows;
+}
+
+export interface MyGame {
+  slug: string;
+  name: string;
+  cover: string;
+  status: GameStatus;
+  rejectReason: string;
+  entryCount: number;
+}
+
+// A user's own games, newest first, whatever their status
+export async function listOwned(q: Q, userId: number): Promise<MyGame[]> {
+  const { rows } = await q.query<MyGame>(
+    `select g.slug, g.name, g.cover_url as cover, g.status, g.reject_reason as "rejectReason",
+       (select count(*)::int from entries e where e.game_id = g.id and e.deleted_at is null) as "entryCount"
+     from games g where g.owner_id = $1 order by g.created_at desc, g.id desc`,
+    [userId],
+  );
+  return rows;
+}
+
+// Resolves a name clash on a generated slug with -2, -3, ...; a typed slug that is taken is refused.
+// shortcut: one insert per candidate, fine until a name has hundreds of clashes
+export async function createGame(
+  q: Q,
+  ownerId: number,
+  name: string,
+  startDate: string,
+  slug: { typed: string } | { base: string },
+): Promise<string | "slug_taken"> {
+  const insert = async (candidate: string): Promise<boolean> =>
+    (
+      await q.query(
+        `insert into games (slug, name, owner_id, start_date) values ($1, $2, $3, $4)
+         on conflict (slug) do nothing`,
+        [candidate, name, ownerId, startDate],
+      )
+    ).rowCount === 1;
+  if ("typed" in slug) {
+    return (await insert(slug.typed)) ? slug.typed : "slug_taken";
+  }
+  for (let n = 1; ; n++) {
+    const suffix = n === 1 ? "" : `-${n}`;
+    const candidate =
+      slug.base.slice(0, 40 - suffix.length).replace(/-+$/, "") + suffix;
+    if (slugError(candidate) === null && (await insert(candidate))) {
+      return candidate;
+    }
+  }
+}
+
+export interface GamePatch {
+  name?: string;
+  description?: string;
+  coverUrl?: string;
+  skipPeriod?: number | null;
+}
+
+// Applies an edit. A text or image change sends an approved or rejected game back to pending.
+// Returns the cover URL the edit replaced, for the caller to delete.
+export async function updateGame(
+  q: Q,
+  game: GameRow,
+  patch: GamePatch,
+): Promise<string | null> {
+  const next = { ...game, ...patch };
+  const changed =
+    next.name !== game.name ||
+    next.description !== game.description ||
+    next.coverUrl !== game.coverUrl;
+  const status =
+    changed && (game.status === "approved" || game.status === "rejected")
+      ? "pending"
+      : game.status;
+  await q.query(
+    `update games set name = $2, description = $3, cover_url = $4, skip_period = $5,
+       status = $6, updated_at = now() where id = $1`,
+    [
+      game.id,
+      next.name,
+      next.description,
+      next.coverUrl,
+      next.skipPeriod,
+      status,
+    ],
+  );
+  return next.coverUrl === game.coverUrl ? null : game.coverUrl;
 }

@@ -7,9 +7,16 @@ const ROOT = resolve(import.meta.dirname, "..");
 const PORT = process.env.PORT ?? 8080;
 
 // Clean URLs (/login) map to <name>.html; deploy/nginx.conf does the same with try_files
-const PAGES = new Set(["login", "verify", "admin", "how-to-play"]);
+const PAGES = new Set([
+  "login",
+  "verify",
+  "admin",
+  "how-to-play",
+  "create",
+  "my-games",
+]);
 const ALLOWED =
-  /^\/(index\.html|game\.html|login\.html|verify\.html|admin\.html|how-to-play\.html|favicon\.ico|(dist|howto|uploads)\/.+)$/;
+  /^\/(index\.html|game\.html|login\.html|verify\.html|admin\.html|how-to-play\.html|create\.html|my-games\.html|edit\.html|favicon\.ico|(dist|howto|uploads)\/.+)$/;
 
 const TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -26,6 +33,8 @@ function pageFor(urlPath) {
   if (urlPath === "/") return "index.html";
   // /g/<slug> is the game shell; the slug is resolved client-side
   if (/^\/g\/[^/]+$/.test(urlPath)) return "game.html";
+  // /g/<slug>/edit is the editor shell
+  if (/^\/g\/[^/]+\/edit$/.test(urlPath)) return "edit.html";
   const name = urlPath.slice(1);
   return PAGES.has(name) ? `${name}.html` : null;
 }

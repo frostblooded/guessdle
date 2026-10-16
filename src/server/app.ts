@@ -9,6 +9,7 @@ import { adminRoutes } from "./routes/admin.ts";
 import { authRoutes } from "./routes/auth.ts";
 import type { AppContext } from "./routes/context.ts";
 import { gameRoutes } from "./routes/game.ts";
+import { manageRoutes } from "./routes/manage.ts";
 import { uploadRoutes } from "./routes/uploads.ts";
 
 export interface AppDeps {
@@ -34,6 +35,8 @@ export interface AppDeps {
   // Per-user upload budget per window, and per-user stored bytes
   uploadLimit?: RateLimit;
   uploadQuotaBytes?: number;
+  // Per-user budget for creating and editing games per window
+  writeLimit?: RateLimit;
 }
 
 // The API only; callers add static files (dev server) or sit behind nginx (prod)
@@ -51,6 +54,7 @@ export function createApp({
   uploadsDir = "uploads",
   uploadLimit,
   uploadQuotaBytes,
+  writeLimit,
 }: AppDeps): Express {
   if (testLogin && process.env["NODE_ENV"] === "production") {
     throw new Error("The test login route cannot run in production");
@@ -78,6 +82,7 @@ export function createApp({
   authRoutes(app, ctx, { mail, adminEmails, testLogin });
   adminRoutes(app, ctx, backupDir);
   gameRoutes(app, ctx);
+  manageRoutes(app, ctx, uploadsDir, writeLimit);
   uploadRoutes(app, ctx, uploadsDir, uploadLimit, uploadQuotaBytes);
   answersRoutes(app, ctx);
 

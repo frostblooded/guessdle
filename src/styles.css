@@ -533,6 +533,8 @@ a {
 input[type="email"],
 input[type="text"],
 input[type="date"],
+input[type="number"],
+textarea,
 select {
   width: 100%;
   min-height: 2.75rem;
@@ -1023,4 +1025,57 @@ td button:disabled {
 .tag[data-tag="admin"] {
   background-color: var(--danger-bg);
   color: var(--danger);
+}
+
+/* Game editor and creation */
+
+textarea {
+  resize: vertical;
+}
+
+.slug-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.cover-preview {
+  display: block;
+  width: 100%;
+  max-height: 12rem;
+  margin-bottom: var(--s2);
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.tabs [role="tab"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mine-list {
+  display: grid;
+  gap: var(--s3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mine-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.mine-row .fine-print {
+  flex: 1 1 10rem;
+}
+
+#details-form .field-label {
+  margin-top: var(--s3);
+}
+
+#details-form .btn-primary {
+  margin-top: var(--s3);
 }

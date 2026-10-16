@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="robots" content="noindex" />
+    <title>Edit game - Guessdle</title>
+    <meta name="description" content="Edit a Guessdle game." />
+    <script>
+      // Set before first paint so a stored choice never flashes the other theme (ADR 0006)
+      try {
+        const theme = localStorage.getItem("theme");
+        if (theme === "light" || theme === "dark") {
+          document.documentElement.dataset.theme = theme;
+        }
+      } catch {}
+    </script>
+    <link rel="stylesheet" href="/dist/styles.css" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <script type="module" src="/dist/edit.js"></script>
+  </head>
+  <body>
+    <header id="site-header" class="site-header"></header>
+    <main id="main" class="page page-narrow">
+      <div class="page-head">
+        <h1 id="edit-title">Edit game</h1>
+        <p><a id="view-link" href="/">View game</a></p>
+      </div>
+      <p id="loading-state" class="empty-state">Loading…</p>
+      <section id="edit-blocked" class="card center" hidden>
+        <p id="edit-blocked-text" class="lede"></p>
+        <a class="btn btn-primary" href="/my-games">My games</a>
+      </section>
+      <div id="editor" hidden>
+        <div class="tabs" role="tablist" aria-label="Editor sections">
+          <button
+            type="button"
+            role="tab"
+            aria-selected="true"
+            id="tab-details"
+          >
+            Details
+          </button>
+          <button type="button" role="tab" aria-selected="false" disabled>
+            Attributes
+          </button>
+          <button type="button" role="tab" aria-selected="false" disabled>
+            Entries
+          </button>
+          <button type="button" role="tab" aria-selected="false" disabled>
+            Answers
+          </button>
+        </div>
+        <p id="status-notice" class="alert alert-warn" role="status"></p>
+        <form id="details-form" class="card" novalidate>
+          <label class="field-label" for="edit-name">Name</label>
+          <input type="text" id="edit-name" maxlength="60" autocomplete="off" />
+          <label class="field-label" for="edit-description">Description</label>
+          <textarea id="edit-description" maxlength="500" rows="3"></textarea>
+          <label class="field-label" for="edit-slug">Web address</label>
+          <input type="text" id="edit-slug" readonly />
+          <p class="field-label">Cover image</p>
+          <img id="cover-preview" class="cover-preview" alt="" hidden />
+          <div class="button-row">
+            <input
+              type="file"
+              id="cover-file"
+              accept="image/jpeg,image/png,image/webp"
+              class="sr-only"
+            />
+            <label class="btn btn-secondary btn-sm" for="cover-file"
+              >Choose image</label
+            >
+            <button
+              id="cover-remove"
+              class="btn btn-quiet btn-sm"
+              type="button"
+              hidden
+            >
+              Remove
+            </button>
+          </div>
+          <label class="field-label" for="edit-skip"
+            >Skip period (days before an entry can repeat)</label
+          >
+          <input
+            type="number"
+            id="edit-skip"
+            min="0"
+            step="1"
+            placeholder="Default: 5"
+          />
+          <p id="edit-error" class="alert alert-error" role="alert"></p>
+          <p id="edit-saved" class="alert" role="status"></p>
+          <button id="save-button" class="btn btn-primary" type="submit">
+            Save
+          </button>
+        </form>
+      </div>
+    </main>
+    <footer id="site-footer" class="site-footer"></footer>
+  </body>
+</html>

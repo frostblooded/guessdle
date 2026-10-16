@@ -15,6 +15,9 @@ const PAGES: Record<string, string> = {
   "verify.html": "verify",
   "admin.html": "admin",
   "how-to-play.html": "how-to-play",
+  "create.html": "create",
+  "my-games.html": "my-games",
+  "edit.html": "edit",
 };
 
 describe("build output is wired through the pages and the deploy", () => {
@@ -120,6 +123,14 @@ describe("build output is wired through the pages and the deploy", () => {
     assert.match(
       conf,
       /location ~ \^\/g\/\[\^\/\]\+\$ \{[^}]*try_files \/game\.html =404;/,
+    );
+  });
+
+  it("nginx serves /g/<slug>/edit from the editor shell", () => {
+    const conf: string = read("deploy/nginx.conf");
+    assert.match(
+      conf,
+      /location ~ \^\/g\/\[\^\/\]\+\/edit\$ \{[^}]*try_files \/edit\.html =404;/,
     );
   });
 

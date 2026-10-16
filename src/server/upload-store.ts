@@ -87,3 +87,16 @@ export async function sweepUploads(
   );
   return removed;
 }
+
+// True when the URL is a file this pipeline stored (a user may only attach those)
+export async function isStoredUpload(
+  pool: pg.Pool,
+  url: string,
+): Promise<boolean> {
+  const name = URL_RE.exec(url)?.[1];
+  return (
+    name !== undefined &&
+    (await pool.query("select 1 from uploads where name = $1", [name]))
+      .rowCount === 1
+  );
+}
