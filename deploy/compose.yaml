@@ -4,7 +4,7 @@ services:
   dev:
     build:
       context: ..
-      dockerfile: deploy/Dockerfile
+      dockerfile: Dockerfile
       target: dev
     ports:
       - "8080:8080"

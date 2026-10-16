@@ -36,16 +36,7 @@ describe("backup sidecar scripts (real Postgres, real sidecar image)", () => {
     run(`BACKUP_TODAY=${day} /opt/backup/backup.sh`);
 
   before(async () => {
-    docker(
-      "build",
-      "-f",
-      "deploy/Dockerfile",
-      "--target",
-      "backup",
-      "-t",
-      IMAGE,
-      ".",
-    );
+    docker("build", "-f", "Dockerfile", "--target", "backup", "-t", IMAGE, ".");
     network = await new Network().start();
     db = await new PostgreSqlContainer("postgres:17-alpine")
       .withNetwork(network)
