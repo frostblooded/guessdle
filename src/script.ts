@@ -1,12 +1,7 @@
 import autoComplete from "@tarekraafat/autocomplete.js";
 import "../styles.css";
 import "@tarekraafat/autocomplete.js/dist/css/autoComplete.css";
-import {
-  fetchUser,
-  signOut,
-  type AccountFetch,
-  type AccountUser,
-} from "./account.ts";
+import { fetchUser, signOut, type AccountUser } from "./account.ts";
 import { initAdmin } from "./admin.ts";
 import { correctnessClass } from "./game/correctness.ts";
 import { findPetId, type GradedAttribute } from "./game/game.ts";
@@ -20,12 +15,16 @@ import {
   type SubmitResult,
 } from "./game/play.ts";
 import { GUESS_DATA, type Pet } from "./game/roster.ts";
+import type { Fetch } from "./game/transport.ts";
 import { initTheme } from "./theme.ts";
 import type {
   AutoCompleteItem,
   AutoCompleteResults,
   AutoCompleteSelectionEvent,
 } from "@tarekraafat/autocomplete.js";
+
+const browserFetch: Fetch = (url, init) => fetch(url, init);
+const now = (): Date => new Date();
 
 const GUESS_DATA_NAMES: string[] = GUESS_DATA.map(
   (item: Pet): string => item.name,
@@ -34,8 +33,8 @@ const GUESS_DATA_NAMES: string[] = GUESS_DATA.map(
 const anonymousPlay: Play = createPlay({
   roster: GUESS_DATA,
   storage: localStorage,
-  now: (): Date => new Date(),
-  fetch: (url, init) => fetch(url, init),
+  now,
+  fetch: browserFetch,
   onNewDay: clearBoard,
 });
 // Signed-in players use the server-stored game instead
@@ -74,19 +73,15 @@ window.onload = function (): void {
 
 // Who is signed in decides where the game lives, so ask before loading it
 async function start(): Promise<void> {
-  const user: AccountUser | null = await fetchUser(fetchLike);
+  const user: AccountUser | null = await fetchUser(browserFetch);
   showAccount(user);
   if (user !== null) {
-    const merged = await mergeLocalGame(
-      localStorage,
-      (): Date => new Date(),
-      (url, init) => fetch(url, init),
-    );
+    const merged = await mergeLocalGame(localStorage, now, browserFetch);
     if (merged === "rate_limited") {
       showNotice(RATE_LIMITED);
     }
     play = createServerPlay({
-      fetch: (url, init) => fetch(url, init),
+      fetch: browserFetch,
       onNewDay: clearBoard,
     });
   }
@@ -146,8 +141,6 @@ function initButtons(): void {
     };
 }
 
-const fetchLike: AccountFetch = (url, init) => fetch(url, init);
-
 function showAccount(user: AccountUser | null): void {
   const name: HTMLElement =
     document.querySelector<HTMLElement>("#account-name")!;
@@ -166,7 +159,7 @@ async function handleReset(): Promise<void> {
 }
 
 async function handleLogout(): Promise<void> {
-  if (await signOut(fetchLike)) {
+  if (await signOut(browserFetch)) {
     play = anonymousPlay;
     play.reset();
     clearBoard();

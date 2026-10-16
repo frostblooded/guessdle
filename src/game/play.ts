@@ -1,18 +1,12 @@
 // Anonymous play: the browser keeps pet ids, the server grades them.
-import type { GradedAttribute } from "./game.ts";
+import { isAnswerRow, type GradedAttribute } from "./game.ts";
 import {
   createGameState,
   type GameState,
   type StateStorage,
 } from "./game-state.ts";
 import type { Pet } from "./roster.ts";
-import {
-  call,
-  failureOf,
-  isAnswerRow,
-  type Failure,
-  type Fetch,
-} from "./transport.ts";
+import { call, failureOf, type Failure, type Fetch } from "./transport.ts";
 
 // POST /api/grade; `answer` (the pet's name) is present only on victory
 interface GradeResponse {

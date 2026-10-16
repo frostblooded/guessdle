@@ -1,7 +1,7 @@
 // Signed-in play: guesses, give-up and reset live on the server (/api/game).
-import type { GradedAttribute } from "./game.ts";
+import { isAnswerRow, type GradedAttribute } from "./game.ts";
 import type { GiveUpResult, Loaded, Play, SubmitResult } from "./play.ts";
-import { call, failureOf, isAnswerRow, type Fetch } from "./transport.ts";
+import { call, failureOf, type Fetch } from "./transport.ts";
 
 // The server's view of today's game
 interface GameResponse {

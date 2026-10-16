@@ -103,3 +103,99 @@ export async function changeGame(
     client.release();
   }
 }
+
+const finished = (current: GameView): boolean =>
+  current.victory || current.gaveUp;
+
+export async function addGuess(
+  q: Q,
+  { roster, userId, date }: GameContext,
+  current: GameView,
+  id: unknown,
+): Promise<Refusal | null> {
+  if (typeof id !== "string" || !roster.some((pet) => pet.id === id)) {
+    return "invalid";
+  }
+  if (finished(current)) {
+    return "finished";
+  }
+  const { rowCount } = await q.query(
+    "insert into user_guesses (user_id, day, pet_id) values ($1, $2, $3) on conflict do nothing",
+    [userId, date, id],
+  );
+  return rowCount === 1 ? null : "duplicate";
+}
+
+export async function giveUp(
+  q: Q,
+  { userId, date }: GameContext,
+  current: GameView,
+): Promise<Refusal | null> {
+  if (finished(current)) {
+    return "finished";
+  }
+  await q.query("insert into user_give_ups (user_id, day) values ($1, $2)", [
+    userId,
+    date,
+  ]);
+  return null;
+}
+
+// Adopts anonymous local history (POST /api/game/merge body); the user-row lock
+// in changeGame makes the "no rows yet" check and the inserts one atomic step.
+export async function mergeLocal(
+  q: Q,
+  { roster, answer, userId, date, day }: GameContext,
+  current: GameView,
+  body: Record<string, unknown>,
+): Promise<Refusal | null> {
+  const { ids, gaveUp } = body;
+  if (
+    !Array.isArray(ids) ||
+    ids.length > roster.length ||
+    !ids.every((id) => roster.some((pet) => pet.id === id)) ||
+    (gaveUp !== undefined && typeof gaveUp !== "boolean")
+  ) {
+    return "invalid";
+  }
+  if (body["day"] !== day) {
+    return "stale_day";
+  }
+  if (current.ids.length > 0 || current.gaveUp) {
+    return "has_progress";
+  }
+  // Keep first occurrences in order, stop after the answer
+  const keep = [...new Set(ids as string[])];
+  const end = keep.indexOf(answer.id);
+  const adopted = end === -1 ? keep : keep.slice(0, end + 1);
+  for (const id of adopted) {
+    await q.query(
+      "insert into user_guesses (user_id, day, pet_id) values ($1, $2, $3)",
+      [userId, date, id],
+    );
+  }
+  if (gaveUp === true && end === -1) {
+    await q.query("insert into user_give_ups (user_id, day) values ($1, $2)", [
+      userId,
+      date,
+    ]);
+  }
+  return null;
+}
+
+export async function resetGame(
+  q: Q,
+  { userId, date }: GameContext,
+  current: GameView,
+): Promise<Refusal | null> {
+  if (!finished(current)) {
+    return "not_finished";
+  }
+  for (const table of ["user_guesses", "user_give_ups"]) {
+    await q.query(`delete from ${table} where user_id = $1 and day = $2`, [
+      userId,
+      date,
+    ]);
+  }
+  return null;
+}

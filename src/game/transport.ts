@@ -1,6 +1,4 @@
 // The one fetch transport shared by anonymous play, signed-in play and merge.
-import { Correctness } from "./correctness.ts";
-import type { GradedAttribute } from "./game.ts";
 
 // The part of fetch that the game clients use
 export type Fetch = (
@@ -53,11 +51,4 @@ export function failureOf(res: Reply | null): Failure | null {
     return "error";
   }
   return res.status === 429 ? "rate_limited" : null;
-}
-
-export function isAnswerRow(row: GradedAttribute[]): boolean {
-  return row.every(
-    (cell: GradedAttribute): boolean =>
-      cell.correctness === Correctness.Correct,
-  );
 }

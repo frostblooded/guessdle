@@ -1,4 +1,5 @@
 // Browser side of sign-in: who is signed in, and signing out.
+import type { Fetch } from "./game/transport.ts";
 
 export interface AccountUser {
   name: string;
@@ -6,17 +7,8 @@ export interface AccountUser {
   admin: boolean;
 }
 
-export interface AccountFetch {
-  (
-    url: string,
-    init?: { method: "POST"; headers: Record<string, string>; body: string },
-  ): Promise<{ ok: boolean; json(): Promise<unknown> }>;
-}
-
 // null when signed out, or when the server cannot be reached (shown as signed out)
-export async function fetchUser(
-  fetch: AccountFetch,
-): Promise<AccountUser | null> {
+export async function fetchUser(fetch: Fetch): Promise<AccountUser | null> {
   try {
     const res = await fetch("/api/me");
     if (!res.ok) {
@@ -30,7 +22,7 @@ export async function fetchUser(
 }
 
 // True once the server has ended the session
-export async function signOut(fetch: AccountFetch): Promise<boolean> {
+export async function signOut(fetch: Fetch): Promise<boolean> {
   try {
     const res = await fetch("/api/auth/logout", {
       method: "POST",

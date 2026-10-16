@@ -2,7 +2,7 @@
 // the types the client renders.
 import {
   type AttributeValue,
-  type Correctness,
+  Correctness,
   gradeCorrectness,
 } from "./correctness.ts";
 import type { Pet } from "./roster.ts";
@@ -13,6 +13,13 @@ export interface GradedAttribute {
   key: Exclude<keyof Pet, "id">;
   value: AttributeValue;
   correctness: Correctness;
+}
+
+export function isAnswerRow(row: GradedAttribute[]): boolean {
+  return row.every(
+    (cell: GradedAttribute): boolean =>
+      cell.correctness === Correctness.Correct,
+  );
 }
 
 export function gradeGuess(answer: Pet, guess: Pet): GradedAttribute[] {

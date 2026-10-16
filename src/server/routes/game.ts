@@ -6,7 +6,11 @@ import { gradeIds } from "../../game/game.ts";
 import { dayNumber, todayIn } from "../answers.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
 import {
+  addGuess,
   changeGame,
+  giveUp,
+  mergeLocal,
+  resetGame,
   REFUSAL_STATUS,
   view,
   type GameContext,
@@ -16,7 +20,7 @@ import {
 import { bodyOf, isIdList, todaysAnswer, type AppContext } from "./context.ts";
 
 export function gameRoutes(app: Express, ctx: AppContext): void {
-  const { pool, roster, petIds, now, timeZone } = ctx;
+  const { pool, roster, now, timeZone } = ctx;
 
   // Stateless grading for anonymous players. The answer is revealed only to a
   // batch containing the right guess.
@@ -126,88 +130,25 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
   app.post(
     "/api/game/guess",
     json,
-    changeRoute(async ({ userId, date, body }, current, q) => {
-      const id = body["id"];
-      if (typeof id !== "string" || !petIds.includes(id)) {
-        return "invalid";
-      }
-      if (current.victory || current.gaveUp) {
-        return "finished";
-      }
-      const { rowCount } = await q.query(
-        "insert into user_guesses (user_id, day, pet_id) values ($1, $2, $3) on conflict do nothing",
-        [userId, date, id],
-      );
-      return rowCount === 1 ? null : "duplicate";
-    }),
+    changeRoute(({ body, ...game }, current, q) =>
+      addGuess(q, game, current, body["id"]),
+    ),
   );
   app.post(
     "/api/game/give-up",
     json,
-    changeRoute(async ({ userId, date }, current, q) => {
-      if (current.victory || current.gaveUp) {
-        return "finished";
-      }
-      await q.query(
-        "insert into user_give_ups (user_id, day) values ($1, $2)",
-        [userId, date],
-      );
-      return null;
-    }),
+    changeRoute((game, current, q) => giveUp(q, game, current)),
   );
-  // Adopts anonymous local history; the user-row lock in changeGame makes the
-  // "no rows yet" check and the inserts one atomic step.
   app.post(
     "/api/game/merge",
     json,
-    changeRoute(async ({ userId, date, day, body, answer }, current, q) => {
-      const { ids, gaveUp } = body;
-      if (
-        !isIdList(ctx, ids) ||
-        (gaveUp !== undefined && typeof gaveUp !== "boolean") ||
-        !ids.every((id) => petIds.includes(id))
-      ) {
-        return "invalid";
-      }
-      if (body["day"] !== day) {
-        return "stale_day";
-      }
-      if (current.ids.length > 0 || current.gaveUp) {
-        return "has_progress";
-      }
-      // Keep first occurrences in order, stop after the answer
-      const keep = [...new Set(ids)];
-      const end = keep.indexOf(answer.id);
-      const adopted = end === -1 ? keep : keep.slice(0, end + 1);
-      for (const id of adopted) {
-        await q.query(
-          "insert into user_guesses (user_id, day, pet_id) values ($1, $2, $3)",
-          [userId, date, id],
-        );
-      }
-      if (gaveUp === true && end === -1) {
-        await q.query(
-          "insert into user_give_ups (user_id, day) values ($1, $2)",
-          [userId, date],
-        );
-      }
-      return null;
-    }),
+    changeRoute(({ body, ...game }, current, q) =>
+      mergeLocal(q, game, current, body),
+    ),
   );
   app.post(
     "/api/game/reset",
     json,
-    changeRoute(async ({ userId, date }, current, q) => {
-      if (!current.victory && !current.gaveUp) {
-        return "not_finished";
-      }
-      for (const table of ["user_guesses", "user_give_ups"]) {
-        await q.query(`delete from ${table} where user_id = $1 and day = $2`, [
-          userId,
-          date,
-        ]);
-      }
-      return null;
-    }),
+    changeRoute((game, current, q) => resetGame(q, game, current)),
   );
 }

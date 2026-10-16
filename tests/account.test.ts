@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { fetchUser, signOut, type AccountFetch } from "../src/account.ts";
+import { fetchUser, signOut } from "../src/account.ts";
+import type { Fetch } from "../src/game/transport.ts";
 
 const reply =
-  (ok: boolean, body: unknown): AccountFetch =>
+  (ok: boolean, body: unknown): Fetch =>
   () =>
-    Promise.resolve({ ok, json: () => Promise.resolve(body) });
-const down: AccountFetch = () => Promise.reject(new Error("offline"));
+    Promise.resolve({
+      ok,
+      status: ok ? 200 : 500,
+      json: () => Promise.resolve(body),
+    });
+const down: Fetch = () => Promise.reject(new Error("offline"));
 
 describe("fetchUser", () => {
   it("returns the signed-in user", async () => {
@@ -30,7 +35,11 @@ describe("signOut", () => {
     const calls: unknown[] = [];
     const ok = await signOut((url, init) => {
       calls.push([url, init]);
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({}),
+      });
     });
     assert.equal(ok, true);
     assert.deepEqual(calls, [
