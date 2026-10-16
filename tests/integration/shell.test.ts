@@ -207,10 +207,7 @@ describe("game shell with link-preview meta", () => {
           // Editing routes hide first (404), then ask for a sign-in, then refuse
           const edit =
             visible === 404 ? 404 : manager ? 200 : who === "anon" ? 401 : 403;
-          // An empty roster cannot draw answers (the editor never asks), so only details is probed there
-          for (const path of entries === 0
-            ? ["details"]
-            : ["details", "answers"]) {
+          for (const path of ["details", "answers"]) {
             assert.equal(
               await get(`/api/games/${SLUG}/${path}`, who),
               edit,

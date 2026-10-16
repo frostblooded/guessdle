@@ -95,7 +95,11 @@ export function answersRoutes(app: Express, ctx: AppContext): void {
         res.status(400).json({ error: "invalid" });
         return;
       }
-      const days = await peekDays(pool, game, ids, from, rawTo, random);
+      // Nothing can be drawn from an empty roster
+      const days =
+        ids.length === 0
+          ? []
+          : await peekDays(pool, game, ids, from, rawTo, random);
       res.json({
         today,
         from,
