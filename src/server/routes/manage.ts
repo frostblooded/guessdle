@@ -2,33 +2,29 @@
 import express from "express";
 import type { Express, Request, Response } from "express";
 import { slugBase, slugError } from "../../game/slug.ts";
+import { deleteGame } from "../approval.ts";
+import { gameLifecycle, type Move } from "../lifecycle.ts";
 import {
-  deleteGame,
-  mailAdminsPending,
-  submitGame,
-  unpublishGame,
-} from "../approval.ts";
+  MAX_NAME,
+  nameIn,
+  parseEntryInput,
+  parseGamePatch,
+} from "../validate.ts";
 import { redrawFuture, releaseEntry, todayIn } from "../answers.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
 import type { AttributeType } from "../../game/game.ts";
-import {
-  deleteEntry,
-  listEntries,
-  parseEntryInput,
-  saveEntry,
-} from "../entries.ts";
+import { deleteEntry, listEntries, saveEntry } from "../entries.ts";
 import {
   createGame,
   editAttributes,
-  findGame,
   listAttributes,
   listOwned,
   MAX_ATTRIBUTE_NAME,
+  patchKind,
   skipOf,
   updateGame,
   type AttributeEdit,
   type GameRow,
-  type GamePatch,
 } from "../games.ts";
 import { rateLimit, type RateLimit } from "../rate-limit.ts";
 import { isStoredUpload, removeUpload } from "../upload-store.ts";
@@ -42,15 +38,6 @@ import {
 
 // Starting values, tune after launch (docs/deploy.md)
 export const DEFAULT_WRITE_LIMIT: RateLimit = { max: 60, windowMs: 60_000 };
-
-const MAX_NAME = 60;
-const MAX_DESCRIPTION = 500;
-
-// A non-empty string of at most max chars once trimmed; undefined otherwise
-const nameIn = (v: unknown, max: number): string | undefined =>
-  typeof v === "string" && v.trim() !== "" && v.trim().length <= max
-    ? v.trim()
-    : undefined;
 
 const invalid = (res: Response, error = "invalid", status = 400): void => {
   res.status(status).json({ error });
@@ -67,6 +54,17 @@ export function manageRoutes(
   // An entry carries up to 10 attributes of 20 items
   const bigJson = express.json({ limit: "64kb" });
   const writes = rateLimit(pool, now, limit);
+  const lifecycle = gameLifecycle(pool, ctx.mail);
+  // A cover or photo is the caller's own upload or the one already set
+  const uploadOk = async (
+    url: string,
+    current: string,
+    user: SessionUser,
+    game: GameRow,
+  ): Promise<boolean> =>
+    url === "" ||
+    url === current ||
+    (await isStoredUpload(pool, url, [user.id, game.ownerId]));
 
   const needUser = async (
     req: Request,
@@ -105,14 +103,6 @@ export function manageRoutes(
       }
       await handler(loaded, user, req, res);
     };
-
-  // After an edit: mails the admins when the game just entered pending
-  const afterEdit = async (before: GameRow): Promise<void> => {
-    const game = await findGame(pool, before.slug);
-    if (game?.status === "pending" && before.status !== "pending") {
-      await mailAdminsPending(pool, ctx.mail, game);
-    }
-  };
 
   const detailsOf = ({ game, roster }: LoadedGame) => ({
     slug: game.slug,
@@ -194,12 +184,16 @@ export function manageRoutes(
         invalid(res);
         return;
       }
-      const out = await editAttributes(pool, game, edit);
-      if (out !== "ok") {
+      const out = await lifecycle.edit(
+        game,
+        "attributes",
+        (tx) => editAttributes(tx, game, edit),
+        (r) => r === "ok",
+      );
+      if (out !== "ok" && out !== "noop") {
         invalid(res, FAILURES[out][1], FAILURES[out][0]);
         return;
       }
-      await afterEdit(game);
       res.json(await listAttributes(pool, game));
     });
 
@@ -252,23 +246,27 @@ export function manageRoutes(
       id === undefined
         ? undefined
         : (await listEntries(pool, game)).find((e) => e.id === id);
-    const input = await parseEntryInput(
-      pool,
-      bodyOf(req),
-      current?.photo ?? "",
-      [user.id, game.ownerId],
-    );
-    if (!input || (id === undefined && !input.name)) {
+    const input = parseEntryInput(bodyOf(req));
+    if (
+      !input ||
+      (id === undefined && !input.name) ||
+      (input.photo !== undefined &&
+        !(await uploadOk(input.photo, current?.photo ?? "", user, game)))
+    ) {
       invalid(res);
       return;
     }
-    const out = await saveEntry(pool, game, id, input);
+    const out = await lifecycle.edit(
+      game,
+      "entries",
+      (tx) => saveEntry(tx, game, id, input),
+      (r) => typeof r !== "string",
+    );
     if (typeof out === "string") {
       invalid(res, ENTRY_FAILURES[out][1], ENTRY_FAILURES[out][0]);
       return;
     }
     await removeUpload(pool, uploadsDir, out.replacedPhoto);
-    await afterEdit(game);
     res.json(await listEntries(pool, game));
   });
   app.get(
@@ -284,7 +282,14 @@ export function manageRoutes(
     writes,
     manageRoute(async ({ game, roster }, _user, req, res) => {
       const id = idOf(req);
-      if (!(await deleteEntry(pool, game, id))) {
+      if (
+        !(await lifecycle.edit(
+          game,
+          "entries",
+          (tx) => deleteEntry(tx, game, id),
+          Boolean,
+        ))
+      ) {
         invalid(res, "not_found", 404);
         return;
       }
@@ -296,37 +301,25 @@ export function manageRoutes(
         id,
         ctx.random,
       );
-      await afterEdit(game);
       res.json(await listEntries(pool, game));
     }),
   );
 
-  // Submit and unpublish: one guarded status move, then the admin email
-  const flowRoute = (
-    move: (
-      q: typeof pool,
-      game: GameRow,
-    ) => Promise<"ok" | "invalid_state" | "too_few_entries">,
-  ) =>
+  // Submit and unpublish: one guarded status move
+  const flowRoute = (move: Move) =>
     manageRoute(async ({ game }, _user, req, res) => {
-      const out = await move(pool, game);
+      const out = await lifecycle.move(game, move);
       if (out !== "ok") {
         invalid(res, out, 409);
         return;
       }
-      await afterEdit(game);
       const fresh = await loadGame(ctx, req, res);
       if (fresh) {
         res.json(detailsOf(fresh));
       }
     });
-  app.post("/api/games/:slug/submit", writes, json, flowRoute(submitGame));
-  app.post(
-    "/api/games/:slug/unpublish",
-    writes,
-    json,
-    flowRoute(unpublishGame),
-  );
+  app.post("/api/games/:slug/submit", writes, json, flowRoute("submit"));
+  app.post("/api/games/:slug/unpublish", writes, json, flowRoute("unpublish"));
 
   app.delete(
     "/api/games/:slug",
@@ -350,54 +343,23 @@ export function manageRoutes(
         invalid(res, "slug_immutable");
         return;
       }
-      const patch: GamePatch = {};
-      const { name, description, skipPeriod, coverUrl } = body;
-      if (name !== undefined) {
-        const title = nameIn(name, MAX_NAME);
-        if (title === undefined) {
-          invalid(res);
-          return;
-        }
-        patch.name = title;
+      const patch = parseGamePatch(
+        body,
+        Math.max(0, roster.entries.length - 1),
+      );
+      if (
+        !patch ||
+        (patch.coverUrl !== undefined &&
+          !(await uploadOk(patch.coverUrl, game.coverUrl, user, game)))
+      ) {
+        invalid(res);
+        return;
       }
-      if (description !== undefined) {
-        if (
-          typeof description !== "string" ||
-          description.length > MAX_DESCRIPTION
-        ) {
-          invalid(res);
-          return;
-        }
-        patch.description = description;
-      }
-      if (skipPeriod !== undefined) {
-        const max = Math.max(0, roster.entries.length - 1);
-        if (
-          skipPeriod !== null &&
-          !(
-            Number.isInteger(skipPeriod) &&
-            (skipPeriod as number) >= 0 &&
-            (skipPeriod as number) <= max
-          )
-        ) {
-          invalid(res);
-          return;
-        }
-        patch.skipPeriod = skipPeriod as number | null;
-      }
-      if (coverUrl !== undefined) {
-        if (
-          typeof coverUrl !== "string" ||
-          (coverUrl !== "" &&
-            coverUrl !== game.coverUrl &&
-            !(await isStoredUpload(pool, coverUrl, [user.id, game.ownerId])))
-        ) {
-          invalid(res);
-          return;
-        }
-        patch.coverUrl = coverUrl;
-      }
-      const replaced = await updateGame(pool, game, patch);
+      const replaced = await lifecycle.edit(
+        game,
+        patchKind(game, patch),
+        (tx) => updateGame(tx, game, patch),
+      );
       const edited = { ...game, ...patch };
       if (skipOf(edited) !== skipOf(game) && roster.entries.length > 0) {
         await redrawFuture(
@@ -409,7 +371,6 @@ export function manageRoutes(
         );
       }
       await removeUpload(pool, uploadsDir, replaced);
-      await afterEdit(game);
       const fresh = await loadGame(ctx, req, res);
       if (fresh) {
         res.json(detailsOf(fresh));

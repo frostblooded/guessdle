@@ -3,6 +3,7 @@ import type pg from "pg";
 import type { AttributeValue } from "../game/correctness.ts";
 import type { AttributeType, Entry, GameAttribute } from "../game/game.ts";
 import { slugError } from "../game/slug.ts";
+import type { EditKind } from "./lifecycle.ts";
 
 type Q = Pick<pg.Pool, "query">;
 
@@ -180,33 +181,28 @@ export interface GamePatch {
   skipPeriod?: number | null;
 }
 
-// Applies an edit. A text or image change sends an approved or rejected game back to pending.
-// Returns the cover URL the edit replaced, for the caller to delete.
+// The lifecycle edit kind of a patch: text or image changes reset status, a skip period alone does not
+export function patchKind(game: GameRow, patch: GamePatch): EditKind {
+  const next = { ...game, ...patch };
+  return next.name !== game.name || next.description !== game.description
+    ? "details"
+    : next.coverUrl !== game.coverUrl
+      ? "cover"
+      : "skip-period";
+}
+
+// Writes the patch (status is the lifecycle's job). Returns the cover URL the edit replaced,
+// for the caller to delete.
 export async function updateGame(
   q: Q,
   game: GameRow,
   patch: GamePatch,
 ): Promise<string | null> {
   const next = { ...game, ...patch };
-  const changed =
-    next.name !== game.name ||
-    next.description !== game.description ||
-    next.coverUrl !== game.coverUrl;
-  const status =
-    changed && (game.status === "approved" || game.status === "rejected")
-      ? "pending"
-      : game.status;
   await q.query(
     `update games set name = $2, description = $3, cover_url = $4, skip_period = $5,
-       status = $6, updated_at = now() where id = $1`,
-    [
-      game.id,
-      next.name,
-      next.description,
-      next.coverUrl,
-      next.skipPeriod,
-      status,
-    ],
+       updated_at = now() where id = $1`,
+    [game.id, next.name, next.description, next.coverUrl, next.skipPeriod],
   );
   return next.coverUrl === game.coverUrl ? null : game.coverUrl;
 }
@@ -246,86 +242,62 @@ export type AttributeEdit =
 
 // Adds, renames, retypes or removes an attribute. Removing hard-deletes its values; Text to
 // List keeps the value as a one-item list, List to Text joins the items with ", ". A real
-// change sends an approved or rejected game back to pending.
+// change is "ok" (the lifecycle then resets the status), a rename to the same name is "noop".
+// Runs in the caller's game transaction (lifecycle.edit).
 export async function editAttributes(
-  pool: pg.Pool,
+  client: Q,
   game: GameRow,
   edit: AttributeEdit,
-): Promise<"ok" | "limit" | "exists" | "not_found"> {
-  const client = await pool.connect();
-  try {
-    await client.query("begin");
-    // Serializes edits of one game so the cap and the name check hold
-    await client.query("select 1 from games where id = $1 for update", [
-      game.id,
-    ]);
-    const attrs = await listAttributes(client, game);
-    const taken = (name: string, except?: number): boolean =>
-      attrs.some(
-        (a) => a.id !== except && a.name.toLowerCase() === name.toLowerCase(),
-      );
-    let changed = true;
-    if ("add" in edit) {
-      const { name, type } = edit.add;
-      if (taken(name) || attrs.length >= MAX_ATTRIBUTES) {
-        await client.query("rollback");
-        return taken(name) ? "exists" : "limit";
-      }
-      await client.query(
-        `insert into attributes (game_id, name, type, position)
+): Promise<"ok" | "noop" | "limit" | "exists" | "not_found"> {
+  const attrs = await listAttributes(client, game);
+  const taken = (name: string, except?: number): boolean =>
+    attrs.some(
+      (a) => a.id !== except && a.name.toLowerCase() === name.toLowerCase(),
+    );
+  let changed = true;
+  if ("add" in edit) {
+    const { name, type } = edit.add;
+    if (taken(name) || attrs.length >= MAX_ATTRIBUTES) {
+      return taken(name) ? "exists" : "limit";
+    }
+    await client.query(
+      `insert into attributes (game_id, name, type, position)
          values ($1, $2, $3, coalesce((select max(position) + 1 from attributes where game_id = $1), 0))`,
-        [game.id, name, type],
-      );
+      [game.id, name, type],
+    );
+  } else {
+    const id = "remove" in edit ? edit.remove : edit.change.id;
+    const attr = attrs.find((a) => a.id === id);
+    if (!attr) {
+      return "not_found";
+    }
+    if ("remove" in edit) {
+      await client.query("delete from attributes where id = $1", [id]);
     } else {
-      const id = "remove" in edit ? edit.remove : edit.change.id;
-      const attr = attrs.find((a) => a.id === id);
-      if (!attr) {
-        await client.query("rollback");
-        return "not_found";
+      const name = edit.change.name ?? attr.name;
+      const type = edit.change.type ?? attr.type;
+      if (taken(name, id)) {
+        return "exists";
       }
-      if ("remove" in edit) {
-        await client.query("delete from attributes where id = $1", [id]);
-      } else {
-        const name = edit.change.name ?? attr.name;
-        const type = edit.change.type ?? attr.type;
-        if (taken(name, id)) {
-          await client.query("rollback");
-          return "exists";
-        }
-        changed = name !== attr.name || type !== attr.type;
-        if (type === "text" && attr.type === "list") {
-          await client.query(
-            `update entry_values v set value = j.joined
+      changed = name !== attr.name || type !== attr.type;
+      if (type === "text" && attr.type === "list") {
+        await client.query(
+          `update entry_values v set value = j.joined
              from (select entry_id, left(string_agg(value, ', ' order by position), $2) as joined
                    from entry_values where attribute_id = $1 group by entry_id) j
              where v.attribute_id = $1 and v.entry_id = j.entry_id and v.position = 0`,
-            [id, MAX_VALUE_LENGTH],
-          );
-          await client.query(
-            "delete from entry_values where attribute_id = $1 and position > 0",
-            [id],
-          );
-        }
+          [id, MAX_VALUE_LENGTH],
+        );
         await client.query(
-          "update attributes set name = $2, type = $3 where id = $1",
-          [id, name, type],
+          "delete from entry_values where attribute_id = $1 and position > 0",
+          [id],
         );
       }
-    }
-    if (changed) {
       await client.query(
-        `update games set updated_at = now(),
-           status = case when status in ('approved', 'rejected') then 'pending' else status end
-         where id = $1`,
-        [game.id],
+        "update attributes set name = $2, type = $3 where id = $1",
+        [id, name, type],
       );
     }
-    await client.query("commit");
-    return "ok";
-  } catch (err) {
-    await client.query("rollback");
-    throw err;
-  } finally {
-    client.release();
   }
+  return changed ? "ok" : "noop";
 }

@@ -1,10 +1,6 @@
 // Entry editing (spec #66): add, change and soft-delete the entries of one game.
 import type pg from "pg";
-import { listAttributes, MAX_VALUE_LENGTH, type GameRow } from "./games.ts";
-import { isStoredUpload } from "./upload-store.ts";
-
-export const MAX_ENTRY_NAME = 60;
-export const MAX_LIST_ITEMS = 20;
+import { listAttributes, type GameRow } from "./games.ts";
 
 export interface EntryRow {
   id: number;
@@ -40,14 +36,10 @@ export interface EntryInput {
   values?: Record<string, string[]>;
 }
 
-const RESET_STATUS = `update games set updated_at = now(),
-  status = case when status in ('approved', 'rejected') then 'pending' else status end
-  where id = $1`;
-
-// Creates the entry (`id` undefined) or changes it. Any edit sends an approved or
-// rejected game back to pending. `replacedPhoto` is the file the caller should delete.
+// Creates the entry (`id` undefined) or changes it. Runs in the caller's game transaction
+// (lifecycle.edit), which applies the status rule. `replacedPhoto` is the file the caller should delete.
 export async function saveEntry(
-  pool: pg.Pool,
+  tx: pg.PoolClient,
   game: GameRow,
   id: number | undefined,
   input: EntryInput,
@@ -57,148 +49,74 @@ export async function saveEntry(
   | "exists"
   | "not_found"
 > {
-  const client = await pool.connect();
-  const fail = async <T>(reason: T): Promise<T> => {
-    await client.query("rollback");
-    return reason;
-  };
-  try {
-    await client.query("begin");
-    // Serializes edits of one game so the name check holds
-    await client.query("select 1 from games where id = $1 for update", [
-      game.id,
-    ]);
-    const current = (
-      await client.query<{ name: string; photo: string }>(
-        `select name, photo_url as photo from entries
-         where id = $1 and game_id = $2 and deleted_at is null`,
-        [id ?? 0, game.id],
-      )
-    ).rows[0];
-    if (id !== undefined && !current) {
-      return await fail("not_found" as const);
-    }
-    const name = input.name ?? current?.name ?? "";
-    const photo = input.photo ?? current?.photo ?? "";
-    const clash = await client.query(
-      `select 1 from entries where game_id = $1 and deleted_at is null and id <> $2
-         and lower(name) = lower($3)`,
-      [game.id, id ?? 0, name],
-    );
-    if (clash.rowCount) {
-      return await fail("exists" as const);
-    }
-    const attrs = await listAttributes(client, game);
-    for (const [attrId, items] of Object.entries(input.values ?? {})) {
-      const attr = attrs.find((a) => String(a.id) === attrId);
-      if (!attr || (attr.type === "text" && items.length > 1)) {
-        return await fail("invalid" as const);
-      }
-    }
-    let entryId = id;
-    if (entryId === undefined) {
-      entryId = (
-        await client.query<{ id: number }>(
-          "insert into entries (game_id, name, photo_url) values ($1, $2, $3) returning id::int",
-          [game.id, name, photo],
-        )
-      ).rows[0]!.id;
-    } else {
-      await client.query(
-        "update entries set name = $2, photo_url = $3 where id = $1",
-        [entryId, name, photo],
-      );
-    }
-    for (const [attrId, items] of Object.entries(input.values ?? {})) {
-      await client.query(
-        "delete from entry_values where entry_id = $1 and attribute_id = $2",
-        [entryId, attrId],
-      );
-      await client.query(
-        `insert into entry_values (entry_id, attribute_id, position, value)
-         select $1, $2, n - 1, v from unnest($3::text[]) with ordinality as t (v, n)`,
-        [entryId, attrId, items],
-      );
-    }
-    await client.query(RESET_STATUS, [game.id]);
-    await client.query("commit");
-    return {
-      id: entryId,
-      replacedPhoto: current && current.photo !== photo ? current.photo : null,
-    };
-  } catch (err) {
-    await client.query("rollback");
-    throw err;
-  } finally {
-    client.release();
+  const current = (
+    await tx.query<{ name: string; photo: string }>(
+      `select name, photo_url as photo from entries
+       where id = $1 and game_id = $2 and deleted_at is null`,
+      [id ?? 0, game.id],
+    )
+  ).rows[0];
+  if (id !== undefined && !current) {
+    return "not_found";
   }
+  const name = input.name ?? current?.name ?? "";
+  const photo = input.photo ?? current?.photo ?? "";
+  const clash = await tx.query(
+    `select 1 from entries where game_id = $1 and deleted_at is null and id <> $2
+       and lower(name) = lower($3)`,
+    [game.id, id ?? 0, name],
+  );
+  if (clash.rowCount) {
+    return "exists";
+  }
+  const attrs = await listAttributes(tx, game);
+  for (const [attrId, items] of Object.entries(input.values ?? {})) {
+    const attr = attrs.find((a) => String(a.id) === attrId);
+    if (!attr || (attr.type === "text" && items.length > 1)) {
+      return "invalid";
+    }
+  }
+  let entryId = id;
+  if (entryId === undefined) {
+    entryId = (
+      await tx.query<{ id: number }>(
+        "insert into entries (game_id, name, photo_url) values ($1, $2, $3) returning id::int",
+        [game.id, name, photo],
+      )
+    ).rows[0]!.id;
+  } else {
+    await tx.query(
+      "update entries set name = $2, photo_url = $3 where id = $1",
+      [entryId, name, photo],
+    );
+  }
+  for (const [attrId, items] of Object.entries(input.values ?? {})) {
+    await tx.query(
+      "delete from entry_values where entry_id = $1 and attribute_id = $2",
+      [entryId, attrId],
+    );
+    await tx.query(
+      `insert into entry_values (entry_id, attribute_id, position, value)
+       select $1, $2, n - 1, v from unnest($3::text[]) with ordinality as t (v, n)`,
+      [entryId, attrId, items],
+    );
+  }
+  return {
+    id: entryId,
+    replacedPhoto: current && current.photo !== photo ? current.photo : null,
+  };
 }
 
 // Soft delete: the entry leaves autocomplete and draws, past guesses and history still resolve.
 // Its photo stays: history still shows it and the nightly sweep counts it as referenced.
 export async function deleteEntry(
-  pool: pg.Pool,
+  q: Pick<pg.Pool, "query">,
   game: GameRow,
   id: number,
 ): Promise<boolean> {
-  const { rowCount } = await pool.query(
+  const { rowCount } = await q.query(
     "update entries set deleted_at = now() where id = $1 and game_id = $2 and deleted_at is null",
     [id, game.id],
   );
-  if (rowCount === 1) {
-    await pool.query(RESET_STATUS, [game.id]);
-  }
   return rowCount === 1;
-}
-
-// The entry fields in a request body, checked; undefined when any is malformed
-export async function parseEntryInput(
-  pool: pg.Pool,
-  body: Record<string, unknown>,
-  current: string,
-  owners: readonly (number | null)[],
-): Promise<EntryInput | undefined> {
-  const { name, photo, values } = body;
-  const out: EntryInput = {};
-  if (name !== undefined) {
-    if (
-      typeof name !== "string" ||
-      name.trim() === "" ||
-      name.trim().length > MAX_ENTRY_NAME
-    ) {
-      return undefined;
-    }
-    out.name = name.trim();
-  }
-  if (photo !== undefined) {
-    if (
-      typeof photo !== "string" ||
-      (photo !== "" &&
-        photo !== current &&
-        !(await isStoredUpload(pool, photo, owners)))
-    ) {
-      return undefined;
-    }
-    out.photo = photo;
-  }
-  if (values !== undefined) {
-    if (typeof values !== "object" || values === null) {
-      return undefined;
-    }
-    out.values = {};
-    for (const [id, raw] of Object.entries(values)) {
-      const list: unknown = Array.isArray(raw) ? raw : [raw];
-      const items = (list as unknown[]).map((v) =>
-        typeof v === "string" ? v.trim() : null,
-      );
-      if (
-        items.length > MAX_LIST_ITEMS ||
-        items.some((v) => v === null || v.length > MAX_VALUE_LENGTH)
-      ) {
-        return undefined;
-      }
-      out.values[id] = items.filter((v): v is string => v !== "");
-    }
-  }
-  return out;
 }

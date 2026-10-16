@@ -2,13 +2,12 @@
 import express from "express";
 import type { Express, Request, Response } from "express";
 import {
-  approveGame,
   deleteGame,
   listAllGames,
   listQueue,
   MAX_REASON,
-  rejectGame,
 } from "../approval.ts";
+import { gameLifecycle, type MoveResult } from "../lifecycle.ts";
 import { readBackupStatus } from "../backup.ts";
 import { findGame, type GameRow } from "../games.ts";
 import { removeUpload } from "../upload-store.ts";
@@ -75,10 +74,7 @@ export function adminRoutes(
   );
   // Approve, reject (with a reason) or delete the game at :slug
   const gameRoute = (
-    act: (
-      game: GameRow,
-      req: Request,
-    ) => Promise<"ok" | "invalid_state" | "invalid">,
+    act: (game: GameRow, req: Request) => Promise<MoveResult | "invalid">,
   ) =>
     adminRoute(async ({ req, res }) => {
       const game = await findGame(pool, String(paramOf(req, "slug")));
@@ -93,11 +89,12 @@ export function adminRoutes(
         res.status(out === "invalid" ? 400 : 409).json({ error: out });
       }
     });
+  const lifecycle = gameLifecycle(pool, ctx.mail);
   const json = express.json({ limit: "2kb" });
   app.post(
     "/api/admin/games/:slug/approve",
     json,
-    gameRoute((game) => approveGame(pool, game)),
+    gameRoute((game) => lifecycle.move(game, "approve")),
   );
   app.post(
     "/api/admin/games/:slug/reject",
@@ -107,7 +104,7 @@ export function adminRoutes(
       const text = typeof reason === "string" ? reason.trim() : "";
       return text === "" || text.length > MAX_REASON
         ? Promise.resolve("invalid")
-        : rejectGame(pool, game, text);
+        : lifecycle.move(game, "reject", text);
     }),
   );
   app.delete(

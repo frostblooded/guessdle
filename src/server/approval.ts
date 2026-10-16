@@ -1,57 +1,9 @@
-// The approval lifecycle (spec #66): submit, unpublish, review, the admin queue and the admin email.
+// The admin queue, game list and game delete (spec #66); status moves live in lifecycle.ts.
 import type pg from "pg";
-import { MIN_ENTRIES, type GameRow } from "./games.ts";
-import type { MailConfig } from "./mailer.ts";
+import type { GameRow } from "./games.ts";
 
 type Q = Pick<pg.Pool, "query">;
-type Moved = "ok" | "invalid_state";
-
 export const MAX_REASON = 500;
-
-// A guarded status change; "invalid_state" when the game is not in a `from` state
-async function move(
-  q: Q,
-  game: GameRow,
-  from: string[],
-  to: string,
-  reason: string,
-): Promise<Moved> {
-  const { rowCount } = await q.query(
-    `update games set status = $3, reject_reason = $4, updated_at = now()
-     where id = $1 and status = any($2)`,
-    [game.id, from, to, reason],
-  );
-  return rowCount === 1 ? "ok" : "invalid_state";
-}
-
-// Draft or rejected to pending; needs MIN_ENTRIES active entries
-export async function submitGame(
-  q: Q,
-  game: GameRow,
-): Promise<Moved | "too_few_entries"> {
-  if (!["draft", "rejected"].includes(game.status)) {
-    return "invalid_state";
-  }
-  const { rows } = await q.query<{ n: number }>(
-    "select count(*)::int as n from entries where game_id = $1 and deleted_at is null",
-    [game.id],
-  );
-  return rows[0]!.n < MIN_ENTRIES
-    ? "too_few_entries"
-    : move(q, game, ["draft", "rejected"], "pending", game.rejectReason);
-}
-
-export const unpublishGame = (q: Q, game: GameRow): Promise<Moved> =>
-  move(q, game, ["approved"], "pending", "");
-
-export const approveGame = (q: Q, game: GameRow): Promise<Moved> =>
-  move(q, game, ["pending"], "approved", "");
-
-export const rejectGame = (
-  q: Q,
-  game: GameRow,
-  reason: string,
-): Promise<Moved> => move(q, game, ["pending"], "rejected", reason);
 
 export interface QueueItem {
   slug: string;
@@ -114,27 +66,4 @@ export async function deleteGame(q: Q, game: GameRow): Promise<string[]> {
   );
   await q.query("delete from games where id = $1", [game.id]);
   return [...rows.map((r) => r.url), ...(game.coverUrl ? [game.coverUrl] : [])];
-}
-
-// Mails every admin that `game` entered pending. Never throws: a mail problem must not fail the edit.
-export async function mailAdminsPending(
-  q: Q,
-  mail: MailConfig | undefined,
-  game: { slug: string; name: string },
-): Promise<void> {
-  if (!mail) {
-    return;
-  }
-  try {
-    const { rows } = await q.query<{ email: string }>(
-      "select email from users where admin",
-    );
-    const text = `The game "${game.name}" is waiting for approval.\n\nPlay it: ${mail.publicUrl}/g/${game.slug}\nReview it: ${mail.publicUrl}/admin\n`;
-    const subject = `Guessdle: "${game.name}" is waiting for approval`;
-    await Promise.all(
-      rows.map(({ email }) => mail.mailer.send({ to: email, subject, text })),
-    );
-  } catch (err) {
-    console.error("Could not mail the admins", err);
-  }
 }
