@@ -48,7 +48,9 @@ describe("build output is wired through the page and the deploy", () => {
       ...prodHtml.matchAll(/"dist\/(script-[A-Z0-9]+\.(?:js|css))"/g),
     ].map((m) => m[1]!);
     assert.equal(refs.length, 2, "one hashed js and one hashed css");
-    for (const ref of refs) assert.ok(existsSync(join(out, ref)), ref);
+    for (const ref of refs) {
+      assert.ok(existsSync(join(out, ref)), ref);
+    }
     assert.ok(!prodHtml.includes('"dist/script.js"'));
     assert.ok(!prodHtml.includes('"dist/script.css"'));
     assert.ok(!prodHtml.includes("styles.css"), "styles live in the bundle");
