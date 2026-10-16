@@ -1,5 +1,6 @@
 import autoComplete from "@tarekraafat/autocomplete.js";
 import seedrandom from "seedrandom";
+import "./styles.css";
 import "@tarekraafat/autocomplete.js/dist/css/autoComplete.css";
 import {
   type AttributeValue,
