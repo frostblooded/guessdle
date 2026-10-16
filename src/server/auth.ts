@@ -130,8 +130,8 @@ export function clearSessionCookie(res: Response, secure: boolean): void {
   });
 }
 
-// CSRF defence with SameSite=Lax: mutating requests must be JSON (a cross-site
-// form or simple request cannot be) and any Origin must be this site.
+// CSRF defence with SameSite=Lax: mutating requests must be JSON or raw bytes
+// (uploads); a cross-site form or simple request can be neither and any Origin must be this site.
 export function csrfGuard(
   req: Request,
   res: Response,
@@ -154,7 +154,11 @@ export function csrfGuard(
       return;
     }
   }
-  if (!/^application\/json\s*(;|$)/i.test(req.headers["content-type"] ?? "")) {
+  if (
+    !/^application\/(json|octet-stream)\s*(;|$)/i.test(
+      req.headers["content-type"] ?? "",
+    )
+  ) {
     res.status(415).json({ error: "unsupported_media_type" });
     return;
   }

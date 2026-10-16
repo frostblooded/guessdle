@@ -6,3 +6,4 @@ dist
 test-results
 tests/test-results
 tests/playwright-report
+uploads

@@ -32,6 +32,10 @@ Stored server-side (`daily_answers`, `src/server/answers.ts`), never in the bund
 
 `/api/admin/answers|users|backup` and the `/admin` page (`src/admin.ts`, tabs Answers, Users, Backups): peek and override answers (today or future only; later generated days are re-drawn), promote or demote users (no self or last-admin demotion), show backup age.
 
+## Uploads
+
+`POST /api/uploads?kind=photo|cover` (signed in, raw bytes as `application/octet-stream`, 5 MB) runs `src/server/images.ts`: type by magic bytes (JPEG, PNG, WebP), sharp resize (photo 800px, cover 1200px), WebP re-encode, random-hex name in `UPLOADS_DIR` (default `./uploads`); answers `{url: "/uploads/<hex>.webp"}` or 413 `too_large`, 415 `unsupported`, 422 `corrupt`. Prod: the `uploads` named volume is rw for `api`, ro for nginx (`/uploads/`, `/api/uploads` body cap 5m). The dev server serves the same folder.
+
 ## Server
 
 - Rate limits: nginx and `src/server/rate-limit.ts`. `/api/test/login` exists only with `NODE_ENV=test`.

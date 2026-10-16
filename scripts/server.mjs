@@ -9,7 +9,7 @@ const PORT = process.env.PORT ?? 8080;
 // Clean URLs (/login) map to <name>.html; deploy/nginx.conf does the same with try_files
 const PAGES = new Set(["login", "verify", "admin", "how-to-play"]);
 const ALLOWED =
-  /^\/(index\.html|login\.html|verify\.html|admin\.html|how-to-play\.html|favicon\.ico|(dist|photos)\/.+)$/;
+  /^\/(index\.html|login\.html|verify\.html|admin\.html|how-to-play\.html|favicon\.ico|(dist|photos|uploads)\/.+)$/;
 
 const TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -17,6 +17,7 @@ const TYPES = {
   ".css": "text/css; charset=utf-8",
   ".map": "application/json",
   ".jpg": "image/jpeg",
+  ".webp": "image/webp",
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon",
 };
@@ -68,6 +69,7 @@ if (process.env.DATABASE_URL) {
     mail: mailConfigFromEnv(process.env),
     limit: rateLimitFromEnv(process.env),
     backupDir: process.env.BACKUP_DIR || undefined,
+    uploadsDir: process.env.UPLOADS_DIR || join(ROOT, "uploads"),
     adminEmails: adminEmailsFromEnv(process.env.ADMIN_EMAILS),
     // Only the e2e suite sets NODE_ENV=test; the stub login never exists elsewhere
     testLogin: process.env.NODE_ENV === "test",

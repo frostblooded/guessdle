@@ -9,6 +9,7 @@ import { adminRoutes } from "./routes/admin.ts";
 import { authRoutes } from "./routes/auth.ts";
 import type { AppContext } from "./routes/context.ts";
 import { gameRoutes } from "./routes/game.ts";
+import { uploadRoutes } from "./routes/uploads.ts";
 
 export interface AppDeps {
   pool: pg.Pool;
@@ -29,6 +30,8 @@ export interface AppDeps {
   limit?: RateLimit;
   // Backups volume (read-only) holding status.json for the admin panel
   backupDir?: string | undefined;
+  // Folder the upload pipeline writes WebP images to (served at /uploads/)
+  uploadsDir?: string | undefined;
 }
 
 // The API only; callers add static files (dev server) or sit behind nginx (prod)
@@ -44,6 +47,7 @@ export function createApp({
   testLogin = false,
   limit = DEFAULT_RATE_LIMIT,
   backupDir = "/backups",
+  uploadsDir = "uploads",
 }: AppDeps): Express {
   if (testLogin && process.env["NODE_ENV"] === "production") {
     throw new Error("The test login route cannot run in production");
@@ -73,6 +77,7 @@ export function createApp({
   authRoutes(app, ctx, { mail, adminEmails, testLogin });
   adminRoutes(app, ctx, backupDir);
   gameRoutes(app, ctx);
+  uploadRoutes(app, ctx, uploadsDir);
 
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "not_found" });

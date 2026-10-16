@@ -23,6 +23,8 @@ RUN npm ci --omit=dev
 COPY src/server ./src/server
 COPY src/game ./src/game
 COPY db ./db
+# A named volume copies this owner, so the node user can write uploads
+RUN mkdir uploads && chown node uploads
 USER node
 EXPOSE 3000
 CMD ["node", "src/server/main.ts"]

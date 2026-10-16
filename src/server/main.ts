@@ -33,5 +33,6 @@ if (import.meta.main) {
     secureCookies: true,
     limit: rateLimitFromEnv(process.env),
     backupDir: process.env["BACKUP_DIR"] || undefined,
+    uploadsDir: process.env["UPLOADS_DIR"] || undefined,
   }).listen(Number(process.env["PORT"] ?? 3000), "0.0.0.0");
 }

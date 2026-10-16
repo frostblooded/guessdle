@@ -7,3 +7,4 @@
 .env
 /backups
 *.dump
+/uploads
