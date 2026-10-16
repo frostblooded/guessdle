@@ -111,12 +111,6 @@ function getAnswerIdx(): number {
   return cachedAnswerIdx;
 }
 
-const THEME_ICONS: Record<ThemeMode, string> = {
-  auto: "🖥",
-  light: "☀",
-  dark: "🌙",
-};
-
 function applyThemeMode(mode: ThemeMode): void {
   if (mode === "auto") {
     delete document.documentElement.dataset["theme"];
@@ -125,7 +119,7 @@ function applyThemeMode(mode: ThemeMode): void {
   }
   const button: HTMLButtonElement =
     document.querySelector<HTMLButtonElement>("#theme-button")!;
-  button.textContent = THEME_ICONS[mode];
+  button.textContent = `Theme: ${mode}`;
   button.setAttribute("aria-label", `Theme: ${mode}. Click to change.`);
 }
 

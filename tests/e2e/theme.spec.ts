@@ -41,6 +41,7 @@ test.describe("dark OS preference, auto mode", () => {
       "aria-label",
       "Theme: auto. Click to change.",
     );
+    await expect(themeButton(page)).toHaveText("Theme: auto");
 
     await page.locator("#new-guess-input").fill("a");
     const option = page.locator("[role=option]").first();
@@ -68,6 +69,7 @@ test.describe("dark OS preference, auto mode", () => {
       "aria-label",
       "Theme: light. Click to change.",
     );
+    await expect(themeButton(page)).toHaveText("Theme: light");
     expect(await background(page)).toBe(LIGHT_BG);
   });
 });
