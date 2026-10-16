@@ -30,8 +30,9 @@ describe("brand", () => {
       const lines = readFileSync(file, "utf8").split("\n");
       lines.forEach((line, i) => {
         const rest = KEPT.reduce((s, re) => s.replace(re, ""), line);
-        if (/petdle/i.test(rest))
+        if (/petdle/i.test(rest)) {
           found.push(`${file}:${i + 1}: ${line.trim()}`);
+        }
       });
     }
     assert.deepEqual(found, []);
