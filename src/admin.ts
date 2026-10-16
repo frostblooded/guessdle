@@ -1,4 +1,5 @@
 // Admin page: Answers (peek and override Daily Answers), Users and Backups tabs.
+import { initQueue } from "./admin-queue.ts";
 import type { EntryRef } from "./game/game.ts";
 
 // The answers tab edits game 1 until the game editor exists
@@ -269,15 +270,20 @@ export function initAdmin(): void {
     );
   };
 
+  const queuePanel = $<HTMLElement>("#queue-panel");
+  const showQueue = initQueue();
+
   const tabs = {
     answers: $<HTMLElement>("#tab-answers"),
     users: $<HTMLElement>("#tab-users"),
     backup: $<HTMLElement>("#tab-backup"),
+    queue: $<HTMLElement>("#tab-queue"),
   };
-  const selectTab = (name: "answers" | "users" | "backup"): void => {
+  const selectTab = (name: keyof typeof tabs): void => {
     answersPanel.hidden = name !== "answers";
     usersPanel.hidden = name !== "users";
     backupPanel.hidden = name !== "backup";
+    queuePanel.hidden = name !== "queue";
     for (const [key, tab] of Object.entries(tabs)) {
       tab.ariaSelected = String(key === name);
       tab.tabIndex = key === name ? 0 : -1;
@@ -286,7 +292,9 @@ export function initAdmin(): void {
       ? show()
       : name === "users"
         ? showUsers()
-        : showBackup());
+        : name === "queue"
+          ? showQueue()
+          : showBackup());
   };
   for (const [name, tab] of Object.entries(tabs)) {
     tab.onclick = (): void => selectTab(name as keyof typeof tabs);

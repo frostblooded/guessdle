@@ -5,6 +5,8 @@ export interface AccountUser {
   name: string;
   email: string;
   admin: boolean;
+  // Games waiting for review; sent to admins only
+  pending?: number;
 }
 
 // null when signed out, or when the server cannot be reached (shown as signed out)

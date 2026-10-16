@@ -2,26 +2,26 @@
 import express from "express";
 import type { Express, Request, Response } from "express";
 import { slugBase, slugError } from "../../game/slug.ts";
+import { mailAdminsPending, submitGame, unpublishGame } from "../approval.ts";
 import { releaseEntry, todayIn } from "../answers.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
 import type { AttributeType } from "../../game/game.ts";
 import {
   deleteEntry,
   listEntries,
-  MAX_ENTRY_NAME,
-  MAX_LIST_ITEMS,
+  parseEntryInput,
   saveEntry,
-  type EntryInput,
 } from "../entries.ts";
 import {
   createGame,
   editAttributes,
+  findGame,
   listAttributes,
   listOwned,
   MAX_ATTRIBUTE_NAME,
-  MAX_VALUE_LENGTH,
   updateGame,
   type AttributeEdit,
+  type GameRow,
   type GamePatch,
 } from "../games.ts";
 import { rateLimit, type RateLimit } from "../rate-limit.ts";
@@ -93,6 +93,14 @@ export function manageRoutes(
       }
       await handler(loaded, user, req, res);
     };
+
+  // After an edit: mails the admins when the game just entered pending
+  const afterEdit = async (before: GameRow): Promise<void> => {
+    const game = await findGame(pool, before.slug);
+    if (game?.status === "pending" && before.status !== "pending") {
+      await mailAdminsPending(pool, ctx.mail, game);
+    }
+  };
 
   const detailsOf = ({ game, roster }: LoadedGame) => ({
     slug: game.slug,
@@ -187,6 +195,7 @@ export function manageRoutes(
         invalid(res, FAILURES[out][1], FAILURES[out][0]);
         return;
       }
+      await afterEdit(game);
       res.json(await listAttributes(pool, game));
     });
 
@@ -226,55 +235,6 @@ export function manageRoutes(
   );
 
   const entryBase = "/api/games/:slug/entries";
-  // The entry fields in the body, checked; undefined when any is malformed
-  const entryInput = async (
-    body: Record<string, unknown>,
-    current: string,
-  ): Promise<EntryInput | undefined> => {
-    const { name, photo, values } = body;
-    const out: EntryInput = {};
-    if (name !== undefined) {
-      if (
-        typeof name !== "string" ||
-        name.trim() === "" ||
-        name.trim().length > MAX_ENTRY_NAME
-      ) {
-        return undefined;
-      }
-      out.name = name.trim();
-    }
-    if (photo !== undefined) {
-      if (
-        typeof photo !== "string" ||
-        (photo !== "" &&
-          photo !== current &&
-          !(await isStoredUpload(pool, photo)))
-      ) {
-        return undefined;
-      }
-      out.photo = photo;
-    }
-    if (values !== undefined) {
-      if (typeof values !== "object" || values === null) {
-        return undefined;
-      }
-      out.values = {};
-      for (const [id, raw] of Object.entries(values)) {
-        const list: unknown = Array.isArray(raw) ? raw : [raw];
-        const items = (list as unknown[]).map((v) =>
-          typeof v === "string" ? v.trim() : null,
-        );
-        if (
-          items.length > MAX_LIST_ITEMS ||
-          items.some((v) => v === null || v.length > MAX_VALUE_LENGTH)
-        ) {
-          return undefined;
-        }
-        out.values[id] = items.filter((v): v is string => v !== "");
-      }
-    }
-    return out;
-  };
   const ENTRY_FAILURES = {
     invalid: [400, "invalid"],
     exists: [409, "entry_exists"],
@@ -288,7 +248,11 @@ export function manageRoutes(
       id === undefined
         ? undefined
         : (await listEntries(pool, game)).find((e) => e.id === id);
-    const input = await entryInput(bodyOf(req), current?.photo ?? "");
+    const input = await parseEntryInput(
+      pool,
+      bodyOf(req),
+      current?.photo ?? "",
+    );
     if (!input || (id === undefined && !input.name)) {
       invalid(res);
       return;
@@ -299,6 +263,7 @@ export function manageRoutes(
       return;
     }
     await removeUpload(pool, uploadsDir, out.replacedPhoto);
+    await afterEdit(game);
     res.json(await listEntries(pool, game));
   });
   app.get(
@@ -326,8 +291,36 @@ export function manageRoutes(
         id,
         ctx.random,
       );
+      await afterEdit(game);
       res.json(await listEntries(pool, game));
     }),
+  );
+
+  // Submit and unpublish: one guarded status move, then the admin email
+  const flowRoute = (
+    move: (
+      q: typeof pool,
+      game: GameRow,
+    ) => Promise<"ok" | "invalid_state" | "too_few_entries">,
+  ) =>
+    manageRoute(async ({ game }, _user, req, res) => {
+      const out = await move(pool, game);
+      if (out !== "ok") {
+        invalid(res, out, 409);
+        return;
+      }
+      await afterEdit(game);
+      const fresh = await loadGame(ctx, req, res);
+      if (fresh) {
+        res.json(detailsOf(fresh));
+      }
+    });
+  app.post("/api/games/:slug/submit", writes, json, flowRoute(submitGame));
+  app.post(
+    "/api/games/:slug/unpublish",
+    writes,
+    json,
+    flowRoute(unpublishGame),
   );
 
   app.patch(
@@ -393,6 +386,7 @@ export function manageRoutes(
       }
       const replaced = await updateGame(pool, game, patch);
       await removeUpload(pool, uploadsDir, replaced);
+      await afterEdit(game);
       const fresh = await loadGame(ctx, req, res);
       if (fresh) {
         res.json(detailsOf(fresh));

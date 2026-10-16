@@ -1,6 +1,7 @@
 // Entry editing (spec #66): add, change and soft-delete the entries of one game.
 import type pg from "pg";
-import { listAttributes, type GameRow } from "./games.ts";
+import { listAttributes, MAX_VALUE_LENGTH, type GameRow } from "./games.ts";
+import { isStoredUpload } from "./upload-store.ts";
 
 export const MAX_ENTRY_NAME = 60;
 export const MAX_LIST_ITEMS = 20;
@@ -148,4 +149,55 @@ export async function deleteEntry(
     await pool.query(RESET_STATUS, [game.id]);
   }
   return rowCount === 1;
+}
+
+// The entry fields in a request body, checked; undefined when any is malformed
+export async function parseEntryInput(
+  pool: Pick<pg.Pool, "query">,
+  body: Record<string, unknown>,
+  current: string,
+): Promise<EntryInput | undefined> {
+  const { name, photo, values } = body;
+  const out: EntryInput = {};
+  if (name !== undefined) {
+    if (
+      typeof name !== "string" ||
+      name.trim() === "" ||
+      name.trim().length > MAX_ENTRY_NAME
+    ) {
+      return undefined;
+    }
+    out.name = name.trim();
+  }
+  if (photo !== undefined) {
+    if (
+      typeof photo !== "string" ||
+      (photo !== "" &&
+        photo !== current &&
+        !(await isStoredUpload(pool, photo)))
+    ) {
+      return undefined;
+    }
+    out.photo = photo;
+  }
+  if (values !== undefined) {
+    if (typeof values !== "object" || values === null) {
+      return undefined;
+    }
+    out.values = {};
+    for (const [id, raw] of Object.entries(values)) {
+      const list: unknown = Array.isArray(raw) ? raw : [raw];
+      const items = (list as unknown[]).map((v) =>
+        typeof v === "string" ? v.trim() : null,
+      );
+      if (
+        items.length > MAX_LIST_ITEMS ||
+        items.some((v) => v === null || v.length > MAX_VALUE_LENGTH)
+      ) {
+        return undefined;
+      }
+      out.values[id] = items.filter((v): v is string => v !== "");
+    }
+  }
+  return out;
 }

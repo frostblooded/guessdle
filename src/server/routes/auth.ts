@@ -1,6 +1,7 @@
 // Email-link sign-in, sign-out and the session probe.
 import express from "express";
 import type { Express, Response } from "express";
+import { pendingCount } from "../approval.ts";
 import {
   clearSessionCookie,
   endSession,
@@ -37,7 +38,13 @@ export function authRoutes(
     const user = await requestUser(pool, req, now());
     res.set("Cache-Control", "no-store");
     res.json({
-      user: user && { name: user.name, email: user.email, admin: user.admin },
+      user: user && {
+        name: user.name,
+        email: user.email,
+        admin: user.admin,
+        // The Admin link's badge
+        ...(user.admin && { pending: await pendingCount(pool) }),
+      },
     });
   });
 

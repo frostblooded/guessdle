@@ -35,6 +35,8 @@ export const signInThen = (path: string): void =>
 
 const ERRORS: Record<string, string> = {
   invalid: "Check the values and try again.",
+  too_few_entries: "Add at least 2 entries before submitting.",
+  invalid_state: "This game's status changed. Reload the page.",
   reserved: "That address is reserved. Pick another one.",
   attribute_exists: "Another attribute already has that name.",
   entry_exists: "Another entry already has that name.",

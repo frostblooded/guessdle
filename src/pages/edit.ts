@@ -1,5 +1,9 @@
 // The game editor: top tabs, of which Details, Attributes and Entries exist so far.
-import { statusNotice, type Details } from "../game/editor.ts";
+import {
+  MIN_ENTRIES_FOR_PLAY,
+  statusNotice,
+  type Details,
+} from "../game/editor.ts";
 import { api, errorText, signInThen, type Reply } from "../manage-client.ts";
 import { initEntries } from "./edit-entries.ts";
 import { browserFetch, initShell } from "../shell.ts";
@@ -40,6 +44,11 @@ function render(d: Details): void {
   const notice = $("#status-notice");
   notice.textContent = statusNotice(d);
   notice.dataset["status"] = d.status;
+  // A rejected game resubmits by editing, but a plain Submit is allowed too
+  const submit = $<HTMLButtonElement>("#submit-button");
+  submit.hidden = d.status !== "draft" && d.status !== "rejected";
+  submit.disabled = d.entryCount < MIN_ENTRIES_FOR_PLAY;
+  $("#unpublish-button").hidden = d.status !== "approved";
 }
 
 void initShell(browserFetch).then(async (user) => {
@@ -92,6 +101,20 @@ void initShell(browserFetch).then(async (user) => {
     error.textContent = errorText(out);
     return false;
   };
+
+  // Submit and unpublish move the status; the server answers with the fresh details
+  for (const [button, action] of [
+    ["#submit-button", "submit"],
+    ["#unpublish-button", "unpublish"],
+  ] as const) {
+    $(button).onclick = async (): Promise<void> => {
+      const out = await api<Details>("POST", `${API}/${action}`, {});
+      if (out?.status === 200) {
+        render(out.data);
+      }
+      $("#flow-error").textContent = out?.status === 200 ? "" : errorText(out);
+    };
+  }
 
   $<HTMLFormElement>("#details-form").onsubmit = (event: SubmitEvent): void => {
     event.preventDefault();

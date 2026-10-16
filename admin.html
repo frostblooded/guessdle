@@ -77,7 +77,46 @@
           >
             Backups
           </button>
+          <button
+            type="button"
+            role="tab"
+            id="tab-queue"
+            aria-selected="false"
+            aria-controls="queue-panel"
+            tabindex="-1"
+          >
+            Queue
+          </button>
         </div>
+        <section
+          id="queue-panel"
+          class="card"
+          role="tabpanel"
+          aria-labelledby="tab-queue"
+          hidden
+        >
+          <h2>Games waiting for approval</h2>
+          <p
+            id="queue-message"
+            class="alert alert-warn"
+            role="status"
+            hidden
+          ></p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Game</th>
+                  <th>Owner</th>
+                  <th>Entries</th>
+                  <th>Waiting since</th>
+                  <th><span class="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody id="queue-games"></tbody>
+            </table>
+          </div>
+        </section>
         <section
           id="backup-panel"
           class="card"
