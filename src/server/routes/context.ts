@@ -95,7 +95,7 @@ export async function todaysAnswer(
   if (roster.entries.length < MIN_ENTRIES) {
     res
       .status(FAILURES.not_enough_entries.status)
-      .json({ error: "not_enough_entries", day });
+      .json({ error: "not_enough_entries" satisfies FailureCode, day });
     return undefined;
   }
   const answerId = await ensureAnswer(

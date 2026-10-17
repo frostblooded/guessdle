@@ -22,7 +22,7 @@ export const FAILURES = {
   ),
   not_enough_entries: failure(
     409,
-    `This game cannot be played yet: it needs at least ${MIN_ENTRIES} entries to pick a daily answer. Add entries in the editor.`,
+    `This game cannot be played yet: it needs at least ${MIN_ENTRIES} entries to pick a daily answer. Use the Edit link to add entries.`,
   ),
   invalid_state: failure(
     409,
@@ -37,6 +37,22 @@ export const FAILURES = {
   too_large: failure(413, "That image is over 5 MB."),
   unsupported: failure(415, "Use a JPEG, PNG or WebP image."),
   corrupt: failure(422, "That image could not be read."),
+  forbidden_origin: failure(
+    403,
+    "The request came from an address this site does not accept. Reload the page from the site itself and try again.",
+  ),
+  unsupported_media_type: failure(
+    415,
+    "The browser sent data in a format the server does not accept. Reload the page and try again.",
+  ),
+  server_error: failure(
+    500,
+    "The server hit an unexpected problem. Reload the page and check whether it worked, then try again; if it keeps failing, wait a few minutes.",
+  ),
+  answer_missing: failure(
+    500,
+    "Today's answer could not be found for this game. Reload the page; if it keeps happening, ask the game owner or an admin to check the entries.",
+  ),
   rate_limited: failure(
     429,
     "Too many changes in a short time. Wait a minute and retry.",
@@ -50,4 +66,4 @@ export const failureText = (code: unknown, status: number): string =>
   FAILURES[String(code) as FailureCode]?.text ??
   (status === 429
     ? FAILURES.rate_limited.text
-    : "The server hit a problem and gave no details. Your change may not have been saved. Reload the page and check, then try again; if it keeps failing, try again in a few minutes.");
+    : "The server answered with a problem it did not explain. Reload the page and check whether it worked, then try again; if it keeps failing, wait a few minutes.");

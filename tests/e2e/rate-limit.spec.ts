@@ -2,7 +2,8 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import { GUESS_DATA } from "./roster.ts";
 import { findAnswerName, submitGuess } from "./helpers.ts";
 
-const MESSAGE = "Too many requests, wait a moment";
+const MESSAGE =
+  "Too many requests in a short time. Wait a minute, then try again.";
 // nginx answers a flood with a plain-text 429, the API with JSON
 const nginx429 = (route: Route): Promise<void> =>
   route.fulfill({

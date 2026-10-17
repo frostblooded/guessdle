@@ -8,6 +8,7 @@ import {
   type GradedAttribute,
 } from "./game/game.ts";
 import { gameStorage } from "./game/game-state.ts";
+import { FAILURES } from "./game/failures.ts";
 import { MIN_ENTRIES } from "./game/limits.ts";
 import { mergeLocalGame } from "./game/merge.ts";
 import { createServerPlay } from "./game/server-play.ts";
@@ -112,7 +113,7 @@ window.onload = async function (): Promise<void> {
     document.querySelector("#board")!.removeAttribute("aria-busy");
     document.querySelector<HTMLElement>("#loading-state")!.hidden = true;
     showNotice(
-      `This game cannot be played yet: it needs at least ${MIN_ENTRIES} entries to pick a daily answer, and it has ${roster.length}. Use the Edit link to add entries.`,
+      `${FAILURES.not_enough_entries.text} It has ${roster.length} now.`,
     );
     return;
   }
@@ -258,7 +259,12 @@ function setFinished(finished: boolean): void {
   document.querySelector<HTMLElement>("#reset-button")!.hidden = !finished;
 }
 
-const RATE_LIMITED = "Too many requests, wait a moment";
+const RATE_LIMITED =
+  "Too many requests in a short time. Wait a minute, then try again.";
+const GUESS_FAILED =
+  "Your guess could not be checked because the server did not answer. It is still in the box: press Enter to try again.";
+const GIVE_UP_FAILED =
+  "Could not reveal the answer because the server did not answer. Try again in a moment.";
 
 // A short message above the guess box; null hides it
 function showNotice(text: string | null): void {
@@ -269,7 +275,13 @@ function showNotice(text: string | null): void {
 
 async function handleGiveUp(): Promise<void> {
   const result: GiveUpResult = await play.giveUp();
-  showNotice(result.kind === "rate_limited" ? RATE_LIMITED : null);
+  showNotice(
+    result.kind === "rate_limited"
+      ? RATE_LIMITED
+      : result.kind === "error"
+        ? GIVE_UP_FAILED
+        : null,
+  );
   if (result.kind === "gaveUp") {
     showBanner("give-up", result.answer);
     setFinished(true);
@@ -384,7 +396,13 @@ async function handleSubmitSelection(): Promise<void> {
   } finally {
     submitting = false;
   }
-  showNotice(result.kind === "rate_limited" ? RATE_LIMITED : null);
+  showNotice(
+    result.kind === "rate_limited"
+      ? RATE_LIMITED
+      : result.kind === "error"
+        ? GUESS_FAILED
+        : null,
+  );
   // The typed guess stays when the server could not grade it, to retry
   if (
     result.kind === "rate_limited" ||
