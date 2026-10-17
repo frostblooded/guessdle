@@ -25,7 +25,7 @@ export function statusNotice(d: Details): string {
     case "pending":
       return `Pending: waiting for an admin to review it.${needs}`;
     case "approved":
-      return `Approved: listed in the gallery. Editing text, images or attributes sends it back to pending.${needs}`;
+      return "";
     case "rejected":
       return `Rejected${d.rejectReason ? `: ${d.rejectReason}` : ""}. Edit the game to send it back to pending.${needs}`;
   }

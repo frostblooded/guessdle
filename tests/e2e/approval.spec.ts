@@ -77,6 +77,7 @@ test("submit, admin reject, resubmit, approve, unpublish", async ({
 
   await page.goto(`/g/${slug}/edit`);
   await expect(page.locator("#loading-state")).toBeHidden();
+  await expect(page.locator("#status-notice")).toBeHidden();
   await page.locator("#unpublish-button").click();
   await expect(page.locator("#status-notice")).toContainText("Pending");
   await page.goto("/");

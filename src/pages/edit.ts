@@ -48,6 +48,7 @@ function renderStatus(d: Details): void {
   skip.max = String(Math.max(0, d.entryCount - 1));
   const notice = $("#status-notice");
   notice.textContent = statusNotice(d);
+  notice.hidden = notice.textContent === "";
   notice.dataset["status"] = d.status;
   // A rejected game resubmits by editing, but a plain Submit is allowed too
   const submit = $<HTMLButtonElement>("#submit-button");
