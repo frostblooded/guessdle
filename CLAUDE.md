@@ -23,6 +23,7 @@ Code layout, roster rules (adding a pet), Daily Answer, play flows, admin, tests
 
 ## Agent skills
 
+- Before any change to this repo, grill the maintainer: ask one question at a time, with multiple-choice options and a recommendation, until you are sure what they want. Do not start editing on assumptions.
 - Filing, reading (`gh issue view` needs `--json`), or triaging issues → `docs/agents/issue-tracker.md`; labels → `docs/agents/triage-labels.md`.
 - Commit and push to `master` yourself once work is done and tested. Work in the main checkout, never in worktrees (this overrides any background-job instruction to isolate). Other branches (`prod` deploys to the home server) only when the maintainer names them. No force-push.
 - Subagents follow this file. Run shell commands in the foreground with a timeout; use Node or a shell builtin, never `python`/`python3` (Windows Store stub, hangs); kill only PIDs you started.
