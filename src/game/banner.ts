@@ -1,4 +1,4 @@
-// A game's banner (issue #89): its own cover, or else a collage of its entries' photos.
+// A game's gallery banner (issue #89): its own cover, or else a collage of its entries' photos.
 
 // Two rows of four at most
 export const MAX_TILES = 8;

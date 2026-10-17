@@ -1,6 +1,5 @@
 import autoComplete from "@tarekraafat/autocomplete.js";
 import "@tarekraafat/autocomplete.js/dist/css/autoComplete.css";
-import { gameBanner } from "./banner.ts";
 import { correctnessClass } from "./game/correctness.ts";
 import {
   findEntryId,
@@ -41,22 +40,30 @@ let play: Play;
 
 let autoCompleteJs: autoComplete | null = null;
 
-interface LoadedGame {
-  name: string;
-  cover: string;
-  canEdit: boolean;
-  attributes: GameAttribute[];
-  entries: EntryRef[];
-}
-
 // The game's attributes and entries, or null when it could not be loaded
-async function loadGame(): Promise<LoadedGame | "missing" | null> {
+async function loadGame(): Promise<
+  | {
+      name: string;
+      canEdit: boolean;
+      attributes: GameAttribute[];
+      entries: EntryRef[];
+    }
+  | "missing"
+  | null
+> {
   try {
     const res = await fetch(`/api/games/${encodeURIComponent(SLUG)}`);
     if (res.status === 404) {
       return "missing";
     }
-    return res.ok ? ((await res.json()) as LoadedGame) : null;
+    return res.ok
+      ? ((await res.json()) as {
+          name: string;
+          canEdit: boolean;
+          attributes: GameAttribute[];
+          entries: EntryRef[];
+        })
+      : null;
   } catch {
     return null;
   }
@@ -93,13 +100,6 @@ window.onload = async function (): Promise<void> {
   roster = game.entries;
   document.querySelector("#game-title")!.textContent = game.name;
   document.title = `${game.name} - Guessdle`;
-  const banner = gameBanner(
-    game.cover,
-    roster.map((entry) => entry.photo),
-  );
-  document
-    .querySelector("#game-banner")!
-    .replaceChildren(...(banner ? [banner] : []));
   if (game.canEdit) {
     const edit = document.querySelector<HTMLAnchorElement>("#edit-link")!;
     edit.href = `/g/${encodeURIComponent(SLUG)}/edit`;

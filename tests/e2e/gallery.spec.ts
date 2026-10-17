@@ -124,7 +124,7 @@ test("a gallery card shows the game's cover, a collage of entry photos without o
   await expect(cards.nth(2).locator("h2")).toHaveText("plain");
 });
 
-test("the original game, which has no cover, shows a collage of its pets on the gallery and its page", async ({
+test("the original game, which has no cover, shows a collage of its pets on the gallery and none on Play", async ({
   page,
 }) => {
   await page.goto("/");
@@ -132,42 +132,6 @@ test("the original game, which has no cover, shows a collage of its pets on the 
     page.locator(".game-card").first().locator(".game-banner-collage img"),
   ).toHaveCount(8);
   await page.goto("/g/petdle");
-  await expect(
-    page.locator("#game-banner .game-banner-collage img"),
-  ).toHaveCount(8);
-});
-
-test("a game page shows its own cover, or no banner when no entry has a photo", async ({
-  page,
-}) => {
-  let change: (game: {
-    cover?: string;
-    entries?: { photo: string }[];
-  }) => void = () => {};
-  await page.route("**/api/games/petdle", async (route) => {
-    const game = (await (await route.fetch()).json()) as Record<
-      string,
-      unknown
-    >;
-    change(game);
-    await route.fulfill({ json: game });
-  });
-  change = (game) => {
-    game.cover = "/uploads/cover.webp";
-  };
-  await page.goto("/g/petdle");
-  await expect(page.locator("#game-banner img.game-banner")).toHaveAttribute(
-    "src",
-    "/uploads/cover.webp",
-  );
-
-  change = (game) => {
-    game.entries = game.entries!.map((entry) => ({
-      ...entry,
-      photo: "",
-    }));
-  };
-  await page.goto("/g/petdle");
   await expect(page.locator("#loading-state")).toBeHidden();
-  await expect(page.locator("#game-banner")).toBeEmpty();
+  await expect(page.locator(".game-banner")).toHaveCount(0);
 });

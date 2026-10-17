@@ -468,13 +468,6 @@ a {
   object-fit: cover;
 }
 
-/* Shorter on Play so the board stays near the top */
-.game-banner-slot .game-banner {
-  aspect-ratio: 4 / 1;
-  margin-bottom: var(--s4);
-  border-radius: var(--radius);
-}
-
 .game-card-body {
   padding: var(--s4);
 }
