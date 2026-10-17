@@ -1,5 +1,6 @@
 // The editor's Entries tab: list, add, change and delete entries with photo and values.
 import { MAX_LIST_ITEMS, MAX_VALUE_LENGTH } from "../game/limits.ts";
+import { cropForUpload } from "../crop-dialog.ts";
 import { api, errorText, type Reply } from "../manage-client.ts";
 
 const $ = <T extends HTMLElement>(selector: string): T =>
@@ -172,10 +173,14 @@ export async function initEntries(
       return;
     }
     error.textContent = "";
+    const cropped = await cropForUpload(file, "photo", error);
+    if (!cropped) {
+      return;
+    }
     const up = await api<{ url?: string }>(
       "POST",
       "/api/uploads?kind=photo",
-      file,
+      cropped,
     );
     if (up?.status === 200 && up.data.url) {
       photo = up.data.url;

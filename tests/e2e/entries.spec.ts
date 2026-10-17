@@ -48,6 +48,7 @@ test("the Entries tab adds, edits and deletes entries and counts what is missing
     mimeType: "image/png",
     buffer: PNG,
   });
+  await page.locator("#crop-confirm").click();
   await expect(page.locator("#entry-photo-preview")).toBeVisible();
   await page.getByLabel("Color (one per line)").fill("Red\nBlue");
   const refreshed = page.waitForResponse(
