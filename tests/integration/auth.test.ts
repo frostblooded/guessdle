@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { after, before, beforeEach, describe, it } from "node:test";
+import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import { createApp, type AppDeps } from "../../src/server/app.ts";
 import {
   upsertUser,
@@ -71,14 +71,14 @@ describe("Sessions and CSRF protection", () => {
       (await db.pool.query(`select count(*) from ${table}`)).rows[0].count,
     );
 
-  before(async () => {
+  beforeAll(async () => {
     db = await startDb();
     await migrate(db.pool, MIGRATIONS_DIR);
     clock = START;
     url = await serve();
     testUrl = await serve({ testLogin: true });
   });
-  after(async () => {
+  afterAll(async () => {
     for (const s of servers) {
       s.close();
     }

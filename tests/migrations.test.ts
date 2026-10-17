@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readdirSync } from "node:fs";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 
 // Parallel branches each add "the next" migration; two with one number apply in an undefined order
 describe("db/migrations", () => {

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { after, before, describe, it } from "node:test";
+import { afterAll, beforeAll, describe, it } from "vitest";
 import sharp from "sharp";
 import { importPhotos } from "../../src/server/import-photos.ts";
 import { MIGRATIONS_DIR } from "../../src/server/main.ts";
@@ -26,7 +26,7 @@ describe("importPhotos", () => {
       )
     ).rows.map((r) => r.photo_url);
 
-  before(async () => {
+  beforeAll(async () => {
     db = await startDb();
     await migrate(db.pool, MIGRATIONS_DIR);
     photos = await mkdtemp(join(tmpdir(), "photos-"));
@@ -49,7 +49,7 @@ describe("importPhotos", () => {
     );
     userId = rows[0]!.id;
   });
-  after(async () => {
+  afterAll(async () => {
     await db.stop();
     await rm(photos, { recursive: true, force: true });
     await rm(uploads, { recursive: true, force: true });

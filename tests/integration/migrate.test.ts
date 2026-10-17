@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { after, before, beforeEach, describe, it } from "node:test";
+import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import { migrate } from "../../src/server/migrate.ts";
 import { startDb } from "./postgres.ts";
 import type { TestDb } from "./postgres.ts";
@@ -11,10 +11,10 @@ describe("migrate", () => {
   let db: TestDb;
   let dir: string;
 
-  before(async () => {
+  beforeAll(async () => {
     db = await startDb();
   });
-  after(async () => {
+  afterAll(async () => {
     await db.stop();
   });
   beforeEach(async () => {
@@ -164,7 +164,7 @@ describe("migrate", () => {
     );
   });
 
-  after(async () => {
+  afterAll(async () => {
     await rm(dir, { recursive: true, force: true });
   });
 });

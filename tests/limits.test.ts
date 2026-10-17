@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import * as limits from "../src/game/limits.ts";
 import { RESERVED_SLUGS, slugError, slugify } from "../src/game/slug.ts";
 

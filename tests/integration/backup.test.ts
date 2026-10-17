@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { after, before, describe, it } from "node:test";
+import { afterAll, beforeAll, describe, it } from "vitest";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import type { StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { Network } from "testcontainers";
@@ -35,7 +35,7 @@ describe("backup sidecar scripts (real Postgres, real sidecar image)", () => {
   const dumpOn = (day: string): [number, string] =>
     run(`BACKUP_TODAY=${day} /opt/backup/backup.sh`);
 
-  before(async () => {
+  beforeAll(async () => {
     docker("build", "-f", "Dockerfile", "--target", "backup", "-t", IMAGE, ".");
     network = await new Network().start();
     db = await new PostgreSqlContainer("postgres:17-alpine")
@@ -63,7 +63,7 @@ describe("backup sidecar scripts (real Postgres, real sidecar image)", () => {
       "3600",
     ).trim();
   });
-  after(async () => {
+  afterAll(async () => {
     docker("rm", "-f", sidecar);
     await pool.end();
     await db.stop();

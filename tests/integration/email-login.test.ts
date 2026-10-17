@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { after, before, beforeEach, describe, it } from "node:test";
+import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import { createApp, type AppDeps } from "../../src/server/app.ts";
 import { hash } from "../../src/server/auth.ts";
 import { MIGRATIONS_DIR } from "../../src/server/main.ts";
@@ -90,12 +90,12 @@ describe("email magic-link sign-in", () => {
     clock = new Date(clock.getTime() + ms);
   };
 
-  before(async () => {
+  beforeAll(async () => {
     db = await startDb();
     await migrate(db.pool, MIGRATIONS_DIR);
     url = await serve();
   });
-  after(async () => {
+  afterAll(async () => {
     for (const s of servers) {
       s.close();
     }
