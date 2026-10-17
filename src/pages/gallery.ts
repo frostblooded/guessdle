@@ -1,3 +1,4 @@
+import { gameBanner } from "../banner.ts";
 import { browserFetch, initShell } from "../shell.ts";
 
 interface Card {
@@ -5,6 +6,7 @@ interface Card {
   name: string;
   description: string;
   cover: string;
+  photos: string[];
   entryCount: number;
 }
 
@@ -13,12 +15,9 @@ function cardElement(card: Card, first: boolean): HTMLLIElement {
   item.className = first ? "game-card game-card-featured" : "game-card";
   const link = document.createElement("a");
   link.href = `/g/${encodeURIComponent(card.slug)}`;
-  if (card.cover) {
-    const cover = document.createElement("img");
-    cover.src = card.cover;
-    cover.alt = "";
-    cover.loading = "lazy";
-    link.append(cover);
+  const banner = gameBanner(card.cover, card.photos);
+  if (banner) {
+    link.append(banner);
   }
   const body = document.createElement("div");
   body.className = "game-card-body";
