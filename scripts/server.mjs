@@ -1,9 +1,10 @@
-// Dev static file server for the repo root. Serves only what the pages load.
+// Dev static file server. Serves the built pages from dist/ (npm run build first) and only what they load.
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, relative, resolve, sep } from "node:path";
 
 const ROOT = resolve(import.meta.dirname, "..");
+const DIST = join(ROOT, "dist");
 const PORT = process.env.PORT ?? 8080;
 
 // Clean URLs (/login) map to <name>.html; deploy/nginx.conf does the same with try_files
@@ -15,8 +16,10 @@ const PAGES = new Set([
   "create",
   "my-games",
 ]);
-const ALLOWED =
-  /^\/(index\.html|game\.html|login\.html|verify\.html|admin\.html|how-to-play\.html|create\.html|my-games\.html|edit\.html|favicon\.ico|(dist|howto|uploads)\/.+)$/;
+// Paths under the repo root; the pages themselves come from pageFor
+const ALLOWED = /^\/(favicon\.ico|(dist|howto|uploads)\/.+)$/;
+const PAGE_FILES =
+  /^\/(index|game|login|verify|admin|how-to-play|create|my-games|edit)\.html$/;
 
 const TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -29,7 +32,9 @@ const TYPES = {
   ".ico": "image/x-icon",
 };
 
+// The built page a URL shows (a file in dist/), or null
 function pageFor(urlPath) {
+  if (PAGE_FILES.test(urlPath)) return urlPath.slice(1);
   if (urlPath === "/") return "index.html";
   // /g/<slug> is the game shell (with DATABASE_URL the API serves it first, with meta injected)
   if (/^\/g\/[^/]+$/.test(urlPath)) return "game.html";
@@ -42,8 +47,9 @@ function pageFor(urlPath) {
 // Absolute path of the file a URL may read, or null if the page may not load it
 function allowedFile(urlPath) {
   try {
-    const route = pageFor(urlPath) ?? decodeURIComponent(urlPath);
-    const file = resolve(join(ROOT, route));
+    const page = pageFor(urlPath);
+    if (page !== null) return join(DIST, page);
+    const file = resolve(join(ROOT, decodeURIComponent(urlPath)));
     // Test the resolved path, so an encoded "..%2f" cannot escape the allowlist
     const path = "/" + relative(ROOT, file).split(sep).join("/");
     return ALLOWED.test(path) ? file : null;
@@ -58,7 +64,7 @@ async function serveStatic(req, res) {
   if (body === null)
     return res
       .writeHead(404, { "Content-Type": TYPES[".html"] })
-      .end(await readFile(join(ROOT, "404.html")));
+      .end(await readFile(join(DIST, "404.html")));
 
   res.writeHead(200, {
     "Content-Type": TYPES[extname(file)] ?? "application/octet-stream",
@@ -81,6 +87,7 @@ if (process.env.DATABASE_URL) {
     limit: rateLimitFromEnv(process.env),
     backupDir: process.env.BACKUP_DIR || undefined,
     uploadsDir: process.env.UPLOADS_DIR || join(ROOT, "uploads"),
+    shellDir: DIST,
     adminEmails: adminEmailsFromEnv(process.env.ADMIN_EMAILS),
     // Only the e2e suite sets NODE_ENV=test; the stub login never exists elsewhere
     testLogin: process.env.NODE_ENV === "test",

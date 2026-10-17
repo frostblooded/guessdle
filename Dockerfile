@@ -4,7 +4,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# Dev: esbuild watch + static server; compose syncs source in (see compose.yaml)
+# Dev: Vite build watch + static server; compose syncs source in (see compose.yaml)
 FROM deps AS dev
 COPY . .
 EXPOSE 8080
@@ -12,7 +12,7 @@ CMD ["sh", "-c", "npm run build -- --watch & exec node scripts/server.mjs"]
 
 FROM deps AS build
 COPY . .
-# build:prod writes the hashed-name HTML pages into dist/; they replace the dev ones here
+# build:prod (Vite) writes the built HTML pages into dist/; they replace the source ones here
 RUN npm run build:prod && mv dist/*.html .
 
 # API: Express + migrations, run straight from TypeScript (Node type stripping)
