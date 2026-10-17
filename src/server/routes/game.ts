@@ -4,7 +4,7 @@ import type { Express, Request, Response } from "express";
 import type pg from "pg";
 import { gradeIds } from "../../game/game.ts";
 import { listGallery } from "../games.ts";
-import { canManage, type LoadedGame } from "../access.ts";
+import { canApprove, canManage, type LoadedGame } from "../access.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
 import {
   addGuess,
@@ -47,6 +47,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
     const manages = canManage(game, user);
     res.json({
       canEdit: manages,
+      canApprove: canApprove(game, user),
       // Only the owner and admins learn the status (issue #87)
       ...(manages && { status: game.status, rejectReason: game.rejectReason }),
       slug: game.slug,

@@ -98,7 +98,7 @@ window.onload = async function (): Promise<void> {
     edit.href = `/g/${encodeURIComponent(SLUG)}/edit`;
     edit.hidden = false;
   }
-  showGameStatus(game);
+  showGameStatus(SLUG, game);
   showColumnTitles(game.attributes);
   // Only the owner and admins reach a game this small; there is no answer to draw
   if (roster.length < MIN_ENTRIES) {

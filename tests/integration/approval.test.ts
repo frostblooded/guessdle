@@ -354,6 +354,40 @@ describe("approval flow", () => {
       }
     });
 
+    it("lets only admins approve a pending game from its page, which leaves the queue", async () => {
+      await makeGame("pending");
+      const bob = await login("bob@example.test");
+      const view = async (cookie?: string): Promise<Body> =>
+        (await request("GET", `/api/games/${SLUG}`, cookie)).body;
+      for (const cookie of [undefined, bob, ann]) {
+        assert.equal((await view(cookie)).canApprove, false);
+      }
+      assert.equal((await view(admin)).canApprove, true);
+      await request("POST", `/api/admin/games/${SLUG}/approve`, admin, {});
+      assert.deepEqual(
+        [(await view(admin)).status, (await view(admin)).canApprove],
+        ["approved", false],
+      );
+      assert.deepEqual((await request("GET", "/api/admin/queue", admin)).body, {
+        games: [],
+      });
+    });
+
+    it("refuses to approve an already approved game, and non-admins with a clear error", async () => {
+      await makeGame("approved");
+      const path = `/api/admin/games/${SLUG}/approve`;
+      assert.deepEqual(Object.values(await request("POST", path, admin, {})), [
+        409,
+        { error: "invalid_state" },
+      ]);
+      await db.pool.query("update games set status = 'pending'");
+      assert.deepEqual(Object.values(await request("POST", path, ann, {})), [
+        403,
+        { error: "forbidden" },
+      ]);
+      assert.equal(await statusOf(), "pending");
+    });
+
     it("rejects with a trimmed reason, and refuses a blank or oversized one", async () => {
       await makeGame("pending");
       const path = `/api/admin/games/${SLUG}/reject`;
