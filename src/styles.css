@@ -1251,11 +1251,19 @@ textarea {
   background: var(--surface-2);
 }
 
+/* No hover on touch: keep the field borders visible as the edit cue */
+@media (hover: none) {
+  #panel-attributes .attr-list input,
+  #panel-attributes .attr-list select {
+    border-color: var(--border);
+  }
+}
+
 #panel-attributes #attr-error {
   margin: var(--s3) var(--s5);
 }
 
-@media (max-width: 35rem) {
+@media (max-width: 36rem) {
   #panel-attributes .attr-row {
     grid-template-columns: minmax(0, 1fr) auto;
     padding: var(--s3) var(--s4);
