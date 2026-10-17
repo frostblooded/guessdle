@@ -36,17 +36,28 @@ export interface GameRow {
 export const skipOf = (game: GameRow): number =>
   game.skipPeriod ?? DEFAULT_SKIP_PERIOD;
 
-export async function findGame(q: Q, slug: string): Promise<GameRow | null> {
+const gameWhere = async (
+  q: Q,
+  where: "slug" | "id",
+  value: string | number,
+): Promise<GameRow | null> => {
   const { rows } = await q.query<GameRow>(
     `select id::int, slug, name, description, cover_url as "coverUrl",
        owner_id::int as "ownerId", status, reject_reason as "rejectReason",
        to_char(start_date, 'YYYY-MM-DD') as "startDate",
        skip_period as "skipPeriod"
-     from games where slug = $1`,
-    [slug],
+     from games where ${where} = $1`,
+    [value],
   );
   return rows[0] ?? null;
-}
+};
+
+export const findGame = (q: Q, slug: string): Promise<GameRow | null> =>
+  gameWhere(q, "slug", slug);
+
+// A party's game, whatever its status (ADR 0016)
+export const findGameById = (q: Q, id: number): Promise<GameRow | null> =>
+  gameWhere(q, "id", id);
 
 export interface Roster {
   attributes: GameAttribute[];
