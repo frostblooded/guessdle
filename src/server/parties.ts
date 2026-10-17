@@ -1,7 +1,7 @@
 // Party mode storage and rules (ADR 0016): the one seam between the party routes, the socket hub and the tables.
 import { randomBytes } from "node:crypto";
 import type pg from "pg";
-import { MAX_PARTY_PLAYERS } from "../game/limits.ts";
+import { MAX_OPEN_PARTIES, MAX_PARTY_PLAYERS } from "../game/limits.ts";
 import {
   partyView,
   randomCode,
@@ -23,8 +23,6 @@ const HOUR_MS = 3600_000;
 // A party nobody acts in ends by itself; an ended one is deleted (freeing its code) after 30 days
 export const IDLE_MS = 12 * HOUR_MS;
 export const KEEP_MS = 30 * 24 * HOUR_MS;
-// Open parties one host may run at once
-export const MAX_OPEN_PARTIES = 5;
 
 export interface PartyRow {
   id: number;
@@ -262,12 +260,13 @@ export async function viewsOf(
   viewers: readonly (number | null)[],
 ): Promise<Map<number | null, PartyView>> {
   const { game, roster, players, rounds } = await loadData(q, party);
-  const ended = (
-    await q.query<{ ended: boolean }>(
-      "select ended_at is not null as ended from parties where id = $1",
-      [party.id],
-    )
-  ).rows[0]!.ended;
+  const ended =
+    (
+      await q.query<{ ended: boolean }>(
+        "select ended_at is not null as ended from parties where id = $1",
+        [party.id],
+      )
+    ).rows[0]?.ended ?? true;
   return new Map(
     [...new Set(viewers)].map((viewer) => [
       viewer,

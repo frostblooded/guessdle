@@ -332,7 +332,8 @@ export type PartyRefusal =
   | "finished"
   | "duplicate"
   | "party_ended"
-  | "not_enough_entries";
+  | "not_enough_entries"
+  | "server_error";
 
 const ACTIONS = new Set(["give-up", "start-round", "end-round", "end-party"]);
 

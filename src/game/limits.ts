@@ -17,3 +17,5 @@ export const MIN_ENTRIES = 2;
 // Party mode (issue #90): a player's nickname, and how many players one party holds
 export const MAX_NICKNAME = 20;
 export const MAX_PARTY_PLAYERS = 30;
+// Open parties one host may run at once
+export const MAX_OPEN_PARTIES = 5;
