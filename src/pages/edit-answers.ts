@@ -81,7 +81,10 @@ export function initAnswers(base: string): () => Promise<void> {
         );
         const action = cell();
         if (day.locked) {
-          action.textContent = "locked";
+          const locked = document.createElement("span");
+          locked.className = "action-locked";
+          locked.textContent = "locked";
+          action.append(locked);
         } else {
           const edit = document.createElement("button");
           edit.type = "button";
