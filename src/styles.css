@@ -1200,9 +1200,68 @@ textarea {
     position: sticky;
     top: var(--s4);
   }
+}
 
-  #panel-attributes #attr-form,
-  #panel-attributes .attr-list {
-    max-width: 40rem;
+/* Attributes tab: one bordered block, divided rows, the add row is the footer */
+
+#panel-attributes {
+  padding: 0;
+  overflow: hidden;
+}
+
+#panel-attributes > .lede {
+  margin: 0;
+  padding: var(--s4) var(--s5);
+  border-bottom: 1px solid var(--border);
+}
+
+#panel-attributes .attr-list {
+  gap: 0;
+  margin: 0;
+}
+
+#panel-attributes .attr-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8rem auto;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s3) var(--s5);
+}
+
+#panel-attributes .attr-list .attr-row {
+  border-bottom: 1px solid var(--border);
+}
+
+#panel-attributes .attr-list input,
+#panel-attributes .attr-list select {
+  min-height: 2.25rem;
+  border-color: transparent;
+  background: transparent;
+}
+
+#panel-attributes .attr-list input:hover,
+#panel-attributes .attr-list select:hover,
+#panel-attributes .attr-list input:focus,
+#panel-attributes .attr-list select:focus {
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+#panel-attributes #attr-form {
+  background: var(--surface-2);
+}
+
+#panel-attributes #attr-error {
+  margin: var(--s3) var(--s5);
+}
+
+@media (max-width: 35rem) {
+  #panel-attributes .attr-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: var(--s3) var(--s4);
+  }
+
+  #panel-attributes .attr-row input[type="text"] {
+    grid-column: 1 / -1;
   }
 }
