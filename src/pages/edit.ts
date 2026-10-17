@@ -200,7 +200,7 @@ void initShell(browserFetch).then(async (user) => {
         type.onchange = (): void => void change(attr.id, { type: type.value });
         const remove = document.createElement("button");
         remove.type = "button";
-        remove.className = "btn btn-quiet btn-sm";
+        remove.className = "btn btn-secondary btn-sm";
         remove.textContent = "Remove";
         remove.setAttribute("aria-label", `Remove ${attr.name}`);
         remove.onclick = (): void => {

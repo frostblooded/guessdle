@@ -48,8 +48,16 @@ test("the Attributes tab adds, renames, retypes and removes attributes", async (
   await page.locator("#tab-attributes").click();
   await expect(page.getByLabel("Name of Hue")).toBeVisible();
 
+  // Visible at rest, without hover: a real border, like the other buttons
+  const removeButton = page.getByRole("button", { name: "Remove Hue" });
+  await expect(removeButton).toBeVisible();
+  await expect(removeButton).not.toHaveCSS(
+    "border-top-color",
+    "rgba(0, 0, 0, 0)",
+  );
+
   page.once("dialog", (dialog) => void dialog.accept());
-  await page.getByRole("button", { name: "Remove Hue" }).click();
+  await removeButton.click();
   await expect(page.locator("#attr-list li")).toHaveCount(0);
 });
 
