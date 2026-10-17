@@ -1147,6 +1147,17 @@ textarea {
   margin-bottom: var(--s3);
 }
 
+.game-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2) var(--s4);
+}
+
+.game-status .alert {
+  flex: 1 1 18rem;
+}
+
 .editor-bar .alert {
   flex: 1 1 18rem;
   margin: 0;

@@ -35,7 +35,18 @@
           are. <a href="/how-to-play">How to play</a>
         </p>
       </div>
-      <p id="status-notice" class="alert alert-warn" role="status" hidden></p>
+      <div class="game-status">
+        <p id="status-notice" class="alert alert-warn" role="status" hidden></p>
+        <button
+          id="approve-button"
+          class="btn btn-primary btn-sm"
+          type="button"
+          hidden
+        >
+          Approve
+        </button>
+      </div>
+      <p id="approve-error" class="alert alert-error" role="alert" hidden></p>
       <section id="not-found" class="card auth-card center" hidden>
         <a class="btn btn-primary" href="/">See all games</a>
       </section>

@@ -73,3 +73,90 @@ test("only the owner and admins see the game's status on its page", async ({
   await open(owner, slug);
   await expect(owner.locator("#status-notice")).toBeHidden();
 });
+
+test("an admin approves a pending game from its page; the owner gets no button", async ({
+  page,
+  browser,
+  baseURL,
+}) => {
+  const id = unique();
+  const owner = await signedIn(browser, baseURL!, `owner-${id}@example.test`);
+  const admin = await signedIn(
+    browser,
+    baseURL!,
+    `admin-${id}@example.test`,
+    true,
+  );
+  const name = `Status ${id}`;
+  const { slug } = (await (
+    await owner.request.post("/api/games", { data: { name } })
+  ).json()) as { slug: string };
+  for (const entry of ["One", "Two"]) {
+    await owner.request.post(`/api/games/${slug}/entries`, {
+      data: { name: entry },
+    });
+  }
+
+  // A draft: the owner sees it, without an Approve button
+  await open(owner, slug);
+  await expect(owner.locator("#status-notice")).toContainText("Draft");
+  await expect(owner.locator("#approve-button")).toBeHidden();
+
+  await owner.request.post(`/api/games/${slug}/submit`, { data: {} });
+
+  // Anonymous players see the pending game but not its status
+  await open(page, slug);
+  await expect(page.locator("#status-notice")).toBeHidden();
+  await expect(page.locator("#approve-button")).toBeHidden();
+
+  await open(owner, slug);
+  await expect(owner.locator("#status-notice")).toContainText("Pending");
+  await expect(owner.locator("#approve-button")).toBeHidden();
+
+  await open(admin, slug);
+  await expect(admin.locator("#status-notice")).toContainText("Pending");
+  await admin.locator("#approve-button").click();
+  await expect(admin.locator("#status-notice")).toBeHidden();
+  await expect(admin.locator("#approve-button")).toBeHidden();
+  await expect(admin.locator("#approve-error")).toBeHidden();
+
+  // Approved: off the queue, no notice and no button on reload
+  const queue = (await (
+    await admin.request.get("/api/admin/queue")
+  ).json()) as {
+    games: { slug: string }[];
+  };
+  expect(queue.games.map((g) => g.slug)).not.toContain(slug);
+  await open(admin, slug);
+  await expect(admin.locator("#status-notice")).toBeHidden();
+  await expect(admin.locator("#approve-button")).toBeHidden();
+});
+
+test("an admin whose Approve lost a race sees why", async ({
+  browser,
+  baseURL,
+}) => {
+  const id = unique();
+  const admin = await signedIn(
+    browser,
+    baseURL!,
+    `admin-race-${id}@example.test`,
+    true,
+  );
+  const { slug } = (await (
+    await admin.request.post("/api/games", { data: { name: `Race ${id}` } })
+  ).json()) as { slug: string };
+  for (const entry of ["One", "Two"]) {
+    await admin.request.post(`/api/games/${slug}/entries`, {
+      data: { name: entry },
+    });
+  }
+  await admin.request.post(`/api/games/${slug}/submit`, { data: {} });
+
+  await open(admin, slug);
+  // Another admin approves it first
+  await admin.request.post(`/api/admin/games/${slug}/approve`, { data: {} });
+  await admin.locator("#approve-button").click();
+  await expect(admin.locator("#approve-error")).toContainText("status changed");
+  await expect(admin.locator("#status-notice")).toContainText("Pending");
+});
