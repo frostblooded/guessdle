@@ -92,9 +92,7 @@ window.onload = async function (): Promise<void> {
     return;
   }
   if (game === null) {
-    document.querySelector("#board")!.removeAttribute("aria-busy");
-    document.querySelector<HTMLElement>("#loading-state")!.hidden = true;
-    showNotice(
+    cannotPlay(
       "Could not load the game. Your connection may be down or the server may have a problem. Refresh the page; if it keeps failing, try again in a few minutes.",
     );
     return;
@@ -110,9 +108,7 @@ window.onload = async function (): Promise<void> {
   showColumnTitles(game.attributes);
   // Only the owner and admins reach a game this small; there is no answer to draw
   if (roster.length < MIN_ENTRIES) {
-    document.querySelector("#board")!.removeAttribute("aria-busy");
-    document.querySelector<HTMLElement>("#loading-state")!.hidden = true;
-    showNotice(
+    cannotPlay(
       `${FAILURES.not_enough_entries.text} It has ${roster.length} now.`,
     );
     return;
@@ -199,6 +195,24 @@ function initNewGuessSubmit(): void {
       autoCompleteJs?.close();
     }
   });
+}
+
+// The game cannot be played on this page view: say why and leave nothing on the board usable
+function cannotPlay(reason: string): void {
+  document.querySelector("#board")!.removeAttribute("aria-busy");
+  document.querySelector<HTMLElement>("#loading-state")!.hidden = true;
+  showNotice(reason);
+  const controls = [
+    "#new-guess-input",
+    "#submit-new-guess-button",
+    "#give-up-button",
+    "#reset-guesses-button",
+    "#reset-button",
+  ];
+  for (const id of controls) {
+    document.querySelector<HTMLInputElement | HTMLButtonElement>(id)!.disabled =
+      true;
+  }
 }
 
 // The buttons ship disabled so a click before the game has loaded is not silently lost
@@ -326,15 +340,15 @@ function refreshEmptyState(): void {
 
 async function loadInitialUsedGuessesElements(): Promise<void> {
   const loaded: Loaded | null = await play.load();
-  document.querySelector("#board")!.removeAttribute("aria-busy");
-  document.querySelector<HTMLElement>("#loading-state")!.hidden = true;
   if (loaded === null) {
-    showNotice(
+    refreshEmptyState();
+    cannotPlay(
       "Could not load your game. Your connection may be down or the server may have a problem. Refresh the page; if it keeps failing, try again in a few minutes.",
     );
-    refreshEmptyState();
     return;
   }
+  document.querySelector("#board")!.removeAttribute("aria-busy");
+  document.querySelector<HTMLElement>("#loading-state")!.hidden = true;
 
   for (const row of loaded.rows) {
     addGuessResultElement(row);

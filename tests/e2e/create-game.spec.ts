@@ -201,4 +201,12 @@ test("the owner of an empty draft sees why it cannot be played, not a connection
   );
   await expect(page.locator("#notice")).not.toContainText("connection");
   await expect(page.locator("#edit-link")).toBeVisible();
+  for (const control of [
+    "#new-guess-input",
+    "#submit-new-guess-button",
+    "#give-up-button",
+    "#reset-guesses-button",
+  ]) {
+    await expect(page.locator(control)).toBeDisabled();
+  }
 });

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { GUESS_DATA } from "./roster.ts";
 import { submitGuess } from "./helpers.ts";
 
@@ -106,6 +106,17 @@ test("the play page shows loading, then the empty state", async ({ page }) => {
   await expect(page.locator("#loading-state")).toBeHidden();
 });
 
+async function expectPlayDisabled(page: Page): Promise<void> {
+  for (const control of [
+    "#new-guess-input",
+    "#submit-new-guess-button",
+    "#give-up-button",
+    "#reset-guesses-button",
+  ]) {
+    await expect(page.locator(control)).toBeDisabled();
+  }
+}
+
 test("a failed game load is reported, not silent", async ({ page }) => {
   await page.goto("/g/petdle");
   await submitGuess(page, GUESS_DATA[0]!.name);
@@ -114,6 +125,18 @@ test("a failed game load is reported, not silent", async ({ page }) => {
   await expect(page.locator("#notice")).toContainText(
     "Could not load your game",
   );
+  await expectPlayDisabled(page);
+});
+
+test("when the game itself cannot load, nothing on the board can be used", async ({
+  page,
+}) => {
+  await page.route("**/api/games/petdle", (route) => route.abort());
+  await page.goto("/g/petdle");
+  await expect(page.locator("#notice")).toContainText(
+    "Could not load the game",
+  );
+  await expectPlayDisabled(page);
 });
 
 test("unknown paths get the styled 404 with a way home", async ({ page }) => {
