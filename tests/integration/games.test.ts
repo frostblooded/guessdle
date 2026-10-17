@@ -182,9 +182,47 @@ describe("games in the database", () => {
         name: "gal-new",
         description: "About gal-new",
         cover: "/uploads/c.webp",
+        photos: [],
         entryCount: 3,
       });
       assert.equal(body[0].entryCount, PET_IDS.length);
+    });
+
+    it("gives a game without a cover the photos of its active entries for a banner collage", async () => {
+      await addGame("gal-bare", "approved", 0, "2026-01-01");
+      await db.pool.query(
+        "update games set cover_url = '' where slug = 'gal-bare'",
+      );
+      const add = (name: string, photo: string): Promise<unknown> =>
+        db.pool.query(
+          "insert into entries (game_id, name, photo_url) select id, $1, $2 from games where slug = 'gal-bare'",
+          [name, photo],
+        );
+      for (let i = 0; i < 10; i++) {
+        await add(`P${i}`, `/uploads/p${i}.webp`);
+      }
+      await add("No photo", "");
+      await db.pool.query(
+        "update entries set deleted_at = now() where name = 'P0' and game_id = (select id from games where slug = 'gal-bare')",
+      );
+      const { body } = await request("GET", "/api/games");
+      const bare = body.find((g: Body) => g.slug === "gal-bare");
+      // P0 is deleted; the blank photo is skipped; at most 8, by entry id
+      assert.deepEqual(
+        bare.photos,
+        [1, 2, 3, 4, 5, 6, 7, 8].map((i) => `/uploads/p${i}.webp`),
+      );
+    });
+
+    it("gives a game without a cover or entry photos an empty collage", async () => {
+      await addGame("gal-plain", "approved", 3, "2026-01-01");
+      await db.pool.query(
+        "update games set cover_url = '' where slug = 'gal-plain'",
+      );
+      const { body } = await request("GET", "/api/games");
+      const plain = body.find((g: Body) => g.slug === "gal-plain");
+      assert.equal(plain.cover, "");
+      assert.deepEqual(plain.photos, []);
     });
 
     it("hides drafts, pending, rejected, and games under 2 active entries", async () => {
