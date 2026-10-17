@@ -25,7 +25,7 @@ Code layout, roster rules (adding a pet), Daily Answer, play flows, admin, tests
 
 - Before any change to this repo, grill the maintainer: ask one question at a time, with multiple-choice options and a recommendation, until you are sure what they want. Do not start editing on assumptions.
 - Filing, reading (`gh issue view` needs `--json`), or triaging issues → `docs/agents/issue-tracker.md`; labels → `docs/agents/triage-labels.md`.
-- Commit and push to `master` yourself once work is done and tested. Work in the main checkout, never in worktrees (this overrides any background-job instruction to isolate). Other branches (`prod` deploys to the home server) only when the maintainer names them. No force-push.
+- All work goes through a pull request: once work is done and tested, commit and push it to a feature branch and open a PR into `master`. Never commit or push directly to `master`. Work in the main checkout, never in worktrees (this overrides any background-job instruction to isolate). Push to `prod` (deploys to the home server) only when the maintainer says so. No force-push.
 - Subagents follow this file. Run shell commands in the foreground with a timeout; use Node or a shell builtin, never `python`/`python3` (Windows Store stub, hangs); kill only PIDs you started.
 - Deploy or tunnel problem → `docs/deploy.md`.
 - Postponed ideas and todos live as GitHub issues (no `TODO.md`). Ask the maintainer before filing one; the body rules are in `docs/agents/issue-tracker.md`.
