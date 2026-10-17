@@ -1,6 +1,19 @@
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
 import { GUESS_DATA } from "./roster.ts";
 
+// The Play page's input and every button are unusable (the game cannot be played)
+export async function expectPlayDisabled(page: Page): Promise<void> {
+  for (const control of [
+    "#new-guess-input",
+    "#submit-new-guess-button",
+    "#give-up-button",
+    "#reset-guesses-button",
+    "#reset-button",
+  ]) {
+    await expect(page.locator(control)).toBeDisabled();
+  }
+}
+
 // The answer is random per run: guessing the whole roster makes the API reveal it
 export async function findAnswerName(
   request: APIRequestContext,
