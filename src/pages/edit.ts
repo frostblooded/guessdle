@@ -33,7 +33,6 @@ function renderFields(d: Details): void {
   $<HTMLAnchorElement>("#view-link").href = `/g/${encodeURIComponent(d.slug)}`;
   $<HTMLInputElement>("#edit-name").value = d.name;
   $<HTMLTextAreaElement>("#edit-description").value = d.description;
-  $<HTMLInputElement>("#edit-slug").value = `/g/${d.slug}`;
   const skip = $<HTMLInputElement>("#edit-skip");
   skip.value = d.skipPeriod === null ? "" : String(d.skipPeriod);
   const cover = $<HTMLImageElement>("#cover-preview");

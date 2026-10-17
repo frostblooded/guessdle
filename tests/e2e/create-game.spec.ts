@@ -78,7 +78,7 @@ test("creating a game opens its editor as a draft, and Details saves", async ({
   await expect(page.locator("#status-notice")).toContainText(
     "needs 2 more entries",
   );
-  await expect(page.locator("#edit-slug")).toHaveAttribute("readonly", "");
+  await expect(page.getByText("Web address")).toHaveCount(0);
   await expect(page.getByRole("tab", { name: "Details" })).toHaveAttribute(
     "aria-selected",
     "true",
