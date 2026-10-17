@@ -83,3 +83,55 @@ test("an admin gets an Edit link on the original game, a visitor does not", asyn
     "/g/petdle/edit",
   );
 });
+
+test("a gallery card shows the game's cover, a collage of entry photos without one, and nothing without either", async ({
+  page,
+}) => {
+  const card = (slug: string, cover: string, photos: string[]): object => ({
+    slug,
+    name: slug,
+    description: "",
+    cover,
+    photos,
+    entryCount: 5,
+  });
+  await page.route("**/api/games", (route) =>
+    route.fulfill({
+      json: [
+        card("covered", "/uploads/cover.webp", []),
+        card("tiled", "", [
+          "/a.webp",
+          "/b.webp",
+          "/c.webp",
+          "/d.webp",
+          "/e.webp",
+        ]),
+        card("plain", "", []),
+      ],
+    }),
+  );
+  await page.goto("/");
+  const cards = page.locator(".game-card");
+  await expect(cards).toHaveCount(3);
+  await expect(cards.nth(0).locator("img.game-banner")).toHaveAttribute(
+    "src",
+    "/uploads/cover.webp",
+  );
+  await expect(cards.nth(0).locator(".game-banner-collage")).toHaveCount(0);
+  // Five photos make two full rows of two
+  await expect(cards.nth(1).locator(".game-banner-collage img")).toHaveCount(4);
+  await expect(cards.nth(2).locator(".game-banner")).toHaveCount(0);
+  await expect(cards.nth(2).locator("h2")).toHaveText("plain");
+});
+
+test("the original game, which has no cover, shows a collage of its pets on the gallery and none on Play", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(
+    page.locator(".game-card").first().locator(".game-banner-collage img"),
+  ).toHaveCount(8);
+  await page.goto("/g/petdle");
+  await expect(page.locator("#loading-state")).toBeHidden();
+  await expect(page.locator(".game-banner")).toHaveCount(0);
+});

@@ -1,3 +1,4 @@
+import { bannerOf, type Banner } from "../game/banner.ts";
 import { browserFetch, initShell } from "../shell.ts";
 
 interface Card {
@@ -5,7 +6,29 @@ interface Card {
   name: string;
   description: string;
   cover: string;
+  photos: string[];
   entryCount: number;
+}
+
+// The banner as an element: one image for a cover, a grid of decorative tiles for a collage
+function bannerElement(banner: NonNullable<Banner>): HTMLElement {
+  const image = (src: string): HTMLImageElement => {
+    const img = document.createElement("img");
+    img.src = src;
+    img.alt = "";
+    img.loading = "lazy";
+    return img;
+  };
+  if (banner.kind === "cover") {
+    const cover = image(banner.url);
+    cover.className = "game-banner";
+    return cover;
+  }
+  const collage = document.createElement("div");
+  collage.className = "game-banner game-banner-collage";
+  collage.style.setProperty("--banner-columns", String(banner.columns));
+  collage.append(...banner.tiles.map(image));
+  return collage;
 }
 
 function cardElement(card: Card, first: boolean): HTMLLIElement {
@@ -13,12 +36,9 @@ function cardElement(card: Card, first: boolean): HTMLLIElement {
   item.className = first ? "game-card game-card-featured" : "game-card";
   const link = document.createElement("a");
   link.href = `/g/${encodeURIComponent(card.slug)}`;
-  if (card.cover) {
-    const cover = document.createElement("img");
-    cover.src = card.cover;
-    cover.alt = "";
-    cover.loading = "lazy";
-    link.append(cover);
+  const banner = bannerOf(card.cover, card.photos);
+  if (banner) {
+    link.append(bannerElement(banner));
   }
   const body = document.createElement("div");
   body.className = "game-card-body";
