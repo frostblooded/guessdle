@@ -5,7 +5,6 @@ const SERVED = [
   ["/index.html", "text/html"],
   ["/g/petdle", "text/html"],
   ["/game.html", "text/html"],
-  ["/dist/gallery.js", "text/javascript"],
   ["/login", "text/html"],
   ["/verify", "text/html"],
   ["/admin", "text/html"],
@@ -13,10 +12,6 @@ const SERVED = [
   ["/party", "text/html"],
   ["/party/ABCD", "text/html"],
   ["/login.html", "text/html"],
-  ["/dist/styles.css", "text/css"],
-  ["/dist/script.js", "text/javascript"],
-  ["/dist/script.css", "text/css"],
-  ["/dist/script.js.map", "application/json"],
   ["/favicon.ico", "image/x-icon"],
   ["/howto/ati.jpg", "image/jpeg"],
 ] as const;
@@ -64,6 +59,24 @@ for (const [path, type] of SERVED) {
     expect(response.headers()["content-type"]).toContain(type);
   });
 }
+
+test("every asset a page links is served from dist/assets", async ({
+  request,
+}) => {
+  const html = await (await request.get("/g/petdle")).text();
+  const assets = [...html.matchAll(/"(\/dist\/assets\/[^"]+)"/g)].map(
+    (m) => m[1]!,
+  );
+  expect(assets.some((a) => a.endsWith(".js"))).toBe(true);
+  expect(assets.some((a) => a.endsWith(".css"))).toBe(true);
+  for (const asset of assets) {
+    const response = await request.get(asset);
+    expect(response.status(), asset).toBe(200);
+    if (asset.endsWith(".js")) {
+      expect((await request.get(`${asset}.map`)).status()).toBe(200);
+    }
+  }
+});
 
 for (const path of NOT_SERVED) {
   test(`${path} is a 404 with the not-found page`, async ({ request }) => {

@@ -6,7 +6,7 @@ A site of Wordle-style daily guessing games. Pick a game and guess its entry of 
 
 ## How it works
 
-- Multi-page static front-end: `index.html` (the gallery, `/`), `game.html` (`/g/<slug>`), `edit.html` (`/g/<slug>/edit`), `create.html`, `my-games.html`, `how-to-play.html`, `login.html`, `verify.html` (the emailed link lands here) and `admin.html`, each with a small entry in `src/` (`script.ts`, `src/pages/*.ts`), bundled by esbuild into `dist/` with one shared `src/styles.css`. Header and footer come from `src/shell.ts` (ADR 0012).
+- Multi-page static front-end: `index.html` (the gallery, `/`), `game.html` (`/g/<slug>`), `edit.html` (`/g/<slug>/edit`), `create.html`, `my-games.html`, `how-to-play.html`, `login.html`, `verify.html` (the emailed link lands here) and `admin.html`, each with a small entry in `src/` (`script.ts`, `src/pages/*.ts`), built by Vite into `dist/` with one shared `src/styles.css`. Header and footer come from `src/shell.ts` (ADR 0012).
 - Express API (`src/server/`) on Postgres. The daily answer is drawn at random on first request and stored per day, graded server-side and never sent to the browser until a win or give-up (ADRs 0008-0010).
 - Anonymous progress is kept in `localStorage`; signing in with an emailed link stores it on the server. Both reset each day.
 - `scripts/server.mjs` serves the static files and mounts the API for local development (needs Postgres, see `docs/deploy.md`).

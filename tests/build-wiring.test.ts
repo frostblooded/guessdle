@@ -8,35 +8,64 @@ import { describe, it } from "vitest";
 const read = (path: string): string =>
   readFileSync(join(import.meta.dirname, "..", path), "utf8");
 
+// Each page and the entry module it loads (Vite rewrites both into dist/ on build)
 const PAGES: Record<string, string> = {
-  "index.html": "gallery",
-  "game.html": "script",
-  "login.html": "login",
-  "verify.html": "verify",
-  "admin.html": "admin",
-  "how-to-play.html": "how-to-play",
-  "create.html": "create",
-  "my-games.html": "my-games",
-  "edit.html": "edit",
-  "party.html": "party",
+  "index.html": "src/pages/gallery.ts",
+  "game.html": "src/script.ts",
+  "login.html": "src/pages/login.ts",
+  "verify.html": "src/pages/verify.ts",
+  "admin.html": "src/pages/admin.ts",
+  "how-to-play.html": "src/pages/how-to-play.ts",
+  "create.html": "src/pages/create.ts",
+  "my-games.html": "src/pages/my-games.ts",
+  "edit.html": "src/pages/edit.ts",
 };
 
+// One prod build into a temp folder, shared by the tests that read its output
+let prodOut: string | undefined;
+function prodBuild(): string {
+  if (prodOut === undefined) {
+    prodOut = mkdtempSync(join(tmpdir(), "petdle-prod-"));
+    execFileSync(
+      process.execPath,
+      [
+        "node_modules/vite/bin/vite.js",
+        "build",
+        "--outDir",
+        prodOut,
+        "--emptyOutDir",
+        "--logLevel",
+        "error",
+      ],
+      { cwd: join(import.meta.dirname, "..") },
+    );
+  }
+  return prodOut;
+}
+
 describe("build output is wired through the pages and the deploy", () => {
-  for (const [page, bundle] of Object.entries(PAGES)) {
-    it(`${page} loads the shared stylesheet and dist/${bundle}.js`, () => {
+  for (const [page, entry] of Object.entries(PAGES)) {
+    it(`${page} loads the shared stylesheet and ${entry}`, () => {
       const html: string = read(page);
-      for (const asset of ["styles.css", `${bundle}.js`]) {
+      for (const asset of ["src/styles.css", entry]) {
         assert.ok(
-          html.includes(`"/dist/${asset}"`),
-          `/dist/${asset} not referenced in ${page}`,
+          html.includes(`"/${asset}"`),
+          `/${asset} not referenced in ${page}`,
         );
       }
     });
   }
 
+  it("vite builds every page", () => {
+    const config: string = read("vite.config.ts");
+    for (const page of [...Object.keys(PAGES), "404.html"]) {
+      assert.ok(config.includes(`"${page.replace(".html", "")}"`), page);
+    }
+  });
+
   it("the 404 page links the shared stylesheet and no script", () => {
     const html: string = read("404.html");
-    assert.ok(html.includes('"/dist/styles.css"'));
+    assert.ok(html.includes('"/src/styles.css"'));
     assert.ok(!html.includes("<script src"));
     assert.ok(!html.includes('type="module"'));
   });
@@ -68,42 +97,37 @@ describe("build output is wired through the pages and the deploy", () => {
     assert.ok(read(".gitignore").split(/\r?\n/).includes("/dist"));
   });
 
-  it("prod build hashes bundle names and rewrites every page to match", () => {
-    const out: string = mkdtempSync(join(tmpdir(), "petdle-prod-"));
-    execFileSync("node", ["scripts/build-prod.mjs", out], {
-      cwd: join(import.meta.dirname, ".."),
-    });
-    for (const [page, bundle] of Object.entries(PAGES)) {
+  it("prod build hashes asset names and rewrites every page to match", () => {
+    const out = prodBuild();
+    for (const page of Object.keys(PAGES)) {
       const prodHtml: string = readFileSync(join(out, page), "utf8");
       const refs: string[] = [
-        ...prodHtml.matchAll(/"\/dist\/([\w-]+-[A-Z0-9]{8}\.(?:js|css))"/g),
+        ...prodHtml.matchAll(
+          /"\/dist\/(assets\/[\w-]+-[\w-]{8}\.(?:js|css))"/g,
+        ),
       ].map((m) => m[1]!);
       assert.ok(
-        refs.some((r) => r.startsWith(`${bundle}-`)),
+        refs.some((r) => r.endsWith(".js")),
         page,
       );
       assert.ok(
-        refs.some((r) => r.startsWith("styles-")),
+        refs.some((r) => r.startsWith("assets/styles-")),
         page,
       );
       for (const ref of refs) {
         assert.ok(existsSync(join(out, ref)), ref);
       }
-      assert.ok(!prodHtml.includes(`"/dist/${bundle}.js"`), page);
-      assert.ok(!prodHtml.includes('"/dist/styles.css"'), page);
+      assert.ok(!prodHtml.includes('"/src/'), page);
     }
     const notFound: string = readFileSync(join(out, "404.html"), "utf8");
-    assert.match(notFound, /"\/dist\/styles-[A-Z0-9]{8}\.css"/);
+    assert.match(notFound, /"\/dist\/assets\/styles-[\w-]{8}\.css"/);
   });
 
   it("the prod bundle holds no answer or Answer Sequence code, only the grade call", () => {
-    const out: string = mkdtempSync(join(tmpdir(), "petdle-prod-"));
-    execFileSync("node", ["scripts/build-prod.mjs", out], {
-      cwd: join(import.meta.dirname, ".."),
-    });
-    const js: string = readdirSync(out)
+    const assets = join(prodBuild(), "assets");
+    const js: string = readdirSync(assets)
       .filter((f) => f.endsWith(".js"))
-      .map((f) => readFileSync(join(out, f), "utf8"))
+      .map((f) => readFileSync(join(assets, f), "utf8"))
       .join("");
     assert.match(js, /[/]grade/);
     assert.ok(!js.includes("seedrandom"), "seeded random is not bundled");
