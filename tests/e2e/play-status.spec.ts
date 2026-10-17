@@ -115,8 +115,21 @@ test("an admin approves a pending game from its page; the owner gets no button",
 
   await open(admin, slug);
   await expect(admin.locator("#status-notice")).toContainText("Pending");
+  // Other tests submit games in parallel: compare with the live count
+  const adminLinkMatchesQueue = async (): Promise<void> => {
+    const { user } = (await (await admin.request.get("/api/me")).json()) as {
+      user: { pending?: number };
+    };
+    await expect(admin.locator("#admin-link")).toHaveText(
+      user.pending ? `Admin (${user.pending})` : "Admin",
+      { timeout: 1000 },
+    );
+  };
+  await expect(adminLinkMatchesQueue).toPass();
   await admin.locator("#approve-button").click();
   await expect(admin.locator("#status-notice")).toBeHidden();
+  // The header count drops without a reload
+  await expect(adminLinkMatchesQueue).toPass();
   await expect(admin.locator("#approve-button")).toBeHidden();
   await expect(admin.locator("#approve-error")).toBeHidden();
 

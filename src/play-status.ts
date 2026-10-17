@@ -2,7 +2,9 @@
 // admin's Approve button on a pending game (issue #88).
 import { statusNotice, type Details } from "./game/editor.ts";
 import { MIN_ENTRIES } from "./game/limits.ts";
+import { fetchUser } from "./account.ts";
 import { api, errorText } from "./manage-client.ts";
+import { browserFetch, showPending } from "./shell.ts";
 
 // What GET /api/games/:slug tells this viewer; the server leaves out `status` for other players
 export interface StatusView {
@@ -49,6 +51,8 @@ export function showGameStatus(slug: string, view: StatusView): void {
     if (out?.status === 200) {
       approve.hidden = true;
       showNotice({ status: "approved" });
+      // The header count drops at once, not on the next page load
+      showPending((await fetchUser(browserFetch))?.pending);
     }
   };
 }

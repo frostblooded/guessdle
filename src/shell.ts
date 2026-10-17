@@ -64,6 +64,11 @@ function markCurrentPage(): void {
   }
 }
 
+// The Admin link counts the games waiting for approval
+export function showPending(pending: number | undefined): void {
+  $("#admin-link").textContent = pending ? `Admin (${pending})` : "Admin";
+}
+
 function showAccount(user: AccountUser | null, fetch: Fetch): void {
   const account = $("#account");
   if (user === null) {
@@ -74,11 +79,8 @@ function showAccount(user: AccountUser | null, fetch: Fetch): void {
   $("#account-name").textContent = user.name;
   $("#account-avatar").textContent = (user.name[0] ?? "?").toUpperCase();
   $("#menu-email").textContent = user.email;
-  const adminLink = $<HTMLAnchorElement>("#admin-link");
-  adminLink.hidden = !user.admin;
-  if (user.pending) {
-    adminLink.textContent = `Admin (${user.pending})`;
-  }
+  $("#admin-link").hidden = !user.admin;
+  showPending(user.pending);
   const button = $<HTMLButtonElement>("#user-menu-button");
   const panel = $("#user-menu-panel");
   button.setAttribute("aria-label", `Account menu for ${user.name}`);
