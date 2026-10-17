@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
-import { after, before, beforeEach, describe, it } from "node:test";
+import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import {
   dateOfDay as dateOf,
   dayNumber as dayNo,
@@ -91,7 +91,7 @@ describe("stored daily answers and anonymous grading", () => {
       )
     ).rows;
 
-  before(async () => {
+  beforeAll(async () => {
     db = await startDb();
     await migrate(db.pool, MIGRATIONS_DIR);
     server = await new Promise<Server>((resolve) => {
@@ -106,7 +106,7 @@ describe("stored daily answers and anonymous grading", () => {
     });
     url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   });
-  after(async () => {
+  afterAll(async () => {
     server.close();
     await db.stop();
   });

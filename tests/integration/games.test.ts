@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { after, afterEach, before, beforeEach, describe, it } from "node:test";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  it,
+} from "vitest";
 import { createApp } from "../../src/server/app.ts";
 import { MIGRATIONS_DIR } from "../../src/server/main.ts";
 import { migrate } from "../../src/server/migrate.ts";
@@ -70,7 +77,7 @@ describe("games in the database", () => {
   const guessRows = async (): Promise<number> =>
     (await db.pool.query("select 1 from user_guesses")).rowCount ?? 0;
 
-  before(async () => {
+  beforeAll(async () => {
     db = await startDb();
     await migrate(db.pool, MIGRATIONS_DIR);
     server = await new Promise<Server>((resolve) => {
@@ -82,7 +89,7 @@ describe("games in the database", () => {
     });
     url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   });
-  after(async () => {
+  afterAll(async () => {
     server.close();
     await db.stop();
   });

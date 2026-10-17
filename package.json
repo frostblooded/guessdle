@@ -8,14 +8,14 @@
     "build:prod": "node scripts/build-prod.mjs",
     "watch": "npm run build -- --watch",
     "test:e2e": "npm run build && npm run typecheck && tsc -p tests/e2e && playwright test -c tests/e2e",
-    "test": "npm run typecheck && tsc -p tsconfig.test.json && node --test \"tests/*.test.ts\"",
+    "test": "npm run typecheck && tsc -p tsconfig.test.json && vitest run --project unit",
     "typecheck": "tsc",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "dup": "jscpd src --min-lines 8 --min-tokens 80 --threshold 0 --reporters console",
     "check": "npm run lint && npm run format:check && npm run dup && npm test && npm run test:integration && npm run test:e2e",
-    "test:integration": "tsc -p tsconfig.test.json && node --test --test-concurrency=1 --test-timeout=120000 \"tests/integration/*.test.ts\""
+    "test:integration": "tsc -p tsconfig.test.json && vitest run --project integration"
   },
   "engines": {
     "node": ">=24"
@@ -35,7 +35,8 @@
     "prettier": "^3.9.10",
     "testcontainers": "^12.2.1",
     "typescript": "~6.0",
-    "typescript-eslint": "^8.71.2"
+    "typescript-eslint": "^8.71.2",
+    "vitest": "^5.0.5"
   },
   "dependencies": {
     "@tarekraafat/autocomplete.js": "^10.2.10",

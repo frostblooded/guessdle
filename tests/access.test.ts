@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { canApprove, decide, type Need } from "../src/server/access.ts";
 import type { GameRow, Roster } from "../src/server/games.ts";
 import type { SessionUser } from "../src/server/auth.ts";

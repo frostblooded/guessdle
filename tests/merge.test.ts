@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { createGameState } from "../src/game/game-state.ts";
 import { mergeLocalGame } from "../src/game/merge.ts";
 
