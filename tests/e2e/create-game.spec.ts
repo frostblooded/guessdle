@@ -121,6 +121,7 @@ test("a cover can be uploaded and removed, and a bad file is explained", async (
   await page
     .locator("#cover-file")
     .setInputFiles({ name: "a.png", mimeType: "image/png", buffer: PNG });
+  await page.locator("#crop-confirm").click();
   await expect(page.locator("#cover-preview")).toBeVisible();
   await expect(page.locator("#cover-preview")).toHaveAttribute(
     "src",
