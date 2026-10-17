@@ -333,6 +333,27 @@ describe("approval flow", () => {
       assert.equal(sent.length, 0);
     });
 
+    it("tells only the owner and admins the status and rejection reason", async () => {
+      await makeGame("rejected");
+      await db.pool.query("update games set reject_reason = 'Too vague'");
+      const bob = await login("bob@example.test");
+      const view = async (cookie?: string): Promise<Body> =>
+        (await request("GET", `/api/games/${SLUG}`, cookie)).body;
+      for (const cookie of [undefined, bob]) {
+        const body = await view(cookie);
+        assert.equal(body.name, "Game zoo");
+        assert.equal(body.status, undefined);
+        assert.equal(body.rejectReason, undefined);
+      }
+      for (const cookie of [ann, admin]) {
+        const body = await view(cookie);
+        assert.deepEqual(
+          [body.status, body.rejectReason],
+          ["rejected", "Too vague"],
+        );
+      }
+    });
+
     it("rejects with a trimmed reason, and refuses a blank or oversized one", async () => {
       await makeGame("pending");
       const path = `/api/admin/games/${SLUG}/reject`;

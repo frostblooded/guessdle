@@ -44,13 +44,15 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       return;
     }
     const { game, roster, user } = loaded;
+    const manages = canManage(game, user);
     res.json({
-      canEdit: canManage(game, user),
+      canEdit: manages,
+      // Only the owner and admins learn the status (issue #87)
+      ...(manages && { status: game.status, rejectReason: game.rejectReason }),
       slug: game.slug,
       name: game.name,
       description: game.description,
       cover: game.coverUrl,
-      status: game.status,
       attributes: roster.attributes,
       entries: roster.entries.map(({ id, name, photo }) => ({
         id,

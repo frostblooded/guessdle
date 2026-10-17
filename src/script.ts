@@ -19,6 +19,7 @@ import {
   type Play,
   type SubmitResult,
 } from "./game/play.ts";
+import { showGameStatus, type StatusView } from "./play-status.ts";
 import { browserFetch, initShell } from "./shell.ts";
 import type {
   AutoCompleteItem,
@@ -40,30 +41,22 @@ let play: Play;
 
 let autoCompleteJs: autoComplete | null = null;
 
+// What GET /api/games/:slug gives the Play page
+type GameView = {
+  name: string;
+  canEdit: boolean;
+  attributes: GameAttribute[];
+  entries: EntryRef[];
+} & StatusView;
+
 // The game's attributes and entries, or null when it could not be loaded
-async function loadGame(): Promise<
-  | {
-      name: string;
-      canEdit: boolean;
-      attributes: GameAttribute[];
-      entries: EntryRef[];
-    }
-  | "missing"
-  | null
-> {
+async function loadGame(): Promise<GameView | "missing" | null> {
   try {
     const res = await fetch(`/api/games/${encodeURIComponent(SLUG)}`);
     if (res.status === 404) {
       return "missing";
     }
-    return res.ok
-      ? ((await res.json()) as {
-          name: string;
-          canEdit: boolean;
-          attributes: GameAttribute[];
-          entries: EntryRef[];
-        })
-      : null;
+    return res.ok ? ((await res.json()) as GameView) : null;
   } catch {
     return null;
   }
@@ -105,6 +98,7 @@ window.onload = async function (): Promise<void> {
     edit.href = `/g/${encodeURIComponent(SLUG)}/edit`;
     edit.hidden = false;
   }
+  showGameStatus(game);
   showColumnTitles(game.attributes);
   // Only the owner and admins reach a game this small; there is no answer to draw
   if (roster.length < MIN_ENTRIES) {
