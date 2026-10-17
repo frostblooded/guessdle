@@ -345,6 +345,7 @@ test.describe("give up", () => {
     await expect(input(page)).toBeHidden();
     await expect(giveUpButton(page)).toBeHidden();
     await expect(resetButton(page)).toBeVisible();
+    await expect(resetButton(page)).toHaveText("Reset today's game");
   });
 
   test("works before any guess", async ({ page }) => {
