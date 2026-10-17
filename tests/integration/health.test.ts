@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { after, before, describe, it } from "node:test";
+import { afterAll, beforeAll, describe, it } from "vitest";
 import pg from "pg";
 import { createApp } from "../../src/server/app.ts";
 import { startDb } from "./postgres.ts";
@@ -21,11 +21,11 @@ describe("health endpoint", () => {
   let server: Server;
   let url: string;
 
-  before(async () => {
+  beforeAll(async () => {
     db = await startDb();
     ({ server, url } = await listen(db.pool));
   });
-  after(async () => {
+  afterAll(async () => {
     server.close();
     await db.stop();
   });

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { Correctness } from "../src/game/correctness.ts";
 import type { Entry } from "../src/game/game.ts";
 import {

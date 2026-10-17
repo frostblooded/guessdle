@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { hash } from "../src/server/auth.ts";
 import { MAX_EMAIL_LENGTH, normalizeEmail } from "../src/server/email-login.ts";
 import { mailConfigFromEnv } from "../src/server/mailer.ts";

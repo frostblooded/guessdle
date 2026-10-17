@@ -4,7 +4,7 @@ import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { after, before, describe, it } from "node:test";
+import { afterAll, beforeAll, describe, it } from "vitest";
 import { createApp } from "../../src/server/app.ts";
 import { MIGRATIONS_DIR } from "../../src/server/main.ts";
 import { migrate } from "../../src/server/migrate.ts";
@@ -33,7 +33,7 @@ describe("admin backup status endpoint", () => {
       headers: cookie ? { Cookie: cookie } : {},
     });
 
-  before(async () => {
+  beforeAll(async () => {
     db = await startDb();
     await migrate(db.pool, MIGRATIONS_DIR);
     dir = await mkdtemp(join(tmpdir(), "backup-it-"));
@@ -47,7 +47,7 @@ describe("admin backup status endpoint", () => {
     });
     url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   });
-  after(async () => {
+  afterAll(async () => {
     server.close();
     await db.stop();
     await rm(dir, { recursive: true, force: true });

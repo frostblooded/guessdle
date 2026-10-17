@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
-import { after, before, describe, it } from "node:test";
+import { afterAll, beforeAll, describe, it } from "vitest";
 import { mailConfigFromEnv } from "../../src/server/mailer.ts";
 import { mailTo, startMailpit, tokenIn, type Mailpit } from "./mailpit.ts";
 
 describe("SMTP delivery through nodemailer", () => {
   let mailpit: Mailpit;
-  before(async () => {
+  beforeAll(async () => {
     mailpit = await startMailpit();
   });
-  after(async () => {
+  afterAll(async () => {
     await mailpit.stop();
   });
 

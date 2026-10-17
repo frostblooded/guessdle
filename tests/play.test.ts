@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { beforeEach, describe, it } from "node:test";
+import { beforeEach, describe, it } from "vitest";
 import { gradeIds } from "../src/game/game.ts";
 import type { StateStorage } from "../src/game/game-state.ts";
 import { createPlay } from "../src/game/play.ts";
