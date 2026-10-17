@@ -633,6 +633,11 @@ input[aria-invalid="true"] {
 
 /* Play */
 
+/* Sits between the page head and the play card, apart from both */
+.play-status {
+  margin: 0 0 var(--s3);
+}
+
 .play-card {
   padding: var(--s4);
   margin-bottom: var(--s4);
