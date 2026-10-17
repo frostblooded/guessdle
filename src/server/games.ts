@@ -7,6 +7,7 @@ import {
 import type pg from "pg";
 import type { AttributeValue } from "../game/correctness.ts";
 import type { AttributeType, Entry, GameAttribute } from "../game/game.ts";
+import { MAX_TILES } from "../game/banner.ts";
 import { slugError } from "../game/slug.ts";
 import type { EditKind } from "./lifecycle.ts";
 
@@ -112,18 +113,26 @@ export interface GalleryCard {
   name: string;
   description: string;
   cover: string;
+  // Banner collage photos of active entries, by id; only for a game without a cover
+  photos: string[];
   entryCount: number;
 }
 
 // Approved games with at least MIN_ENTRIES active entries: the original first, then newest first
 export async function listGallery(q: Q): Promise<GalleryCard[]> {
   const { rows } = await q.query<GalleryCard>(
-    `select g.slug, g.name, g.description, g.cover_url as cover, count(e.id)::int as "entryCount"
+    `select g.slug, g.name, g.description, g.cover_url as cover,
+       case when g.cover_url = '' then array(
+         select p.photo_url from entries p
+         where p.game_id = g.id and p.deleted_at is null and p.photo_url <> ''
+         order by p.id limit $2
+       ) else '{}'::text[] end as photos,
+       count(e.id)::int as "entryCount"
      from games g join entries e on e.game_id = g.id and e.deleted_at is null
      where g.status = 'approved'
      group by g.id having count(e.id) >= $1
      order by g.slug = 'petdle' desc, g.created_at desc, g.id desc`,
-    [MIN_ENTRIES],
+    [MIN_ENTRIES, MAX_TILES],
   );
   return rows;
 }
