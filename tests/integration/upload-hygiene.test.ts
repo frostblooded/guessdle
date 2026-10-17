@@ -4,7 +4,7 @@ import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { after, before, beforeEach, describe, it } from "node:test";
+import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import sharp from "sharp";
 import { createApp } from "../../src/server/app.ts";
 import { MIGRATIONS_DIR } from "../../src/server/main.ts";
@@ -56,7 +56,7 @@ describe("upload hygiene", () => {
       )
     ).rows[0]!.id;
 
-  before(async () => {
+  beforeAll(async () => {
     db = await startDb();
     await migrate(db.pool, MIGRATIONS_DIR);
     dir = await mkdtemp(join(tmpdir(), "hygiene-"));
@@ -80,7 +80,7 @@ describe("upload hygiene", () => {
     });
     url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   });
-  after(async () => {
+  afterAll(async () => {
     server.close();
     await db.stop();
     await rm(dir, { recursive: true, force: true });

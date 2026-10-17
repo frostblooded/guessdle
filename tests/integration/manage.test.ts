@@ -5,7 +5,7 @@ import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { after, before, beforeEach, describe, it } from "node:test";
+import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import { createApp } from "../../src/server/app.ts";
 import { MIGRATIONS_DIR } from "../../src/server/main.ts";
 import { migrate } from "../../src/server/migrate.ts";
@@ -70,7 +70,7 @@ describe("creating and editing a game", () => {
     return `/uploads/${name}`;
   };
 
-  before(async () => {
+  beforeAll(async () => {
     db = await startDb();
     await migrate(db.pool, MIGRATIONS_DIR);
     uploads = await mkdtemp(join(tmpdir(), "guessdle-manage-"));
@@ -85,7 +85,7 @@ describe("creating and editing a game", () => {
     });
     url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   });
-  after(async () => {
+  afterAll(async () => {
     server.close();
     await db.stop();
   });

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { bannerOf, MAX_TILES } from "../src/game/banner.ts";
 
 const photos = (n: number): string[] =>
