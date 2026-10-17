@@ -50,6 +50,7 @@ test("submit, admin reject, resubmit, approve, unpublish", async ({
   await admin.locator("#user-menu-button").click();
   await expect(admin.locator("#admin-link")).toContainText(/Admin \(\d+\)/);
   await admin.locator("#admin-link").click();
+  await expect(admin.locator("#tab-queue")).toHaveText("Approval queue");
   await admin.locator("#tab-queue").click();
   const row = admin.locator(`#queue-games tr[data-slug="${slug}"]`);
   await expect(row).toBeVisible();

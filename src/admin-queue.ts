@@ -1,4 +1,4 @@
-// Admin Queue tab: pending games oldest first, each with a play link, Approve, Reject and Delete.
+// Admin Approval queue tab: pending games oldest first, each with a play link, Approve, Reject and Delete.
 import { api } from "./manage-client.ts";
 
 interface QueueItem {

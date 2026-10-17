@@ -31,7 +31,7 @@ Stored server-side per game (`daily_answers` keyed by game and date, `src/server
 
 ## Admin
 
-`/api/admin/users|backup|queue|games` and the `/admin` page (`src/admin.ts`, tabs Queue, All games, Users, Backups). Answers peek/override is per game, owner or admin, in the editor's Answers tab (`src/pages/edit-answers.ts`; Answer History from a week back, real dates) over `/api/games/:slug/answers`: peek and override answers (today or future only; later generated days are re-drawn). Changing a game's skip period (0..N-1) re-draws its future generated days only (`redrawFuture`). Admin also: promote or demote users (no self or last-admin demotion), show backup age.
+`/api/admin/users|backup|queue|games` and the `/admin` page (`src/admin.ts`, tabs Approval queue, All games, Users, Backups). Answers peek/override is per game, owner or admin, in the editor's Answers tab (`src/pages/edit-answers.ts`; Answer History from a week back, real dates) over `/api/games/:slug/answers`: peek and override answers (today or future only; later generated days are re-drawn). Changing a game's skip period (0..N-1) re-draws its future generated days only (`redrawFuture`). Admin also: promote or demote users (no self or last-admin demotion), show backup age.
 
 ## Approval
 

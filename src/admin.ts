@@ -1,4 +1,4 @@
-// Admin page: Users, Backups and Queue tabs (answers live in each game's editor).
+// Admin page: Users, Backups and Approval queue tabs (answers live in each game's editor).
 import { initAllGames } from "./admin-games.ts";
 import { initQueue } from "./admin-queue.ts";
 
