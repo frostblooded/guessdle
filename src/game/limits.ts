@@ -14,3 +14,6 @@ export const MAX_LIST_ITEMS = 20;
 export const MAX_REASON = 500;
 // A game plays with at least this many active entries
 export const MIN_ENTRIES = 2;
+// Party mode (issue #90): a player's nickname, and how many players one party holds
+export const MAX_NICKNAME = 20;
+export const MAX_PARTY_PLAYERS = 30;

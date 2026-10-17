@@ -1,5 +1,6 @@
 // Accounts and sessions: opaque cookie sessions in Postgres, the admin email list and the CSRF guard for mutating endpoints.
 import { createHash, randomBytes } from "node:crypto";
+import type { IncomingMessage } from "node:http";
 import type { NextFunction, Request, Response } from "express";
 import type pg from "pg";
 
@@ -103,7 +104,9 @@ export async function endSession(
   }
 }
 
-export function sessionToken(req: Request): string | undefined {
+export function sessionToken(
+  req: Pick<IncomingMessage, "headers">,
+): string | undefined {
   return /(?:^|;\s*)sid=([^;]+)/.exec(req.headers.cookie ?? "")?.[1];
 }
 
