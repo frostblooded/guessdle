@@ -188,3 +188,17 @@ test("Create and My games are one click from the account menu", async ({
   await page.getByRole("link", { name: "My games" }).click();
   await expect(page).toHaveURL(/\/my-games$/);
 });
+
+test("the owner of an empty draft sees why it cannot be played, not a connection error", async ({
+  page,
+}) => {
+  await stubLogin(page);
+  const slug = await createViaForm(page, "Empty draft");
+  await page.goto(`/g/${slug}`);
+  await expect(page.locator("#loading-state")).toBeHidden();
+  await expect(page.locator("#notice")).toContainText(
+    "needs at least 2 entries",
+  );
+  await expect(page.locator("#notice")).not.toContainText("connection");
+  await expect(page.locator("#edit-link")).toBeVisible();
+});

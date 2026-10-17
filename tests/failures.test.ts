@@ -12,6 +12,7 @@ const SERVER_CODES: FailureCode[] = [
   "invalid",
   "too_few_entries",
   "invalid_state",
+  "not_enough_entries",
   "reserved",
   "attribute_exists",
   "entry_exists",
@@ -45,7 +46,7 @@ describe("failure table", () => {
     }
   });
   it("falls back for unknown codes and an unreachable server", () => {
-    assert.match(failureText(undefined, 500), /Something went wrong/);
+    assert.match(failureText(undefined, 500), /server hit a problem/);
     assert.match(failureText(undefined, 429), /Too many/);
   });
 });

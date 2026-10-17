@@ -8,6 +8,7 @@ import {
   type GradedAttribute,
 } from "./game/game.ts";
 import { gameStorage } from "./game/game-state.ts";
+import { MIN_ENTRIES } from "./game/limits.ts";
 import { mergeLocalGame } from "./game/merge.ts";
 import { createServerPlay } from "./game/server-play.ts";
 import {
@@ -92,7 +93,9 @@ window.onload = async function (): Promise<void> {
   if (game === null) {
     document.querySelector("#board")!.removeAttribute("aria-busy");
     document.querySelector<HTMLElement>("#loading-state")!.hidden = true;
-    showNotice("Could not load the game. Check your connection and refresh.");
+    showNotice(
+      "Could not load the game. Your connection may be down or the server may have a problem. Refresh the page; if it keeps failing, try again in a few minutes.",
+    );
     return;
   }
   roster = game.entries;
@@ -104,6 +107,15 @@ window.onload = async function (): Promise<void> {
     edit.hidden = false;
   }
   showColumnTitles(game.attributes);
+  // Only the owner and admins reach a game this small; there is no answer to draw
+  if (roster.length < MIN_ENTRIES) {
+    document.querySelector("#board")!.removeAttribute("aria-busy");
+    document.querySelector<HTMLElement>("#loading-state")!.hidden = true;
+    showNotice(
+      `This game cannot be played yet: it needs at least ${MIN_ENTRIES} entries to pick a daily answer, and it has ${roster.length}. Use the Edit link to add entries.`,
+    );
+    return;
+  }
   const storage = gameStorage(localStorage, SLUG);
   // Signed-in players use the server-stored game instead
   play = createPlay({
@@ -305,7 +317,9 @@ async function loadInitialUsedGuessesElements(): Promise<void> {
   document.querySelector("#board")!.removeAttribute("aria-busy");
   document.querySelector<HTMLElement>("#loading-state")!.hidden = true;
   if (loaded === null) {
-    showNotice("Could not load your game. Check your connection and refresh.");
+    showNotice(
+      "Could not load your game. Your connection may be down or the server may have a problem. Refresh the page; if it keeps failing, try again in a few minutes.",
+    );
     refreshEmptyState();
     return;
   }

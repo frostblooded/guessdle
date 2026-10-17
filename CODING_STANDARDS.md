@@ -27,3 +27,7 @@ Check each of these when the diff touches `src/server/auth.ts`, sessions, or any
 - Responses reveal the Daily Answer only after a win or give-up.
 - Changes to shared state (answers, user rows) take the advisory or row lock.
 - A URL or id taken from the request body that points at stored data (an upload, an entry) is checked to belong to the acting user or the game before it is saved or deleted.
+
+## Error messages
+
+Every error a user can reach says what happened and what to do next. Map each cause to its own message (`src/game/failures.ts` for server codes); say "check your connection" only for a real network failure, never for a refusal or a server error.

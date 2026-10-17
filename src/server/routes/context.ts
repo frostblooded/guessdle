@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import type pg from "pg";
 import { FAILURES, type FailureCode } from "../../game/failures.ts";
 import type { Entry } from "../../game/game.ts";
+import { MIN_ENTRIES } from "../../game/limits.ts";
 import { dayNumber, ensureAnswer, todayIn } from "../answers.ts";
 import {
   resolveGame,
@@ -90,6 +91,13 @@ export async function todaysAnswer(
   date: string,
   day: number,
 ): Promise<Entry | undefined> {
+  // Only the owner and admins reach a game this small; no answer can be drawn from it
+  if (roster.entries.length < MIN_ENTRIES) {
+    res
+      .status(FAILURES.not_enough_entries.status)
+      .json({ error: "not_enough_entries", day });
+    return undefined;
+  }
   const answerId = await ensureAnswer(
     pool,
     game,

@@ -25,7 +25,9 @@ export function initQueue(): () => Promise<void> {
     say("Loading the queue…");
     const out = await api<{ games: QueueItem[] }>("GET", "/api/admin/queue");
     if (out?.status !== 200) {
-      say("Could not load the queue.");
+      say(
+        "Could not load the queue. Your connection or the server may be failing, or your admin session may have ended. Reload the page and try again.",
+      );
       return;
     }
     say(out.data.games.length === 0 ? "No games are waiting." : null);
@@ -40,7 +42,9 @@ export function initQueue(): () => Promise<void> {
   ): Promise<void> => {
     const out = await api(method, `/api/admin/games/${path}`, payload ?? {});
     if (out?.status !== 200) {
-      say("Could not do that. Reload the queue and try again.");
+      say(
+        "The review action did not go through. Another admin may have handled this game already, or the server may be failing. Reload the queue to see its current state.",
+      );
       return;
     }
     await load();

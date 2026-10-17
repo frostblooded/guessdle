@@ -65,7 +65,8 @@ export function initAdmin(): void {
     usersMessage.hidden = false;
     const { ok, json } = await call("GET", "/api/admin/users");
     if (!ok) {
-      usersMessage.textContent = "Could not load the users.";
+      usersMessage.textContent =
+        "Could not load the users. Your connection or the server may be failing, or your admin session may have ended. Reload the page and try again.";
       usersMessage.hidden = false;
       return;
     }
@@ -96,7 +97,8 @@ export function initAdmin(): void {
             admin: !user.admin,
           });
           if (!res.ok) {
-            usersMessage.textContent = "Could not change that role.";
+            usersMessage.textContent =
+              "Could not change that role. The server refused it (you cannot remove your own admin rights or the last admin) or failed. Reload the list to see the current roles.";
             usersMessage.hidden = false;
             return;
           }
@@ -117,7 +119,8 @@ export function initAdmin(): void {
           }
           const res = await call("DELETE", `/api/admin/users/${user.id}`);
           if (!res.ok) {
-            usersMessage.textContent = "Could not delete that user.";
+            usersMessage.textContent =
+              "Could not delete that user. The server refused it (you cannot delete your own account) or failed. Reload the list to check, then try again.";
             usersMessage.hidden = false;
             return;
           }
@@ -138,7 +141,9 @@ export function initAdmin(): void {
     const { ok, json } = await call("GET", "/api/admin/backup");
     const data = json as BackupStatus;
     const problems = !ok
-      ? ["Could not load the backup status."]
+      ? [
+          "Could not load the backup status. Your connection or the server may be failing, or your admin session may have ended. Reload the page and try again.",
+        ]
       : data.state === "error"
         ? [data.message]
         : data.reasons;

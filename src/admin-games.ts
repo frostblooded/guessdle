@@ -29,7 +29,9 @@ export function initAllGames(): () => Promise<void> {
       `/api/admin/games?q=${encodeURIComponent(search.value.trim())}`,
     );
     if (out?.status !== 200) {
-      say("Could not load the games.");
+      say(
+        "Could not load the games. Your connection or the server may be failing, or your admin session may have ended. Reload the page and try again.",
+      );
       return;
     }
     say(out.data.games.length === 0 ? "No games match." : null);
@@ -65,7 +67,9 @@ export function initAllGames(): () => Promise<void> {
           }
           const out = await api("DELETE", `/api/admin/games/${slug}`);
           if (out?.status !== 200) {
-            say("Could not delete that game. Reload and try again.");
+            say(
+              "Could not delete that game. It may already be gone, or the server may be failing. Reload the list to check, then try again.",
+            );
             return;
           }
           await load();

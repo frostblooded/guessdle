@@ -6,7 +6,10 @@ import { MIN_ENTRIES } from "./limits.ts";
 const failure = (status: number, text: string) => ({ status, text });
 
 export const FAILURES = {
-  invalid: failure(400, "Check the values and try again."),
+  invalid: failure(
+    400,
+    "One of the values is not allowed (empty, too long or the wrong format). Check what you entered and try again.",
+  ),
   slug_immutable: failure(400, "A game's address cannot be changed."),
   reserved: failure(400, "That address is reserved. Pick another one."),
   unauthorized: failure(401, "Your session ended. Sign in again."),
@@ -17,7 +20,14 @@ export const FAILURES = {
     409,
     `Add at least ${MIN_ENTRIES} entries before submitting.`,
   ),
-  invalid_state: failure(409, "This game's status changed. Reload the page."),
+  not_enough_entries: failure(
+    409,
+    `This game cannot be played yet: it needs at least ${MIN_ENTRIES} entries to pick a daily answer. Add entries in the editor.`,
+  ),
+  invalid_state: failure(
+    409,
+    "This game's status changed since you opened the page. Reload the page to see its current status.",
+  ),
   attribute_exists: failure(409, "Another attribute already has that name."),
   entry_exists: failure(409, "Another entry already has that name."),
   slug_taken: failure(409, "That address is already taken. Pick another one."),
@@ -40,4 +50,4 @@ export const failureText = (code: unknown, status: number): string =>
   FAILURES[String(code) as FailureCode]?.text ??
   (status === 429
     ? FAILURES.rate_limited.text
-    : "Something went wrong. Try again.");
+    : "The server hit a problem and gave no details. Your change may not have been saved. Reload the page and check, then try again; if it keeps failing, try again in a few minutes.");
