@@ -103,7 +103,9 @@ export function gameEdits(ctx: EditContext, uploadsDir: string) {
           url: input.values![String(a.id)]![0] ?? "",
           current: current?.values[String(a.id)]?.[0] ?? "",
         }));
-      images.push({ url: input.photo, current: current?.photo ?? "" });
+      if (input.photo !== undefined) {
+        images.push({ url: input.photo, current: current?.photo ?? "" });
+      }
       for (const { url, current } of images) {
         if (!(await mayAttach(game, editor, url, current))) {
           return "invalid";
