@@ -168,7 +168,7 @@ export function manageRoutes(
     return drafts.every((d) => d !== undefined) ? drafts : undefined;
   };
   // Applies the edit `build` reads from the request (one change, or the whole list), then
-  // answers with the attributes
+  // answers with the attributes. Only a real change resets the status; a reorder does not.
   const attributeRoute = (
     build: (req: Request) => AttributeEdit | AttributeDraft[] | undefined,
   ) =>
@@ -188,7 +188,7 @@ export function manageRoutes(
             : editAttributes(tx, game, edit),
         (r) => r === "ok",
       );
-      if (out !== "ok" && out !== "noop") {
+      if (out !== "ok" && out !== "noop" && out !== "reorder") {
         fail(res, out);
         return;
       }
