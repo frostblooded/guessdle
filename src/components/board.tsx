@@ -2,7 +2,7 @@
 import type { ComponentProps, CSSProperties, ReactNode } from "react";
 import { correctnessClass } from "../game/correctness.ts";
 import type { Hint } from "../game/correctness.ts";
-import type { GradedAttribute } from "../game/game.ts";
+import type { BoardColumn, GradedAttribute } from "../game/game.ts";
 import { cn } from "../lib/utils.ts";
 
 const TILE_COLORS: Record<string, string> = {
@@ -11,13 +11,14 @@ const TILE_COLORS: Record<string, string> = {
   incorrect: "bg-incorrect",
 };
 
-// A grid row: the photo column, then one equal column per name and attribute
+// A grid row: a narrow square column per picture (`images`, one flag per column), the others
+// sharing the rest equally
 export function BoardRow({
-  columns,
+  images,
   className,
   style,
   ...props
-}: ComponentProps<"div"> & { columns: number }) {
+}: ComponentProps<"div"> & { images: readonly boolean[] }) {
   return (
     <div
       className={cn(
@@ -25,7 +26,9 @@ export function BoardRow({
         className,
       )}
       style={{
-        gridTemplateColumns: `var(--photo) repeat(${columns - 1}, minmax(0, 1fr))`,
+        gridTemplateColumns: images
+          .map((image) => (image ? "var(--photo)" : "minmax(0, 1fr)"))
+          .join(" "),
         ...style,
       }}
       {...props}
@@ -46,6 +49,23 @@ export function TitleTile({ className, ...props }: ComponentProps<"div">) {
       )}
       {...props}
     />
+  );
+}
+
+// The board's title row: one dark tile per column
+export function TitleRow({ columns }: { columns: readonly BoardColumn[] }) {
+  return (
+    <BoardRow
+      id="guess-results-titles-row"
+      images={columns.map((column) => column.image)}
+      aria-hidden="true"
+    >
+      {columns.map((column, i) => (
+        <TitleTile key={i} className="guess-result-title">
+          {column.title}
+        </TitleTile>
+      ))}
+    </BoardRow>
   );
 }
 
@@ -108,7 +128,7 @@ export function HintArrow({ hint }: { hint: Hint }) {
   );
 }
 
-// One guessed entry: its photo, then each graded value
+// One guessed entry: its pictures as they are, then each graded value
 export function GuessRow({
   row,
   style,
@@ -118,12 +138,12 @@ export function GuessRow({
 }) {
   return (
     <BoardRow
-      columns={row.length}
+      images={row.map((cell) => cell.image === true)}
       className="guess-result-row animate-in"
       style={style}
     >
-      {row.map(({ key, value, correctness, hint }, i) =>
-        i === 0 ? (
+      {row.map(({ key, value, correctness, hint, image }) =>
+        image ? (
           <PhotoTile key={key} src={value as string} />
         ) : (
           <GradeTile key={key} grade={correctnessClass(correctness)}>

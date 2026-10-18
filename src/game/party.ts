@@ -304,7 +304,10 @@ export function partyView(input: ViewInput): PartyView {
         return {
           ...res,
           guessNames: rows.map((row) => String(nameCell(row).value)),
-          grades: rows.map((row) => row.map((cell) => cell.correctness)),
+          // Image columns are never colored, so they get no square
+          grades: rows.map((row) =>
+            row.filter((cell) => !cell.image).map((cell) => cell.correctness),
+          ),
         };
       }),
     }))
