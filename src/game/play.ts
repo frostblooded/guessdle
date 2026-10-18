@@ -1,6 +1,11 @@
 // Anonymous play: the browser keeps pet ids, the server grades them.
 import { FAILURES } from "./failures.ts";
-import { isAnswerRow, type EntryRef, type GradedAttribute } from "./game.ts";
+import {
+  isAnswerRow,
+  SKIP,
+  type EntryRef,
+  type GradedAttribute,
+} from "./game.ts";
 import {
   createGameState,
   type GameState,
@@ -85,7 +90,7 @@ export interface Play {
   // Graded rows of the guesses stored for today, oldest first; the reason if the
   // server could not grade them (the stored guesses stay)
   load(): Promise<Loaded | LoadFailure>;
-  // Takes an entry id
+  // Takes an entry id, or SKIP (Blur games)
   submit(id: number): Promise<SubmitResult>;
   // Reveals the answer and finishes the game
   giveUp(): Promise<GiveUpResult>;
@@ -192,11 +197,14 @@ export function createPlay({
       if (finished) {
         return { kind: "finished" };
       }
-      if (!roster.some((entry: EntryRef): boolean => entry.id === id)) {
+      if (
+        id !== SKIP &&
+        !roster.some((entry: EntryRef): boolean => entry.id === id)
+      ) {
         return { kind: "invalid" };
       }
       const used: number[] = state.getUsedGuesses();
-      if (used.includes(id)) {
+      if (id !== SKIP && used.includes(id)) {
         return { kind: "duplicate" };
       }
       const res = await post<GradeResponse>(gradeUrl, {

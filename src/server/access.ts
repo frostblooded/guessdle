@@ -4,7 +4,7 @@
 import type { Request } from "express";
 import type pg from "pg";
 import { requestUser, type SessionUser } from "./auth.ts";
-import { MIN_ENTRIES } from "../game/limits.ts";
+import { minEntriesOf } from "../game/blur.ts";
 import { findGame, loadRoster, type GameRow, type Roster } from "./games.ts";
 
 export type Need = "play" | "edit" | "admin";
@@ -18,7 +18,7 @@ export interface LoadedGame {
 }
 
 export const isPlayable = (game: GameRow, roster: Roster): boolean =>
-  game.status !== "draft" && roster.entries.length >= MIN_ENTRIES;
+  game.status !== "draft" && roster.entries.length >= minEntriesOf(game.kind);
 
 export const canManage = (game: GameRow, user: SessionUser | null): boolean =>
   user !== null && (user.admin || game.ownerId === user.id);
