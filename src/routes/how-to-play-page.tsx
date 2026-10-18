@@ -18,7 +18,7 @@ export function HowToPlayPage() {
     <div className="mx-auto max-w-3xl">
       <PageHead
         title="How to play"
-        lede="Never played a guessing game like this? Try a practice round with Petdle's pets. It takes a minute."
+        lede="Never played a guessing game like this? Try a practice round with real pets. It takes a minute."
       />
       {tutorial.data ? (
         <PracticeGame tutorial={tutorial.data} />

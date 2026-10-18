@@ -1,4 +1,4 @@
-// How to play's practice game: the frozen Petdle copy migration 011 took (no secret to keep,
+// How to play's practice game: the frozen pet game copy migration 011 took (no secret to keep,
 // so the page grades in the browser).
 import type { Express } from "express";
 import type { Tutorial } from "../../game/tutorial.ts";

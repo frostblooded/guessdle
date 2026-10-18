@@ -1,4 +1,4 @@
-// How to play's practice game: four short steps on the frozen Petdle copy, from "there is a
+// How to play's practice game: four short steps on the frozen pet game copy, from "there is a
 // secret pet" to a win, explaining each clue in plain words. Graded in the browser.
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router";

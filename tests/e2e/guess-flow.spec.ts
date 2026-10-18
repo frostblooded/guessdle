@@ -389,7 +389,7 @@ test("the how-to-play page is linked from the nav and plays a practice game to a
   await expect(page).toHaveURL(/\/$/);
 });
 
-test("the practice game offers every Petdle pet and fits a phone screen", async ({
+test("the practice game offers every pet of the pet game and fits a phone screen", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 667 });

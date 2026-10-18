@@ -14,7 +14,7 @@ import { pid, SLUGS } from "./petdle.ts";
 import { startDb } from "./postgres.ts";
 import type { TestDb } from "./postgres.ts";
 
-describe("the tutorial's frozen Petdle copy", () => {
+describe("the tutorial's frozen pet game copy", () => {
   let db: TestDb;
   let server: Server;
   let url: string;
@@ -39,7 +39,7 @@ describe("the tutorial's frozen Petdle copy", () => {
     await db.stop();
   });
 
-  it("holds every Petdle pet with its values, A to Z, with Ati as the secret", async () => {
+  it("holds every pet game entry with its values, A to Z, with Ati as the secret", async () => {
     const { status, body } = await tutorial();
     assert.equal(status, 200);
     assert.deepEqual(body.attributes, [
@@ -64,7 +64,7 @@ describe("the tutorial's frozen Petdle copy", () => {
     );
   });
 
-  it("does not change when Petdle's entries change", async () => {
+  it("does not change when the pet game's entries change", async () => {
     const before = await tutorial();
     await db.pool.query(
       "update entries set name = 'Atilla', photo_url = '/uploads/x.webp' where id = $1",

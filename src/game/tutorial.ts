@@ -1,4 +1,4 @@
-// How to play's practice game (pure): the frozen Petdle copy it plays on, plain-words clues for a
+// How to play's practice game (pure): the frozen pet game copy it plays on, plain-words clues for a
 // graded row, and which pets still fit every clue so far.
 import { Correctness, type AttributeValue } from "./correctness.ts";
 import {
