@@ -96,6 +96,20 @@ describe("DaysPage", () => {
     );
   });
 
+  it("an anonymous Blur day with every try used is lost, and reading the list writes nothing", async () => {
+    localStorage.setItem("game:pets:day:0:usedGuesses", "[3, -1]");
+    localStorage.setItem("game:pets:day:1:usedGuesses", "[3]");
+    const before = { ...localStorage };
+    vi.stubGlobal("fetch", fakeServer(null, json(200, { ...DAYS, tries: 2 })));
+    renderDays();
+    await screen.findByText("Today");
+    assert.deepEqual(
+      [...document.querySelectorAll(".day-status")].map((b) => b.textContent),
+      ["Not played", "In progress", "Lost"],
+    );
+    assert.deepEqual({ ...localStorage }, before);
+  });
+
   it("says why the list could not load", async () => {
     vi.stubGlobal(
       "fetch",
