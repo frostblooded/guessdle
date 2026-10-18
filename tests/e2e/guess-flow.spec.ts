@@ -108,6 +108,76 @@ test("pressing Enter submits the guess", async ({ page }) => {
   await expect(rows(page)).toHaveCount(1);
 });
 
+test("clicking a suggestion submits it at once", async ({ page }) => {
+  await input(page).fill(wrongName);
+  await suggestions(page)
+    .filter({ hasText: new RegExp(`^${wrongName}$`) })
+    .click();
+
+  await expect(rows(page)).toHaveCount(1);
+  await expect(rows(page).first()).toContainText(wrongName);
+  await expect(input(page)).toHaveValue("");
+});
+
+test("Enter on a highlighted suggestion submits it at once", async ({
+  page,
+}) => {
+  await input(page).fill(wrongName);
+  await input(page).press("ArrowDown");
+  await input(page).press("Enter");
+
+  await expect(rows(page)).toHaveCount(1);
+  await expect(input(page)).toHaveValue("");
+});
+
+test("a picked suggestion the server could not grade stays in the box", async ({
+  page,
+}) => {
+  await page.route("**/api/games/petdle/grade", (route) => route.abort());
+  await input(page).fill(wrongName);
+  await suggestions(page)
+    .filter({ hasText: new RegExp(`^${wrongName}$`) })
+    .click();
+
+  await expect(page.locator("#notice")).toContainText("could not be checked");
+  await expect(rows(page)).toHaveCount(0);
+  await expect(input(page)).toHaveValue(wrongName);
+});
+
+test.describe("on a phone", () => {
+  test.use({
+    hasTouch: true,
+    isMobile: true,
+    viewport: { width: 390, height: 844 },
+  });
+
+  test("tapping a suggestion submits it at once", async ({ page }) => {
+    await input(page).fill(wrongName);
+    await suggestions(page)
+      .filter({ hasText: new RegExp(`^${wrongName}$`) })
+      .tap();
+
+    await expect(rows(page)).toHaveCount(1);
+    await expect(input(page)).toHaveValue("");
+  });
+
+  test("Give up and Reset sit above the guess box, away from Guess", async ({
+    page,
+  }) => {
+    const guess = (await page
+      .locator("#submit-new-guess-button")
+      .boundingBox())!;
+    for (const id of ["#give-up-button", "#reset-guesses-button"]) {
+      const box = (await page.locator(id).boundingBox())!;
+      expect(box.y + box.height).toBeLessThan(guess.y);
+    }
+  });
+});
+
+test("Play has no description under the title", async ({ page }) => {
+  await expect(page.locator(".page-head .lede")).toHaveCount(0);
+});
+
 test("used guesses are removed from the autocomplete list", async ({
   page,
 }) => {

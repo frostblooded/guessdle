@@ -21,7 +21,8 @@ export function GuessBox({
   names: readonly string[];
   value: string;
   onChange: (value: string) => void;
-  onSubmit: () => void;
+  // Called with the name to guess: the typed text on Enter, or the name picked from the list
+  onSubmit: (name: string) => void;
   disabled: boolean;
 }) {
   const items = matchNames(names, value);
@@ -35,14 +36,17 @@ export function GuessBox({
   } = useCombobox({
     items,
     inputValue: value,
-    // Never "selected": picking a name only fills the box, and the same name can be picked again
+    // Never "selected", so the same name can be picked again
     selectedItem: null,
     inputId: "new-guess-input",
     menuId: "guess-options",
     getItemId: (index) => `guess-option-${index}`,
     onSelectedItemChange: ({ selectedItem }) => {
+      // Picking a name (click, tap or Enter on a highlighted one) guesses it at once. It fills the
+      // box too, so a guess the server could not grade stays there to retry.
       if (selectedItem) {
         onChange(selectedItem);
+        onSubmit(selectedItem);
       }
     },
   });
@@ -64,7 +68,7 @@ export function GuessBox({
             // Enter with nothing highlighted submits what is typed
             if (event.key === "Enter" && (!open || highlightedIndex < 0)) {
               event.preventDefault();
-              onSubmit();
+              onSubmit(value);
             }
           },
         })}

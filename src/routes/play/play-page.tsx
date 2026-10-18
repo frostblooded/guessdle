@@ -153,8 +153,8 @@ function Game({ slug }: { slug: string }) {
     })();
   }, [playable, tooSmall, me.isPending, me.data, slug]);
 
-  async function submit(): Promise<void> {
-    const id = findEntryId(roster, guess);
+  async function submit(name: string): Promise<void> {
+    const id = findEntryId(roster, name);
     if (id === null || submitting.current || !play.current) {
       return;
     }
@@ -255,18 +255,35 @@ function Game({ slug }: { slug: string }) {
         centered
         titleId="game-title"
         title={playable?.name ?? "Guess today's answer"}
-        lede={
-          <p id="game-lede">
-            One mystery a day, unlimited guesses. Each row shows how close you
-            are. <Link to="/how-to-play">How to play</Link>
-          </p>
-        }
         actions={
-          <PlayActions
-            slug={slug}
-            canHost={playable !== null && !tooSmall}
-            canEdit={playable?.canEdit === true}
-          />
+          <>
+            {/* Up here, well away from Guess, so a slightly-off tap cannot hit them */}
+            <Button
+              id="give-up-button"
+              variant="outline"
+              size="sm"
+              hidden={finished}
+              disabled={cannotPlay || loading}
+              onClick={() => void giveUp()}
+            >
+              Give up
+            </Button>
+            <Button
+              id="reset-guesses-button"
+              variant="outline"
+              size="sm"
+              hidden={finished}
+              disabled={cannotPlay || rows.length === 0}
+              onClick={askReset}
+            >
+              Reset
+            </Button>
+            <PlayActions
+              slug={slug}
+              canHost={playable !== null && !tooSmall}
+              canEdit={playable?.canEdit === true}
+            />
+          </>
         }
       />
       {playable && <PlayStatus slug={slug} view={playable} />}
@@ -291,41 +308,19 @@ function Game({ slug }: { slug: string }) {
               names={names}
               value={guess}
               onChange={setGuess}
-              onSubmit={() => void submit()}
+              onSubmit={(name) => void submit(name)}
               disabled={cannotPlay}
             />
             <Button
               id="submit-new-guess-button"
               className="h-11 px-5 font-bold uppercase"
               disabled={cannotPlay || loading}
-              onClick={() => void submit()}
+              onClick={() => void submit(guess)}
             >
               Guess
             </Button>
           </div>
-          <div
-            className={`game-actions flex flex-wrap gap-2 ${finished ? "justify-center" : "justify-end"}`}
-          >
-            <Button
-              id="reset-guesses-button"
-              variant="ghost"
-              size="sm"
-              hidden={finished}
-              disabled={cannotPlay || rows.length === 0}
-              onClick={askReset}
-            >
-              Reset
-            </Button>
-            <Button
-              id="give-up-button"
-              variant="ghost"
-              size="sm"
-              hidden={finished}
-              disabled={cannotPlay || loading}
-              onClick={() => void giveUp()}
-            >
-              Give up
-            </Button>
+          <div className="game-actions flex justify-center" hidden={!finished}>
             <Button
               id="reset-button"
               hidden={!finished}
