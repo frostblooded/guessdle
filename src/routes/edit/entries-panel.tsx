@@ -1,6 +1,9 @@
 // The editor's Entries tab: list, add, change and delete entries with photo and values.
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useCrop } from "../../components/crop-dialog.tsx";
+import { CropError, ZOOM_MAX_SIDE } from "../../game/crop.ts";
+import type { ZoomPart } from "../../game/zoom.ts";
+import { shrinkImage } from "../../image-cropper.ts";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button, buttonVariants } from "../../components/ui/button.tsx";
 import { Input, Label, Textarea } from "../../components/ui/input.tsx";
@@ -12,6 +15,7 @@ import {
 } from "../../game/limits.ts";
 import { api, errorText, type Reply } from "../../manage-client.ts";
 import { IMAGE_TYPES, type Attribute, type Entry } from "./types.ts";
+import { ZoomPartsEditor } from "./zoom-parts-editor.tsx";
 
 // What the form holds: the entry being edited (null: adding), its name, photo URL and values
 interface Draft {
@@ -19,12 +23,15 @@ interface Draft {
   name: string;
   photo: string;
   values: Record<string, string>;
+  // Zoom games: the photo's parts, closest first
+  parts: ZoomPart[];
 }
 
 const draftOf = (entry: Entry | null): Draft => ({
   editing: entry,
   name: entry?.name ?? "",
   photo: entry?.photo ?? "",
+  parts: entry?.parts ?? [],
   values: Object.fromEntries(
     Object.entries(entry?.values ?? {}).map(([id, items]) => [
       id,
@@ -37,9 +44,12 @@ export function EntriesPanel({
   base,
   initial,
   active,
+  zoomParts,
   onChange,
 }: {
   base: string;
+  // A Zoom game's part count; undefined for a classic game
+  zoomParts?: number | undefined;
   initial: { attributes: Attribute[]; entries: Entry[] };
   // The tab is open: refresh the lists, since attributes may have changed
   active: boolean;
@@ -108,7 +118,10 @@ export function EntriesPanel({
         (draft.values[String(attr.id)] ?? "").split("\n"),
       ]),
     );
-    const body = { name: draft.name, photo: draft.photo, values };
+    const body =
+      zoomParts === undefined
+        ? { name: draft.name, photo: draft.photo, values }
+        : { name: draft.name, photo: draft.photo, parts: draft.parts };
     const ok = draft.editing
       ? await run("PATCH", `${base}/entries/${draft.editing.id}`, body)
       : await run("POST", `${base}/entries`, body);
@@ -124,30 +137,55 @@ export function EntriesPanel({
       return;
     }
     setError("");
-    const cropped = await crop(file, "photo");
-    if (!cropped) {
+    const zoom = zoomParts !== undefined;
+    const ready = zoom ? await shrink(file) : await crop(file, "photo");
+    if (!ready) {
       return;
     }
     const up = await api<{ url?: string }>(
       "POST",
-      "/api/uploads?kind=photo",
-      cropped,
+      `/api/uploads?kind=${zoom ? "zoom" : "photo"}`,
+      ready,
     );
     const url = up?.status === 200 ? up.data.url : undefined;
     if (url) {
-      setDraft((d) => ({ ...d, photo: url }));
+      // A new image starts from the default parts
+      setDraft((d) => ({ ...d, photo: url, parts: [] }));
     } else {
       setError(errorText(up));
     }
   };
 
+  // A Zoom game's photo goes up whole, only shrunk to the stored size
+  const shrink = async (file: Blob): Promise<Blob | null> => {
+    try {
+      return await shrinkImage(file, ZOOM_MAX_SIDE);
+    } catch (e) {
+      if (e instanceof CropError) {
+        setError(e.message);
+        return null;
+      }
+      throw e;
+    }
+  };
+
+  const incomplete = (entry: Entry): boolean =>
+    zoomParts === undefined
+      ? formAttributes.some((attr) => !entry.values[String(attr.id)]?.length)
+      : !entry.photo || (entry.parts?.length ?? 0) !== zoomParts;
+
   return (
     <div className="space-y-5">
       {dialog}
       <p className="lede text-sm text-muted-foreground">
-        Each entry is a row on the board. A game needs at least {MIN_ENTRIES}{" "}
-        entries before anyone can play it, and every entry needs a value for
-        every attribute.
+        {zoomParts === undefined
+          ? "Each entry is a row on the board."
+          : "Each entry is one possible answer."}{" "}
+        A game needs at least {MIN_ENTRIES} entries before anyone can play it,
+        and every entry needs{" "}
+        {zoomParts === undefined
+          ? "a value for every attribute."
+          : `an image with ${zoomParts} zoomed ${zoomParts === 1 ? "part" : "parts"} on it.`}
       </p>
       <ul
         id="entry-list"
@@ -173,11 +211,9 @@ export function EntriesPanel({
             <span className="entry-name min-w-0 flex-1 truncate font-medium">
               {entry.name}
             </span>
-            {formAttributes.some(
-              (attr) => !entry.values[String(attr.id)]?.length,
-            ) && (
+            {incomplete(entry) && (
               <span className="entry-missing shrink-0 text-sm font-medium text-error">
-                Missing values
+                {zoomParts === undefined ? "Missing values" : "Missing parts"}
               </span>
             )}
             <Button
@@ -229,8 +265,25 @@ export function EntriesPanel({
           />
         </div>
         <div className="space-y-2">
-          <p className="text-sm font-medium">Photo</p>
-          {draft.photo && (
+          <p className="text-sm font-medium">
+            {zoomParts === undefined ? "Photo" : "Image"}
+          </p>
+          {zoomParts !== undefined && !draft.photo && (
+            <p className="text-sm text-muted-foreground">
+              Pick a sharp, large image. Players only see the zoomed parts you
+              place on it, and the whole image once the day is over.
+            </p>
+          )}
+          {zoomParts !== undefined && draft.photo && (
+            <ZoomPartsEditor
+              key={draft.photo}
+              src={draft.photo}
+              parts={draft.parts}
+              count={zoomParts}
+              onChange={(parts) => setDraft((d) => ({ ...d, parts }))}
+            />
+          )}
+          {zoomParts === undefined && draft.photo && (
             <img
               id="entry-photo-preview"
               className="cover-preview size-24 rounded-lg object-cover"
@@ -250,16 +303,18 @@ export function EntriesPanel({
               className={buttonVariants({ variant: "outline", size: "sm" })}
               htmlFor="entry-photo"
             >
-              Choose photo
+              {zoomParts === undefined ? "Choose photo" : "Choose image"}
             </label>
-            <Button
-              id="entry-photo-remove"
-              variant="ghost"
-              size="sm"
-              onClick={() => setDraft((d) => ({ ...d, photo: "" }))}
-            >
-              Remove photo
-            </Button>
+            {zoomParts === undefined && (
+              <Button
+                id="entry-photo-remove"
+                variant="ghost"
+                size="sm"
+                onClick={() => setDraft((d) => ({ ...d, photo: "" }))}
+              >
+                Remove photo
+              </Button>
+            )}
           </div>
         </div>
         <div id="entry-fields" className="space-y-4 empty:hidden">

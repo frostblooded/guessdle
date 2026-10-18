@@ -1,7 +1,8 @@
 // Entry editing (spec #66): add, change and soft-delete the entries of one game.
 import type pg from "pg";
 import { parseNumberValue } from "../game/number.ts";
-import { listAttributes, type GameRow } from "./games.ts";
+import { partsFit, type ImageSize, type ZoomPart } from "../game/zoom.ts";
+import { listAttributes, loadParts, type GameRow } from "./games.ts";
 
 export interface EntryRow {
   id: number;
@@ -9,6 +10,8 @@ export interface EntryRow {
   photo: string;
   // Attribute id to its items (Text has at most one; empty means no value)
   values: Record<string, string[]>;
+  // Zoom games only: the photo's zoomed parts, closest first
+  parts?: ZoomPart[];
 }
 
 export async function listEntries(
@@ -28,17 +31,28 @@ export async function listEntries(
      from entries e where e.game_id = $1 and e.deleted_at is null order by e.id`,
     [game.id],
   );
-  return rows.map((r) => ({ ...r, values: r.values ?? {} }));
+  const parts = game.kind === "zoom" ? await loadParts(q, game) : null;
+  return rows.map((r) => ({
+    ...r,
+    values: r.values ?? {},
+    ...(parts && { parts: parts.get(r.id) ?? [] }),
+  }));
 }
 
 export interface EntryInput {
   name?: string;
   photo?: string;
   values?: Record<string, string[]>;
+  parts?: ZoomPart[];
 }
+
+// The pixel size of a stored upload, null when there is no such image
+export type ImageSizeOf = (url: string) => Promise<ImageSize | null>;
 
 // Creates the entry (`id` undefined) or changes it. Every attribute needs a value once saved,
 // from the input or already stored; Number values are stored as parseNumberValue gives them.
+// A Zoom game's entry instead needs its photo and exactly the game's count of parts inside it;
+// a new photo needs new parts.
 // Runs in the caller's game transaction (lifecycle.edit), which applies the status rule.
 // `replacedPhoto` is the file the caller should delete.
 export async function saveEntry(
@@ -46,6 +60,7 @@ export async function saveEntry(
   game: GameRow,
   id: number | undefined,
   input: EntryInput,
+  sizeOf: ImageSizeOf = async () => null,
 ): Promise<
   | { id: number; replacedPhoto: string | null }
   | "invalid"
@@ -53,6 +68,7 @@ export async function saveEntry(
   | "not_found"
   | "missing_values"
   | "not_a_number"
+  | "missing_parts"
 > {
   const current = (
     await tx.query<{ name: string; photo: string }>(
@@ -100,6 +116,23 @@ export async function saveEntry(
   if (!attrs.every((a) => filled(String(a.id)))) {
     return "missing_values";
   }
+  if (game.kind === "zoom") {
+    const kept = input.parts === undefined && photo === (current?.photo ?? "");
+    if (!kept) {
+      const parts = input.parts ?? [];
+      const size = photo === "" ? null : await sizeOf(photo);
+      if (!size || parts.length !== game.zoomParts) {
+        return "missing_parts";
+      }
+      if (!partsFit(parts, size)) {
+        return "invalid";
+      }
+    } else if (id === undefined) {
+      return "missing_parts";
+    }
+  } else if (input.parts !== undefined) {
+    return "invalid";
+  }
   let entryId = id;
   if (entryId === undefined) {
     entryId = (
@@ -112,6 +145,22 @@ export async function saveEntry(
     await tx.query(
       "update entries set name = $2, photo_url = $3 where id = $1",
       [entryId, name, photo],
+    );
+  }
+  if (input.parts !== undefined) {
+    await tx.query("delete from entry_zoom_parts where entry_id = $1", [
+      entryId,
+    ]);
+    await tx.query(
+      `insert into entry_zoom_parts (entry_id, position, x, y, size)
+       select $1, n - 1, x, y, s
+       from unnest($2::int[], $3::int[], $4::int[]) with ordinality as t (x, y, s, n)`,
+      [
+        entryId,
+        input.parts.map((p) => p.x),
+        input.parts.map((p) => p.y),
+        input.parts.map((p) => p.size),
+      ],
     );
   }
   for (const [attrId, items] of Object.entries(values)) {

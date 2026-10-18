@@ -22,6 +22,7 @@ import { AnswersPanel } from "./answers-panel.tsx";
 import { AttributesPanel } from "./attributes-panel.tsx";
 import { EntriesPanel } from "./entries-panel.tsx";
 import { StatusBar } from "./status-bar.tsx";
+import { ZoomPartsField } from "./zoom-parts-field.tsx";
 import { IMAGE_TYPES, type Attribute, type Entry } from "./types.ts";
 
 type Loaded =
@@ -77,11 +78,13 @@ interface Fields {
   name: string;
   description: string;
   skip: string;
+  zoomParts: number;
 }
 const fieldsOf = (d: Details): Fields => ({
   name: d.name,
   description: d.description,
   skip: d.skipPeriod === null ? "" : String(d.skipPeriod),
+  zoomParts: d.zoomParts,
 });
 
 // The title row: the game name once loaded, and a way to the game itself
@@ -152,10 +155,22 @@ function Editor({
   const submitDetails = (event: FormEvent): void => {
     event.preventDefault();
     const skip = fields.skip.trim();
+    const zoom = saved.kind === "zoom";
+    if (
+      zoom &&
+      fields.zoomParts > saved.zoomParts &&
+      details.entryCount > 0 &&
+      !confirm(
+        "With more parts, every entry needs its new parts placed before anyone can play again. Change it?",
+      )
+    ) {
+      return;
+    }
     void save({
       name: fields.name,
       description: fields.description,
       skipPeriod: skip === "" ? null : Number(skip),
+      ...(zoom && { zoomParts: fields.zoomParts }),
     });
   };
 
@@ -197,7 +212,10 @@ function Editor({
         />
         <Tabs value={tab} onValueChange={setTab} className="space-y-4">
           <TabsList aria-label="Editor sections">
-            {TABS.map(([value, label, panel]) => (
+            {/* A Zoom game has no attributes */}
+            {TABS.filter(
+              ([value]) => saved.kind !== "zoom" || value !== "attributes",
+            ).map(([value, label, panel]) => (
               <TabsTrigger key={value} value={value} panelId={panel}>
                 {label}
               </TabsTrigger>
@@ -279,6 +297,14 @@ function Editor({
                     )}
                   </div>
                 </div>
+                {saved.kind === "zoom" && (
+                  <ZoomPartsField
+                    value={fields.zoomParts}
+                    onChange={(zoomParts) =>
+                      setFields((f) => ({ ...f, zoomParts }))
+                    }
+                  />
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="edit-skip">
                     Skip period (days before an entry can repeat)
@@ -326,6 +352,7 @@ function Editor({
                 base={base}
                 initial={initial}
                 active={tab === "entries"}
+                zoomParts={saved.kind === "zoom" ? saved.zoomParts : undefined}
                 onChange={refreshStatus}
               />
             </Card>

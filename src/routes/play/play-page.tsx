@@ -2,8 +2,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { Link, useParams } from "react-router";
-import { BoardRow, GuessRow, TitleTile } from "../../components/board.tsx";
-import { EmptyState, MessageCard, PageHead } from "../../components/page.tsx";
+import { ZoomView } from "../../components/zoom-view.tsx";
+import { MessageCard, PageHead } from "../../components/page.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import {
   AlertDialog,
@@ -19,6 +19,8 @@ import { Card } from "../../components/ui/card.tsx";
 import { FAILURES } from "../../game/failures.ts";
 import {
   findEntryId,
+  isAnswerRow,
+  nameCell,
   type EntryRef,
   type GameAttribute,
   type GradedAttribute,
@@ -26,11 +28,13 @@ import {
 import { gameStorage } from "../../game/game-state.ts";
 import { MIN_ENTRIES } from "../../game/limits.ts";
 import { mergeLocalGame } from "../../game/merge.ts";
-import { createPlay, type Play } from "../../game/play.ts";
+import { createPlay, type Play, type Reveal } from "../../game/play.ts";
+import type { GameKind } from "../../game/zoom.ts";
 import { createServerPlay } from "../../game/server-play.ts";
 import { browserFetch, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { GuessBox } from "./guess-box.tsx";
+import { PlayResults } from "./play-results.tsx";
 import { PlayActions, PlayStatus, type StatusView } from "./play-status.tsx";
 import { ResultBanner, type Result } from "./result-banner.tsx";
 
@@ -39,7 +43,11 @@ type PlayableGame = {
   canEdit: boolean;
   // Some entries miss values, so the game cannot be played for now
   paused: boolean;
+  kind: GameKind;
+  // Zoom games: parts per day, one try each
+  zoomParts?: number;
   attributes: GameAttribute[];
+  // A Zoom game's entries come without photos
   entries: EntryRef[];
 } & StatusView;
 
@@ -87,6 +95,8 @@ function Game({ slug }: { slug: string }) {
   const [blocked, setBlocked] = useState(false);
   const [guess, setGuess] = useState("");
   const [confirming, setConfirming] = useState(false);
+  // Bumped on every fresh board, so a Zoom game's part images are fetched again
+  const [board, setBoard] = useState(0);
   const play = useRef<Play | null>(null);
   const started = useRef(false);
   const submitting = useRef(false);
@@ -109,7 +119,13 @@ function Game({ slug }: { slug: string }) {
   const clearBoard = (): void => {
     setRows([]);
     setResult(null);
+    setBoard((n) => n + 1);
   };
+
+  const resultOf = (
+    kind: NonNullable<Result>["kind"],
+    reveal: Reveal,
+  ): Result => ({ kind, answer: reveal.answer!, photo: reveal.answerPhoto });
 
   // Once the game and who is signed in are known: pick where the game lives, then load it.
   // The ref keeps StrictMode's second effect run from merging twice.
@@ -147,11 +163,16 @@ function Game({ slug }: { slug: string }) {
         return;
       }
       setRows([...loaded.rows].reverse());
-      if (loaded.answer !== undefined && (loaded.victory || loaded.gaveUp)) {
-        setResult({
-          kind: loaded.victory ? "victory" : "give-up",
-          answer: loaded.answer,
-        });
+      if (
+        loaded.answer !== undefined &&
+        (loaded.victory || loaded.gaveUp || loaded.lost)
+      ) {
+        setResult(
+          resultOf(
+            loaded.victory ? "victory" : loaded.lost ? "lost" : "give-up",
+            loaded,
+          ),
+        );
       }
       setReady(true);
     })();
@@ -181,8 +202,8 @@ function Game({ slug }: { slug: string }) {
     if (res.kind === "duplicate") {
       return;
     }
-    if (res.isAnswer && res.answer !== undefined) {
-      setResult({ kind: "victory", answer: res.answer });
+    if (res.answer !== undefined && (res.isAnswer || res.lost)) {
+      setResult(resultOf(res.isAnswer ? "victory" : "lost", res));
     }
     setRows((old) => [res.row, ...old]);
   }
@@ -200,7 +221,7 @@ function Game({ slug }: { slug: string }) {
           : null,
     );
     if (res.kind === "gaveUp") {
-      setResult({ kind: "give-up", answer: res.answer });
+      setResult(resultOf("give-up", res));
     }
   }
 
@@ -244,8 +265,10 @@ function Game({ slug }: { slug: string }) {
           : notice;
   const loading = !cannotPlay && !ready;
   const finished = result !== null;
-  // Each row names its guess in the second cell; those names leave the suggestions
-  const used = new Set(rows.map((row) => row[1]?.value));
+  // Each row names its guess; those names leave the suggestions
+  const used = new Set(rows.map((row) => nameCell(row).value));
+  const zoom = playable?.kind === "zoom" ? (playable.zoomParts ?? 1) : null;
+  const wrong = rows.filter((row) => !isAnswerRow(row)).length;
   const names = roster
     .map((entry) => entry.name)
     .filter((name) => !used.has(name));
@@ -304,6 +327,19 @@ function Game({ slug }: { slug: string }) {
         aria-label="Game board"
         aria-busy={isPending || loading ? true : undefined}
       >
+        {zoom !== null && ready && (
+          <div className="mb-6">
+            <ZoomView
+              partUrl={(n) =>
+                `/api/games/${encodeURIComponent(slug)}/zoom/${n}?b=${board}`
+              }
+              tries={zoom}
+              wrong={wrong}
+              finished={finished}
+              reveal={result?.photo}
+            />
+          </div>
+        )}
         <Card className="play-card mb-6 gap-3 p-4 sm:p-5">
           <div
             id="new-guess-row"
@@ -357,37 +393,12 @@ function Game({ slug }: { slug: string }) {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-        <div className="results flex flex-col gap-2 sm:gap-2.5">
-          <BoardRow
-            id="guess-results-titles-row"
-            columns={titles.length}
-            aria-hidden="true"
-          >
-            {titles.map((title, i) => (
-              <TitleTile key={i} className="guess-result-title">
-                {title}
-              </TitleTile>
-            ))}
-          </BoardRow>
-          {(isPending || loading) && (
-            <EmptyState id="loading-state">
-              Loading today&apos;s game…
-            </EmptyState>
-          )}
-          {ready && rows.length === 0 && (
-            <EmptyState id="empty-state">
-              No guesses yet. Start typing a name above, then pick one.
-            </EmptyState>
-          )}
-          <div
-            id="guess-results-container"
-            className="flex flex-col gap-2 sm:gap-2.5"
-          >
-            {rows.map((row, i) => (
-              <GuessRow key={rows.length - i} row={row} />
-            ))}
-          </div>
-        </div>
+        <PlayResults
+          rows={rows}
+          titles={zoom === null ? titles : null}
+          loading={isPending || loading}
+          empty={ready && rows.length === 0}
+        />
       </section>
     </>
   );

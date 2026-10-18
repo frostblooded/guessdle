@@ -243,6 +243,7 @@ export async function loadData(q: Q, party: PartyRow): Promise<PartyData> {
     players: players.rows,
     rounds: rounds.rows.map((r) => ({
       ...r,
+      ...(game.kind === "zoom" && { tries: game.zoomParts }),
       guesses: guesses.rows
         .filter((g) => g.roundId === r.id)
         .map(({ playerId, entryId, at }) => ({ playerId, entryId, at })),
@@ -272,7 +273,12 @@ export async function viewsOf(
       viewer,
       partyView({
         code: party.code,
-        game: { slug: game.slug, name: game.name },
+        game: {
+          slug: game.slug,
+          name: game.name,
+          kind: game.kind,
+          ...(game.kind === "zoom" && { zoomParts: game.zoomParts }),
+        },
         attributes: roster.attributes,
         entries: roster.entries,
         all: roster.all,

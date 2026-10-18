@@ -3,11 +3,8 @@ import { randomBytes } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
-import {
-  type ImageKind,
-  MAX_UPLOAD_BYTES,
-  UPLOAD_SHAPES,
-} from "../game/crop.ts";
+import { type ImageKind, MAX_UPLOAD_BYTES, maxSideOf } from "../game/crop.ts";
+import type { ImageSize, ZoomPart } from "../game/zoom.ts";
 
 export { type ImageKind, isImageKind, MAX_UPLOAD_BYTES } from "../game/crop.ts";
 
@@ -45,7 +42,7 @@ export async function processImage(
   try {
     return await sharp(input, { limitInputPixels: MAX_PIXELS })
       .rotate()
-      .resize(UPLOAD_SHAPES[kind].maxSide, UPLOAD_SHAPES[kind].maxSide, {
+      .resize(maxSideOf(kind), maxSideOf(kind), {
         fit: "inside",
         withoutEnlargement: true,
       })
@@ -62,4 +59,57 @@ export async function storeWebp(dir: string, webp: Buffer): Promise<string> {
   await mkdir(dir, { recursive: true });
   await writeFile(join(dir, name), webp);
   return `/uploads/${name}`;
+}
+
+// The file a stored upload URL names, or null for anything else
+const fileOf = (dir: string, url: string): string | null => {
+  const name = /^\/uploads\/([0-9a-f]{32}\.webp)$/.exec(url)?.[1];
+  return name === undefined ? null : join(dir, name);
+};
+
+// The pixel size of a stored upload, null when there is no such readable file
+export const imageSizeOf =
+  (dir: string) =>
+  async (url: string): Promise<ImageSize | null> => {
+    const file = fileOf(dir, url);
+    try {
+      const { width, height } = file ? await sharp(file).metadata() : {};
+      return width && height ? { width, height } : null;
+    } catch {
+      return null;
+    }
+  };
+
+// The side of a zoomed part as Play shows it: small parts are enlarged to it
+export const PART_SIDE = 640;
+const PART_CACHE = 200;
+
+// Renders zoomed parts of stored uploads as WebP squares, keeping the latest ones in memory
+export function partRenderer(dir: string) {
+  const cache = new Map<string, Promise<Buffer | null>>();
+  const render = async (url: string, p: ZoomPart): Promise<Buffer | null> => {
+    const file = fileOf(dir, url);
+    if (!file) {
+      return null;
+    }
+    try {
+      return await sharp(file)
+        .extract({ left: p.x, top: p.y, width: p.size, height: p.size })
+        .resize(PART_SIDE, PART_SIDE, { fit: "fill" })
+        .webp()
+        .toBuffer();
+    } catch {
+      return null;
+    }
+  };
+  return (url: string, part: ZoomPart): Promise<Buffer | null> => {
+    const key = `${url}:${part.x}:${part.y}:${part.size}`;
+    const hit = cache.get(key) ?? render(url, part);
+    cache.delete(key);
+    cache.set(key, hit);
+    if (cache.size > PART_CACHE) {
+      cache.delete(cache.keys().next().value!);
+    }
+    return hit;
+  };
 }

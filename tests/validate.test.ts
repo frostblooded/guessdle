@@ -48,9 +48,27 @@ describe("parseGamePatch", () => {
   });
 });
 
+describe("parseGamePatch: Zoom games", () => {
+  it("takes a part count of 1 to 6 for a Zoom game only", () => {
+    assert.deepEqual(parseGamePatch({ zoomParts: 4 }, 3, true), {
+      zoomParts: 4,
+    });
+    assert.equal(parseGamePatch({ zoomParts: 4 }, 3), undefined);
+    for (const zoomParts of [0, 7, 2.5, "3"]) {
+      assert.equal(parseGamePatch({ zoomParts }, 3, true), undefined);
+    }
+  });
+});
+
 describe("parseEntryInput", () => {
   it("accepts an empty body", () => {
     assert.deepEqual(parseEntryInput({}), {});
+  });
+  it("shape-checks zoomed parts", () => {
+    assert.deepEqual(parseEntryInput({ parts: [{ x: 1, y: 2, size: 20 }] }), {
+      parts: [{ x: 1, y: 2, size: 20 }],
+    });
+    assert.equal(parseEntryInput({ parts: [{ x: 1 }] }), undefined);
   });
   it("trims the name and bounds it to 60", () => {
     assert.deepEqual(parseEntryInput({ name: " Rex " }), { name: "Rex" });

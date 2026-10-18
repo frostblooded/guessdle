@@ -1,10 +1,11 @@
-// The viewer's own board in a live party round: the guess box, their graded rows and, once they
-// solved it or gave up, the answer.
+// The viewer's own board in a live party round: the guess box, their graded rows (a Zoom game's
+// parts and guessed names) and, once they solved it, gave up or ran out of tries, the answer.
 import { useState } from "react";
 import { BoardRow, GuessRow, TitleTile } from "../../components/board.tsx";
+import { ZoomGuesses, ZoomView } from "../../components/zoom-view.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
-import { findEntryId } from "../../game/game.ts";
+import { findEntryId, isAnswerRow, nameCell } from "../../game/game.ts";
 import type { LiveRound, PartyView } from "../../game/party.ts";
 import { GuessBox } from "../play/guess-box.tsx";
 
@@ -28,8 +29,10 @@ export function PartyRound({
 }) {
   const [guess, setGuess] = useState("");
   const entries = view.game.entries;
-  const done = mine.solved || mine.gaveUp;
-  const used = new Set(mine.rows.map((row) => row[1]?.value));
+  const done = mine.solved || mine.gaveUp || mine.lost;
+  const used = new Set(mine.rows.map((row) => nameCell(row).value));
+  const zoom = view.game.kind === "zoom" ? (view.game.zoomParts ?? 1) : null;
+  const newestFirst = [...mine.rows].reverse();
   const names = entries.map((e) => e.name).filter((name) => !used.has(name));
   const titles = ["Photo", "Name", ...view.game.attributes.map((a) => a.name)];
 
@@ -70,7 +73,9 @@ export function PartyRound({
               <strong className="text-xl font-bold">
                 {mine.solved
                   ? `Solved in ${mine.rows.length} ${mine.rows.length === 1 ? "guess" : "guesses"}!`
-                  : "You gave up"}
+                  : mine.lost
+                    ? "Out of tries"
+                    : "You gave up"}
               </strong>
               <span className="break-words">
                 The answer is {mine.answer.name}. Waiting for the others to
@@ -80,6 +85,19 @@ export function PartyRound({
           </div>
         )}
       </div>
+      {zoom !== null && (
+        <div className="mb-6">
+          <ZoomView
+            partUrl={(n) =>
+              `/api/parties/${encodeURIComponent(view.code)}/zoom/${round.number}/${n}`
+            }
+            tries={zoom}
+            wrong={mine.rows.filter((row) => !isAnswerRow(row)).length}
+            finished={done}
+            reveal={done ? mine.answer?.photo : undefined}
+          />
+        </div>
+      )}
       {!done && (
         <Card id="guess-card" className="play-card mb-6 gap-3 p-4 sm:p-5">
           <div id="new-guess-row" className="guess-row flex gap-2">
@@ -110,7 +128,8 @@ export function PartyRound({
           </div>
         </Card>
       )}
-      {mine.rows.length > 0 && (
+      {zoom !== null && <ZoomGuesses rows={newestFirst} />}
+      {zoom === null && mine.rows.length > 0 && (
         <div id="board" className="results flex flex-col gap-2 sm:gap-2.5">
           <BoardRow
             id="guess-results-titles-row"
@@ -124,7 +143,7 @@ export function PartyRound({
             ))}
           </BoardRow>
           <div id="guess-results-container" className="flex flex-col gap-2">
-            {[...mine.rows].reverse().map((row, i) => (
+            {newestFirst.map((row, i) => (
               <GuessRow key={mine.rows.length - i} row={row} />
             ))}
           </div>

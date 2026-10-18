@@ -19,3 +19,7 @@ export const MAX_NICKNAME = 20;
 export const MAX_PARTY_PLAYERS = 30;
 // Open parties one host may run at once
 export const MAX_OPEN_PARTIES = 5;
+// Zoom games: how many zoomed parts each entry has (one try per part), and the smallest part side in image pixels
+export const MAX_ZOOM_PARTS = 6;
+export const DEFAULT_ZOOM_PARTS = 5;
+export const MIN_ZOOM_PART = 16;

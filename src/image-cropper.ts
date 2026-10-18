@@ -8,7 +8,7 @@ import {
   CropError,
   cropOutputSize,
   encodeUnderLimit,
-  type ImageKind,
+  type CropKind,
   type Rect,
   sameRect,
   UPLOAD_SHAPES,
@@ -57,10 +57,44 @@ const toBlob = (
 ): Promise<Blob | null> =>
   new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 
+// The canvas as a file under the upload limit: WebP where the browser encodes it (the server
+// stores WebP anyway), else JPEG; CropError("too_large") when none fits
+async function encode(canvas: HTMLCanvasElement): Promise<Blob> {
+  const blob = await encodeUnderLimit([
+    async () => {
+      const webp = await toBlob(canvas, "image/webp", 0.9);
+      return webp?.type === "image/webp" ? webp : null;
+    },
+    () => toBlob(canvas, "image/jpeg", 0.9),
+    () => toBlob(canvas, "image/jpeg", 0.7),
+  ]);
+  if (!blob) {
+    throw new CropError("too_large");
+  }
+  return blob;
+}
+
+// A Zoom game's photo, uncropped (ADR 0019): the whole image, shrunk so its longer side fits
+// maxSide. CropError when it cannot be read or stays over the limit.
+export async function shrinkImage(file: Blob, maxSide: number): Promise<Blob> {
+  const image = await loadImage(file);
+  try {
+    const { naturalWidth: w, naturalHeight: h } = image;
+    const scale = Math.min(1, maxSide / Math.max(w, h));
+    const out = document.createElement("canvas");
+    out.width = Math.max(1, Math.round(w * scale));
+    out.height = Math.max(1, Math.round(h * scale));
+    out.getContext("2d")!.drawImage(image, 0, 0, out.width, out.height);
+    return await encode(out);
+  } finally {
+    URL.revokeObjectURL(image.src);
+  }
+}
+
 export function mountCropper(
   host: HTMLElement,
   image: HTMLImageElement,
-  kind: ImageKind,
+  kind: CropKind,
 ): MountedCropper {
   const { aspect, maxSide } = UPLOAD_SHAPES[kind];
   host.innerHTML = template(aspect);
@@ -106,19 +140,7 @@ export function mountCropper(
           size.width,
           size.height,
         );
-      // WebP where the browser encodes it (the server stores WebP anyway), else JPEG
-      const blob = await encodeUnderLimit([
-        async () => {
-          const webp = await toBlob(out, "image/webp", 0.9);
-          return webp?.type === "image/webp" ? webp : null;
-        },
-        () => toBlob(out, "image/jpeg", 0.9),
-        () => toBlob(out, "image/jpeg", 0.7),
-      ]);
-      if (!blob) {
-        throw new CropError("too_large");
-      }
-      return blob;
+      return encode(out);
     },
     zoom(step: number): void {
       selection.$zoom(step);

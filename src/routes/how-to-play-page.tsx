@@ -146,6 +146,16 @@ export function HowToPlayPage() {
           </li>
         ))}
       </ol>
+      <Card id="help-zoom" className="mt-4 p-5 sm:p-6">
+        <h2 className="mb-2 text-lg font-semibold">Zoom games</h2>
+        <p className="text-muted-foreground">
+          Some games show a picture instead of a table. You start with a close
+          zoom on part of the secret answer&apos;s image. Every wrong guess
+          shows the next, wider part, and you have one try per part: miss on
+          the last one and the day is over. Tap the small pictures to look at
+          the parts again.
+        </p>
+      </Card>
       <p className="cta mt-8 text-center">
         <Link
           className={buttonVariants({ size: "lg", className: "no-underline" })}

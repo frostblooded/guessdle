@@ -20,3 +20,9 @@ export const GaveUp: Story = {
 export const NoPhoto: Story = {
   args: { roster: [{ id: 1, name: "Ati", photo: "" }] },
 };
+export const OutOfTries: Story = {
+  args: {
+    result: { kind: "lost", answer: "Ati", photo: ati },
+    roster: [{ id: 1, name: "Ati", photo: "" }],
+  },
+};

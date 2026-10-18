@@ -10,9 +10,12 @@ import {
   addGuess,
   changeGame,
   giveUp,
+  isLost,
   mergeLocal,
   resetGame,
   REFUSAL_STATUS,
+  revealOf,
+  triesOf,
   view,
   type GameContext,
   type GameView,
@@ -36,7 +39,8 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
     res.json(await listGallery(pool));
   });
 
-  // What a player needs to render the game: its attributes and active entries
+  // What a player needs to render the game: its attributes and active entries. A Zoom game's
+  // entries go without photos: those are its answers (ADR 0019).
   app.get(base, async (req, res) => {
     res.set("Cache-Control", "no-store");
     const loaded = await loadGame(ctx, req, res);
@@ -54,19 +58,21 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       name: game.name,
       description: game.description,
       cover: game.coverUrl,
+      kind: game.kind,
+      ...(game.kind === "zoom" && { zoomParts: game.zoomParts }),
       attributes: roster.attributes,
       // Some entries miss values: nobody can play until they are filled in
       paused: roster.incomplete > 0,
       entries: roster.entries.map(({ id, name, photo }) => ({
         id,
         name,
-        photo,
+        photo: game.kind === "zoom" ? "" : photo,
       })),
     });
   });
 
   // Stateless grading for anonymous players. The answer is revealed only to a
-  // batch containing the right guess.
+  // batch containing the right guess, or one using up a Zoom game's tries.
   app.post(
     `${base}/grade`,
     express.json({ limit: "10kb" }),
@@ -81,7 +87,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         res.status(status).json({ error, day });
       };
       const ids = bodyOf(req)["ids"];
-      if (!isIdList(roster, ids)) {
+      if (!isIdList(roster, ids) || ids.length > (triesOf(game) ?? Infinity)) {
         fail(400, "invalid");
         return;
       }
@@ -91,7 +97,13 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         return;
       }
 
-      const graded = gradeIds(roster.attributes, roster.all, answer, ids);
+      const graded = gradeIds(
+        roster.attributes,
+        roster.all,
+        answer,
+        ids,
+        game.kind,
+      );
       if (graded.kind === "invalid") {
         fail(400, "invalid");
         return;
@@ -100,11 +112,13 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         fail(409, "duplicate");
         return;
       }
+      const lost = isLost(game, ids, graded.victory);
       res.json({
         day,
         rows: graded.rows,
         victory: graded.victory,
-        ...(graded.victory && { answer: answer.name }),
+        ...(lost && { lost: true }),
+        ...((graded.victory || lost) && revealOf(game, answer)),
       });
     },
   );
@@ -118,7 +132,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
     const { date, day } = todayOf(ctx, loaded.game);
     const answer = await todaysAnswer(ctx, res, loaded, date, day);
     if (answer) {
-      res.json({ day, answer: answer.name });
+      res.json({ day, ...revealOf(loaded.game, answer) });
     }
   });
 

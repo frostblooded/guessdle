@@ -13,6 +13,12 @@ An Admin's sign-off that lets a Game appear in the front-page gallery. Unapprove
 **Owner**:
 The signed-in user who created a Game. Owners and Admins edit the Game, set its Overrides, submit, unpublish and delete it. Deleting a user deletes their Games.
 
+**Kind**:
+A Game is **Classic** (guessed by comparing Attributes) or **Zoom** (guessed from Zoomed Parts of an image). Chosen when the Game is created; it never changes.
+
+**Zoomed Part**:
+A square of a Zoom Game Entry's image, placed by the Owner. Every Entry has the Game's count of them (1 to 6), shown in order from the closest zoom. A Zoom Game gives one try per part: each wrong Guess shows the next part, and a wrong Guess on the last one loses the day.
+
 **Draft**:
 A Game's first status. Only its Owner and Admins can see it (everyone else gets a 404) until it is submitted. Statuses: draft, pending, approved, rejected.
 
