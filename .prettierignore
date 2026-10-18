@@ -7,10 +7,7 @@ tests/fixtures
 package-lock.json
 howto
 storybook-static
-# Third-party Claude Code hooks and skills, kept as upstream ships them.
+.claude/skills
+# Third-party Claude Code hooks, kept as upstream ships them.
 .claude/caveman
 .claude/ponytail
-.claude/skills/caveman*
-.claude/skills/ultracave
-.claude/skills/megacave
-.claude/skills/ponytail*
