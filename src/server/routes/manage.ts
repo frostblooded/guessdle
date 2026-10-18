@@ -3,30 +3,22 @@ import { canApprove, type LoadedGame } from "../access.ts";
 import express from "express";
 import type { Express, Request, Response } from "express";
 import { slugBase, slugError } from "../../game/slug.ts";
-import { gameLifecycle, type Move } from "../lifecycle.ts";
+import type { Move } from "../lifecycle.ts";
 import { MAX_ATTRIBUTE_NAME, MAX_NAME } from "../../game/limits.ts";
 import { nameIn, parseEntryInput, parseGamePatch } from "../validate.ts";
-import { redrawFuture, releaseEntry, todayIn } from "../answers.ts";
+import { todayIn } from "../answers.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
 import type { AttributeType } from "../../game/game.ts";
-import { deleteEntry, listEntries, saveEntry } from "../entries.ts";
+import { listEntries } from "../entries.ts";
+import { gameEdits } from "../game-edits.ts";
 import {
-  editAttributes,
   listAttributes,
-  saveAttributes,
   type AttributeDraft,
   type AttributeEdit,
 } from "../attributes.ts";
-import {
-  createGame,
-  listOwned,
-  patchKind,
-  skipOf,
-  updateGame,
-} from "../games.ts";
+import { createGame, listOwned } from "../games.ts";
 import { rateLimit, type RateLimit } from "../rate-limit.ts";
 import { isGameKind } from "../../game/blur.ts";
-import { uploadRefs } from "../upload-refs.ts";
 import {
   bodyOf,
   fail,
@@ -49,8 +41,7 @@ export function manageRoutes(
   // An entry carries up to 10 attributes of 20 items
   const bigJson = express.json({ limit: "64kb" });
   const writes = rateLimit(pool, now, limit);
-  const lifecycle = gameLifecycle(pool, ctx.mail);
-  const refs = uploadRefs(pool, uploadsDir);
+  const edits = gameEdits(ctx, uploadsDir);
 
   const needUser = async (
     req: Request,
@@ -182,20 +173,11 @@ export function manageRoutes(
   ) =>
     manageRoute(async ({ game }, _user, req, res) => {
       const edit = build(req);
-      // A Blur game has no attributes
-      if (!edit || game.kind === "blur") {
+      if (!edit) {
         fail(res, "invalid");
         return;
       }
-      const out = await lifecycle.edit(
-        game,
-        "attributes",
-        (tx) =>
-          Array.isArray(edit)
-            ? saveAttributes(tx, game, edit)
-            : editAttributes(tx, game, edit),
-        (r) => r === "ok",
-      );
+      const out = await edits.attributes(game, edit);
       if (out !== "ok" && out !== "noop" && out !== "reorder") {
         fail(res, out);
         return;
@@ -249,46 +231,16 @@ export function manageRoutes(
   const entryRoute = manageRoute(async ({ game }, user, req, res) => {
     const raw = req.params["id"];
     const id = raw === undefined ? undefined : idOf(req);
-    const current =
-      id === undefined
-        ? undefined
-        : (await listEntries(pool, game)).find((e) => e.id === id);
     const input = parseEntryInput(bodyOf(req));
-    // Every picture sent, the photo and each Image value, with what it replaces
-    const images = (await listAttributes(pool, game))
-      .filter(
-        (a) => a.type === "image" && String(a.id) in (input?.values ?? {}),
-      )
-      .map((a) => ({
-        url: input!.values![String(a.id)]![0] ?? "",
-        current: current?.values[String(a.id)]?.[0] ?? "",
-      }));
-    if (input?.photo !== undefined) {
-      images.push({ url: input.photo, current: current?.photo ?? "" });
-    }
-    const allowed = async (): Promise<boolean> => {
-      for (const { url, current } of images) {
-        if (!(await refs.mayAttach(url, current, user.id, game.ownerId))) {
-          return false;
-        }
-      }
-      return true;
-    };
-    if (!input || (id === undefined && !input.name) || !(await allowed())) {
+    if (!input || (id === undefined && !input.name)) {
       fail(res, "invalid");
       return;
     }
-    const out = await lifecycle.edit(
-      game,
-      "entries",
-      (tx) => saveEntry(tx, game, id, input),
-      (r) => typeof r !== "string",
-    );
+    const out = await edits.saveEntry(game, user, id, input);
     if (typeof out === "string") {
       fail(res, out);
       return;
     }
-    await refs.release(out.replaced);
     res.json(await listEntries(pool, game));
   });
   app.get(
@@ -302,27 +254,12 @@ export function manageRoutes(
   app.delete(
     `${entryBase}/:id`,
     writes,
-    manageRoute(async ({ game, roster }, _user, req, res) => {
-      const id = idOf(req);
-      if (
-        !(await lifecycle.edit(
-          game,
-          "entries",
-          (tx) => deleteEntry(tx, game, id),
-          Boolean,
-        ))
-      ) {
-        fail(res, "not_found");
+    manageRoute(async ({ game }, _user, req, res) => {
+      const out = await edits.deleteEntry(game, idOf(req));
+      if (out !== "ok") {
+        fail(res, out);
         return;
       }
-      await releaseEntry(
-        pool,
-        game,
-        roster.entries.map((e) => e.id).filter((e) => e !== id),
-        todayIn(now(), ctx.timeZone),
-        id,
-        ctx.random,
-      );
       res.json(await listEntries(pool, game));
     }),
   );
@@ -330,7 +267,7 @@ export function manageRoutes(
   // Submit and unpublish: one guarded status move
   const flowRoute = (move: Move) =>
     manageRoute(async ({ game }, user, req, res) => {
-      const out = await lifecycle.move(game, move);
+      const out = await edits.move(game, move);
       if (out !== "ok") {
         fail(res, out);
         return;
@@ -347,7 +284,7 @@ export function manageRoutes(
     "/api/games/:slug",
     writes,
     manageRoute(async ({ game }, _user, _req, res) => {
-      await refs.dropGame(game);
+      await edits.drop(game);
       res.json({ ok: true });
     }),
   );
@@ -368,35 +305,10 @@ export function manageRoutes(
         Math.max(0, roster.entries.length - 1),
         game.kind === "blur",
       );
-      if (
-        !patch ||
-        (patch.coverUrl !== undefined &&
-          !(await refs.mayAttach(
-            patch.coverUrl,
-            game.coverUrl,
-            user.id,
-            game.ownerId,
-          )))
-      ) {
+      if (!patch || (await edits.patch(game, user, patch)) !== "ok") {
         fail(res, "invalid");
         return;
       }
-      const replaced = await lifecycle.edit(
-        game,
-        patchKind(game, patch),
-        (tx) => updateGame(tx, game, patch),
-      );
-      const edited = { ...game, ...patch };
-      if (skipOf(edited) !== skipOf(game) && roster.entries.length > 0) {
-        await redrawFuture(
-          pool,
-          edited,
-          roster.entries.map((e) => e.id),
-          todayIn(now(), ctx.timeZone),
-          ctx.random,
-        );
-      }
-      await refs.release([replaced]);
       const fresh = await loadGame(ctx, req, res);
       if (fresh) {
         res.json(detailsOf(fresh, user));
