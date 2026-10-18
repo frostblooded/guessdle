@@ -117,6 +117,27 @@ describe("build output is wired through the pages and the deploy", () => {
     );
   });
 
+  it("nginx serves /party and /party/<CODE> with the app shell", () => {
+    const conf: string = read("deploy/nginx.conf");
+    assert.match(
+      conf,
+      /location ~ \^\/party\(\/\[A-Za-z\]\+\)\?\$ \{[^}]*try_files \/index\.html =404;/,
+    );
+  });
+
+  it("nginx upgrades party sockets to WebSockets", () => {
+    const conf: string = read("deploy/nginx.conf");
+    const block =
+      /location ~ \^\/api\/parties\/\[\^\/\]\+\/socket\$ \{([^}]*)\}/.exec(
+        conf,
+      );
+    assert.ok(block, "socket location");
+    assert.match(block[1]!, /proxy_http_version 1\.1;/);
+    assert.match(block[1]!, /proxy_set_header Upgrade \$http_upgrade;/);
+    assert.match(block[1]!, /proxy_set_header Connection "upgrade";/);
+    assert.match(block[1]!, /proxy_pass http:\/\/api:3000;/);
+  });
+
   it("nginx revalidates by default and caches dist/ forever", () => {
     const conf: string = read("deploy/nginx.conf");
     assert.match(conf, /add_header Cache-Control "no-cache"/);

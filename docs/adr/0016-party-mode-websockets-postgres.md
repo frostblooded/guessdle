@@ -1,0 +1,14 @@
+# 0016: Party mode over WebSockets, stored in Postgres
+
+Status: accepted (issue #90).
+
+A signed-in host opens a party on one game, and friends compete from their phones. Settled with the maintainer one question at a time (2026-10-17).
+
+- **Who**: a signed-in user hosts (any game they can play, their own drafts included, so they can test a game with friends); guests join with a nickname only (1 to 20 characters, unique per party whatever the case). A phone is a player through a random token kept in `localStorage` (`party:<CODE>`); only its hash is stored. A host on another signed-in device is recognised by the session. At most 30 players a party and 5 open parties a host.
+- **Joining**: a 4-letter code (no I or O), the link `/party/<CODE>` and a QR of that link drawn in the browser (`qrcode-generator`). `/party` alone asks for a code.
+- **Rounds**: the host plays too and starts, ends and starts the next round, removes players and ends the party. Each round draws a fresh random active entry, avoiding the party's earlier answers until all are used; the Daily Answer is never touched. A round ends when every player has solved it or given up, or when the host ends it. Late joiners play the live round, timed from its start.
+- **Scoring**: a round is won with the fewest guesses, ties broken by time from the round's start to the solving guess (exact ties share a place). With N players in the round, 1st gets N points, 2nd N - 1, and so on; unsolved gets 0. The standings add the points of finished rounds.
+- **What phones see**: during a round, every player's guess count and whether they solved or gave up, never the guesses; your own board, and the answer once you are done. A finished round shows everyone's guesses and grades.
+- **Transport**: one WebSocket per phone at `/api/parties/<CODE>/socket` (`ws` on the API server, attached to the HTTP server's upgrade event; nginx upgrades that path). After every change the server sends each socket its whole view; the view is small (a party is at most 30 players), so there is no diffing. Actions (guess, give up, host controls) go over the socket; open, read and join are HTTP. The socket checks the Origin like the CSRF guard, caps messages per socket and pings every 30 s to stay open through the tunnel.
+- **Storage**: Postgres (`parties`, `party_players`, `party_rounds`, `party_guesses`, `party_give_ups`), so a restart loses nothing and the results last. Every change runs under a row lock on the party, so "everyone is done" and the caps hold. A party idle for 12 hours ends by itself; an ended party and its results are deleted 30 days later, which frees its code. `/party/<CODE>` of an ended party is its read-only results page.
+- Rejected: polling and Server-Sent Events (slower, or one-way), in-memory parties (lost on restart), timers per round, accounts for guests, per-host party history pages.

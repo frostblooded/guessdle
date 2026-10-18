@@ -1,11 +1,12 @@
 // API container entry: migrate, then serve /api on PORT
 import { join } from "node:path";
 import pg from "pg";
-import { createApp } from "./app.ts";
+import { attachPartySockets, createApp } from "./app.ts";
 import { adminEmailsFromEnv } from "./auth.ts";
 import { mailConfigFromEnv } from "./mailer.ts";
 import { migrate } from "./migrate.ts";
 import { rateLimitFromEnv } from "./rate-limit.ts";
+import { sweepParties } from "./parties.ts";
 import { uploadRefs } from "./upload-refs.ts";
 
 export const MIGRATIONS_DIR = join(import.meta.dirname, "../../db/migrations");
@@ -42,7 +43,13 @@ if (import.meta.main) {
   };
   sweep();
   setInterval(sweep, 24 * 3600_000).unref();
-  createApp({
+  // Ends idle parties and deletes old ones (reads also end an idle party on the spot)
+  setInterval(() => {
+    sweepParties(pool, new Date()).catch((err: unknown) =>
+      console.error("Party sweep failed", err),
+    );
+  }, 3600_000).unref();
+  const app = createApp({
     pool,
     timeZone: process.env["SERVER_TIMEZONE"],
     mail: mailConfigFromEnv(process.env),
@@ -51,5 +58,9 @@ if (import.meta.main) {
     limit: rateLimitFromEnv(process.env),
     backupDir: process.env["BACKUP_DIR"] || undefined,
     uploadsDir,
-  }).listen(Number(process.env["PORT"] ?? 3000), "0.0.0.0");
+  });
+  attachPartySockets(
+    app.listen(Number(process.env["PORT"] ?? 3000), "0.0.0.0"),
+    app,
+  );
 }

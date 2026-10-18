@@ -9,7 +9,7 @@ const PORT = process.env.PORT ?? 8080;
 
 // The app's routes (src/App.tsx) get the shell with 200; deploy/nginx.conf lists the same ones
 const ROUTES =
-  /^\/(|login|verify|admin|how-to-play|create|my-games|g\/[^/]+|g\/[^/]+\/edit)$/;
+  /^\/(|login|verify|admin|how-to-play|create|my-games|party|party\/[A-Za-z]+|g\/[^/]+|g\/[^/]+\/edit)$/;
 // Paths under the repo root the app loads
 const ALLOWED = /^\/(favicon\.ico|(dist|uploads)\/.+)$/;
 
@@ -54,9 +54,11 @@ async function serveStatic(req, res) {
 
 // With DATABASE_URL the Express API (src/server) runs in this process; the e2e suite leaves it unset.
 let handler = serveStatic;
+let sockets = null;
 if (process.env.DATABASE_URL) {
   const { connect } = await import("../src/server/main.ts");
-  const { createApp } = await import("../src/server/app.ts");
+  const { attachPartySockets, createApp } =
+    await import("../src/server/app.ts");
   const { adminEmailsFromEnv } = await import("../src/server/auth.ts");
   const { mailConfigFromEnv } = await import("../src/server/mailer.ts");
   const { rateLimitFromEnv } = await import("../src/server/rate-limit.ts");
@@ -74,5 +76,7 @@ if (process.env.DATABASE_URL) {
   });
   app.use(serveStatic);
   handler = app;
+  sockets = (server) => attachPartySockets(server, app);
 }
-createServer(handler).listen(PORT, "0.0.0.0");
+const server = createServer(handler).listen(PORT, "0.0.0.0");
+sockets?.(server);

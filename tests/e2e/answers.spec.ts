@@ -106,3 +106,56 @@ test("the skip period is limited to N-1 and saved", async ({ page }) => {
   await page.locator("#tab-answers").click();
   await expect(page.locator("#ans-days tr")).toHaveCount(7);
 });
+
+// A new game has no past days, so serve a list with locked history and open future days
+async function serveMixedDays(page: Page): Promise<void> {
+  await page.route("**/api/games/*/answers*", async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+    const day = (date: string, extra: object): object => ({
+      date,
+      entryId: 1,
+      name: "Rex",
+      source: "generated",
+      today: false,
+      locked: false,
+      missing: false,
+      previous: [],
+      ...extra,
+    });
+    await route.fulfill({
+      json: {
+        today: "2026-10-17",
+        from: "2026-10-15",
+        to: "2026-10-19",
+        days: [
+          day("2026-10-15", { locked: true }),
+          day("2026-10-16", { locked: true, source: "override" }),
+          day("2026-10-17", { today: true }),
+          day("2026-10-18", { source: "override" }),
+          day("2026-10-19", {}),
+        ],
+      },
+    });
+  });
+}
+
+for (const width of [1280, 360]) {
+  test(`locked and overridable rows are the same height at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await serveMixedDays(page);
+    await openAnswers(page, ["Rex"]);
+    const rows = page.locator("#ans-days tr");
+    await expect(rows).toHaveCount(5);
+    await expect(rows.first()).toContainText("locked");
+    await expect(rows.last().locator("button")).toBeVisible();
+    const heights = await rows.evaluateAll((trs) =>
+      trs.map((tr) => tr.getBoundingClientRect().height),
+    );
+    expect(new Set(heights).size, heights.join(", ")).toBe(1);
+  });
+}

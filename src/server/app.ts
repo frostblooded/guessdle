@@ -1,3 +1,4 @@
+import type { Server } from "node:http";
 import express from "express";
 import type { ErrorRequestHandler, Express } from "express";
 import type pg from "pg";
@@ -10,6 +11,8 @@ import { authRoutes } from "./routes/auth.ts";
 import type { AppContext } from "./routes/context.ts";
 import { gameRoutes } from "./routes/game.ts";
 import { manageRoutes } from "./routes/manage.ts";
+import { partyRoutes } from "./routes/parties.ts";
+import { createPartyHub, type PartyHub } from "./party-hub.ts";
 import { shellRoutes } from "./routes/shell.ts";
 import { uploadRoutes } from "./routes/uploads.ts";
 
@@ -42,6 +45,17 @@ export interface AppDeps {
   shellDir?: string;
 }
 
+// Each app's party socket hub, for attachPartySockets
+const hubs = new WeakMap<Express, PartyHub>();
+
+// Party sockets need the HTTP server's upgrade event, which Express never sees (ADR 0016).
+// Closing the server closes the hub.
+export function attachPartySockets(server: Server, app: Express): void {
+  const hub = hubs.get(app)!;
+  server.on("upgrade", hub.upgrade);
+  server.on("close", hub.close);
+}
+
 // The API only; callers add static files (dev server) or sit behind nginx (prod)
 export function createApp({
   pool,
@@ -72,6 +86,8 @@ export function createApp({
     mail,
   };
   const app = express();
+  const hub = createPartyHub(ctx);
+  hubs.set(app, hub);
   // One hop: nginx (or nothing in dev) sets X-Forwarded-For to the real client IP
   app.set("trust proxy", 1);
   app.use("/api", rateLimit(pool, now, limit), csrfGuard);
@@ -90,6 +106,7 @@ export function createApp({
   manageRoutes(app, ctx, uploadsDir, writeLimit);
   uploadRoutes(app, ctx, uploadsDir, uploadLimit, uploadQuotaBytes);
   answersRoutes(app, ctx);
+  partyRoutes(app, ctx, hub);
   shellRoutes(app, ctx, shellDir);
 
   app.use("/api", (_req, res) => {

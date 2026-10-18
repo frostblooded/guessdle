@@ -134,12 +134,15 @@ for (const { name, width, height } of VIEWPORTS) {
       await expectNoProblems(page);
     });
 
-    test("with worst-case guess rows", async ({ page }) => {
-      for (const guess of WORST_GUESSES) {
+    test("with worst-case guess rows", async ({ page, request }) => {
+      // The Daily Answer is random per run; guessing it would end the game early
+      const answerName = await findAnswerName(request);
+      const guesses = WORST_GUESSES.filter((guess) => guess !== answerName);
+      for (const guess of guesses) {
         await submitGuess(page, guess);
       }
       await expect(page.locator(".guess-result-row")).toHaveCount(
-        WORST_GUESSES.length,
+        guesses.length,
       );
       await expectNoProblems(page);
     });
@@ -153,8 +156,12 @@ for (const { name, width, height } of VIEWPORTS) {
       await expectNoProblems(page);
     });
 
-    test("reset confirmation dialog", async ({ page }) => {
-      await submitGuess(page, WORST_GUESSES[0]!);
+    test("reset confirmation dialog", async ({ page, request }) => {
+      const answerName = await findAnswerName(request);
+      await submitGuess(
+        page,
+        WORST_GUESSES.find((guess) => guess !== answerName)!,
+      );
       await page.locator("#reset-guesses-button").click();
       const box = await page.locator("#reset-dialog").boundingBox();
       expect(box!.x).toBeGreaterThanOrEqual(0);
