@@ -76,7 +76,7 @@ export function parseGamePatch(
 export function parseEntryInput(
   body: Record<string, unknown>,
 ): EntryInput | undefined {
-  const { name, photo, values, blurOrder } = body;
+  const { name, photo, description, values, blurOrder } = body;
   const out: EntryInput = {};
   if (blurOrder !== undefined) {
     if (!isBlurOrder(blurOrder)) {
@@ -96,6 +96,15 @@ export function parseEntryInput(
       return undefined;
     }
     out.photo = photo;
+  }
+  if (description !== undefined) {
+    if (
+      typeof description !== "string" ||
+      description.trim().length > MAX_DESCRIPTION
+    ) {
+      return undefined;
+    }
+    out.description = description.trim();
   }
   if (values !== undefined) {
     if (typeof values !== "object" || values === null) {

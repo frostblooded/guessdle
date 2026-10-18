@@ -23,7 +23,7 @@ The order a Blur Game Entry's nine image squares clear in, picked by the Owner. 
 A Game's first status. Only its Owner and Admins can see it (everyone else gets a 404) until it is submitted. Statuses: draft, pending, approved, rejected.
 
 **Entry**:
-One item in a Game's Roster: a name and a value per Attribute (a Blur game's Entry: a name, an image and a square order). Pictures are Image Attribute values; an Entry's photo, where one picture stands for it (guess suggestions, the result card, party rounds), is its first non-blank Image value. Replaces "Pet" (the old Petdle word). Entry ids are numeric and never reused. Deleting an Entry is soft: it leaves autocomplete and future draws, but past Guesses and Daily Answers still resolve.
+One item in a Game's Roster: a name, a value per Attribute and an optional **Description** (a Blur game's Entry: a name, an image, a square order and the Description). The Description (up to 500 characters, any Kind) shows with the answer once it is revealed (a win, a give-up, or a Blur Game's last try); a missing one never pauses a Game. Pictures are Image Attribute values; an Entry's photo, where one picture stands for it (guess suggestions, the result card, party rounds), is its first non-blank Image value. Replaces "Pet" (the old Petdle word). Entry ids are numeric and never reused. Deleting an Entry is soft: it leaves autocomplete and future draws, but past Guesses and Daily Answers still resolve.
 
 **Roster**:
 The list of a Game's active Entries. A Game is playable with at least 2.
@@ -49,8 +49,11 @@ A compared property of an Entry, such as colors or owners, defined per Game. Typ
 **Correctness**:
 How well one attribute of a guess matches the Daily Answer: correct, partially correct, or incorrect. Text: correct only on an exact match. List: correct on the same set, partially correct when at least one value is shared, otherwise incorrect. Number: correct on the same value, otherwise incorrect with a **Hint** (↑ the answer is higher, ↓ lower). Empty equals empty. Grades are never stored, so a schema edit regrades live.
 
+**Free Hint**:
+In a Classic Game, after 3 wrong Guesses a player may reveal one thing about the answer, once per day (or Party Round): either the answer's value for one Attribute drawn at random from those no Guess has matched yet (an Attribute the answer has no value for is never drawn), or the answer's Description, when it has one. It is free: stats and Placement Points ignore it. It is part of the Game State and is forgotten on reset. Not the same as a Number column's **Hint** arrow.
+
 **Game State**:
-What is remembered about today: the Guesses made (as Entry ids), whether the player gave up, and the day last played. Anonymous players keep it in the browser (`localStorage`). Signed-in players keep it on the server, so it follows them across devices. Victory is never stored: it is derived from the Guesses and the current Daily Answer. It resets on a new calendar day, or when the player resets at any time once they have made a Guess (the Daily Answer stays the same). On first login, leftover browser guesses are merged into the account only if the account has no progress that day; otherwise the server state wins.
+What is remembered about today: the Guesses made (as Entry ids), whether the player gave up, the Free Hint used, and the day last played. Anonymous players keep it in the browser (`localStorage`). Signed-in players keep it on the server, so it follows them across devices. Victory is never stored: it is derived from the Guesses and the current Daily Answer. It resets on a new calendar day, or when the player resets at any time once they have made a Guess (the Daily Answer stays the same). On first login, leftover browser guesses are merged into the account only if the account has no progress that day; otherwise the server state wins.
 
 **Day of play**:
 One Game on one day, today or a Past Day, together with that day's Daily Answer: what Guesses are graded against, what a finished day reveals, and whose stats a first win counts in.

@@ -67,13 +67,19 @@ describe("changing today's answer restarts the day", () => {
     await db.stop();
   });
 
-  it("wipes today's guesses, give-ups and stats and bumps the revision, only when the answer changes", async () => {
+  it("wipes today's guesses, give-ups, hints and stats and bumps the revision, only when the answer changes", async () => {
     const admin = await login("admin@example.com", true);
     const player = await login("player@example.com");
     const quitter = await login("quitter@example.com");
     await send("POST", `${G}/state/guess`, { id: OTHER }, player);
     await send("POST", `${G}/state/give-up`, {}, quitter);
     await send("POST", `${G}/result`, { ids: [BELA], player: TOKEN });
+    await db.pool.query(
+      `insert into user_hints (user_id, game_id, day, kind)
+       select u.id, g.id, $1, 'description' from users u, games g
+       where u.email = 'player@example.com' and g.slug = $2`,
+      [TODAY, GAME],
+    );
     assert.equal(
       (await send("POST", `${G}/grade`, { ids: [] })).body.revision,
       0,
@@ -83,6 +89,7 @@ describe("changing today's answer restarts the day", () => {
     await send("PUT", `${G}/answers/${TODAY}`, { entryId: BELA }, admin);
     assert.equal(await count("user_guesses"), 1);
     assert.equal(await count("user_give_ups"), 1);
+    assert.equal(await count("user_hints"), 1);
     assert.equal(await count("game_results"), 1);
 
     const put = await send(
@@ -94,6 +101,7 @@ describe("changing today's answer restarts the day", () => {
     assert.equal(put.status, 200);
     assert.equal(await count("user_guesses"), 0);
     assert.equal(await count("user_give_ups"), 0);
+    assert.equal(await count("user_hints"), 0);
     assert.equal(await count("game_results"), 0);
     const graded = await send("POST", `${G}/grade`, { ids: [OTHER] });
     assert.equal(graded.body.revision, 1);

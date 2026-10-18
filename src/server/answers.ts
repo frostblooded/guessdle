@@ -143,7 +143,7 @@ async function storedEntry(
 
 // After `date`'s answer changed from `before`: if players could have played it (it was
 // stored) and it is now another entry, everyone starts that day over. Its guesses,
-// give-ups and results go, and the revision tells browsers to drop their boards.
+// give-ups, Free Hints and results go, and the revision tells browsers to drop their boards.
 async function restartIfChanged(
   client: Client,
   game: GameRow,
@@ -157,7 +157,12 @@ async function restartIfChanged(
     "update daily_answers set revision = revision + 1 where game_id = $1 and day = $2",
     [game.id, date],
   );
-  for (const table of ["user_guesses", "user_give_ups", "game_results"]) {
+  for (const table of [
+    "user_guesses",
+    "user_give_ups",
+    "user_hints",
+    "game_results",
+  ]) {
     await client.query(`delete from ${table} where game_id = $1 and day = $2`, [
       game.id,
       date,

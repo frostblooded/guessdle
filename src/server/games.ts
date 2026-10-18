@@ -118,9 +118,10 @@ export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
     photo: string;
     deleted: boolean;
     blurOrder: number[] | null;
+    description: string;
   }>(
     `select id::int, name, photo_url as photo, deleted_at is not null as deleted,
-       blur_order::int[] as "blurOrder"
+       blur_order::int[] as "blurOrder", description
      from entries where game_id = $1 order by id`,
     [game.id],
   );
@@ -144,16 +145,19 @@ export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
     return (attr.type === "list" ? list : (list[0] ?? "")) as AttributeValue;
   };
   const attrs = attributes.rows.map(({ name, type }) => ({ name, type }));
-  const all = entries.rows.map(({ id, name, photo, blurOrder }): Entry => {
-    const values = attributes.rows.map((attr) => cell(id, attr));
-    return {
-      id,
-      name,
-      photo: game.kind === "blur" ? photo : firstImage(attrs, values),
-      values,
-      ...(game.kind === "blur" && blurOrder && { blurOrder }),
-    };
-  });
+  const all = entries.rows.map(
+    ({ id, name, photo, description, blurOrder }): Entry => {
+      const values = attributes.rows.map((attr) => cell(id, attr));
+      return {
+        id,
+        name,
+        photo: game.kind === "blur" ? photo : firstImage(attrs, values),
+        values,
+        description,
+        ...(game.kind === "blur" && blurOrder && { blurOrder }),
+      };
+    },
+  );
   const active = all.filter((_, i) => !entries.rows[i]!.deleted);
   return {
     attributes: attrs,

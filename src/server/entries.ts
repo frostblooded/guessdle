@@ -9,6 +9,8 @@ export interface EntryRow {
   name: string;
   // Blur games only: the entry's image (a classic entry's pictures are Image values)
   photo: string;
+  // Optional text shown once the entry is revealed as the answer
+  description: string;
   // Attribute id to its items (Text has at most one; empty means no value)
   values: Record<string, string[]>;
   // Blur games only: the order the grid's squares clear in, once picked
@@ -23,10 +25,11 @@ export async function listEntries(
     id: number;
     name: string;
     photo: string;
+    description: string;
     values: Record<string, string[]> | null;
     blurOrder: number[] | null;
   }>(
-    `select e.id::int, e.name, e.photo_url as photo, e.blur_order::int[] as "blurOrder",
+    `select e.id::int, e.name, e.photo_url as photo, e.description, e.blur_order::int[] as "blurOrder",
        (select jsonb_object_agg(attribute_id, items) from (
           select attribute_id, jsonb_agg(value order by position) as items
           from entry_values where entry_id = e.id group by attribute_id) v) as values
@@ -43,6 +46,7 @@ export async function listEntries(
 export interface EntryInput {
   name?: string;
   photo?: string;
+  description?: string;
   values?: Record<string, string[]>;
   blurOrder?: number[];
 }
@@ -71,9 +75,10 @@ export async function saveEntry(
     await tx.query<{
       name: string;
       photo: string;
+      description: string;
       blurOrder: number[] | null;
     }>(
-      `select name, photo_url as photo, blur_order::int[] as "blurOrder" from entries
+      `select name, photo_url as photo, description, blur_order::int[] as "blurOrder" from entries
        where id = $1 and game_id = $2 and deleted_at is null`,
       [id ?? 0, game.id],
     )
@@ -83,6 +88,7 @@ export async function saveEntry(
   }
   const name = input.name ?? current?.name ?? "";
   const photo = input.photo ?? current?.photo ?? "";
+  const description = input.description ?? current?.description ?? "";
   const clash = await tx.query(
     `select 1 from entries where game_id = $1 and deleted_at is null and id <> $2
        and lower(name) = lower($3)`,
@@ -132,14 +138,14 @@ export async function saveEntry(
   if (entryId === undefined) {
     entryId = (
       await tx.query<{ id: number }>(
-        "insert into entries (game_id, name, photo_url) values ($1, $2, $3) returning id::int",
-        [game.id, name, photo],
+        "insert into entries (game_id, name, photo_url, description) values ($1, $2, $3, $4) returning id::int",
+        [game.id, name, photo, description],
       )
     ).rows[0]!.id;
   } else {
     await tx.query(
-      "update entries set name = $2, photo_url = $3 where id = $1",
-      [entryId, name, photo],
+      "update entries set name = $2, photo_url = $3, description = $4 where id = $1",
+      [entryId, name, photo, description],
     );
   }
   if (input.blurOrder !== undefined) {
