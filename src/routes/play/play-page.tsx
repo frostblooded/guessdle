@@ -19,7 +19,14 @@ import {
   type GradedAttribute,
 } from "../../game/game.ts";
 import { openPlay } from "../../game/open-play.ts";
-import type { Play } from "../../game/play.ts";
+import {
+  RATE_LIMITED,
+  refusalText,
+  type GiveUpResult,
+  type Loaded,
+  type Play,
+  type SubmitResult,
+} from "../../game/play.ts";
 import { minEntriesOf, type GameKind } from "../../game/blur.ts";
 import { browserFetch, gameKey, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
@@ -74,8 +81,19 @@ export async function loadGame(
 
 const now = (): Date => new Date();
 
-export const RATE_LIMITED =
-  "Too many requests in a short time. Wait a minute, then try again.";
+// The banner for a loaded board, null while the day is still being played
+const finishedResult = (loaded: Loaded): Result =>
+  loaded.answer !== undefined &&
+  (loaded.victory || loaded.gaveUp || loaded.lost)
+    ? resultOf(
+        loaded.victory ? "victory" : loaded.lost ? "lost" : "give-up",
+        loaded,
+      )
+    : null;
+
+// The notice a guess or give-up leaves: why it was refused, or none
+const noticeOf = (res: SubmitResult | GiveUpResult): string | null =>
+  res.kind === "rate_limited" || res.kind === "error" ? refusalText(res) : null;
 
 // `day`: a past day's Day Number from the address, or null for today
 function Game({ slug, day }: { slug: string; day: number | null }) {
@@ -130,6 +148,20 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
     setBoard((n) => n + 1);
   };
 
+  // Loads the board as stored and shows it: on open, and when a guess or give-up finds the day
+  // already over (finished on another device)
+  async function showBoard(current: Play): Promise<void> {
+    const loaded = await current.load();
+    if ("failure" in loaded) {
+      setBlocked(true);
+      setNotice(loaded.failure);
+      return;
+    }
+    setRows([...loaded.rows].reverse());
+    setResult(finishedResult(loaded));
+    setReady(true);
+  }
+
   // Once the game and who is signed in are known: pick where the game lives, then load it.
   // The ref keeps StrictMode's second effect run from merging twice.
   useEffect(() => {
@@ -158,25 +190,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
         setNotice(RATE_LIMITED);
       }
       play.current = current;
-      const loaded = await current.load();
-      if ("failure" in loaded) {
-        setBlocked(true);
-        setNotice(loaded.failure);
-        return;
-      }
-      setRows([...loaded.rows].reverse());
-      if (
-        loaded.answer !== undefined &&
-        (loaded.victory || loaded.gaveUp || loaded.lost)
-      ) {
-        setResult(
-          resultOf(
-            loaded.victory ? "victory" : loaded.lost ? "lost" : "give-up",
-            loaded,
-          ),
-        );
-      }
-      setReady(true);
+      await showBoard(current);
     })();
   }, [playable, closed, me.isPending, me.data, slug, day, pastDay]);
 
@@ -196,13 +210,11 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
     const res = await play.current.submit(id).finally(() => {
       submitting.current = false;
     });
-    setNotice(
-      res.kind === "rate_limited"
-        ? RATE_LIMITED
-        : res.kind === "error"
-          ? res.message
-          : null,
-    );
+    setNotice(noticeOf(res));
+    if (res.kind === "finished") {
+      await showBoard(play.current);
+      return;
+    }
     // The typed guess stays when the server could not grade it, to retry, and on a skip
     if (res.kind !== "accepted" && res.kind !== "duplicate") {
       return;
@@ -230,15 +242,11 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
     if (!res) {
       return;
     }
-    setNotice(
-      res.kind === "rate_limited"
-        ? RATE_LIMITED
-        : res.kind === "error"
-          ? res.message
-          : null,
-    );
+    setNotice(noticeOf(res));
     if (res.kind === "gaveUp") {
       setResult(resultOf("give-up", res));
+    } else if (res.kind === "finished" && play.current) {
+      await showBoard(play.current);
     }
   }
 
