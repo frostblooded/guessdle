@@ -118,6 +118,15 @@ export function StatsPanel({
   const hasTimes = stats.times.some((n) => n > 0);
   return (
     <div className="flex flex-col gap-5">
+      {stats.firstTryFailed && (
+        <p
+          id="stats-not-counted"
+          className="rounded-lg bg-warn-bg p-3 text-sm text-warn"
+        >
+          Only the first try counts, and your first try{when} ended without a
+          win, so this one is not in the stats.
+        </p>
+      )}
       {you && (
         <dl className="grid grid-cols-2 gap-3 text-center">
           <div className="rounded-lg bg-muted p-3">
@@ -141,9 +150,11 @@ export function StatsPanel({
         </dl>
       )}
       <p id="stats-players" className="text-center text-sm">
-        {others === 0
-          ? `You are the first to solve it${when}.`
-          : `${players(stats.players)} solved it${when}.`}
+        {stats.players === 0
+          ? `Nobody has solved it${when} yet.`
+          : others === 0 && you
+            ? `You are the first to solve it${when}.`
+            : `${players(stats.players)} solved it${when}.`}
       </p>
       <BarChart
         id="stats-guess-chart"

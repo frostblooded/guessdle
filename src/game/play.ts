@@ -113,6 +113,9 @@ export interface PlayDeps {
   // A past day's Day Number: graded against that day's answer, and its
   // `storage` (pastDayStorage) never expires
   day?: number;
+  // The browser's player token (stats.ts): a give-up or used-up tries on the first
+  // attempt of the day keeps a later win out of the victory stats
+  player?: string;
 }
 
 export function createPlay({
@@ -123,6 +126,7 @@ export function createPlay({
   fetch,
   onNewDay = (): void => {},
   day: pastDay,
+  player,
 }: PlayDeps): Play {
   const state: GameState = createGameState(storage, now, pastDay === undefined);
   // Won, gave up or lost; not stored, it is re-derived on load
@@ -131,6 +135,7 @@ export function createPlay({
   const query: string = pastDay === undefined ? "" : `?day=${pastDay}`;
   const gradeUrl: string = `${base}/grade${query}`;
   const giveUpUrl: string = `${base}/give-up${query}`;
+  const who = player === undefined ? {} : { player };
 
   // The parsed body of a successful POST, or why there is none
   async function post<T>(url: string, body: unknown): Promise<T | Refused> {
@@ -162,7 +167,7 @@ export function createPlay({
       const gaveUp: boolean = state.getGaveUp();
       const loaded: Loaded = { rows: [], victory: false };
       if (ids.length > 0) {
-        const res = await post<GradeResponse>(gradeUrl, { ids });
+        const res = await post<GradeResponse>(gradeUrl, { ids, ...who });
         if ("kind" in res) {
           return { failure: refusalText(res) };
         }
@@ -178,7 +183,7 @@ export function createPlay({
         Object.assign(loaded, revealIn(res), res.lost && { lost: true });
       }
       if (gaveUp) {
-        const res = await post<GiveUpResponse>(giveUpUrl, {});
+        const res = await post<GiveUpResponse>(giveUpUrl, who);
         if ("kind" in res) {
           return { failure: refusalText(res) };
         }
@@ -209,6 +214,7 @@ export function createPlay({
       }
       const res = await post<GradeResponse>(gradeUrl, {
         ids: [...used, id],
+        ...who,
       });
       if ("kind" in res) {
         return res;
@@ -237,7 +243,7 @@ export function createPlay({
       if (finished) {
         return { kind: "finished" };
       }
-      const res = await post<GiveUpResponse>(giveUpUrl, {});
+      const res = await post<GiveUpResponse>(giveUpUrl, who);
       if ("kind" in res) {
         return res;
       }

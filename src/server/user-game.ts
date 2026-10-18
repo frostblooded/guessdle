@@ -7,6 +7,7 @@ import {
   type GradedAttribute,
 } from "../game/game.ts";
 import type { GameRow, Roster } from "./games.ts";
+import { recordFailure } from "./results.ts";
 
 export interface GameView {
   day: number;
@@ -153,12 +154,21 @@ export async function changeGame(
 const finished = (current: GameView): boolean =>
   current.victory || current.gaveUp || current.lost === true;
 
+// A failed attempt takes the account's one result for the day, if it is the first attempt
+const failed = (q: Q, { game, userId, date }: GameContext, guesses: number) =>
+  recordFailure(
+    q,
+    { gameId: game.id, date, player: `user:${userId}` },
+    guesses,
+  );
+
 export async function addGuess(
   q: Q,
-  { game, roster, userId, date }: GameContext,
+  ctx: GameContext,
   current: GameView,
   id: unknown,
 ): Promise<Refusal | null> {
+  const { game, roster, userId, date, answer } = ctx;
   if (typeof id !== "number" || !isGuessId(game, roster, id)) {
     return "invalid";
   }
@@ -169,21 +179,30 @@ export async function addGuess(
     "insert into user_guesses (user_id, game_id, day, entry_id) values ($1, $2, $3, $4) on conflict do nothing",
     [userId, game.id, date, id === SKIP ? null : id],
   );
-  return rowCount === 1 ? null : "duplicate";
+  if (rowCount !== 1) {
+    return "duplicate";
+  }
+  const ids = [...current.ids, id];
+  if (isLost(game, ids, id === answer.id)) {
+    await failed(q, ctx, ids.length);
+  }
+  return null;
 }
 
 export async function giveUp(
   q: Q,
-  { game, userId, date }: GameContext,
+  ctx: GameContext,
   current: GameView,
 ): Promise<Refusal | null> {
   if (finished(current)) {
     return "finished";
   }
+  const { game, userId, date } = ctx;
   await q.query(
     "insert into user_give_ups (user_id, game_id, day) values ($1, $2, $3)",
     [userId, game.id, date],
   );
+  await failed(q, ctx, current.ids.length);
   return null;
 }
 
@@ -191,10 +210,11 @@ export async function giveUp(
 // in changeGame makes the "no rows yet" check and the inserts one atomic step.
 export async function mergeLocal(
   q: Q,
-  { game, roster, answer, userId, date, day }: GameContext,
+  ctx: GameContext,
   current: GameView,
   body: Record<string, unknown>,
 ): Promise<Refusal | null> {
+  const { game, roster, answer, userId, date, day } = ctx;
   const { ids, gaveUp } = body;
   if (
     !Array.isArray(ids) ||
@@ -225,11 +245,16 @@ export async function mergeLocal(
       [userId, game.id, date, id === SKIP ? null : id],
     );
   }
-  if (gaveUp === true && end === -1 && !isLost(game, adopted, false)) {
+  const lost = end === -1 && isLost(game, adopted, false);
+  if (gaveUp === true && end === -1 && !lost) {
     await q.query(
       "insert into user_give_ups (user_id, game_id, day) values ($1, $2, $3)",
       [userId, game.id, date],
     );
+  }
+  // The browser's attempt failed: it was the account's first one today
+  if (lost || (gaveUp === true && end === -1)) {
+    await failed(q, ctx, adopted.length);
   }
   return null;
 }

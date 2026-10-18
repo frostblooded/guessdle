@@ -8,6 +8,7 @@ import {
 import { mergeLocalGame } from "./merge.ts";
 import { createPlay, type Play } from "./play.ts";
 import { createServerPlay } from "./server-play.ts";
+import { playerToken } from "./stats.ts";
 import type { Fetch } from "./transport.ts";
 
 export interface OpenPlayDeps {
@@ -49,6 +50,7 @@ export async function openPlay({
         fetch,
         onNewDay,
         ...past,
+        player: playerToken(storage),
       }),
       rateLimited: false,
     };

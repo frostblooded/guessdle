@@ -5,11 +5,11 @@ import type pg from "pg";
 import { gradeIds } from "../../game/game.ts";
 import type { DaysResponse } from "../../game/days.ts";
 import { listDays } from "../days.ts";
-import { isPlayerToken, MAX_SECONDS } from "../../game/stats.ts";
+import { MAX_SECONDS } from "../../game/stats.ts";
 import { listGallery } from "../games.ts";
 import { canApprove, canManage, type LoadedGame } from "../access.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
-import { dayStats, recordResult } from "../results.ts";
+import { dayStats, playerOf, recordFailure, recordResult } from "../results.ts";
 import {
   addGuess,
   changeGame,
@@ -147,6 +147,15 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         return;
       }
       const lost = isLost(game, ids, graded.victory);
+      // Out of tries on the browser's first attempt: no later win that day counts
+      const player = playerOf(null, bodyOf(req));
+      if (lost && player !== null) {
+        await recordFailure(
+          pool,
+          { gameId: game.id, date, player },
+          ids.length,
+        );
+      }
       res.json({
         day,
         rows: graded.rows,
@@ -157,25 +166,35 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
     },
   );
 
-  // Stateless and open to anyone by decision (spec #38): reveals the day's answer
-  app.post(`${base}/give-up`, async (req, res) => {
-    const loaded = await loadGame(ctx, req, res);
-    if (!loaded) {
-      return;
-    }
-    const played = dayOf(ctx, req, loaded.game);
-    if (!played) {
-      failWith(res, "no_such_day");
-      return;
-    }
-    const { date, day } = played;
-    const answer = await todaysAnswer(ctx, res, loaded, date, day);
-    if (answer) {
+  // Stateless and open to anyone by decision (spec #38): reveals the day's answer. With the
+  // browser's player token, a give-up on its first attempt keeps any later win out of the stats.
+  app.post(
+    `${base}/give-up`,
+    express.json({ limit: "10kb" }),
+    async (req, res) => {
+      const loaded = await loadGame(ctx, req, res);
+      if (!loaded) {
+        return;
+      }
+      const played = dayOf(ctx, req, loaded.game);
+      if (!played) {
+        failWith(res, "no_such_day");
+        return;
+      }
+      const { date, day } = played;
+      const answer = await todaysAnswer(ctx, res, loaded, date, day);
+      if (!answer) {
+        return;
+      }
+      const player = playerOf(null, bodyOf(req));
+      if (player !== null) {
+        await recordFailure(pool, { gameId: loaded.game.id, date, player }, 0);
+      }
       res.json({ day, ...revealOf(loaded.game, answer) });
-    }
-  });
+    },
+  );
 
-  // Records the player's first win of the day (today, or a past day named by ?day=N) and
+  // Records the player's first attempt of the day if it is a win (today, or a past day named by ?day=N) and
   // answers with that day's stats. Signed-in
   // players are known by their session and their stored guesses; anonymous ones by
   // the browser's token and the ids they send, which must end with the answer.
@@ -197,11 +216,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       }
       const { date, day, past } = played;
       const body = bodyOf(req);
-      const player = user
-        ? `user:${user.id}`
-        : isPlayerToken(body["player"])
-          ? `anon:${body["player"]}`
-          : null;
+      const player = playerOf(user?.id ?? null, body);
       const ids = body["ids"];
       if (player === null || (!user && !isIdList(game, roster, ids))) {
         res.status(400).json({ error: "invalid", day });
