@@ -117,11 +117,11 @@ describe("build output is wired through the pages and the deploy", () => {
     );
   });
 
-  it("nginx serves /party and /party/<CODE> from the party page", () => {
+  it("nginx serves /party and /party/<CODE> with the app shell", () => {
     const conf: string = read("deploy/nginx.conf");
     assert.match(
       conf,
-      /location ~ \^\/party\(\/\[A-Za-z\]\+\)\?\$ \{[^}]*try_files \/party\.html =404;/,
+      /location ~ \^\/party\(\/\[A-Za-z\]\+\)\?\$ \{[^}]*try_files \/index\.html =404;/,
     );
   });
 

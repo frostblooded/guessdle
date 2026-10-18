@@ -1,4 +1,4 @@
-# 0016: Vite builds the front-end
+# 0017: Vite builds the front-end
 
 Status: accepted. Supersedes the esbuild parts of ADR 0004 and the build script of ADR 0007; first step of the React migration.
 
