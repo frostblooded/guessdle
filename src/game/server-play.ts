@@ -18,14 +18,18 @@ export interface ServerPlayDeps {
   fetch: Fetch;
   // Called when a response shows the server is on a newer day than the page
   onNewDay?: () => void;
+  // A past day's Day Number; today when absent
+  day?: number;
 }
 
 export function createServerPlay({
   slug,
   fetch,
   onNewDay = (): void => {},
+  day: pastDay,
 }: ServerPlayDeps): Play {
   const base = `/api/games/${slug}/state`;
+  const query = pastDay === undefined ? "" : `?day=${pastDay}`;
   let ids: number[] = [];
   let finished: boolean = false;
   let day: number | null = null;
@@ -44,7 +48,7 @@ export function createServerPlay({
 
   const play: Play = {
     async load(): Promise<Loaded | null> {
-      const res = await call(fetch, base);
+      const res = await call(fetch, `${base}${query}`);
       if (res?.status !== 200) {
         return null;
       }
@@ -62,7 +66,7 @@ export function createServerPlay({
       if (finished) {
         return { kind: "finished" };
       }
-      const res = await call(fetch, `${base}/guess`, { id });
+      const res = await call(fetch, `${base}/guess${query}`, { id });
       const failure = failureOf(res);
       if (failure !== null) {
         return { kind: failure };
@@ -93,7 +97,7 @@ export function createServerPlay({
       if (finished) {
         return { kind: "finished" };
       }
-      const res = await call(fetch, `${base}/give-up`, {});
+      const res = await call(fetch, `${base}/give-up${query}`, {});
       const failure = failureOf(res);
       if (failure !== null) {
         return { kind: failure };
@@ -111,7 +115,7 @@ export function createServerPlay({
     },
 
     async reset(): Promise<boolean> {
-      const res = await call(fetch, `${base}/reset`, {});
+      const res = await call(fetch, `${base}/reset${query}`, {});
       if (res?.status !== 200) {
         return false;
       }

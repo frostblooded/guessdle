@@ -117,6 +117,14 @@ describe("build output is wired through the pages and the deploy", () => {
     );
   });
 
+  it("nginx serves the past days list and archive days from the app shell", () => {
+    const conf: string = read("deploy/nginx.conf");
+    assert.match(
+      conf,
+      /location ~ \^\/g\/\[\^\/\]\+\/\(days\|day\/\[0-9\]\+\)\$ \{[^}]*try_files \/index\.html =404;/,
+    );
+  });
+
   it("nginx serves /party and /party/<CODE> with the app shell", () => {
     const conf: string = read("deploy/nginx.conf");
     assert.match(

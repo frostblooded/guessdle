@@ -30,8 +30,12 @@ class FakeServer {
   requests: number[][] = [];
 
   giveUps: number = 0;
+  urls: string[] = [];
 
-  fetch: Fetch = async (url, init) => {
+  fetch: Fetch = async (fullUrl, init) => {
+    this.urls.push(fullUrl);
+    // A past day's query; this fake grades every day the same
+    const url = fullUrl.replace(/\?day=\d+$/, "");
     assert.equal(init?.method, "POST");
     assert.equal(init?.headers["Content-Type"], "application/json");
     if (this.down) {
@@ -427,5 +431,42 @@ describe("day rollover", () => {
     await play.submit(one!.id);
     await play.submit(two!.id);
     assert.equal(started, 0);
+  });
+});
+
+describe("a past day", () => {
+  const TUESDAY = new Date(2025, 9, 7, 12);
+  const openPast = (now: Date) =>
+    createPlay({
+      slug: SLUG,
+      roster: GUESS_DATA,
+      storage,
+      now: () => now,
+      fetch: server.fetch,
+      day: 42,
+    });
+
+  it("grades and gives up against that day", async () => {
+    const play = openPast(MONDAY);
+    await play.submit(one!.id);
+    await play.giveUp();
+    assert.deepEqual(server.urls, [
+      `/api/games/${SLUG}/grade?day=42`,
+      `/api/games/${SLUG}/give-up?day=42`,
+    ]);
+  });
+
+  it("keeps its guesses on later calendar days", async () => {
+    await openPast(MONDAY).submit(one!.id);
+    const loaded = await openPast(TUESDAY).load();
+    assert.equal(loaded?.rows.length, 1);
+  });
+
+  it("remembers a win for the Past days list, and a reset forgets it", async () => {
+    const play = openPast(MONDAY);
+    await play.submit(answer.id);
+    assert.equal(storage.getItem("victory"), "true");
+    play.reset();
+    assert.equal(storage.getItem("victory"), null);
   });
 });
