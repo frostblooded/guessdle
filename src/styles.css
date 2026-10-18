@@ -1307,3 +1307,262 @@ textarea {
     grid-column: 1 / -1;
   }
 }
+
+/* Party mode (ADR 0016) */
+
+.party-form {
+  display: grid;
+  gap: var(--s3);
+  margin-bottom: var(--s4);
+}
+
+.party-form .field-label {
+  margin-bottom: 0;
+}
+
+#code-input {
+  font-size: var(--text-lg);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+.invite {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s4);
+  margin-bottom: var(--s4);
+  padding: var(--s4);
+
+  p {
+    margin: 0 0 var(--s1);
+  }
+}
+
+/* A QR needs dark on light whatever the theme */
+.qr {
+  width: 9rem;
+  padding: var(--s1);
+  border-radius: var(--radius-sm);
+  background-color: white;
+
+  svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+}
+
+.invite-text {
+  flex: 1 1 10rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.party-code {
+  font-size: var(--text-xl);
+  font-weight: 800;
+  letter-spacing: 0.15em;
+}
+
+/* While a round is live the invite shrinks to the code, so the board fits a phone */
+.invite-compact {
+  .qr,
+  #copy-link,
+  .invite-text > .fine-print:last-of-type {
+    display: none;
+  }
+
+  .party-code {
+    font-size: var(--text-lg);
+  }
+}
+
+.host-controls {
+  margin-bottom: var(--s4);
+}
+
+.party-players-card {
+  margin: var(--s4) 0;
+  padding: var(--s4);
+
+  h2 {
+    margin-top: 0;
+    font-size: var(--text-lg);
+  }
+}
+
+.party-players,
+.party-results {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.party-player,
+.party-result-summary {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s1) var(--s3);
+  padding: var(--s2) 0;
+  overflow-wrap: anywhere;
+}
+
+.party-player + .party-player,
+.party-result + .party-result {
+  border-top: 1px solid var(--border);
+}
+
+.party-player-name {
+  font-weight: 600;
+}
+
+.party-player-detail {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.party-player-detail:empty {
+  display: none;
+}
+
+.party-player-detail.solved {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.party-place {
+  grid-row: span 2;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.party-points {
+  grid-column: 3;
+  grid-row: 1;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.party-player .btn {
+  grid-column: 3;
+  justify-self: end;
+}
+
+.podium {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: var(--s2);
+  margin: var(--s4) 0;
+}
+
+.podium-step {
+  display: grid;
+  justify-items: center;
+  flex: 1 1 0;
+  max-width: 11rem;
+  min-width: 0;
+  padding: var(--s3) var(--s2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+  background-color: var(--surface);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.podium-1 {
+  order: 2;
+  min-height: 9rem;
+  border-color: var(--success);
+  background-color: var(--success-bg);
+}
+
+.podium-2 {
+  order: 1;
+  min-height: 7rem;
+}
+
+.podium-3 {
+  order: 3;
+  min-height: 5.5rem;
+}
+
+.podium-place {
+  font-size: var(--text-lg);
+  font-weight: 800;
+}
+
+#history h2,
+#round h2 {
+  font-size: var(--text-lg);
+}
+
+.party-round {
+  margin-bottom: var(--s4);
+  padding: var(--s4);
+}
+
+.party-round-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+
+  h3,
+  p {
+    margin: 0;
+  }
+}
+
+.party-round-photo {
+  width: 3.5rem;
+  height: 3.5rem;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+}
+
+.party-results {
+  margin-top: var(--s3);
+}
+
+.party-result .party-place {
+  grid-row: auto;
+}
+
+.party-guesses {
+  display: grid;
+  gap: 2px;
+  padding: 0 0 var(--s2) calc(2.5rem + var(--s3));
+  font-size: var(--text-sm);
+}
+
+.party-guess {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.party-squares {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.party-square {
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 2px;
+
+  &.correct {
+    background-color: var(--correct);
+  }
+
+  &.partially-correct {
+    background-color: var(--partial);
+  }
+
+  &.incorrect {
+    background-color: var(--incorrect);
+  }
+}

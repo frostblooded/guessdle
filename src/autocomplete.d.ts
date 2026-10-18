@@ -18,7 +18,7 @@ declare module "@tarekraafat/autocomplete.js" {
     selector: string;
     placeHolder?: string;
     data: {
-      src: string[];
+      src: string[] | (() => string[]);
       filter?: (list: AutoCompleteItem[]) => AutoCompleteItem[];
     };
     resultsList?: {
@@ -37,5 +37,5 @@ declare module "@tarekraafat/autocomplete.js" {
   }
 }
 
-// The CSS side-effect import in script.ts (bundled by esbuild)
+// The CSS side-effect imports (bundled by esbuild)
 declare module "*.css";

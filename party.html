@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="robots" content="noindex" />
+    <title>Party - Guessdle</title>
+    <meta
+      name="description"
+      content="Play a Guessdle game against friends, each on their own phone."
+    />
+    <script>
+      // Set before first paint so a stored choice never flashes the other theme (ADR 0006)
+      try {
+        const theme = localStorage.getItem("theme");
+        if (theme === "light" || theme === "dark") {
+          document.documentElement.dataset.theme = theme;
+        }
+      } catch {}
+    </script>
+    <link rel="stylesheet" href="/dist/styles.css" />
+    <link rel="stylesheet" href="/dist/party.css" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <script type="module" src="/dist/party.js"></script>
+  </head>
+  <body>
+    <header id="site-header" class="site-header"></header>
+    <main id="main" class="page page-medium">
+      <div class="page-head">
+        <h1 id="party-title">Party</h1>
+        <p id="party-lede" class="lede">
+          Everyone guesses the same secret entry on their own phone. Fewest
+          guesses wins the round.
+        </p>
+      </div>
+      <p id="party-error" class="alert alert-error" role="alert"></p>
+
+      <form id="code-form" class="card party-form" novalidate hidden>
+        <label class="field-label" for="code-input">Party code</label>
+        <input
+          type="text"
+          id="code-input"
+          maxlength="4"
+          autocomplete="off"
+          autocapitalize="characters"
+          spellcheck="false"
+          placeholder="ABCD"
+        />
+        <button class="btn btn-primary" type="submit">Find party</button>
+      </form>
+
+      <form id="host-form" class="card party-form" novalidate hidden>
+        <label class="field-label" for="host-nickname">Your nickname</label>
+        <input
+          type="text"
+          id="host-nickname"
+          maxlength="20"
+          autocomplete="nickname"
+        />
+        <button id="host-button" class="btn btn-primary" type="submit">
+          Open party
+        </button>
+      </form>
+
+      <form id="join-form" class="card party-form" novalidate hidden>
+        <label class="field-label" for="join-nickname">Your nickname</label>
+        <input
+          type="text"
+          id="join-nickname"
+          maxlength="20"
+          autocomplete="nickname"
+        />
+        <button id="join-button" class="btn btn-primary" type="submit">
+          Join party
+        </button>
+      </form>
+
+      <section id="party" aria-label="Party" hidden>
+        <p id="connection" class="alert alert-warn" role="status" hidden>
+          Connection lost. Reconnecting…
+        </p>
+        <div id="invite" class="card invite">
+          <div id="qr" class="qr" aria-hidden="true"></div>
+          <div class="invite-text">
+            <p class="fine-print">Party code</p>
+            <p id="party-code" class="party-code"></p>
+            <p class="fine-print">
+              Scan the code, or open <a id="party-link" href="#"></a>
+            </p>
+            <button
+              id="copy-link"
+              class="btn btn-secondary btn-sm"
+              type="button"
+            >
+              Copy link
+            </button>
+          </div>
+        </div>
+
+        <div id="host-controls" class="button-row host-controls" hidden>
+          <button id="start-round" class="btn btn-primary" type="button">
+            Start round 1
+          </button>
+          <button id="end-round" class="btn btn-secondary" type="button" hidden>
+            End round
+          </button>
+          <button id="end-party" class="btn btn-quiet" type="button">
+            End party
+          </button>
+        </div>
+
+        <div id="podium" class="podium" hidden></div>
+
+        <section id="round" aria-labelledby="round-title" hidden>
+          <h2 id="round-title">Round 1</h2>
+          <p id="notice" class="alert alert-warn" role="status" hidden></p>
+          <div id="result-banner" aria-live="polite"></div>
+          <div id="guess-card" class="card play-card">
+            <div id="new-guess-row" class="guess-row">
+              <label class="sr-only" for="new-guess-input">Name</label>
+              <input
+                type="text"
+                id="new-guess-input"
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck="false"
+              />
+              <button
+                id="submit-new-guess-button"
+                class="btn btn-primary"
+                type="button"
+              >
+                Guess
+              </button>
+            </div>
+            <div class="game-actions">
+              <button
+                id="give-up-button"
+                class="btn btn-quiet btn-sm"
+                type="button"
+              >
+                Give up
+              </button>
+            </div>
+          </div>
+          <div id="board" class="results" hidden>
+            <div
+              id="guess-results-titles-row"
+              class="row"
+              aria-hidden="true"
+            ></div>
+            <div id="guess-results-container"></div>
+          </div>
+        </section>
+
+        <p id="waiting" class="empty-state" hidden></p>
+
+        <section
+          class="card party-players-card"
+          aria-labelledby="players-title"
+        >
+          <h2 id="players-title">Players</h2>
+          <ol id="players" class="party-players"></ol>
+        </section>
+
+        <section id="history" aria-labelledby="history-title" hidden>
+          <h2 id="history-title">Finished rounds</h2>
+          <div id="history-list"></div>
+        </section>
+      </section>
+
+      <dialog id="end-dialog" class="dialog" aria-labelledby="end-title">
+        <form method="dialog">
+          <h2 id="end-title">End the party?</h2>
+          <p>
+            Nobody can join or play after this. The final standings stay at this
+            link.
+          </p>
+          <div class="dialog-actions">
+            <button class="btn btn-secondary" value="cancel" autofocus>
+              Cancel
+            </button>
+            <button class="btn btn-primary" value="confirm">End party</button>
+          </div>
+        </form>
+      </dialog>
+    </main>
+    <footer id="site-footer" class="site-footer"></footer>
+  </body>
+</html>

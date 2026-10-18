@@ -10,6 +10,7 @@ export const ENTRY_POINTS = {
   create: "src/pages/create.ts",
   "my-games": "src/pages/my-games.ts",
   edit: "src/pages/edit.ts",
+  party: "src/pages/party.ts",
   styles: "src/styles.css",
 };
 

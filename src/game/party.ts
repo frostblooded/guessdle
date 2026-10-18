@@ -9,7 +9,7 @@ import {
   type GameAttribute,
   type GradedAttribute,
 } from "./game.ts";
-import { MAX_NICKNAME } from "./limits.ts";
+import { MAX_NICKNAME, MIN_ENTRIES } from "./limits.ts";
 
 // No I or O, so a code read aloud or off a screen is never mistaken for 1 or 0
 export const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -370,3 +370,34 @@ export function parseClientMessage(raw: string): ClientMessage | null {
         : null;
   }
 }
+
+// "1st", "2nd", "3rd", "4th", ... "11th", "21st"
+export function ordinal(n: number): string {
+  const teen = n % 100 >= 11 && n % 100 <= 13;
+  const suffix = teen ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
+  return `${n}${suffix}`;
+}
+
+// How a player is doing in the live round, as the scoreboard says it
+export function progressLabel(p: Omit<Progress, "timeMs">): string {
+  const count = `${p.guesses} ${p.guesses === 1 ? "guess" : "guesses"}`;
+  return p.solved ? `${count}, solved` : p.gaveUp ? `${count}, gave up` : count;
+}
+
+export const REFUSAL_TEXT: Record<PartyRefusal, string> = {
+  invalid: "That is not one of this game's entries.",
+  not_host: "Only the host can do that.",
+  not_player: "Join the party to play.",
+  no_round: "There is no round going on right now.",
+  round_live: "A round is already going on.",
+  finished: "You are done with this round. Wait for the next one.",
+  duplicate: "You already guessed that one.",
+  party_ended: "This party has ended.",
+  not_enough_entries:
+    `This game needs at least ${MIN_ENTRIES} entries before a round can start.`,
+  server_error:
+    "The server hit an unexpected problem. Try again in a moment.",
+};
+
+// The socket close code for a player the host removed
+export const CLOSE_REMOVED = 4001;
