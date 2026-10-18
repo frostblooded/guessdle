@@ -24,6 +24,10 @@ export const FAILURES = {
   forbidden: failure(403, "You cannot change this game."),
   quota_exceeded: failure(403, "You have used all your upload space."),
   not_found: failure(404, "This game no longer exists."),
+  no_such_day: failure(
+    404,
+    "This game has no puzzle for that day. Pick a day from the Past days list.",
+  ),
   too_few_entries: failure(
     409,
     `Add at least ${MIN_ENTRIES} entries before submitting.`,

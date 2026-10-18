@@ -51,12 +51,17 @@ function fakeServer(game?: Response) {
         json(200, {
           name: "Pets",
           canEdit: false,
+          today: 5,
+          startDate: "2026-10-13",
           attributes: [{ name: "Color", type: "text" }],
           entries: ENTRIES.map(({ id, name, photo }) => ({ id, name, photo })),
         })
       );
     }
-    if (url === "/api/games/pets/grade") {
+    if (
+      url === "/api/games/pets/grade" ||
+      url === "/api/games/pets/grade?day=3"
+    ) {
       const { ids } = JSON.parse(String(init?.body)) as { ids: number[] };
       return json(200, {
         day: 1,
@@ -65,22 +70,26 @@ function fakeServer(game?: Response) {
         ...(ids.includes(ANSWER) && { answer: "Dido" }),
       });
     }
-    if (url === "/api/games/pets/give-up") {
+    if (
+      url === "/api/games/pets/give-up" ||
+      url === "/api/games/pets/give-up?day=3"
+    ) {
       return json(200, { day: 1, answer: "Dido" });
     }
     return json(404, {});
   });
 }
 
-function renderPlay(): void {
+function renderPlay(path: string = "/g/pets"): void {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={["/g/pets"]}>
+      <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="/g/:slug" element={<PlayPage />} />
+          <Route path="/g/:slug/day/:day" element={<PlayPage />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -213,5 +222,58 @@ describe("PlayPage", () => {
         name,
       );
     }
+  });
+});
+
+describe("PlayPage on a past day", () => {
+  it("names the day, grades against it and keeps its guesses apart from today's", async () => {
+    const server = fakeServer();
+    vi.stubGlobal("fetch", server);
+    renderPlay("/g/pets/day/3");
+    await screen.findByText(/No guesses yet/);
+    assert.match(
+      document.querySelector("#game-lede")!.textContent ?? "",
+      /^Day 3, Fri 16 Oct 2026\./,
+    );
+    assert.ok(screen.getByRole("link", { name: "Play today's game" }));
+    assert.ok(screen.getByRole("link", { name: "Past days" }));
+    await guess("Bela");
+    assert.ok(
+      server.mock.calls.some(([url]) => url === "/api/games/pets/grade?day=3"),
+    );
+    assert.deepEqual(
+      JSON.parse(localStorage.getItem("game:pets:day:3:usedGuesses")!),
+      [1],
+    );
+    assert.equal(localStorage.getItem("game:pets:usedGuesses"), null);
+    assert.equal(screen.queryByRole("button", { name: "Reset" }), null);
+  });
+
+  it("a finished past day is a record: no reset", async () => {
+    vi.stubGlobal("fetch", fakeServer());
+    renderPlay("/g/pets/day/3");
+    await screen.findByText(/No guesses yet/);
+    await guess("Dido");
+    await screen.findByText("You did it!");
+    assert.equal(
+      screen.queryByRole("button", { name: "Reset today's game" }),
+      null,
+    );
+  });
+
+  it("a day after today does not exist yet", async () => {
+    vi.stubGlobal("fetch", fakeServer());
+    renderPlay("/g/pets/day/9");
+    await screen.findByText(/no puzzle for that day/);
+    assert.equal(document.querySelector("#board"), null);
+    assert.ok(screen.getByRole("link", { name: "Past days" }));
+  });
+
+  it("today's Day Number opens the game's own page", async () => {
+    vi.stubGlobal("fetch", fakeServer());
+    renderPlay("/g/pets/day/5");
+    await screen.findByText(/No guesses yet/);
+    assert.equal(document.querySelector("#game-lede"), null);
+    assert.ok(screen.getByRole("button", { name: "Reset" }));
   });
 });

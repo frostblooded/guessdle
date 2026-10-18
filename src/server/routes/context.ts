@@ -4,7 +4,7 @@ import type pg from "pg";
 import { FAILURES, type FailureCode } from "../../game/failures.ts";
 import type { Entry } from "../../game/game.ts";
 import { MIN_ENTRIES } from "../../game/limits.ts";
-import { dayNumber, ensureAnswer, todayIn } from "../answers.ts";
+import { dateOfDay, dayNumber, ensureAnswer, todayIn } from "../answers.ts";
 import {
   resolveGame,
   type LoadedGame,
@@ -83,7 +83,33 @@ export function todayOf(
   return { date, day: dayNumber(date, game.startDate) };
 }
 
-// Today's answer, or a 500 sent and undefined
+// The day a request plays: today, or a past day named by `?day=N` (0 up to today).
+// `past` marks an archive day, whose wins stay out of the daily stats.
+export function dayOf(
+  ctx: AppContext,
+  req: Request,
+  game: GameRow,
+): { date: string; day: number; past: boolean } | null {
+  const today = todayOf(ctx, game);
+  const raw = queryOf(req)["day"];
+  if (raw === undefined) {
+    return { ...today, past: false };
+  }
+  if (typeof raw !== "string" || !/^\d{1,6}$/.test(raw)) {
+    return null;
+  }
+  const day = Number(raw);
+  if (day > today.day) {
+    return null;
+  }
+  return {
+    date: dateOfDay(day, game.startDate),
+    day,
+    past: day !== today.day,
+  };
+}
+
+// The answer for `date` (today or a past day), or the failure sent and undefined
 export async function todaysAnswer(
   { pool, random }: AppContext,
   res: Response,

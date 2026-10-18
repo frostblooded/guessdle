@@ -2,6 +2,7 @@
 import type pg from "pg";
 import type { GameRow } from "./games.ts";
 import { skipOf } from "./games.ts";
+import { dateOfDay } from "../game/date.ts";
 
 const LOCK_KEY = 5_150_002; // arbitrary; serialises answer generation per game across API replicas
 const DAY_MS = 86_400_000;
@@ -13,9 +14,7 @@ export function dayNumber(date: string, start: string): number {
   return Math.round((utcMs(date) - utcMs(start)) / DAY_MS);
 }
 
-export function dateOfDay(day: number, start: string): string {
-  return new Date(utcMs(start) + day * DAY_MS).toISOString().slice(0, 10);
-}
+export { dateOfDay };
 
 // The calendar date ("YYYY-MM-DD") it is right now in `timeZone`
 export function todayIn(now: Date, timeZone: string): string {

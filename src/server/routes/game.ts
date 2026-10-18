@@ -3,6 +3,8 @@ import express from "express";
 import type { Express, Request, Response } from "express";
 import type pg from "pg";
 import { gradeIds } from "../../game/game.ts";
+import type { DaysResponse } from "../../game/days.ts";
+import { listDays } from "../days.ts";
 import { listGallery } from "../games.ts";
 import { canApprove, canManage, type LoadedGame } from "../access.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
@@ -20,6 +22,8 @@ import {
 } from "../user-game.ts";
 import {
   bodyOf,
+  dayOf,
+  fail as failWith,
   isIdList,
   loadGame,
   todayOf,
@@ -54,6 +58,9 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       name: game.name,
       description: game.description,
       cover: game.coverUrl,
+      // Today's Day Number: past days are 0 up to it
+      today: todayOf(ctx, game).day,
+      startDate: game.startDate,
       attributes: roster.attributes,
       // Some entries miss values: nobody can play until they are filled in
       paused: roster.incomplete > 0,
@@ -63,6 +70,27 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         photo,
       })),
     });
+  });
+
+  // The Past days list, with the signed-in player's progress on each day
+  app.get(`${base}/days`, async (req, res) => {
+    res.set("Cache-Control", "no-store");
+    const loaded = await loadGame(ctx, req, res);
+    if (!loaded) {
+      return;
+    }
+    const { date, day } = todayOf(ctx, loaded.game);
+    // Drawing today's answer fills every earlier day too
+    if (!(await todaysAnswer(ctx, res, loaded, date, day))) {
+      return;
+    }
+    const days = await listDays(
+      pool,
+      loaded.game,
+      day,
+      loaded.user?.id ?? null,
+    );
+    res.json({ today: day, days } satisfies DaysResponse);
   });
 
   // Stateless grading for anonymous players. The answer is revealed only to a
@@ -76,7 +104,12 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         return;
       }
       const { game, roster } = loaded;
-      const { date, day } = todayOf(ctx, game);
+      const played = dayOf(ctx, req, game);
+      if (!played) {
+        failWith(res, "no_such_day");
+        return;
+      }
+      const { date, day } = played;
       const fail = (status: number, error: string): void => {
         res.status(status).json({ error, day });
       };
@@ -109,20 +142,26 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
     },
   );
 
-  // Stateless and open to anyone by decision (spec #38): reveals today's answer
+  // Stateless and open to anyone by decision (spec #38): reveals the day's answer
   app.post(`${base}/give-up`, async (req, res) => {
     const loaded = await loadGame(ctx, req, res);
     if (!loaded) {
       return;
     }
-    const { date, day } = todayOf(ctx, loaded.game);
+    const played = dayOf(ctx, req, loaded.game);
+    if (!played) {
+      failWith(res, "no_such_day");
+      return;
+    }
+    const { date, day } = played;
     const answer = await todaysAnswer(ctx, res, loaded, date, day);
     if (answer) {
       res.json({ day, answer: answer.name });
     }
   });
 
-  // Signed-in Game State. Every route needs a session and today's answer.
+  // Signed-in Game State. Every route needs a session and the day's answer
+  // (today, or a past day named by ?day=N).
   interface GameRouteCtx extends GameContext {
     user: SessionUser;
     body: Record<string, unknown>;
@@ -141,7 +180,12 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       if (!loaded) {
         return;
       }
-      const { date, day } = todayOf(ctx, loaded.game);
+      const played = dayOf(ctx, req, loaded.game);
+      if (!played) {
+        failWith(res, "no_such_day");
+        return;
+      }
+      const { date, day, past } = played;
       const answer = await todaysAnswer(ctx, res, loaded, date, day);
       if (!answer) {
         return;
@@ -153,6 +197,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         userId: user.id,
         date,
         day,
+        past,
         user,
         body: bodyOf(req),
         res,
@@ -200,8 +245,9 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
   app.post(
     `${base}/state/merge`,
     json,
-    changeRoute(({ body, ...game }, current, q) =>
-      mergeLocal(q, game, current, body),
+    // Only today's browser guesses are adopted; past days stay where they were played
+    changeRoute(async ({ body, ...game }, current, q) =>
+      game.past ? "stale_day" : mergeLocal(q, game, current, body),
     ),
   );
   app.post(

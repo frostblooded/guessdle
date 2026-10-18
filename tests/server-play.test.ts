@@ -32,9 +32,11 @@ class FakeServer {
     };
   }
 
-  fetch: Fetch = async (url, init) => {
+  fetch: Fetch = async (fullUrl, init) => {
     const method = init?.method ?? "GET";
-    this.calls.push(`${method} ${url}`);
+    this.calls.push(`${method} ${fullUrl}`);
+    // A past day's query; this fake keeps one day
+    const url = fullUrl.replace(/\?day=\d+$/, "");
     if (this.down) {
       throw new Error("offline");
     }
@@ -255,5 +257,26 @@ describe("reset", () => {
     assert.equal(await play.reset(), false);
     server.down = false;
     assert.deepEqual(await play.submit(one!.id), { kind: "finished" });
+  });
+});
+
+describe("a past day", () => {
+  it("names the day on every request", async () => {
+    const play = createServerPlay({
+      slug: SLUG,
+      fetch: server.fetch,
+      day: 42,
+    });
+    await play.load();
+    await play.submit(one!.id);
+    await play.giveUp();
+    await play.reset();
+    const base = `/api/games/${SLUG}/state`;
+    assert.deepEqual(server.calls, [
+      `GET ${base}?day=42`,
+      `POST ${base}/guess?day=42`,
+      `POST ${base}/give-up?day=42`,
+      `POST ${base}/reset?day=42`,
+    ]);
   });
 });

@@ -643,4 +643,118 @@ describe("signed-in Game State on the server", () => {
       assert.equal(res.status, 415);
     });
   });
+
+  describe("past days", () => {
+    // 2026-10-15, Day Number 426: the backfill stores "ati"
+    const PAST = 426;
+    const PAST_ANSWER = pid("ati");
+    const P = `?day=${PAST}`;
+
+    it("plays a past day against its own answer, apart from today", async () => {
+      const cookie = await login("a@x.test");
+      const empty = await get(`${G}/state${P}`, cookie);
+      assert.equal(empty.status, 200);
+      assert.equal(empty.body.day, PAST);
+      assert.deepEqual(empty.body.ids, []);
+
+      await post(`${G}/state/guess${P}`, cookie, { id: ANSWER });
+      const won = await post(`${G}/state/guess${P}`, cookie, {
+        id: PAST_ANSWER,
+      });
+      assert.equal(won.status, 200);
+      assert.equal(won.body.victory, true);
+      assert.equal(won.body.answer, "Ati");
+      assert.deepEqual(won.body.ids, [ANSWER, PAST_ANSWER]);
+
+      const today = await get(`${G}/state`, cookie);
+      assert.equal(today.body.day, 427);
+      assert.deepEqual(today.body.ids, []);
+    });
+
+    it("today's Day Number is today's game", async () => {
+      const cookie = await login("a@x.test");
+      await post(`${G}/state/guess?day=427`, cookie, { id: OTHERS[0] });
+      assert.deepEqual((await get(`${G}/state`, cookie)).body.ids, [OTHERS[0]]);
+    });
+
+    it("refuses days the game does not have", async () => {
+      const cookie = await login("a@x.test");
+      for (const day of ["428", "-1", "abc", "1.5", "", "9999999"]) {
+        const { status, body } = await get(`${G}/state?day=${day}`, cookie);
+        assert.equal(status, 404, day);
+        assert.equal(body.error, "no_such_day", day);
+        const graded = await fetch(`${url}${G}/grade?day=${day}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: [] }),
+        });
+        assert.equal(graded.status, 404, day);
+      }
+    });
+
+    it("never merges browser guesses into a past day", async () => {
+      const cookie = await login("a@x.test");
+      const { status, body } = await post(`${G}/state/merge${P}`, cookie, {
+        day: PAST,
+        ids: [OTHERS[0]],
+      });
+      assert.equal(status, 409);
+      assert.equal(body.error, "stale_day");
+      assert.deepEqual((await get(`${G}/state${P}`, cookie)).body.ids, []);
+    });
+
+    it("grades and gives up anonymously against the past day", async () => {
+      const grade = await fetch(`${url}${G}/grade${P}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [ANSWER, PAST_ANSWER] }),
+      });
+      const graded = (await grade.json()) as Body;
+      assert.equal(graded.day, PAST);
+      assert.equal(graded.victory, true);
+      assert.equal(graded.answer, "Ati");
+      const giveUp = await fetch(`${url}${G}/give-up${P}`, {
+        method: "POST",
+      });
+      assert.deepEqual(await giveUp.json(), { day: PAST, answer: "Ati" });
+    });
+
+    it("the game says which day is today and when day 0 was", async () => {
+      const res = await fetch(`${url}${G}`);
+      const body = (await res.json()) as Body;
+      assert.equal(body.today, 427);
+      assert.equal(body.startDate, "2025-08-15");
+    });
+
+    it("lists every day newest first, with the signed-in player's progress", async () => {
+      const anon = (await (await fetch(`${url}${G}/days`)).json()) as Body;
+      assert.equal(anon.today, 427);
+      assert.equal(anon.days.length, 428);
+      assert.deepEqual(anon.days[0], {
+        day: 427,
+        date: "2026-10-16",
+        status: "unplayed",
+      });
+      assert.deepEqual(anon.days.at(-1), {
+        day: 0,
+        date: "2025-08-15",
+        status: "unplayed",
+      });
+
+      const cookie = await login("a@x.test");
+      await post(`${G}/state/guess`, cookie, { id: OTHERS[0] });
+      await post(`${G}/state/guess${P}`, cookie, { id: PAST_ANSWER });
+      await post(`${G}/state/give-up?day=425`, cookie);
+      await post(`${G}/state/guess?day=424`, cookie, { id: OTHERS[0] });
+      await post(`${G}/state/give-up?day=424`, cookie);
+      const { body } = await get(`${G}/days`, cookie);
+      assert.deepEqual(
+        body.days.slice(0, 5).map((d: Body) => d.status),
+        ["playing", "won", "gave-up", "gave-up", "unplayed"],
+      );
+      // Another player's progress never shows
+      const other = await get(`${G}/days`, await login("b@x.test"));
+      assert.equal(other.body.days[1].status, "unplayed");
+    });
+  });
 });

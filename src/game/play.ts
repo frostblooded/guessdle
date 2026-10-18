@@ -76,6 +76,9 @@ export interface PlayDeps {
   // Called when a response shows the server is on a newer day and the stored
   // game was forgotten, so the page can clear what it shows
   onNewDay?: () => void;
+  // A past day's Day Number: graded against that day's answer, and its
+  // `storage` (pastDayStorage) never expires
+  day?: number;
 }
 
 export function createPlay({
@@ -85,11 +88,15 @@ export function createPlay({
   now,
   fetch,
   onNewDay = (): void => {},
+  day: pastDay,
 }: PlayDeps): Play {
-  const state: GameState = createGameState(storage, now);
+  const state: GameState = createGameState(storage, now, pastDay === undefined);
   // Won or gave up; not stored, it is re-derived on load
   let finished: boolean = false;
   const base: string = `/api/games/${slug}`;
+  const query: string = pastDay === undefined ? "" : `?day=${pastDay}`;
+  const gradeUrl: string = `${base}/grade${query}`;
+  const giveUpUrl: string = `${base}/give-up${query}`;
 
   // The parsed body of a successful POST, or why there is none
   async function post<T>(url: string, body: unknown): Promise<T | Failure> {
@@ -116,7 +123,7 @@ export function createPlay({
       const gaveUp: boolean = state.getGaveUp();
       const loaded: Loaded = { rows: [], victory: false };
       if (ids.length > 0) {
-        const res = await post<GradeResponse>(`${base}/grade`, { ids });
+        const res = await post<GradeResponse>(gradeUrl, { ids });
         if (typeof res === "string") {
           return null;
         }
@@ -126,12 +133,15 @@ export function createPlay({
         state.setDay(res.day);
         loaded.rows = res.rows;
         loaded.victory = res.victory;
+        if (res.victory) {
+          state.setWon();
+        }
         if (res.answer !== undefined) {
           loaded.answer = res.answer;
         }
       }
       if (gaveUp) {
-        const res = await post<GiveUpResponse>(`${base}/give-up`, {});
+        const res = await post<GiveUpResponse>(giveUpUrl, {});
         if (typeof res === "string") {
           return null;
         }
@@ -157,7 +167,7 @@ export function createPlay({
       if (used.includes(id)) {
         return { kind: "duplicate" };
       }
-      const res = await post<GradeResponse>(`${base}/grade`, {
+      const res = await post<GradeResponse>(gradeUrl, {
         ids: [...used, id],
       });
       if (typeof res === "string") {
@@ -171,6 +181,9 @@ export function createPlay({
       const row: GradedAttribute[] = res.rows[res.rows.length - 1]!;
       const isAnswer: boolean = isAnswerRow(row);
       finished = isAnswer;
+      if (isAnswer) {
+        state.setWon();
+      }
       return {
         kind: "accepted",
         row,
@@ -183,7 +196,7 @@ export function createPlay({
       if (finished) {
         return { kind: "finished" };
       }
-      const res = await post<GiveUpResponse>(`${base}/give-up`, {});
+      const res = await post<GiveUpResponse>(giveUpUrl, {});
       if (typeof res === "string") {
         return { kind: res };
       }
