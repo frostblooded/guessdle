@@ -319,12 +319,15 @@ export interface AttributeDraft {
 
 // Replaces a game's attributes with `drafts`, in that order: missing ids are removed, a changed
 // type erases that attribute's values, new ones are added. All or nothing, in the caller's game
-// transaction (lifecycle.edit). "noop" when nothing changed.
+// transaction (lifecycle.edit). "noop" when nothing changed, "reorder" when only the order did
+// (which keeps the game's status).
 export async function saveAttributes(
   client: Q,
   game: GameRow,
   drafts: readonly AttributeDraft[],
-): Promise<"ok" | "noop" | "invalid" | "attribute_exists" | "not_found"> {
+): Promise<
+  "ok" | "noop" | "reorder" | "invalid" | "attribute_exists" | "not_found"
+> {
   const attrs = await listAttributes(client, game);
   const ids = drafts.flatMap((d) => (d.id === undefined ? [] : [d.id]));
   const names = drafts.map((d) => d.name.toLowerCase());
@@ -348,6 +351,13 @@ export async function saveAttributes(
   if (unchanged) {
     return "noop";
   }
+  const reordered =
+    drafts.length === attrs.length &&
+    drafts.every((d) =>
+      attrs.some(
+        (a) => a.id === d.id && a.name === d.name && a.type === d.type,
+      ),
+    );
   const removed = attrs.filter((a) => !ids.includes(a.id)).map((a) => a.id);
   const retyped = attrs
     .filter((a) => drafts.some((d) => d.id === a.id && d.type !== a.type))
@@ -367,7 +377,7 @@ export async function saveAttributes(
       [d.id ?? game.id, d.name, d.type, position],
     );
   }
-  return "ok";
+  return reordered ? "reorder" : "ok";
 }
 
 export type AttributeEdit =
