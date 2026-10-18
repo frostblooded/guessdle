@@ -37,30 +37,30 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-sans:
-    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  /* Typewriter face from the original hand-made site, self-hosted (@fontsource/courier-prime) */
+  --font-sans: "Courier Prime", "Courier New", ui-monospace, monospace;
 }
 
 :root {
   color-scheme: light dark;
-  --radius: 0.75rem;
+  --radius: 0.625rem;
 
-  /* Surfaces and text (zinc) */
-  --background: light-dark(#fafafa, #09090b);
-  --foreground: light-dark(#18181b, #fafafa);
-  --card: light-dark(#ffffff, #18181b);
-  --secondary: light-dark(#f4f4f5, #27272a);
-  --muted: light-dark(#f4f4f5, #27272a);
-  --muted-foreground: light-dark(#52525b, #a1a1aa);
-  --accent: light-dark(#eef2ff, #1e1b4b);
-  --accent-foreground: light-dark(#3730a3, #e0e7ff);
-  --border: light-dark(#e4e4e7, #27272a);
-  --input: light-dark(#d4d4d8, #3f3f46);
+  /* Surfaces and text: white with slate ink, a slate-green night in dark */
+  --background: light-dark(#ffffff, #141c1b);
+  --foreground: light-dark(#1b2b2b, #e6eeec);
+  --card: light-dark(#ffffff, #1b2624);
+  --secondary: light-dark(#eef2f2, #24312f);
+  --muted: light-dark(#eef2f2, #24312f);
+  --muted-foreground: light-dark(#4a5c5c, #a3b5b1);
+  --accent: light-dark(#e3ebea, #24403a);
+  --accent-foreground: light-dark(#1b3a3a, #d5f0e9);
+  --border: light-dark(#d3dcdc, #2c3a37);
+  --input: light-dark(#7f9494, #4b5f5b);
 
-  /* Brand (indigo) */
-  --primary: light-dark(#4f46e5, #818cf8);
-  --primary-foreground: light-dark(#ffffff, #1e1b4b);
-  --ring: light-dark(#6366f1, #a5b4fc);
+  /* Brand (dark slate gray, the old title tiles) */
+  --primary: light-dark(#2f4f4f, #9fd3c7);
+  --primary-foreground: light-dark(#ffffff, #10201c);
+  --ring: light-dark(#2f4f4f, #9fd3c7);
   --destructive: light-dark(#dc2626, #f87171);
   --destructive-foreground: light-dark(#ffffff, #450a0a);
 
@@ -73,10 +73,10 @@
   --success-bg: light-dark(#f0fdf4, #0f2a1a);
 
   /* Game result tiles (white text on each) */
-  --correct: light-dark(#15803d, #166534);
-  --partial: light-dark(#c2410c, #9a3412);
-  --incorrect: light-dark(#b91c1c, #991b1b);
-  --tile: light-dark(#3f3f46, #27272a);
+  --correct: light-dark(#1e7a34, #1e6b34);
+  --partial: light-dark(#b35c00, #8f4a00);
+  --incorrect: light-dark(#c62828, #9b2323);
+  --tile: light-dark(#2f4f4f, #2c3a37);
 }
 
 :root[data-theme="light"] {

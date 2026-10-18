@@ -1,37 +1,50 @@
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "../lib/utils.ts";
 
-// The title block at the top of a page: h1, an optional lede and actions on the right
+// The title block at the top of a page: h1, an optional lede and actions on the right.
+// `centered` is the big centred title of the original hand-made site, for the gallery and Play.
 export function PageHead({
   title,
   titleId,
   lede,
   actions,
+  centered = false,
   className,
 }: {
   title: ReactNode;
   titleId?: string;
   lede?: ReactNode;
   actions?: ReactNode;
+  centered?: boolean;
   className?: string;
 }) {
   return (
     <div
       className={cn(
         "page-head mb-6 flex flex-wrap items-end justify-between gap-4",
+        centered && "mb-8 flex-col items-center text-center sm:mt-4",
         className,
       )}
     >
       <div className="min-w-0 space-y-2">
         <h1
           id={titleId}
-          className="text-3xl font-bold tracking-tight break-words sm:text-4xl"
+          className={cn(
+            "text-3xl font-bold tracking-wide break-words uppercase sm:text-4xl",
+            centered && "text-5xl sm:text-7xl",
+          )}
         >
           {title}
         </h1>
         {lede && <div className="lede text-muted-foreground">{lede}</div>}
       </div>
-      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+      {actions && (
+        <div
+          className={cn("flex flex-wrap gap-2", centered && "justify-center")}
+        >
+          {actions}
+        </div>
+      )}
     </div>
   );
 }

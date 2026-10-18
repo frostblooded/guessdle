@@ -16,8 +16,8 @@ export function ResultBanner({
   return (
     <div
       id={victory ? "victory-title" : "give-up-title"}
-      className={`banner banner-${result.kind} animate-in mb-6 flex items-center gap-4 rounded-xl border p-4 shadow-sm ${
-        victory ? "bg-success-bg text-success" : "bg-card text-foreground"
+      className={`banner banner-${result.kind} animate-in mb-6 flex flex-col items-center gap-3 text-center sm:flex-row sm:justify-center sm:gap-5 sm:text-left ${
+        victory ? "text-success" : "text-foreground"
       }`}
     >
       {photo && (
@@ -28,7 +28,7 @@ export function ResultBanner({
         />
       )}
       <div className="flex min-w-0 flex-col gap-1">
-        <strong className="text-xl font-bold">
+        <strong className="text-3xl font-bold uppercase sm:text-5xl">
           {victory ? "You did it!" : "Better luck tomorrow"}
         </strong>
         <span className="break-words">
