@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "../../components/ui/table.tsx";
 import { getJson } from "../../lib/api.ts";
+import { useDelayed } from "../../lib/use-delayed.ts";
 import { api } from "../../manage-client.ts";
 
 interface AdminUser {
@@ -38,9 +39,10 @@ export function UsersPanel({ active }: { active: boolean }) {
   });
   const [failed, setFailed] = useState<string | null>(null);
   const data = users.data ?? { users: [], self: 0 };
+  const slow = useDelayed(users.isPending);
   const message = users.isError
     ? LOAD_FAILED
-    : (failed ?? (users.isPending ? "Loading users…" : null));
+    : (failed ?? (slow ? "Loading users…" : null));
 
   // Runs one change, then reloads the list; `failed` says what went wrong
   const act = async (
