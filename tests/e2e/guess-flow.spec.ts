@@ -1,6 +1,11 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { GUESS_DATA } from "./roster.ts";
-import { confirmReset, findAnswerName, submitGuess } from "./helpers.ts";
+import {
+  confirmReset,
+  findAnswerName,
+  submitGuess,
+  winGame,
+} from "./helpers.ts";
 
 // The browser's own (fake) clock; the server decides the Daily Answer's day
 const DAY = new Date(2025, 7, 18, 12);
@@ -35,12 +40,33 @@ test.beforeEach(async ({ page, request }) => {
 test("a correct guess shows the victory banner with the answer", async ({
   page,
 }) => {
-  await submitGuess(page, answerName);
+  await winGame(page, answerName);
 
   await expect(victory(page)).toContainText("You did it");
   await expect(page.locator("#victory-answer-name")).toHaveText(answerName);
   await expect(rows(page)).toHaveCount(1);
   await expect(rows(page).first().locator(".cell.incorrect")).toHaveCount(0);
+});
+
+test("a win opens the stats popup; See stats brings it back after a reload", async ({
+  page,
+}) => {
+  await submitGuess(page, wrongName);
+  await submitGuess(page, answerName);
+  const dialog = page.locator("#stats-dialog");
+  await expect(dialog).toContainText("Congratulations!");
+  await expect(dialog.locator("#stats-guesses")).toHaveText("2");
+  await expect(
+    dialog.locator("#stats-guess-chart [data-mine]"),
+  ).toHaveAttribute("aria-label", /^2: \d+ players?, you$/);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+
+  await page.reload();
+  await expect(victory(page)).toBeVisible();
+  await expect(dialog).toBeHidden();
+  await page.locator("#stats-button").click();
+  await expect(dialog.locator("#stats-guesses")).toHaveText("2");
 });
 
 test("a wrong guess adds a row with graded cells and no victory", async ({
@@ -207,7 +233,7 @@ test("guesses and victory survive a reload on the same day", async ({
   page,
 }) => {
   await submitGuess(page, wrongName);
-  await submitGuess(page, answerName);
+  await winGame(page, answerName);
 
   await page.reload();
   await expect(page.locator("#loading-state")).toBeHidden();
@@ -221,7 +247,7 @@ test("guesses and victory survive a reload on the same day", async ({
 
 test("the next day shows a fresh board", async ({ page }) => {
   await submitGuess(page, wrongName);
-  await submitGuess(page, answerName);
+  await winGame(page, answerName);
   await expect(victory(page)).toBeVisible();
 
   await page.clock.setSystemTime(NEXT_DAY);
@@ -231,7 +257,7 @@ test("the next day shows a fresh board", async ({ page }) => {
   await expect(rows(page)).toHaveCount(0);
   await expect(victory(page)).toHaveCount(0);
 
-  await submitGuess(page, answerName);
+  await winGame(page, answerName);
 
   await expect(page.locator("#victory-answer-name")).toHaveText(answerName);
 });
@@ -477,7 +503,7 @@ test.describe("give up", () => {
   });
 
   test("is not offered after a win", async ({ page }) => {
-    await submitGuess(page, answerName);
+    await winGame(page, answerName);
 
     await expect(giveUpButton(page)).toBeHidden();
     await expect(giveUpTitle(page)).toHaveCount(0);
@@ -500,7 +526,7 @@ test.describe("give up", () => {
 test.describe("reset", () => {
   test("after a win clears the board and allows replay", async ({ page }) => {
     await submitGuess(page, wrongName);
-    await submitGuess(page, answerName);
+    await winGame(page, answerName);
     await expect(resetButton(page)).toBeVisible();
     await expect(input(page)).toBeHidden();
 
@@ -515,7 +541,7 @@ test.describe("reset", () => {
 
     await submitGuess(page, wrongName);
     await expect(rows(page)).toHaveCount(1);
-    await submitGuess(page, answerName);
+    await winGame(page, answerName);
     await expect(victory(page)).toContainText(answerName);
   });
 
@@ -531,12 +557,12 @@ test.describe("reset", () => {
     await expect(rows(page)).toHaveCount(0);
     await expect(input(page)).toBeVisible();
 
-    await submitGuess(page, answerName);
+    await winGame(page, answerName);
     await expect(victory(page)).toContainText(answerName);
   });
 
   test("holds after a reload", async ({ page }) => {
-    await submitGuess(page, answerName);
+    await winGame(page, answerName);
     await resetButton(page).click();
     await confirmReset(page);
 
@@ -591,7 +617,7 @@ test.describe("mid-game reset", () => {
     await confirmReset(page);
     await expect(rows(page)).toHaveCount(0);
     await expect(input(page)).toBeVisible();
-    await submitGuess(page, answerName);
+    await winGame(page, answerName);
     await expect(victory(page)).toContainText(answerName);
   });
 
@@ -628,7 +654,7 @@ test.describe("mid-game reset", () => {
   });
 
   test("asks before resetting after a win too", async ({ page }) => {
-    await submitGuess(page, answerName);
+    await winGame(page, answerName);
     await resetButton(page).click();
     await expect(dialog(page)).toBeVisible();
     await page.keyboard.press("Escape");
@@ -653,7 +679,7 @@ test.describe("day rollover in an open tab", () => {
   });
 
   test("a reload on a later server day clears a won game", async ({ page }) => {
-    await submitGuess(page, answerName);
+    await winGame(page, answerName);
     await expect(victory(page)).toBeVisible();
 
     await serverMovesToNextDay(page, "**/api/games/petdle/grade");

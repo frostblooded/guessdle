@@ -33,6 +33,8 @@ import { useTitle } from "../../lib/use-title.ts";
 import { GuessBox } from "./guess-box.tsx";
 import { PlayActions, PlayStatus, type StatusView } from "./play-status.tsx";
 import { ResultBanner, type Result } from "./result-banner.tsx";
+import { StatsDialog } from "./stats-dialog.tsx";
+import { useVictoryStats } from "./use-victory-stats.ts";
 
 type PlayableGame = {
   name: string;
@@ -91,6 +93,7 @@ function Game({ slug }: { slug: string }) {
   const started = useRef(false);
   const submitting = useRef(false);
   const opener = useRef<HTMLButtonElement | null>(null);
+  const victory = useVictoryStats(slug, play);
 
   const playable = typeof game === "object" && game !== null ? game : null;
   const roster = playable?.entries ?? [];
@@ -181,8 +184,12 @@ function Game({ slug }: { slug: string }) {
     if (res.kind === "duplicate") {
       return;
     }
+    if (rows.length === 0) {
+      victory.startClock();
+    }
     if (res.isAnswer && res.answer !== undefined) {
       setResult({ kind: "victory", answer: res.answer });
+      void victory.show();
     }
     setRows((old) => [res.row, ...old]);
   }
@@ -326,7 +333,18 @@ function Game({ slug }: { slug: string }) {
               Guess
             </Button>
           </div>
-          <div className="game-actions flex justify-center" hidden={!finished}>
+          <div
+            className="game-actions flex flex-wrap justify-center gap-2"
+            hidden={!finished}
+          >
+            <Button
+              id="stats-button"
+              variant="outline"
+              hidden={result?.kind !== "victory"}
+              onClick={() => void victory.show()}
+            >
+              See stats
+            </Button>
             <Button
               id="reset-button"
               hidden={!finished}
@@ -337,6 +355,16 @@ function Game({ slug }: { slug: string }) {
             </Button>
           </div>
         </Card>
+        {result?.kind === "victory" && (
+          <StatsDialog
+            open={victory.open}
+            onOpenChange={victory.setOpen}
+            answer={result.answer}
+            stats={victory.stats}
+            failed={victory.failed}
+            returnFocusId="stats-button"
+          />
+        )}
         <AlertDialog open={confirming} onOpenChange={setConfirming}>
           <AlertDialogContent
             id="reset-dialog"

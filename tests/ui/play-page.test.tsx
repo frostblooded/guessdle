@@ -65,6 +65,18 @@ function fakeServer(game?: Response) {
         ...(ids.includes(ANSWER) && { answer: "Dido" }),
       });
     }
+    if (url === "/api/games/pets/result") {
+      const { ids } = JSON.parse(String(init?.body)) as { ids: number[] };
+      return json(200, {
+        day: 1,
+        you: { guesses: ids.length, seconds: 75 },
+        players: 3,
+        guesses: [0, 1, 2, 0, 0, 0, 0, 0, 0, 0],
+        times: [1, 0, 2, 0, 0, 0],
+        fewerGuessesThan: 50,
+        fasterThan: 50,
+      });
+    }
     if (url === "/api/games/pets/give-up") {
       return json(200, { day: 1, answer: "Dido" });
     }
@@ -157,8 +169,54 @@ describe("PlayPage", () => {
       document.querySelector("#victory-answer-name")!.textContent,
       "Dido",
     );
+    // The stats popup opens over the page; the board is behind it
+    await screen.findByRole("dialog");
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => assert.equal(screen.queryByRole("dialog"), null));
     assert.ok(screen.getByRole("button", { name: "Reset today's game" }));
     assert.equal(screen.queryByRole("button", { name: "Give up" }), null);
+  });
+
+  it("a win opens the stats popup, and See stats opens it again", async () => {
+    const server = fakeServer();
+    vi.stubGlobal("fetch", server);
+    renderPlay();
+    await screen.findByText(/No guesses yet/);
+    await guess("Bela");
+    await guess("Dido");
+    const dialog = await screen.findByRole("dialog");
+    assert.ok(screen.getByRole("heading", { name: "Congratulations!" }));
+    await waitFor(() =>
+      assert.equal(document.querySelector("#stats-guesses")!.textContent, "2"),
+    );
+    assert.equal(document.querySelector("#stats-time")!.textContent, "1m 15s");
+    assert.ok(screen.getByText("Fewer guesses than 50% of players"));
+    assert.ok(screen.getByText("3 players solved it today."));
+    const mine = document.querySelector("#stats-guess-chart [data-mine]");
+    assert.equal(mine?.getAttribute("aria-label"), "2: 1 player, you");
+    const sent = server.mock.calls.find(
+      ([url]) => url === "/api/games/pets/result",
+    )!;
+    const body = JSON.parse(String(sent[1]?.body)) as Record<string, unknown>;
+    assert.deepEqual(body["ids"], [1, 2]);
+    assert.equal(typeof body["player"], "string");
+
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() => assert.ok(!dialog.isConnected));
+    const again = screen.getByRole("button", { name: "See stats" });
+    assert.equal(document.activeElement, again);
+    await userEvent.click(again);
+    await screen.findByRole("dialog");
+  });
+
+  it("giving up shows no stats", async () => {
+    vi.stubGlobal("fetch", fakeServer());
+    renderPlay();
+    await screen.findByText(/No guesses yet/);
+    await userEvent.click(screen.getByRole("button", { name: "Give up" }));
+    await screen.findByText("Better luck tomorrow");
+    assert.equal(screen.queryByRole("dialog"), null);
+    assert.equal(screen.queryByRole("button", { name: "See stats" }), null);
   });
 
   it("reset asks first; Cancel keeps the board, Reset clears it", async () => {
