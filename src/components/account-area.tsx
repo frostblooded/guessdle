@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { signOut, type AccountUser } from "../account.ts";
+import { profilePath } from "../game/playlists.ts";
 import { forgetAllGames } from "../game/game-state.ts";
 import { browserFetch, useMe } from "../lib/api.ts";
 import { cn } from "../lib/utils.ts";
@@ -82,6 +83,14 @@ function UserMenu({ user }: { user: AccountUser }) {
             {user.email}
           </strong>
         </p>
+        <Link
+          id="profile-link"
+          className={menuItem}
+          to={user.username === null ? "/profile" : profilePath(user.username)}
+          onClick={() => setOpen(false)}
+        >
+          Profile and playlists
+        </Link>
         <Link
           className={menuItem}
           to="/my-games"

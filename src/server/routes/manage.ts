@@ -11,16 +11,18 @@ import { requestUser, type SessionUser } from "../auth.ts";
 import type { AttributeType } from "../../game/game.ts";
 import { deleteEntry, listEntries, saveEntry } from "../entries.ts";
 import {
-  createGame,
   editAttributes,
   listAttributes,
-  listOwned,
-  patchKind,
   saveAttributes,
-  skipOf,
-  updateGame,
   type AttributeDraft,
   type AttributeEdit,
+} from "../attributes.ts";
+import {
+  createGame,
+  listOwned,
+  patchKind,
+  skipOf,
+  updateGame,
 } from "../games.ts";
 import { rateLimit, type RateLimit } from "../rate-limit.ts";
 import { isGameKind } from "../../game/blur.ts";

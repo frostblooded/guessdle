@@ -90,11 +90,13 @@ export function EntriesPanel({
     })();
   }, [active, base]);
 
-  // Runs a call that answers with the entry list; false when it was refused
+  // Runs a call that answers with the entry list; false when it was refused. `clear` empties
+  // the form with the new list, before the page refresh, so nothing typed after it is lost.
   const run = async (
     method: "POST" | "PATCH" | "DELETE",
     path: string,
     body?: unknown,
+    clear = false,
   ): Promise<boolean> => {
     setError("");
     const out = await api<Entry[]>(method, path, body);
@@ -104,7 +106,7 @@ export function EntriesPanel({
     }
     setEntries(out.data);
     setDraft((d) =>
-      d.editing && !out.data.some((e) => e.id === d.editing?.id)
+      clear || (d.editing && !out.data.some((e) => e.id === d.editing?.id))
         ? draftOf(null)
         : d,
     );
@@ -133,12 +135,9 @@ export function EntriesPanel({
           }),
         }
       : { name: draft.name, values };
-    const ok = draft.editing
-      ? await run("PATCH", `${base}/entries/${draft.editing.id}`, body)
-      : await run("POST", `${base}/entries`, body);
-    if (ok) {
-      setDraft(draftOf(null));
-    }
+    await (draft.editing
+      ? run("PATCH", `${base}/entries/${draft.editing.id}`, body, true)
+      : run("POST", `${base}/entries`, body, true));
   };
 
   // Crops and uploads the chosen picture, then hands its URL to `done`

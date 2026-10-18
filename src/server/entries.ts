@@ -1,7 +1,8 @@
 // Entry editing (spec #66): add, change and soft-delete the entries of one game.
 import type pg from "pg";
 import { parseNumberValue } from "../game/number.ts";
-import { listAttributes, type GameRow } from "./games.ts";
+import { listAttributes } from "./attributes.ts";
+import type { GameRow } from "./games.ts";
 
 export interface EntryRow {
   id: number;

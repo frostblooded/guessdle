@@ -64,6 +64,12 @@ A signed-in user with the admin flag. Admins get an Admin link in the account me
 **Day Number**:
 Whole calendar days since the game's start date. The start date itself is day 0. Each Day Number maps to exactly one Daily Answer.
 
+**Username**:
+A signed-in player's one public name, picked once (lowercase letters, digits, underscores). Their **Profile** at `/u/<username>` shows their Playlists and their gallery Games. The account's `name` is its email and is never shown publicly.
+
+**Playlist**:
+A player's named, ordered list of Games, public (anyone with the link, and on their Profile) or private (only them). Only Games the gallery shows can be added, and a Game that leaves the gallery drops out of view until it returns.
+
 **Party**:
 A live competition on one Game, opened by a signed-in **Host**, that friends join from their phones with a 4-letter code (ADR 0016). It runs any number of **Rounds** and ends when the Host ends it or after 12 idle hours; its results stay at its link for 30 days.
 
