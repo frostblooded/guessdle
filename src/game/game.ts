@@ -18,10 +18,12 @@ export interface GameAttribute {
 
 // What the client knows of an entry: enough to autocomplete and show a photo. A classic
 // entry's photo is its first Image value (blank when it has none); a Blur entry's is its image.
+// A classic entry carries its values too, for the selection list.
 export interface EntryRef {
   id: number;
   name: string;
   photo: string;
+  values?: AttributeValue[];
 }
 
 // An entry with its values, one per game attribute in attribute order (Text, Number and
