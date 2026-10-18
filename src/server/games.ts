@@ -140,12 +140,9 @@ export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
     return (attr.type === "list" ? list : (list[0] ?? "")) as AttributeValue;
   };
   const all = entries.rows.map(
-    ({ id, name, photo, blurOrder, description }): Entry => ({
-      id,
-      name,
-      photo,
-      description,
-      values: attributes.rows.map((attr) => cell(id, attr)),
+    ({ blurOrder, deleted: _deleted, ...entry }): Entry => ({
+      ...entry,
+      values: attributes.rows.map((attr) => cell(entry.id, attr)),
       ...(game.kind === "blur" && blurOrder && { blurOrder }),
     }),
   );
