@@ -4,7 +4,9 @@ import {
   Correctness,
   correctnessClass,
   gradeCorrectness,
+  gradeNumber,
 } from "../src/game/correctness.ts";
+import { parseNumberValue } from "../src/game/number.ts";
 
 describe("gradeCorrectness: single-value attribute", () => {
   it("is Correct when the names match", () => {
@@ -121,5 +123,65 @@ describe("correctnessClass", () => {
       "partially-correct",
     );
     assert.equal(correctnessClass(Correctness.Incorrect), "incorrect");
+  });
+});
+
+describe("gradeNumber", () => {
+  it("is Correct on the same value, however it is written", () => {
+    assert.deepEqual(gradeNumber("12", "12"), {
+      correctness: Correctness.Correct,
+    });
+    assert.deepEqual(gradeNumber("2.50", "2.5"), {
+      correctness: Correctness.Correct,
+    });
+  });
+
+  it("is Incorrect with the way to the answer otherwise", () => {
+    assert.deepEqual(gradeNumber("3", "10"), {
+      correctness: Correctness.Incorrect,
+      hint: "higher",
+    });
+    assert.deepEqual(gradeNumber("10", "3"), {
+      correctness: Correctness.Incorrect,
+      hint: "lower",
+    });
+    // Numerically, not as text: "9" sorts after "10"
+    assert.equal(gradeNumber("9", "10").hint, "higher");
+    assert.equal(gradeNumber("-1.5", "-2").hint, "lower");
+  });
+
+  it("grades blanks like Text, with no hint", () => {
+    assert.deepEqual(gradeNumber("", ""), { correctness: Correctness.Correct });
+    assert.deepEqual(gradeNumber("4", ""), {
+      correctness: Correctness.Incorrect,
+    });
+  });
+});
+
+describe("parseNumberValue", () => {
+  it("keeps whole numbers, decimals and negatives, trimmed", () => {
+    assert.equal(parseNumberValue(" 12 "), "12");
+    assert.equal(parseNumberValue("-3"), "-3");
+    assert.equal(parseNumberValue("4.5"), "4.5");
+    assert.equal(parseNumberValue(".5"), ".5");
+  });
+
+  it("reads a comma as the decimal point", () => {
+    assert.equal(parseNumberValue("2,5"), "2.5");
+  });
+
+  it("refuses anything else", () => {
+    for (const bad of [
+      "",
+      "abc",
+      "1e5",
+      "1.2.3",
+      "12 cm",
+      "1,000.5",
+      "--1",
+      "Infinity",
+    ]) {
+      assert.equal(parseNumberValue(bad), null, bad);
+    }
   });
 });

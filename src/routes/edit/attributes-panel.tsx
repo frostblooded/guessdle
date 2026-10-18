@@ -1,8 +1,11 @@
-// The editor's Attributes tab: each attribute is a column on the board.
+// The editor's Attributes tab: each attribute is a column on the board. Edits stay here until
+// Save sends the whole list at once.
 import { useState, type FormEvent } from "react";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Input, NativeSelect } from "../../components/ui/input.tsx";
+import { erasedBy } from "../../game/editor.ts";
+import { FAILURES } from "../../game/failures.ts";
 import { MAX_ATTRIBUTE_NAME } from "../../game/limits.ts";
 import { api, errorText, type Reply } from "../../manage-client.ts";
 import type { Attribute } from "./types.ts";
@@ -10,7 +13,22 @@ import type { Attribute } from "./types.ts";
 const TYPES = [
   ["text", "Text"],
   ["list", "List"],
+  ["number", "Number"],
 ] as const;
+
+// One row of the unsaved list: a saved attribute (with its id) or a new one
+interface Draft {
+  key: string;
+  id?: number;
+  name: string;
+  type: Attribute["type"];
+}
+
+let nextKey = 0;
+const draftsOf = (attributes: Attribute[]): Draft[] =>
+  attributes.map((a) => ({ key: `saved-${a.id}`, ...a }));
+const sameName = (a: string, b: string): boolean =>
+  a.trim().toLowerCase() === b.trim().toLowerCase();
 
 export function AttributesPanel({
   base,
@@ -19,77 +37,101 @@ export function AttributesPanel({
   onChange,
 }: {
   base: string;
+  // What the server has
   attributes: Attribute[];
   setAttributes: (attributes: Attribute[]) => void;
   // Runs after every saved change, so the page can refresh its status line
   onChange: () => Promise<void>;
 }) {
+  const [drafts, setDrafts] = useState(() => draftsOf(attributes));
   const [error, setError] = useState("");
   const [newName, setNewName] = useState("");
   const [newType, setNewType] = useState<Attribute["type"]>("text");
+  const [busy, setBusy] = useState(false);
 
-  // Runs an attribute call; redraws the list and the status. False when refused.
-  const run = async (
-    method: "POST" | "PATCH" | "DELETE",
-    path: string,
-    body?: unknown,
-  ): Promise<boolean> => {
-    setError("");
-    const out = await api<Attribute[]>(method, path, body);
-    if (out?.status === 200) {
-      setAttributes(out.data);
-      await onChange();
-      return true;
-    }
-    // Show what the server actually has after a refused edit, then the error: a reader (or a test) that waits for the error must not see the list redrawn under it
-    const now = await api<Attribute[]>("GET", `${base}/attributes`);
-    if (now?.status === 200) {
-      setAttributes(now.data);
-    }
-    setError(errorText(out as Reply | null));
-    return false;
-  };
-  const change = (attr: Attribute, body: Partial<Attribute>): void =>
-    void run("PATCH", `${base}/attributes/${attr.id}`, body);
+  const dirty =
+    JSON.stringify(drafts.map(({ id, name, type }) => ({ id, name, type }))) !==
+    JSON.stringify(
+      attributes.map(({ id, name, type }) => ({ id, name, type })),
+    );
+  const update = (key: string, change: Partial<Draft>): void =>
+    setDrafts((list) =>
+      list.map((d) => (d.key === key ? { ...d, ...change } : d)),
+    );
 
-  const add = async (event: FormEvent): Promise<void> => {
+  const add = (event: FormEvent): void => {
     event.preventDefault();
-    if (
-      await run("POST", `${base}/attributes`, { name: newName, type: newType })
-    ) {
-      setNewName("");
+    setError("");
+    if (newName.trim() === "") {
+      setError("Name the new attribute first.");
+      return;
     }
+    if (drafts.some((d) => sameName(d.name, newName))) {
+      setError(FAILURES.attribute_exists.text);
+      return;
+    }
+    setDrafts((list) => [
+      ...list,
+      { key: `new-${nextKey++}`, name: newName.trim(), type: newType },
+    ]);
+    setNewName("");
+  };
+
+  const save = async (): Promise<void> => {
+    const erased = erasedBy(attributes, drafts);
+    if (
+      erased.length > 0 &&
+      !confirm(
+        `Save? Every entry loses its values for ${erased.map((n) => `"${n}"`).join(", ")}. The game is paused until every entry is filled in again.`,
+      )
+    ) {
+      return;
+    }
+    setError("");
+    setBusy(true);
+    const out = await api<Attribute[]>("PUT", `${base}/attributes`, {
+      attributes: drafts.map(({ id, name, type }) => ({ id, name, type })),
+    });
+    setBusy(false);
+    if (out?.status !== 200) {
+      setError(errorText(out as Reply | null));
+      return;
+    }
+    setAttributes(out.data);
+    setDrafts(draftsOf(out.data));
+    await onChange();
   };
 
   return (
     <div className="space-y-5">
       <p className="lede text-sm text-muted-foreground">
-        Each attribute is a column on the board. Removing one deletes its values
-        from every entry.
+        Each attribute is a column on the board. Number columns tell players
+        whether the answer is higher or lower. Changes apply when you press
+        Save; removing an attribute or changing its type erases its values from
+        every entry.
       </p>
       <ul id="attr-list" className="attr-list space-y-2">
-        {attributes.map((attr) => (
-          // Keyed by what the server has, so a refused rename snaps back
+        {drafts.map((draft) => (
           <li
-            key={`${attr.id}:${attr.name}:${attr.type}`}
+            key={draft.key}
             className="attr-row flex flex-wrap items-center gap-2"
           >
             <Input
               className="min-w-40 flex-1"
               maxLength={MAX_ATTRIBUTE_NAME}
-              defaultValue={attr.name}
-              aria-label={`Name of ${attr.name}`}
-              onBlur={(event) => {
-                if (event.target.value !== attr.name) {
-                  change(attr, { name: event.target.value });
-                }
-              }}
+              value={draft.name}
+              aria-label={`Name of ${draft.name}`}
+              onChange={(event) =>
+                update(draft.key, { name: event.target.value })
+              }
             />
             <NativeSelect
-              value={attr.type}
-              aria-label={`Type of ${attr.name}`}
+              value={draft.type}
+              aria-label={`Type of ${draft.name}`}
               onChange={(event) =>
-                change(attr, { type: event.target.value as Attribute["type"] })
+                update(draft.key, {
+                  type: event.target.value as Attribute["type"],
+                })
               }
             >
               {TYPES.map(([value, label]) => (
@@ -101,16 +143,10 @@ export function AttributesPanel({
             <Button
               variant="outline"
               size="sm"
-              aria-label={`Remove ${attr.name}`}
-              onClick={() => {
-                if (
-                  confirm(
-                    `Remove "${attr.name}"? Its values are deleted from every entry.`,
-                  )
-                ) {
-                  void run("DELETE", `${base}/attributes/${attr.id}`);
-                }
-              }}
+              aria-label={`Remove ${draft.name}`}
+              onClick={() =>
+                setDrafts((list) => list.filter((d) => d.key !== draft.key))
+              }
             >
               Remove
             </Button>
@@ -121,7 +157,7 @@ export function AttributesPanel({
         id="attr-form"
         className="attr-row flex flex-wrap items-center gap-2"
         noValidate
-        onSubmit={(event) => void add(event)}
+        onSubmit={add}
       >
         <Input
           id="attr-name"
@@ -147,11 +183,38 @@ export function AttributesPanel({
             </option>
           ))}
         </NativeSelect>
-        <Button type="submit">Add</Button>
+        <Button type="submit" variant="outline">
+          Add
+        </Button>
       </form>
       <Alert id="attr-error" variant="error" role="alert">
         {error}
       </Alert>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          id="attr-save"
+          disabled={!dirty || busy}
+          onClick={() => void save()}
+        >
+          Save
+        </Button>
+        <Button
+          id="attr-discard"
+          variant="ghost"
+          disabled={!dirty || busy}
+          onClick={() => {
+            setError("");
+            setDrafts(draftsOf(attributes));
+          }}
+        >
+          Discard changes
+        </Button>
+        {dirty && (
+          <span id="attr-unsaved" className="text-sm text-muted-foreground">
+            Unsaved changes
+          </span>
+        )}
+      </div>
     </div>
   );
 }

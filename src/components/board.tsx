@@ -1,6 +1,7 @@
 // The guess board: a title row and graded rows of tiles, shared by Play and How to play.
 import type { ComponentProps, CSSProperties, ReactNode } from "react";
 import { correctnessClass } from "../game/correctness.ts";
+import type { Hint } from "../game/correctness.ts";
 import type { GradedAttribute } from "../game/game.ts";
 import { cn } from "../lib/utils.ts";
 
@@ -87,6 +88,26 @@ export function GradeTile({
   );
 }
 
+const HINTS: Record<Hint, { arrow: string; label: string }> = {
+  higher: { arrow: "↑", label: "The answer is higher" },
+  lower: { arrow: "↓", label: "The answer is lower" },
+};
+
+// A wrong Number's arrow: which way the answer lies
+export function HintArrow({ hint }: { hint: Hint }) {
+  const { arrow, label } = HINTS[hint];
+  return (
+    <span
+      className="hint ml-1 text-base sm:text-xl"
+      data-hint={hint}
+      title={label}
+    >
+      <span aria-hidden="true">{arrow}</span>
+      <span className="sr-only">{label}</span>
+    </span>
+  );
+}
+
 // One guessed entry: its photo, then each graded value
 export function GuessRow({
   row,
@@ -101,12 +122,13 @@ export function GuessRow({
       className="guess-result-row animate-in"
       style={style}
     >
-      {row.map(({ key, value, correctness }, i) =>
+      {row.map(({ key, value, correctness, hint }, i) =>
         i === 0 ? (
           <PhotoTile key={key} src={value as string} />
         ) : (
           <GradeTile key={key} grade={correctnessClass(correctness)}>
             {Array.isArray(value) ? value.join(", ") : value}
+            {hint && <HintArrow hint={hint} />}
           </GradeTile>
         ),
       )}

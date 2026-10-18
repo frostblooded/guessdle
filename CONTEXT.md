@@ -22,6 +22,9 @@ One item in a Game's Roster: a name, a photo and a value per Attribute. Replaces
 **Roster**:
 The list of a Game's active Entries. A Game is playable with at least 2.
 
+**Paused**:
+A Game with an active Entry missing a value (after a new Attribute, or a type change). Nobody can play it, start a Party on it or submit it, and it leaves the gallery, until every Entry is filled in.
+
 **Guess**:
 An Entry the player submits as their attempt at the Daily Answer.
 
@@ -35,10 +38,10 @@ The stored Daily Answers of a Game from its start date onward, one per calendar 
 The number of most recent daily answers that cannot be chosen again, including across consecutive days. Per Game: default 5, at most one less than the number of active Entries.
 
 **Attribute**:
-A compared property of an Entry, such as colors or owners, defined per Game. Type **Text** holds one value, type **List** an ordered set of values. A Guess is graded per Attribute as correct, partially correct, or incorrect.
+A compared property of an Entry, such as colors or owners, defined per Game. Type **Text** holds one value, type **List** an ordered set of values, type **Number** one number (decimals and negatives allowed). Every Entry needs a value for every Attribute. A Guess is graded per Attribute as correct, partially correct, or incorrect. Owners edit the Attributes as a list that only lands on Save; removing an Attribute or changing its type erases its values from every Entry.
 
 **Correctness**:
-How well one attribute of a guess matches the Daily Answer: correct, partially correct, or incorrect. Text: correct only on an exact match. List: correct on the same set, partially correct when at least one value is shared, otherwise incorrect. Empty equals empty. Grades are never stored, so a schema edit regrades live.
+How well one attribute of a guess matches the Daily Answer: correct, partially correct, or incorrect. Text: correct only on an exact match. List: correct on the same set, partially correct when at least one value is shared, otherwise incorrect. Number: correct on the same value, otherwise incorrect with a **Hint** (↑ the answer is higher, ↓ lower). Empty equals empty. Grades are never stored, so a schema edit regrades live.
 
 **Game State**:
 What is remembered about today: the Guesses made (as Entry ids), whether the player gave up, and the day last played. Anonymous players keep it in the browser (`localStorage`). Signed-in players keep it on the server, so it follows them across devices. Victory is never stored: it is derived from the Guesses and the current Daily Answer. It resets on a new calendar day, or when the player resets at any time once they have made a Guess (the Daily Answer stays the same). On first login, leftover browser guesses are merged into the account only if the account has no progress that day; otherwise the server state wins.

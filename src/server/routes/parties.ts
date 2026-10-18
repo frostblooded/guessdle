@@ -44,6 +44,10 @@ export function partyRoutes(
       fail(res, "not_enough_entries");
       return;
     }
+    if (loaded.roster.incomplete > 0) {
+      fail(res, "game_paused");
+      return;
+    }
     const nickname = cleanNickname(bodyOf(req)["nickname"]);
     if (nickname === null) {
       fail(res, "invalid");

@@ -98,6 +98,12 @@ export async function todaysAnswer(
       .json({ error: "not_enough_entries" satisfies FailureCode, day });
     return undefined;
   }
+  if (roster.incomplete > 0) {
+    res
+      .status(FAILURES.game_paused.status)
+      .json({ error: "game_paused" satisfies FailureCode, day });
+    return undefined;
+  }
   const answerId = await ensureAnswer(
     pool,
     game,

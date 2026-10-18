@@ -10,6 +10,14 @@ export const FAILURES = {
     400,
     "One of the values is not allowed (empty, too long or the wrong format). Check what you entered and try again.",
   ),
+  missing_values: failure(
+    400,
+    "Fill in every attribute of the entry before saving it.",
+  ),
+  not_a_number: failure(
+    400,
+    "A number attribute takes a number, like 12, -3 or 4.5.",
+  ),
   slug_immutable: failure(400, "A game's address cannot be changed."),
   reserved: failure(400, "That address is reserved. Pick another one."),
   unauthorized: failure(401, "Your session ended. Sign in again."),
@@ -23,6 +31,14 @@ export const FAILURES = {
   not_enough_entries: failure(
     409,
     `This game cannot be played yet: it needs at least ${MIN_ENTRIES} entries to pick a daily answer. Use the Edit link to add entries.`,
+  ),
+  incomplete_entries: failure(
+    409,
+    "Some entries are missing values. Fill in every attribute of every entry before submitting.",
+  ),
+  game_paused: failure(
+    409,
+    "This game is paused while some of its entries are missing values. It comes back once they are filled in.",
   ),
   invalid_state: failure(
     409,

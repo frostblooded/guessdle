@@ -47,7 +47,9 @@ const STEPS: { title: string; text: ReactNode; example: Example | null }[] = [
     text: (
       <>
         <b>Green</b>: same as the secret pet. <b>Red</b>: not the same. Cookie
-        is not Ati (red name), but has Ati&apos;s colors and owner (green).
+        is not Ati (red name), but has Ati&apos;s colors and owner (green). Some
+        games have number columns: a red number gets an arrow, ↑ when the answer
+        is higher and ↓ when it is lower.
       </>
     ),
     example: COOKIE,
