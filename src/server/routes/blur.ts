@@ -1,10 +1,11 @@
-// A Blur game's board (ADR 0019): the answer's image with only some squares clear, the only way
-// it reaches a player before the day or round is over. Boards are rendered from the stored
-// upload, so the image's own URL stays secret.
+// A Blur game's images (ADR 0019): the board, the answer's image with only some squares clear,
+// which is the only way it reaches a player before the day or round is over, and the gallery
+// banner's blurred tiles. Both are rendered from the stored uploads, so their URLs stay secret.
 import type { Express, Request, Response } from "express";
 import type { Entry } from "../../game/game.ts";
 import { normalizeCode } from "../../game/party.ts";
-import { blurRenderer } from "../images.ts";
+import { MAX_TILES } from "../../game/banner.ts";
+import { blurRenderer, tileRenderer } from "../images.ts";
 import { findParty, loadData } from "../parties.ts";
 import type { GameRow } from "../games.ts";
 import {
@@ -22,6 +23,7 @@ export function blurRoutes(
   uploadsDir: string,
 ): void {
   const render = blurRenderer(uploadsDir);
+  const tile = tileRenderer(uploadsDir);
   // How many squares are clear, 1-9 from the URL, or 0
   const shownOf = (req: Request): number => {
     const raw = String(paramOf(req, "n"));
@@ -93,5 +95,31 @@ export function blurRoutes(
       return;
     }
     await send(req, res, game, answer);
+  });
+
+  // Tile n of the gallery banner: the nth entry photo, by entry id, heavily blurred. Not a
+  // secret, so browsers may keep it a while.
+  app.get("/api/games/:slug/tile/:n", async (req, res) => {
+    const loaded = await loadGame(ctx, req, res);
+    if (!loaded) {
+      return;
+    }
+    const n = Number(paramOf(req, "n"));
+    const photo = loaded.roster.entries
+      .map((entry) => entry.photo)
+      .filter((p) => p !== "")[n];
+    const image =
+      loaded.game.kind === "blur" &&
+      Number.isInteger(n) &&
+      n < MAX_TILES &&
+      photo
+        ? await tile(photo)
+        : null;
+    if (!image) {
+      fail(res, "not_found");
+      return;
+    }
+    res.set("Cache-Control", "public, max-age=300");
+    res.type("image/webp").send(image);
   });
 }

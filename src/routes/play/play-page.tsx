@@ -106,7 +106,8 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const gameFailure =
     typeof game === "string" && game !== "missing" ? game : null;
   const roster = playable?.entries ?? [];
-  const tooSmall = playable !== null && roster.length < minEntriesOf(playable.kind);
+  const tooSmall =
+    playable !== null && roster.length < minEntriesOf(playable.kind);
   // Not playable for now: too few entries, or paused
   const closed = tooSmall || playable?.paused === true;
   // A past day the game has; today's and later Day Numbers are handled below

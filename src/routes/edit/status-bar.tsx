@@ -60,7 +60,8 @@ export function StatusBar({
           <Button
             id="submit-button"
             disabled={
-              details.entryCount < minEntriesOf(details.kind) || details.incompleteCount > 0
+              details.entryCount < minEntriesOf(details.kind) ||
+              details.incompleteCount > 0
             }
             onClick={() => void flow("submit")}
           >

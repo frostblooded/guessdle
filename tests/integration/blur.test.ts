@@ -213,8 +213,19 @@ describe("blur games", () => {
     const card = (await request("GET", "/api/games")).body.find(
       (c: Body) => c.slug === "blurry",
     );
-    assert.deepEqual(card.photos, []);
     assert.equal(card.kind, "blur");
+    // The banner collage is blurred tiles served by index, never the photos themselves
+    assert.deepEqual(card.photos, [
+      "/api/games/blurry/tile/0",
+      "/api/games/blurry/tile/1",
+    ]);
+    const tile = await fetch(`${url}${card.photos[1]}`);
+    assert.equal(tile.status, 200);
+    assert.equal(tile.headers.get("content-type"), "image/webp");
+    const meta = await sharp(Buffer.from(await tile.arrayBuffer())).metadata();
+    assert.deepEqual([meta.width, meta.height], [240, 240]);
+    assert.equal((await fetch(`${url}${G}/tile/2`)).status, 404);
+    assert.equal((await fetch(`${url}/api/games/petdle/tile/0`)).status, 404);
   });
 
   it("serves today's answer blurred but for the earned squares, up to the tries", async () => {
