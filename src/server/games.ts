@@ -85,6 +85,12 @@ else exists (
   where e.game_id = g.id and e.deleted_at is null and not exists (
     select 1 from entry_values v where v.entry_id = e.id and v.attribute_id = a.id)) end)`;
 
+// SQL true when the game aliased `g` is one the gallery shows: approved, with enough active
+// entries (one for a Blur game, MIN_ENTRIES otherwise) and none missing a value
+export const IN_GALLERY = `(g.status = 'approved' and not ${HAS_MISSING_VALUES}
+  and (select count(*) from entries n where n.game_id = g.id and n.deleted_at is null)
+    >= case when g.kind = 'blur' then 1 else ${MIN_ENTRIES} end)`;
+
 // An entry that pauses its game: a value missing, or in a Blur game its photo or square order
 export const isIncomplete = (game: GameRow, entry: Entry): boolean =>
   game.kind === "blur"
@@ -160,9 +166,22 @@ export interface GalleryCard {
   kind: GameKind;
 }
 
-// Approved games with enough active entries (MIN_ENTRIES, one for a Blur game) and none missing a value: the original
-// first, then newest first
-export async function listGallery(q: Q): Promise<GalleryCard[]> {
+// Which gallery games a list shows: all of them, one owner's, or one playlist's in its order
+export type GalleryScope =
+  | { ownerId: number; playlistId?: never }
+  | { playlistId: number; ownerId?: never }
+  | Record<string, never>;
+
+// Approved games with enough active entries (MIN_ENTRIES, one for a Blur game) and none missing
+// a value: the original first, then newest first. A scope narrows them to an owner's (newest first) or a playlist's.
+export async function listGallery(
+  q: Q,
+  scope: GalleryScope = {},
+): Promise<GalleryCard[]> {
+  const inPlaylist = scope.playlistId !== undefined;
+  const narrowedBy = [scope.playlistId ?? scope.ownerId].filter(
+    (id) => id !== undefined,
+  );
   const { rows } = await q.query<GalleryCard>(
     `select g.slug, g.name, g.description, g.cover_url as cover,
        case when g.cover_url = '' then array(
@@ -172,10 +191,18 @@ export async function listGallery(q: Q): Promise<GalleryCard[]> {
        ) else '{}'::text[] end as photos,
        count(e.id)::int as "entryCount", g.kind
      from games g join entries e on e.game_id = g.id and e.deleted_at is null
+     ${inPlaylist ? "join playlist_games pl on pl.game_id = g.id and pl.playlist_id = $3" : ""}
      where g.status = 'approved' and not ${HAS_MISSING_VALUES}
-     group by g.id having count(e.id) >= case when g.kind = 'blur' then 1 else $1 end
-     order by g.slug = 'petdle' desc, g.created_at desc, g.id desc`,
-    [MIN_ENTRIES, MAX_TILES],
+       ${scope.ownerId !== undefined ? "and g.owner_id = $3" : ""}
+     group by g.id${inPlaylist ? ", pl.position" : ""} having count(e.id) >= case when g.kind = 'blur' then 1 else $1 end
+     order by ${
+       inPlaylist
+         ? "pl.position"
+         : scope.ownerId !== undefined
+           ? "g.created_at desc, g.id desc"
+           : "g.slug = 'petdle' desc, g.created_at desc, g.id desc"
+     }`,
+    [MIN_ENTRIES, MAX_TILES, ...narrowedBy],
   );
   return rows.map((card) =>
     card.kind === "blur"
@@ -315,12 +342,15 @@ export interface AttributeDraft {
 
 // Replaces a game's attributes with `drafts`, in that order: missing ids are removed, a changed
 // type erases that attribute's values, new ones are added. All or nothing, in the caller's game
-// transaction (lifecycle.edit). "noop" when nothing changed.
+// transaction (lifecycle.edit). "noop" when nothing changed, "reorder" when only the order did
+// (which keeps the game's status).
 export async function saveAttributes(
   client: Q,
   game: GameRow,
   drafts: readonly AttributeDraft[],
-): Promise<"ok" | "noop" | "invalid" | "attribute_exists" | "not_found"> {
+): Promise<
+  "ok" | "noop" | "reorder" | "invalid" | "attribute_exists" | "not_found"
+> {
   const attrs = await listAttributes(client, game);
   const ids = drafts.flatMap((d) => (d.id === undefined ? [] : [d.id]));
   const names = drafts.map((d) => d.name.toLowerCase());
@@ -344,6 +374,13 @@ export async function saveAttributes(
   if (unchanged) {
     return "noop";
   }
+  const reordered =
+    drafts.length === attrs.length &&
+    drafts.every((d) =>
+      attrs.some(
+        (a) => a.id === d.id && a.name === d.name && a.type === d.type,
+      ),
+    );
   const removed = attrs.filter((a) => !ids.includes(a.id)).map((a) => a.id);
   const retyped = attrs
     .filter((a) => drafts.some((d) => d.id === a.id && d.type !== a.type))
@@ -363,7 +400,7 @@ export async function saveAttributes(
       [d.id ?? game.id, d.name, d.type, position],
     );
   }
-  return "ok";
+  return reordered ? "reorder" : "ok";
 }
 
 export type AttributeEdit =
