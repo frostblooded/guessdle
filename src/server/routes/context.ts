@@ -113,13 +113,16 @@ export function dayOf(
 }
 
 // The answer for `date` (today or a past day), or the failure sent and undefined
+// A day's answer entry and its revision (bumped when an override changed it)
+export type AnswerOfDay = Entry & { revision: number };
+
 export async function todaysAnswer(
   { pool, random }: AppContext,
   res: Response,
   { game, roster }: LoadedGame,
   date: string,
   day: number,
-): Promise<Entry | undefined> {
+): Promise<AnswerOfDay | undefined> {
   // Only the owner and admins reach a game too small to draw an answer from
   const blocker = playBlocker(game, roster);
   if (blocker) {
@@ -128,16 +131,17 @@ export async function todaysAnswer(
       .json({ error: blocker satisfies FailureCode, day });
     return undefined;
   }
-  const answerId = await ensureAnswer(
+  const stored = await ensureAnswer(
     pool,
     game,
     roster.entries.map((entry) => entry.id),
     date,
     random,
   );
-  const answer = roster.all.find((entry) => entry.id === answerId);
+  const answer = roster.all.find((entry) => entry.id === stored?.entryId);
   if (!answer) {
     res.status(500).json({ error: "answer_missing", day });
+    return undefined;
   }
-  return answer;
+  return { ...answer, revision: stored!.revision };
 }

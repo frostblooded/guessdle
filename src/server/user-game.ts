@@ -11,6 +11,8 @@ import type { GameRow, Roster } from "./games.ts";
 
 export interface GameView {
   day: number;
+  // The answer's revision: a changed one means the day started over (migration 013)
+  revision: number;
   ids: number[];
   rows: GradedAttribute[][];
   victory: boolean;
@@ -55,7 +57,7 @@ export const REFUSAL_STATUS = {
   finished: 409,
   // merge: the account already has rows for the day
   has_progress: 409,
-  // merge: the payload is for another day
+  // merge: the payload is for another day, or for an answer since changed
   stale_day: 409,
 } as const;
 export type Refusal = keyof typeof REFUSAL_STATUS;
@@ -67,7 +69,7 @@ type Q = Pick<pg.Pool, "query">;
 export interface GameContext {
   game: GameRow;
   roster: Roster;
-  answer: Entry;
+  answer: Entry & { revision: number };
   userId: number;
   date: string;
   day: number;
@@ -109,6 +111,7 @@ export async function view(
   const lost = isLost(game, ids, graded.victory);
   return {
     day,
+    revision: answer.revision,
     ids,
     rows: graded.rows,
     victory: graded.victory,
@@ -202,7 +205,8 @@ export async function mergeLocal(
   ) {
     return "invalid";
   }
-  if (body["day"] !== day) {
+  // Browsers from before revisions existed send none: they played revision 0
+  if (body["day"] !== day || (body["revision"] ?? 0) !== answer.revision) {
     return "stale_day";
   }
   if (current.ids.length > 0 || current.gaveUp) {

@@ -154,6 +154,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       const lost = isLost(game, ids, graded.victory);
       res.json({
         day,
+        revision: answer.revision,
         rows: graded.rows,
         victory: graded.victory,
         ...(lost && { lost: true }),
@@ -176,7 +177,11 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
     const { date, day } = played;
     const answer = await todaysAnswer(ctx, res, loaded, date, day);
     if (answer) {
-      res.json({ day, ...revealOf(loaded.game, answer) });
+      res.json({
+        day,
+        revision: answer.revision,
+        ...revealOf(loaded.game, answer),
+      });
     }
   });
 
