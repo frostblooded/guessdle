@@ -10,6 +10,8 @@ const base: Details = {
   status: "draft",
   rejectReason: "",
   skipPeriod: null,
+  kind: "classic",
+  blurTries: 5,
   entryCount: 5,
   incompleteCount: 0,
 };

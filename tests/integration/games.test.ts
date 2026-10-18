@@ -184,6 +184,7 @@ describe("games in the database", () => {
         cover: "/uploads/c.webp",
         photos: [],
         entryCount: 3,
+        kind: "classic",
       });
       assert.equal(body[0].entryCount, PET_IDS.length);
     });

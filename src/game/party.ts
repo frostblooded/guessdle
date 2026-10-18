@@ -4,12 +4,14 @@
 import type { Correctness } from "./correctness.ts";
 import {
   gradeGuess,
+  nameCell,
   type Entry,
   type EntryRef,
   type GameAttribute,
   type GradedAttribute,
 } from "./game.ts";
 import { MAX_NICKNAME, MIN_ENTRIES } from "./limits.ts";
+import type { GameKind } from "./blur.ts";
 
 // No I or O, so a code read aloud or off a screen is never mistaken for 1 or 0
 export const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -59,6 +61,8 @@ export interface RoundData {
   // In the order they were made
   guesses: { playerId: number; entryId: number; at: number }[];
   giveUps: { playerId: number; at: number }[];
+  // Blur games: guesses each player gets (ADR 0019); unlimited when absent
+  tries?: number;
 }
 
 // Who plays a round: everyone in the party when it ended (or now, while live), late joiners too
@@ -73,6 +77,8 @@ export interface Progress {
   guesses: number;
   solved: boolean;
   gaveUp: boolean;
+  // Blur games: used every try without solving it
+  lost: boolean;
   // From the round's start to the solving guess
   timeMs: number | null;
 }
@@ -85,13 +91,19 @@ export function progressOf(round: RoundData, playerId: number): Progress {
     guesses: mine.length,
     solved: solving !== undefined,
     gaveUp: round.giveUps.some((g) => g.playerId === playerId),
+    lost:
+      solving === undefined &&
+      round.tries !== undefined &&
+      mine.length >= round.tries,
     timeMs: solving ? solving.at - round.startedAt : null,
   };
 }
 
-export const isDone = (p: Progress): boolean => p.solved || p.gaveUp;
+export const isDone = (
+  p: Pick<Progress, "solved" | "gaveUp" | "lost">,
+): boolean => p.solved || p.gaveUp || p.lost;
 
-// A live round ends by itself once every player has solved it or given up
+// A live round ends by itself once every player has solved it, given up or run out of tries
 export function everyoneDone(
   players: readonly PartyPlayer[],
   round: RoundData,
@@ -178,7 +190,11 @@ export interface PartyView {
   game: {
     slug: string;
     name: string;
+    kind: GameKind;
+    // Blur games: tries per round
+    blurTries?: number;
     attributes: GameAttribute[];
+    // A Blur game's entries come without photos
     entries: EntryRef[];
   };
   ended: boolean;
@@ -195,11 +211,12 @@ export interface LiveRound {
   number: number;
   live: boolean;
   progress: Omit<Progress, "timeMs">[];
-  // The viewer's own board; the answer once they solved it or gave up
+  // The viewer's own board; the answer once they solved it, gave up or ran out of tries
   yours: {
     rows: GradedAttribute[][];
     solved: boolean;
     gaveUp: boolean;
+    lost: boolean;
     answer?: EntryRef;
   } | null;
 }
@@ -215,7 +232,7 @@ export interface FinishedRound {
 
 export interface ViewInput {
   code: string;
-  game: { slug: string; name: string };
+  game: { slug: string; name: string; kind?: GameKind; blurTries?: number };
   attributes: readonly GameAttribute[];
   // Active entries (offered to guess) and every entry (so old guesses still resolve)
   entries: readonly Entry[];
@@ -231,6 +248,7 @@ const ref = ({ id, name, photo }: Entry): EntryRef => ({ id, name, photo });
 
 export function partyView(input: ViewInput): PartyView {
   const { attributes, all, players, rounds, viewer } = input;
+  const kind = input.game.kind ?? "classic";
   const entry = (id: number): Entry =>
     all.find((e) => e.id === id) ?? {
       id,
@@ -242,7 +260,7 @@ export function partyView(input: ViewInput): PartyView {
     round.guesses
       .filter((g) => g.playerId === playerId)
       .map((g) =>
-        gradeGuess(attributes, entry(round.answerId), entry(g.entryId)),
+        gradeGuess(attributes, entry(round.answerId), entry(g.entryId), kind),
       );
   const latest = rounds.at(-1);
   const me = players.find((p) => p.id === viewer);
@@ -253,14 +271,18 @@ export function partyView(input: ViewInput): PartyView {
       number: latest.number,
       live: latest.endedAt === null,
       progress: participants(players, latest).map((p) => {
-        const { playerId, guesses, solved, gaveUp } = progressOf(latest, p.id);
-        return { playerId, guesses, solved, gaveUp };
+        const { playerId, guesses, solved, gaveUp, lost } = progressOf(
+          latest,
+          p.id,
+        );
+        return { playerId, guesses, solved, gaveUp, lost };
       }),
       yours: mine
         ? {
             rows: graded(latest, mine.playerId),
             solved: mine.solved,
             gaveUp: mine.gaveUp,
+            lost: mine.lost,
             ...(isDone(mine) && { answer: ref(entry(latest.answerId)) }),
           }
         : null,
@@ -275,7 +297,7 @@ export function partyView(input: ViewInput): PartyView {
         const rows = graded(r, res.playerId);
         return {
           ...res,
-          guessNames: rows.map((row) => String(row[1]!.value)),
+          guessNames: rows.map((row) => String(nameCell(row).value)),
           grades: rows.map((row) => row.map((cell) => cell.correctness)),
         };
       }),
@@ -285,8 +307,12 @@ export function partyView(input: ViewInput): PartyView {
     code: input.code,
     game: {
       ...input.game,
+      kind,
       attributes: [...attributes],
-      entries: input.entries.map(ref),
+      entries: input.entries.map((e) => ({
+        ...ref(e),
+        photo: kind === "blur" ? "" : e.photo,
+      })),
     },
     ended: input.ended,
     you: me ? { playerId: me.id, host: me.host } : null,
@@ -394,7 +420,13 @@ export function clockTime(ms: number): string {
 // How a player is doing in the live round, as the scoreboard says it
 export function progressLabel(p: Omit<Progress, "timeMs">): string {
   const count = `${p.guesses} ${p.guesses === 1 ? "guess" : "guesses"}`;
-  return p.solved ? `${count}, solved` : p.gaveUp ? `${count}, gave up` : count;
+  return p.solved
+    ? `${count}, solved`
+    : p.gaveUp
+      ? `${count}, gave up`
+      : p.lost
+        ? `${count}, out of tries`
+        : count;
 }
 
 export const REFUSAL_TEXT: Record<PartyRefusal, string> = {

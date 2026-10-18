@@ -164,6 +164,20 @@ describe("gradeIds", () => {
   });
 });
 
+describe("gradeIds: Blur games", () => {
+  it("grades the name only, so no photo reaches the player", () => {
+    const out = gradeIds(ATTRIBUTES, ROSTER, first, [2, 1], "blur");
+    assert.deepEqual(out, {
+      kind: "graded",
+      rows: [
+        [{ key: "name", value: "Bela", correctness: Correctness.Incorrect }],
+        [{ key: "name", value: "Ati", correctness: Correctness.Correct }],
+      ],
+      victory: true,
+    });
+  });
+});
+
 describe("findEntryId", () => {
   it("finds an entry id from typed text, ignoring case", () => {
     assert.equal(findEntryId(ROSTER, "COOKIE"), 3);

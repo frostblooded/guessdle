@@ -222,8 +222,8 @@ describe("partyView", () => {
     assert.deepEqual(mine.you, { playerId: 1, host: true });
     assert.equal(mine.round!.live, true);
     assert.deepEqual(mine.round!.progress, [
-      { playerId: 1, guesses: 1, solved: false, gaveUp: false },
-      { playerId: 2, guesses: 2, solved: false, gaveUp: false },
+      { playerId: 1, guesses: 1, solved: false, gaveUp: false, lost: false },
+      { playerId: 2, guesses: 2, solved: false, gaveUp: false, lost: false },
     ]);
     assert.equal(mine.round!.yours!.rows.length, 1);
     assert.equal(mine.round!.yours!.rows[0]![1]!.value, "Dido");
@@ -264,6 +264,60 @@ describe("partyView", () => {
       Correctness.Correct,
     ]);
     assert.equal(out.round!.live, false);
+  });
+});
+
+describe("Blur game rounds", () => {
+  const entry = (id: number, name: string): Entry => ({
+    id,
+    name,
+    photo: `/p/${id}.webp`,
+    values: [],
+  });
+  const all = [entry(3, "Cookie"), entry(4, "Dido"), entry(10, "Bela")];
+  const view = (rounds: RoundData[], viewer: number | null) =>
+    partyView({
+      code: "KWZP",
+      game: { slug: "pics", name: "Pics", kind: "blur", blurTries: 2 },
+      attributes: [],
+      entries: all,
+      all,
+      ended: false,
+      players: [ANA, BO],
+      rounds,
+      viewer,
+    });
+
+  it("ends a player's round after their last try, with no points", () => {
+    const live = round({
+      endedAt: null,
+      tries: 2,
+      guesses: [g(1, 3, 1100), g(1, 4, 1200), g(2, 10, 1300)],
+    });
+    assert.ok(everyoneDone([ANA, BO], live));
+    const ana = view([live], 1).round!.yours!;
+    assert.equal(ana.lost, true);
+    assert.equal(ana.answer!.name, "Bela");
+    // Names only on the board
+    assert.deepEqual(ana.rows[0], [
+      { key: "name", value: "Cookie", correctness: Correctness.Incorrect },
+    ]);
+    const results = roundResults([ANA, BO], { ...live, endedAt: 2000 });
+    assert.deepEqual(
+      results.map((r) => [r.playerId, r.points, r.lost]),
+      [
+        [2, 2, false],
+        [1, 0, true],
+      ],
+    );
+  });
+
+  it("sends no entry photos until a round is over", () => {
+    const live = round({ endedAt: null, tries: 2 });
+    const out = view([live], 1);
+    assert.equal(out.game.kind, "blur");
+    assert.ok(out.game.entries.every((e) => e.photo === ""));
+    assert.equal(out.round!.yours!.answer, undefined);
   });
 });
 
@@ -343,7 +397,13 @@ describe("text", () => {
     );
   });
   it("labels progress", () => {
-    const p = { playerId: 1, guesses: 1, solved: false, gaveUp: false };
+    const p = {
+      playerId: 1,
+      guesses: 1,
+      solved: false,
+      gaveUp: false,
+      lost: false,
+    };
     assert.equal(progressLabel(p), "1 guess");
     assert.equal(
       progressLabel({ ...p, guesses: 3, solved: true }),
@@ -352,6 +412,10 @@ describe("text", () => {
     assert.equal(
       progressLabel({ ...p, guesses: 0, gaveUp: true }),
       "0 guesses, gave up",
+    );
+    assert.equal(
+      progressLabel({ ...p, guesses: 3, lost: true }),
+      "3 guesses, out of tries",
     );
   });
 });

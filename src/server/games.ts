@@ -10,6 +10,7 @@ import {
 } from "../game/game.ts";
 import { MAX_TILES } from "../game/banner.ts";
 import { slugError } from "../game/slug.ts";
+import type { GameKind } from "../game/blur.ts";
 import type { EditKind } from "./lifecycle.ts";
 
 type Q = Pick<pg.Pool, "query">;
@@ -30,6 +31,9 @@ export interface GameRow {
   // Day Number 0 ("YYYY-MM-DD")
   startDate: string;
   skipPeriod: number | null;
+  kind: GameKind;
+  // Blur games: the number of tries
+  blurTries: number;
 }
 
 // A game plays with at least this many active entries
@@ -46,7 +50,7 @@ const gameWhere = async (
     `select id::int, slug, name, description, cover_url as "coverUrl",
        owner_id::int as "ownerId", status, reject_reason as "rejectReason",
        to_char(start_date, 'YYYY-MM-DD') as "startDate",
-       skip_period as "skipPeriod"
+       skip_period as "skipPeriod", kind, blur_tries as "blurTries"
      from games where ${where} = $1`,
     [value],
   );
@@ -71,11 +75,21 @@ export interface Roster {
 }
 
 // SQL true when the game aliased `g` has an active entry missing a value (no value rows for an
-// attribute; blanks are never stored). Such a game is paused.
-export const HAS_MISSING_VALUES = `exists (
+// attribute; blanks are never stored), or, in a Blur game, missing its photo or its square
+// order. Such a game is paused.
+export const HAS_MISSING_VALUES = `(case when g.kind = 'blur' then exists (
+  select 1 from entries e
+  where e.game_id = g.id and e.deleted_at is null and (e.photo_url = '' or e.blur_order is null))
+else exists (
   select 1 from entries e join attributes a on a.game_id = e.game_id
   where e.game_id = g.id and e.deleted_at is null and not exists (
-    select 1 from entry_values v where v.entry_id = e.id and v.attribute_id = a.id))`;
+    select 1 from entry_values v where v.entry_id = e.id and v.attribute_id = a.id)) end)`;
+
+// An entry that pauses its game: a value missing, or in a Blur game its photo or square order
+export const isIncomplete = (game: GameRow, entry: Entry): boolean =>
+  game.kind === "blur"
+    ? entry.photo === "" || entry.blurOrder === undefined
+    : !hasAllValues(entry.values);
 
 // A game's attributes and entries with their values
 export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
@@ -92,8 +106,10 @@ export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
     name: string;
     photo: string;
     deleted: boolean;
+    blurOrder: number[] | null;
   }>(
-    `select id::int, name, photo_url as photo, deleted_at is not null as deleted
+    `select id::int, name, photo_url as photo, deleted_at is not null as deleted,
+       blur_order::int[] as "blurOrder"
      from entries where game_id = $1 order by id`,
     [game.id],
   );
@@ -116,18 +132,19 @@ export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
     const list = byCell.get(`${entryId}:${attr.id}`) ?? [];
     return (attr.type === "list" ? list : (list[0] ?? "")) as AttributeValue;
   };
-  const all = entries.rows.map(({ id, name, photo }): Entry => ({
+  const all = entries.rows.map(({ id, name, photo, blurOrder }): Entry => ({
     id,
     name,
     photo,
     values: attributes.rows.map((attr) => cell(id, attr)),
+    ...(game.kind === "blur" && blurOrder && { blurOrder }),
   }));
   const active = all.filter((_, i) => !entries.rows[i]!.deleted);
   return {
     attributes: attributes.rows.map(({ name, type }) => ({ name, type })),
     entries: active,
     all,
-    incomplete: active.filter((entry) => !hasAllValues(entry.values)).length,
+    incomplete: active.filter((entry) => isIncomplete(game, entry)).length,
   };
 }
 
@@ -136,9 +153,11 @@ export interface GalleryCard {
   name: string;
   description: string;
   cover: string;
-  // Banner collage photos of active entries, by id; only for a game without a cover
+  // Banner collage photos of active entries, by id; only for a classic game without a cover
+  // (a Blur game's photos are its answers)
   photos: string[];
   entryCount: number;
+  kind: GameKind;
 }
 
 // Approved games with at least MIN_ENTRIES active entries and none missing a value: the original
@@ -146,12 +165,12 @@ export interface GalleryCard {
 export async function listGallery(q: Q): Promise<GalleryCard[]> {
   const { rows } = await q.query<GalleryCard>(
     `select g.slug, g.name, g.description, g.cover_url as cover,
-       case when g.cover_url = '' then array(
+       case when g.cover_url = '' and g.kind = 'classic' then array(
          select p.photo_url from entries p
          where p.game_id = g.id and p.deleted_at is null and p.photo_url <> ''
          order by p.id limit $2
        ) else '{}'::text[] end as photos,
-       count(e.id)::int as "entryCount"
+       count(e.id)::int as "entryCount", g.kind
      from games g join entries e on e.game_id = g.id and e.deleted_at is null
      where g.status = 'approved' and not ${HAS_MISSING_VALUES}
      group by g.id having count(e.id) >= $1
@@ -189,13 +208,14 @@ export async function createGame(
   name: string,
   startDate: string,
   slug: { typed: string } | { base: string },
+  kind: GameKind = "classic",
 ): Promise<string | "slug_taken"> {
   const insert = async (candidate: string): Promise<boolean> =>
     (
       await q.query(
-        `insert into games (slug, name, owner_id, start_date) values ($1, $2, $3, $4)
+        `insert into games (slug, name, owner_id, start_date, kind) values ($1, $2, $3, $4, $5)
          on conflict (slug) do nothing`,
-        [candidate, name, ownerId, startDate],
+        [candidate, name, ownerId, startDate, kind],
       )
     ).rowCount === 1;
   if ("typed" in slug) {
@@ -216,12 +236,17 @@ export interface GamePatch {
   description?: string;
   coverUrl?: string;
   skipPeriod?: number | null;
+  // Blur games only
+  blurTries?: number;
 }
 
-// The lifecycle edit kind of a patch: text or image changes reset status, a skip period alone does not
+// The lifecycle edit kind of a patch: text, image or try count changes reset status, a skip
+// period alone does not
 export function patchKind(game: GameRow, patch: GamePatch): EditKind {
   const next = { ...game, ...patch };
-  return next.name !== game.name || next.description !== game.description
+  return next.name !== game.name ||
+    next.description !== game.description ||
+    next.blurTries !== game.blurTries
     ? "details"
     : next.coverUrl !== game.coverUrl
       ? "cover"
@@ -238,8 +263,15 @@ export async function updateGame(
   const next = { ...game, ...patch };
   await q.query(
     `update games set name = $2, description = $3, cover_url = $4, skip_period = $5,
-       updated_at = now() where id = $1`,
-    [game.id, next.name, next.description, next.coverUrl, next.skipPeriod],
+       blur_tries = $6, updated_at = now() where id = $1`,
+    [
+      game.id,
+      next.name,
+      next.description,
+      next.coverUrl,
+      next.skipPeriod,
+      next.blurTries,
+    ],
   );
   return next.coverUrl === game.coverUrl ? null : game.coverUrl;
 }

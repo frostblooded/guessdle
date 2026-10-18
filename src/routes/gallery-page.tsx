@@ -16,6 +16,7 @@ interface GameCard {
   cover: string;
   photos: string[];
   entryCount: number;
+  kind: "classic" | "blur";
 }
 
 async function fetchGames(): Promise<GameCard[]> {
@@ -98,6 +99,7 @@ function Card({ card, featured }: { card: GameCard; featured: boolean }) {
           <h2 className="flex flex-wrap items-center gap-2 text-xl font-bold tracking-wide uppercase">
             {card.name}
             {featured && <Badge variant="default">Original</Badge>}
+            {card.kind === "blur" && <Badge variant="secondary">Blur</Badge>}
           </h2>
           {card.description && (
             <p className="line-clamp-3 text-sm text-muted-foreground">

@@ -7,27 +7,41 @@ import {
 } from "./game-state.ts";
 import { call, failureOf, type Failure, type Fetch } from "./transport.ts";
 
-// POST /api/games/:slug/grade; `answer` (the entry's name) is present only on victory
-interface GradeResponse {
+// What a finished day reveals: the answer's name, and a Blur game's whole image
+export interface Reveal {
+  answer?: string;
+  answerPhoto?: string;
+}
+
+// POST /api/games/:slug/grade; `answer` (the entry's name) is present only once the day is
+// over (victory, or a Blur game's tries used up: `lost`)
+interface GradeResponse extends Reveal {
   day: number;
   rows: GradedAttribute[][];
   victory: boolean;
-  answer?: string;
+  lost?: true;
 }
 
 // POST /api/games/:slug/give-up
 interface GiveUpResponse {
   day: number;
   answer: string;
+  answerPhoto?: string;
 }
 
-export interface Loaded {
+export interface Loaded extends Reveal {
   rows: GradedAttribute[][];
   victory: boolean;
-  // The answer's name: present on victory and after a give-up
-  answer?: string;
   gaveUp?: true;
+  // Blur games: every try used without the answer
+  lost?: true;
 }
+
+// The reveal fields present in a response
+export const revealIn = (res: Reveal): Reveal => ({
+  ...(res.answer !== undefined && { answer: res.answer }),
+  ...(res.answerPhoto !== undefined && { answerPhoto: res.answerPhoto }),
+});
 
 export type SubmitResult =
   | { kind: "invalid" }
@@ -37,15 +51,16 @@ export type SubmitResult =
   | { kind: "rate_limited" }
   // The game is over (won or gave up); reset to play again
   | { kind: "finished" }
-  | {
+  | ({
       kind: "accepted";
       row: GradedAttribute[];
       isAnswer: boolean;
-      answer?: string;
-    };
+      // Blur games: this guess used the last try
+      lost?: true;
+    } & Reveal);
 
 export type GiveUpResult =
-  | { kind: "gaveUp"; answer: string }
+  | { kind: "gaveUp"; answer: string; answerPhoto?: string }
   | { kind: "finished" }
   | { kind: "error" }
   | { kind: "rate_limited" }
@@ -91,7 +106,7 @@ export function createPlay({
   day: pastDay,
 }: PlayDeps): Play {
   const state: GameState = createGameState(storage, now, pastDay === undefined);
-  // Won or gave up; not stored, it is re-derived on load
+  // Won, gave up or lost; not stored, it is re-derived on load
   let finished: boolean = false;
   const base: string = `/api/games/${slug}`;
   const query: string = pastDay === undefined ? "" : `?day=${pastDay}`;
@@ -136,9 +151,7 @@ export function createPlay({
         if (res.victory) {
           state.setWon();
         }
-        if (res.answer !== undefined) {
-          loaded.answer = res.answer;
-        }
+        Object.assign(loaded, revealIn(res), res.lost && { lost: true });
       }
       if (gaveUp) {
         const res = await post<GiveUpResponse>(giveUpUrl, {});
@@ -149,10 +162,10 @@ export function createPlay({
           return { rows: [], victory: false };
         }
         state.setDay(res.day);
-        loaded.answer = res.answer;
+        Object.assign(loaded, revealIn(res));
         loaded.gaveUp = true;
       }
-      finished = loaded.victory || gaveUp;
+      finished = loaded.victory || gaveUp || loaded.lost === true;
       return loaded;
     },
 
@@ -180,7 +193,7 @@ export function createPlay({
       state.setDay(res.day);
       const row: GradedAttribute[] = res.rows[res.rows.length - 1]!;
       const isAnswer: boolean = isAnswerRow(row);
-      finished = isAnswer;
+      finished = isAnswer || res.lost === true;
       if (isAnswer) {
         state.setWon();
       }
@@ -188,7 +201,8 @@ export function createPlay({
         kind: "accepted",
         row,
         isAnswer,
-        ...(res.answer !== undefined && { answer: res.answer }),
+        ...(res.lost && { lost: true as const }),
+        ...revealIn(res),
       };
     },
 
@@ -206,7 +220,7 @@ export function createPlay({
       state.setGaveUp();
       state.setDay(res.day);
       finished = true;
-      return { kind: "gaveUp", answer: res.answer };
+      return { kind: "gaveUp", answer: res.answer, ...revealIn(res) };
     },
 
     reset(): boolean {

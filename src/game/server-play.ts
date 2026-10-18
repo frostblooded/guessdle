@@ -1,16 +1,23 @@
 // Signed-in play: guesses, give-up and reset live on the server (/api/game).
 import { isAnswerRow, type GradedAttribute } from "./game.ts";
-import type { GiveUpResult, Loaded, Play, SubmitResult } from "./play.ts";
+import {
+  revealIn,
+  type GiveUpResult,
+  type Loaded,
+  type Play,
+  type Reveal,
+  type SubmitResult,
+} from "./play.ts";
 import { call, failureOf, type Fetch } from "./transport.ts";
 
 // The server's view of today's game
-interface GameResponse {
+interface GameResponse extends Reveal {
   day: number;
   ids: number[];
   rows: GradedAttribute[][];
   victory: boolean;
   gaveUp: boolean;
-  answer?: string;
+  lost?: true;
 }
 
 export interface ServerPlayDeps {
@@ -40,7 +47,7 @@ export function createServerPlay({
     }
     day = game.day;
     ids = game.ids;
-    finished = game.victory || game.gaveUp;
+    finished = game.victory || game.gaveUp || game.lost === true;
   }
 
   const errorOf = (data: unknown): string | undefined =>
@@ -57,8 +64,9 @@ export function createServerPlay({
       return {
         rows: game.rows,
         victory: game.victory,
-        ...(game.answer !== undefined && { answer: game.answer }),
+        ...revealIn(game),
         ...(game.gaveUp && { gaveUp: true as const }),
+        ...(game.lost && { lost: true as const }),
       };
     },
 
@@ -79,7 +87,8 @@ export function createServerPlay({
           kind: "accepted",
           row,
           isAnswer: isAnswerRow(row),
-          ...(game.answer !== undefined && { answer: game.answer }),
+          ...(game.lost && { lost: true as const }),
+          ...revealIn(game),
         };
       }
       const error = errorOf(res!.data);
@@ -105,7 +114,7 @@ export function createServerPlay({
       if (res!.status === 200) {
         const game = res!.data as GameResponse;
         adopt(game);
-        return { kind: "gaveUp", answer: game.answer! };
+        return { kind: "gaveUp", answer: game.answer!, ...revealIn(game) };
       }
       if (errorOf(res!.data) === "finished") {
         finished = true;

@@ -10,6 +10,8 @@ export interface Entry {
   name: string;
   photo: string;
   values: Record<string, string[]>;
+  // Blur games only: the order the squares clear in, null until picked
+  blurOrder?: number[] | null;
 }
 
 export const IMAGE_TYPES = "image/jpeg,image/png,image/webp";

@@ -9,9 +9,36 @@ export interface GameView {
   rows: GradedAttribute[][];
   victory: boolean;
   gaveUp: boolean;
-  // The answer's name: present on victory and after a give-up
+  // Blur games: every try was used without finding the answer
+  lost?: true;
+  // The answer's name: present once the day is over (victory, give-up or lost)
   answer?: string;
+  // Blur games, once the day is over: the answer's whole image
+  answerPhoto?: string;
 }
+
+// A Blur game's tries, null for a classic game with unlimited guesses
+export const triesOf = (game: GameRow): number | null =>
+  game.kind === "blur" ? game.blurTries : null;
+
+// The answer as a finished day reveals it: its name, and a Blur game's whole image
+export const revealOf = (
+  game: GameRow,
+  answer: Entry,
+): { answer: string; answerPhoto?: string } => ({
+  answer: answer.name,
+  ...(game.kind === "blur" && { answerPhoto: answer.photo }),
+});
+
+// Whether `ids` used up a Blur game's tries without the answer
+export const isLost = (
+  game: GameRow,
+  ids: readonly number[],
+  victory: boolean,
+): boolean => {
+  const tries = triesOf(game);
+  return tries !== null && !victory && ids.length >= tries;
+};
 
 // Each refusal and the HTTP status it answers with
 export const REFUSAL_STATUS = {
@@ -58,18 +85,26 @@ export async function view(
     ).rowCount === 1;
   // Soft-deleted entries still resolve, so past guesses keep their rows
   const ids = guesses.rows.map((row) => row.entry_id);
-  const graded = gradeIds(roster.attributes, roster.all, answer, ids);
+  const graded = gradeIds(
+    roster.attributes,
+    roster.all,
+    answer,
+    ids,
+    game.kind,
+  );
   if (graded.kind !== "graded") {
     // Stored rows are never duplicated
     throw new Error("stored guesses are not gradable");
   }
+  const lost = isLost(game, ids, graded.victory);
   return {
     day,
     ids,
     rows: graded.rows,
     victory: graded.victory,
     gaveUp,
-    ...((graded.victory || gaveUp) && { answer: answer.name }),
+    ...(lost && { lost: true as const }),
+    ...((graded.victory || gaveUp || lost) && revealOf(game, answer)),
   };
 }
 
@@ -104,7 +139,7 @@ export async function changeGame(
 }
 
 const finished = (current: GameView): boolean =>
-  current.victory || current.gaveUp;
+  current.victory || current.gaveUp || current.lost === true;
 
 export async function addGuess(
   q: Q,
@@ -166,14 +201,17 @@ export async function mergeLocal(
   // Keep first occurrences in order, stop after the answer
   const keep = [...new Set(ids as number[])];
   const end = keep.indexOf(answer.id);
-  const adopted = end === -1 ? keep : keep.slice(0, end + 1);
+  const adopted = (end === -1 ? keep : keep.slice(0, end + 1)).slice(
+    0,
+    triesOf(game) ?? undefined,
+  );
   for (const id of adopted) {
     await q.query(
       "insert into user_guesses (user_id, game_id, day, entry_id) values ($1, $2, $3, $4)",
       [userId, game.id, date, id],
     );
   }
-  if (gaveUp === true && end === -1) {
+  if (gaveUp === true && end === -1 && !isLost(game, adopted, false)) {
     await q.query(
       "insert into user_give_ups (user_id, game_id, day) values ($1, $2, $3)",
       [userId, game.id, date],

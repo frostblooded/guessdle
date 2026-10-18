@@ -22,6 +22,7 @@ import { AnswersPanel } from "./answers-panel.tsx";
 import { AttributesPanel } from "./attributes-panel.tsx";
 import { EntriesPanel } from "./entries-panel.tsx";
 import { StatusBar } from "./status-bar.tsx";
+import { BlurTriesField } from "./blur-tries-field.tsx";
 import { IMAGE_TYPES, type Attribute, type Entry } from "./types.ts";
 
 type Loaded =
@@ -77,11 +78,13 @@ interface Fields {
   name: string;
   description: string;
   skip: string;
+  blurTries: number;
 }
 const fieldsOf = (d: Details): Fields => ({
   name: d.name,
   description: d.description,
   skip: d.skipPeriod === null ? "" : String(d.skipPeriod),
+  blurTries: d.blurTries,
 });
 
 // The title row: the game name once loaded, and a way to the game itself
@@ -152,10 +155,12 @@ function Editor({
   const submitDetails = (event: FormEvent): void => {
     event.preventDefault();
     const skip = fields.skip.trim();
+    const blur = saved.kind === "blur";
     void save({
       name: fields.name,
       description: fields.description,
       skipPeriod: skip === "" ? null : Number(skip),
+      ...(blur && { blurTries: fields.blurTries }),
     });
   };
 
@@ -197,7 +202,10 @@ function Editor({
         />
         <Tabs value={tab} onValueChange={setTab} className="space-y-4">
           <TabsList aria-label="Editor sections">
-            {TABS.map(([value, label, panel]) => (
+            {/* A Blur game has no attributes */}
+            {TABS.filter(
+              ([value]) => saved.kind !== "blur" || value !== "attributes",
+            ).map(([value, label, panel]) => (
               <TabsTrigger key={value} value={value} panelId={panel}>
                 {label}
               </TabsTrigger>
@@ -279,6 +287,14 @@ function Editor({
                     )}
                   </div>
                 </div>
+                {saved.kind === "blur" && (
+                  <BlurTriesField
+                    value={fields.blurTries}
+                    onChange={(blurTries) =>
+                      setFields((f) => ({ ...f, blurTries }))
+                    }
+                  />
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="edit-skip">
                     Skip period (days before an entry can repeat)
@@ -326,6 +342,7 @@ function Editor({
                 base={base}
                 initial={initial}
                 active={tab === "entries"}
+                blur={saved.kind === "blur"}
                 onChange={refreshStatus}
               />
             </Card>

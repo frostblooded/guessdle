@@ -13,6 +13,12 @@ An Admin's sign-off that lets a Game appear in the front-page gallery. Unapprove
 **Owner**:
 The signed-in user who created a Game. Owners and Admins edit the Game, set its Overrides, submit, unpublish and delete it. Deleting a user deletes their Games.
 
+**Kind**:
+A Game is **Classic** (guessed by comparing Attributes) or **Blur** (guessed from a blurred image). Chosen when the Game is created; it never changes.
+
+**Square Order**:
+The order a Blur Game Entry's nine image squares clear in, picked by the Owner. Only the first square is clear at first; each wrong Guess clears the next. The Game sets the tries (1 to 9): a wrong Guess on the last one loses the day.
+
 **Draft**:
 A Game's first status. Only its Owner and Admins can see it (everyone else gets a 404) until it is submitted. Statuses: draft, pending, approved, rejected.
 

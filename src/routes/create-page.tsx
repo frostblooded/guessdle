@@ -9,6 +9,20 @@ import { slugify } from "../game/slug.ts";
 import { api, errorText } from "../manage-client.ts";
 import { useSignedIn } from "../lib/use-signed-in.ts";
 import { useTitle } from "../lib/use-title.ts";
+import type { GameKind } from "../game/blur.ts";
+
+const KINDS: { kind: GameKind; title: string; text: string }[] = [
+  {
+    kind: "classic",
+    title: "Classic",
+    text: "Players guess by comparing attributes, like colors or owners.",
+  },
+  {
+    kind: "blur",
+    title: "Blur",
+    text: "Players guess from an image split into nine blurred squares that clear one by one.",
+  },
+];
 
 function CreateForm() {
   const [name, setName] = useState("");
@@ -18,6 +32,7 @@ function CreateForm() {
   const [error, setError] = useState("");
   const [slugRefused, setSlugRefused] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [kind, setKind] = useState<GameKind>("classic");
 
   const submit = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
@@ -25,6 +40,7 @@ function CreateForm() {
     setBusy(true);
     const reply = await api("POST", "/api/games", {
       name,
+      kind,
       ...(typed && { slug }),
     });
     if (reply?.status === 201) {
@@ -87,6 +103,36 @@ function CreateForm() {
             create the game.
           </p>
         </div>
+        <fieldset className="space-y-2">
+          <legend className="mb-2 text-sm font-medium">Game type</legend>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {KINDS.map((k) => (
+              <label
+                key={k.kind}
+                className="flex cursor-pointer gap-3 rounded-lg border p-3 has-[:checked]:border-primary has-[:checked]:bg-muted"
+              >
+                <input
+                  type="radio"
+                  name="game-kind"
+                  id={`game-kind-${k.kind}`}
+                  value={k.kind}
+                  className="mt-1 accent-primary"
+                  checked={kind === k.kind}
+                  onChange={() => setKind(k.kind)}
+                />
+                <span className="space-y-1">
+                  <span className="block font-semibold">{k.title}</span>
+                  <span className="block text-sm text-muted-foreground">
+                    {k.text}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+          <p className="fine-print text-xs text-muted-foreground">
+            The type cannot be changed after you create the game.
+          </p>
+        </fieldset>
         <Alert id="create-error" variant="error" role="alert">
           {error}
         </Alert>

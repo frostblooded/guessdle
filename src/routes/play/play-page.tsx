@@ -3,14 +3,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { Navigate, useParams } from "react-router";
-import { BoardRow, GuessRow, TitleTile } from "../../components/board.tsx";
-import { EmptyState, PageHead } from "../../components/page.tsx";
+import { BlurView } from "../../components/blur-view.tsx";
+import { PageHead } from "../../components/page.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
 import { FAILURES } from "../../game/failures.ts";
 import {
   findEntryId,
+  isAnswerRow,
+  nameCell,
   type EntryRef,
   type GameAttribute,
   type GradedAttribute,
@@ -18,6 +20,7 @@ import {
 import { MIN_ENTRIES } from "../../game/limits.ts";
 import { openPlay } from "../../game/open-play.ts";
 import type { Play } from "../../game/play.ts";
+import type { GameKind } from "../../game/blur.ts";
 import { browserFetch, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { GuessBox } from "./guess-box.tsx";
@@ -27,9 +30,10 @@ import {
   PastDayLede,
   PastDaysLink,
 } from "./past-day.tsx";
+import { boardUrl, PlayResults } from "./play-results.tsx";
 import { PlayActions, PlayStatus, type StatusView } from "./play-status.tsx";
 import { ResetDialog } from "./reset-dialog.tsx";
-import { ResultBanner, type Result } from "./result-banner.tsx";
+import { ResultBanner, resultOf, type Result } from "./result-banner.tsx";
 import { StatsDialog } from "./stats-dialog.tsx";
 import { useVictoryStats } from "./use-victory-stats.ts";
 
@@ -42,7 +46,11 @@ export type PlayableGame = {
   canEdit: boolean;
   // Some entries miss values, so the game cannot be played for now
   paused: boolean;
+  kind: GameKind;
+  // Blur games: tries per day
+  blurTries?: number;
   attributes: GameAttribute[];
+  // A Blur game's entries come without photos
   entries: EntryRef[];
 } & StatusView;
 
@@ -91,6 +99,8 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const [blocked, setBlocked] = useState(false);
   const [guess, setGuess] = useState("");
   const [confirming, setConfirming] = useState(false);
+  // Bumped on every fresh board, so a Blur game's board image is fetched again
+  const [board, setBoard] = useState(0);
   const play = useRef<Play | null>(null);
   const started = useRef(false);
   const submitting = useRef(false);
@@ -119,6 +129,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const clearBoard = (): void => {
     setRows([]);
     setResult(null);
+    setBoard((n) => n + 1);
   };
 
   // Once the game and who is signed in are known: pick where the game lives, then load it.
@@ -156,11 +167,16 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
         return;
       }
       setRows([...loaded.rows].reverse());
-      if (loaded.answer !== undefined && (loaded.victory || loaded.gaveUp)) {
-        setResult({
-          kind: loaded.victory ? "victory" : "give-up",
-          answer: loaded.answer,
-        });
+      if (
+        loaded.answer !== undefined &&
+        (loaded.victory || loaded.gaveUp || loaded.lost)
+      ) {
+        setResult(
+          resultOf(
+            loaded.victory ? "victory" : loaded.lost ? "lost" : "give-up",
+            loaded,
+          ),
+        );
       }
       setReady(true);
     })();
@@ -194,9 +210,9 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
     if (rows.length === 0 && !past) {
       victory.startClock();
     }
-    if (res.isAnswer && res.answer !== undefined) {
-      setResult({ kind: "victory", answer: res.answer });
-      if (!past) {
+    if (res.answer !== undefined && (res.isAnswer || res.lost)) {
+      setResult(resultOf(res.isAnswer ? "victory" : "lost", res));
+      if (res.isAnswer && !past) {
         void victory.show();
       }
     }
@@ -216,7 +232,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
           : null,
     );
     if (res.kind === "gaveUp") {
-      setResult({ kind: "give-up", answer: res.answer });
+      setResult(resultOf("give-up", res));
     }
   }
 
@@ -255,8 +271,10 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
           : notice;
   const loading = !cannotPlay && !ready;
   const finished = result !== null;
-  // Each row names its guess in the second cell; those names leave the suggestions
-  const used = new Set(rows.map((row) => row[1]?.value));
+  // Each row names its guess; those names leave the suggestions
+  const used = new Set(rows.map((row) => nameCell(row).value));
+  const blur = playable?.kind === "blur" ? (playable.blurTries ?? 1) : null;
+  const wrong = rows.filter((row) => !isAnswerRow(row)).length;
   const names = roster
     .map((entry) => entry.name)
     .filter((name) => !used.has(name));
@@ -326,6 +344,15 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
         aria-label="Game board"
         aria-busy={isPending || loading ? true : undefined}
       >
+        {blur !== null && ready && (
+          <BlurView
+            boardUrl={(n) => boardUrl(slug, n, board, pastDay)}
+            tries={blur}
+            wrong={wrong}
+            finished={finished}
+            reveal={result?.photo}
+          />
+        )}
         <Card className="play-card mb-6 gap-3 p-4 sm:p-5">
           <div
             id="new-guess-row"
@@ -386,37 +413,13 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
           onConfirm={() => void reset()}
           opener={opener}
         />
-        <div className="results flex flex-col gap-2 sm:gap-2.5">
-          <BoardRow
-            id="guess-results-titles-row"
-            columns={titles.length}
-            aria-hidden="true"
-          >
-            {titles.map((title, i) => (
-              <TitleTile key={i} className="guess-result-title">
-                {title}
-              </TitleTile>
-            ))}
-          </BoardRow>
-          {(isPending || loading) && (
-            <EmptyState id="loading-state">
-              {past ? "Loading the game…" : "Loading today's game…"}
-            </EmptyState>
-          )}
-          {ready && rows.length === 0 && (
-            <EmptyState id="empty-state">
-              No guesses yet. Start typing a name above, then pick one.
-            </EmptyState>
-          )}
-          <div
-            id="guess-results-container"
-            className="flex flex-col gap-2 sm:gap-2.5"
-          >
-            {rows.map((row, i) => (
-              <GuessRow key={rows.length - i} row={row} />
-            ))}
-          </div>
-        </div>
+        <PlayResults
+          rows={rows}
+          titles={blur === null ? titles : null}
+          loading={isPending || loading}
+          loadingText={past ? "Loading the game…" : "Loading today's game…"}
+          empty={ready && rows.length === 0}
+        />
       </section>
     </>
   );

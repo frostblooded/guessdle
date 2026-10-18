@@ -7,6 +7,7 @@ import {
   gradeNumber,
   type Hint,
 } from "./correctness.ts";
+import type { GameKind } from "./blur.ts";
 
 export type AttributeType = "text" | "list" | "number";
 
@@ -26,10 +27,13 @@ export interface EntryRef {
 // Number as a string, List as an array)
 export interface Entry extends EntryRef {
   values: AttributeValue[];
+  // Blur games only: the order the grid's squares clear in (cells 0-8), once picked
+  blurOrder?: number[];
 }
 
 // One column of a guessed entry, graded against the Daily Answer. Rows list the
-// photo, the name, then the game's Attributes: the table column order.
+// photo, the name, then the game's Attributes: the table column order. A Blur game's rows
+// hold the name only, so no entry's image reaches the player before the day ends.
 export interface GradedAttribute {
   key: string;
   value: AttributeValue;
@@ -42,6 +46,10 @@ export interface GradedAttribute {
 export const hasAllValues = (values: readonly AttributeValue[]): boolean =>
   values.every((value: AttributeValue): boolean => value.length > 0);
 
+// A graded row's name cell, wherever the row's kind puts it
+export const nameCell = (row: readonly GradedAttribute[]): GradedAttribute =>
+  row.find((cell: GradedAttribute): boolean => cell.key === "name")!;
+
 export function isAnswerRow(row: GradedAttribute[]): boolean {
   return row.every(
     (cell: GradedAttribute): boolean =>
@@ -53,7 +61,22 @@ export function gradeGuess(
   attributes: readonly GameAttribute[],
   answer: Entry,
   guess: Entry,
+  kind: GameKind = "classic",
 ): GradedAttribute[] {
+  const name: GradedAttribute = {
+    key: "name",
+    value: guess.name,
+    correctness: gradeCorrectness(guess.name, answer.name),
+  };
+  if (kind === "blur") {
+    return [
+      {
+        ...name,
+        correctness:
+          guess.id === answer.id ? Correctness.Correct : Correctness.Incorrect,
+      },
+    ];
+  }
   return [
     {
       key: "photo",
@@ -61,11 +84,7 @@ export function gradeGuess(
       correctness:
         guess.id === answer.id ? Correctness.Correct : Correctness.Incorrect,
     },
-    {
-      key: "name",
-      value: guess.name,
-      correctness: gradeCorrectness(guess.name, answer.name),
-    },
+    name,
     ...attributes.map(
       (attribute: GameAttribute, i: number): GradedAttribute => ({
         key: attribute.name,
@@ -95,6 +114,7 @@ export function gradeIds(
   roster: readonly Entry[],
   answer: Entry,
   ids: readonly number[],
+  kind: GameKind = "classic",
 ): GradeIdsResult {
   const guesses: Entry[] = [];
   for (const id of ids) {
@@ -113,7 +133,7 @@ export function gradeIds(
   return {
     kind: "graded",
     rows: guesses.map((guess: Entry): GradedAttribute[] =>
-      gradeGuess(attributes, answer, guess),
+      gradeGuess(attributes, answer, guess, kind),
     ),
     victory: ids.includes(answer.id),
   };

@@ -1,6 +1,8 @@
 // The editor's Entries tab: list, add, change and delete entries with photo and values.
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useCrop } from "../../components/crop-dialog.tsx";
+import { CELLS } from "../../game/blur.ts";
+import { FAILURES } from "../../game/failures.ts";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button, buttonVariants } from "../../components/ui/button.tsx";
 import { Input, Label, Textarea } from "../../components/ui/input.tsx";
@@ -12,6 +14,7 @@ import {
 } from "../../game/limits.ts";
 import { api, errorText, type Reply } from "../../manage-client.ts";
 import { IMAGE_TYPES, type Attribute, type Entry } from "./types.ts";
+import { BlurOrderEditor } from "./blur-order-editor.tsx";
 
 // What the form holds: the entry being edited (null: adding), its name, photo URL and values
 interface Draft {
@@ -19,12 +22,15 @@ interface Draft {
   name: string;
   photo: string;
   values: Record<string, string>;
+  // Blur games: the squares picked so far, in the order they clear
+  blurOrder: number[];
 }
 
 const draftOf = (entry: Entry | null): Draft => ({
   editing: entry,
   name: entry?.name ?? "",
   photo: entry?.photo ?? "",
+  blurOrder: entry?.blurOrder ?? [],
   values: Object.fromEntries(
     Object.entries(entry?.values ?? {}).map(([id, items]) => [
       id,
@@ -37,9 +43,12 @@ export function EntriesPanel({
   base,
   initial,
   active,
+  blur = false,
   onChange,
 }: {
   base: string;
+  // A Blur game: entries have an image and a square order instead of values
+  blur?: boolean;
   initial: { attributes: Attribute[]; entries: Entry[] };
   // The tab is open: refresh the lists, since attributes may have changed
   active: boolean;
@@ -108,7 +117,19 @@ export function EntriesPanel({
         (draft.values[String(attr.id)] ?? "").split("\n"),
       ]),
     );
-    const body = { name: draft.name, photo: draft.photo, values };
+    if (blur && draft.photo && draft.blurOrder.length !== CELLS) {
+      setError(FAILURES.missing_order.text);
+      return;
+    }
+    const body = blur
+      ? {
+          name: draft.name,
+          photo: draft.photo,
+          ...(draft.blurOrder.length === CELLS && {
+            blurOrder: draft.blurOrder,
+          }),
+        }
+      : { name: draft.name, photo: draft.photo, values };
     const ok = draft.editing
       ? await run("PATCH", `${base}/entries/${draft.editing.id}`, body)
       : await run("POST", `${base}/entries`, body);
@@ -141,13 +162,23 @@ export function EntriesPanel({
     }
   };
 
+  const incomplete = (entry: Entry): boolean =>
+    blur
+      ? !entry.photo || !entry.blurOrder
+      : formAttributes.some((attr) => !entry.values[String(attr.id)]?.length);
+
   return (
     <div className="space-y-5">
       {dialog}
       <p className="lede text-sm text-muted-foreground">
-        Each entry is a row on the board. A game needs at least {MIN_ENTRIES}{" "}
-        entries before anyone can play it, and every entry needs a value for
-        every attribute.
+        {blur
+          ? "Each entry is one possible answer."
+          : "Each entry is a row on the board."}{" "}
+        A game needs at least {MIN_ENTRIES} entries before anyone can play it,
+        and every entry needs{" "}
+        {blur
+          ? "an image and the order its nine squares clear in."
+          : "a value for every attribute."}
       </p>
       <ul
         id="entry-list"
@@ -173,11 +204,9 @@ export function EntriesPanel({
             <span className="entry-name min-w-0 flex-1 truncate font-medium">
               {entry.name}
             </span>
-            {formAttributes.some(
-              (attr) => !entry.values[String(attr.id)]?.length,
-            ) && (
+            {incomplete(entry) && (
               <span className="entry-missing shrink-0 text-sm font-medium text-error">
-                Missing values
+                {blur ? "Missing image or order" : "Missing values"}
               </span>
             )}
             <Button
@@ -229,8 +258,21 @@ export function EntriesPanel({
           />
         </div>
         <div className="space-y-2">
-          <p className="text-sm font-medium">Photo</p>
-          {draft.photo && (
+          <p className="text-sm font-medium">{blur ? "Image" : "Photo"}</p>
+          {blur && !draft.photo && (
+            <p className="text-sm text-muted-foreground">
+              Players see this image split into nine squares, all blurred but
+              one, and the whole image once the day is over.
+            </p>
+          )}
+          {blur && draft.photo && (
+            <BlurOrderEditor
+              src={draft.photo}
+              order={draft.blurOrder}
+              onChange={(blurOrder) => setDraft((d) => ({ ...d, blurOrder }))}
+            />
+          )}
+          {!blur && draft.photo && (
             <img
               id="entry-photo-preview"
               className="cover-preview size-24 rounded-lg object-cover"
@@ -250,16 +292,18 @@ export function EntriesPanel({
               className={buttonVariants({ variant: "outline", size: "sm" })}
               htmlFor="entry-photo"
             >
-              Choose photo
+              {blur ? "Choose image" : "Choose photo"}
             </label>
-            <Button
-              id="entry-photo-remove"
-              variant="ghost"
-              size="sm"
-              onClick={() => setDraft((d) => ({ ...d, photo: "" }))}
-            >
-              Remove photo
-            </Button>
+            {!blur && (
+              <Button
+                id="entry-photo-remove"
+                variant="ghost"
+                size="sm"
+                onClick={() => setDraft((d) => ({ ...d, photo: "" }))}
+              >
+                Remove photo
+              </Button>
+            )}
           </div>
         </div>
         <div id="entry-fields" className="space-y-4 empty:hidden">

@@ -23,6 +23,7 @@ import {
   type AttributeEdit,
 } from "../games.ts";
 import { rateLimit, type RateLimit } from "../rate-limit.ts";
+import { isGameKind } from "../../game/blur.ts";
 import { uploadRefs } from "../upload-refs.ts";
 import {
   bodyOf,
@@ -87,6 +88,8 @@ export function manageRoutes(
     status: game.status,
     rejectReason: game.rejectReason,
     skipPeriod: game.skipPeriod,
+    kind: game.kind,
+    blurTries: game.blurTries,
     entryCount: roster.entries.length,
     incompleteCount: roster.incomplete,
     canApprove: canApprove(game, user),
@@ -97,9 +100,9 @@ export function manageRoutes(
     if (!user) {
       return;
     }
-    const { name, slug } = bodyOf(req);
+    const { name, slug, kind = "classic" } = bodyOf(req);
     const title = nameIn(name, MAX_NAME);
-    if (title === undefined) {
+    if (title === undefined || !isGameKind(kind)) {
       fail(res, "invalid");
       return;
     }
@@ -116,6 +119,7 @@ export function manageRoutes(
       title,
       todayIn(now(), ctx.timeZone),
       typeof slug === "string" ? { typed: slug } : { base: slugBase(title) },
+      kind,
     );
     if (created === "slug_taken") {
       fail(res, "slug_taken");
@@ -170,7 +174,8 @@ export function manageRoutes(
   ) =>
     manageRoute(async ({ game }, _user, req, res) => {
       const edit = build(req);
-      if (!edit) {
+      // A Blur game has no attributes
+      if (!edit || game.kind === "blur") {
         fail(res, "invalid");
         return;
       }
@@ -343,6 +348,7 @@ export function manageRoutes(
       const patch = parseGamePatch(
         body,
         Math.max(0, roster.entries.length - 1),
+        game.kind === "blur",
       );
       if (
         !patch ||

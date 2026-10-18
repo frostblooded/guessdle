@@ -9,6 +9,8 @@ export interface EntryRow {
   photo: string;
   // Attribute id to its items (Text has at most one; empty means no value)
   values: Record<string, string[]>;
+  // Blur games only: the order the grid's squares clear in, once picked
+  blurOrder?: number[] | null;
 }
 
 export async function listEntries(
@@ -20,25 +22,32 @@ export async function listEntries(
     name: string;
     photo: string;
     values: Record<string, string[]> | null;
+    blurOrder: number[] | null;
   }>(
-    `select e.id::int, e.name, e.photo_url as photo,
+    `select e.id::int, e.name, e.photo_url as photo, e.blur_order::int[] as "blurOrder",
        (select jsonb_object_agg(attribute_id, items) from (
           select attribute_id, jsonb_agg(value order by position) as items
           from entry_values where entry_id = e.id group by attribute_id) v) as values
      from entries e where e.game_id = $1 and e.deleted_at is null order by e.id`,
     [game.id],
   );
-  return rows.map((r) => ({ ...r, values: r.values ?? {} }));
+  return rows.map(({ blurOrder, ...r }) => ({
+    ...r,
+    values: r.values ?? {},
+    ...(game.kind === "blur" && { blurOrder }),
+  }));
 }
 
 export interface EntryInput {
   name?: string;
   photo?: string;
   values?: Record<string, string[]>;
+  blurOrder?: number[];
 }
 
 // Creates the entry (`id` undefined) or changes it. Every attribute needs a value once saved,
 // from the input or already stored; Number values are stored as parseNumberValue gives them.
+// A Blur game's entry instead needs its photo and a complete square order, sent or stored.
 // Runs in the caller's game transaction (lifecycle.edit), which applies the status rule.
 // `replacedPhoto` is the file the caller should delete.
 export async function saveEntry(
@@ -53,10 +62,15 @@ export async function saveEntry(
   | "not_found"
   | "missing_values"
   | "not_a_number"
+  | "missing_order"
 > {
   const current = (
-    await tx.query<{ name: string; photo: string }>(
-      `select name, photo_url as photo from entries
+    await tx.query<{
+      name: string;
+      photo: string;
+      blurOrder: number[] | null;
+    }>(
+      `select name, photo_url as photo, blur_order::int[] as "blurOrder" from entries
        where id = $1 and game_id = $2 and deleted_at is null`,
       [id ?? 0, game.id],
     )
@@ -100,6 +114,14 @@ export async function saveEntry(
   if (!attrs.every((a) => filled(String(a.id)))) {
     return "missing_values";
   }
+  if (game.kind === "blur") {
+    const order = input.blurOrder ?? current?.blurOrder ?? null;
+    if (photo === "" || order === null) {
+      return "missing_order";
+    }
+  } else if (input.blurOrder !== undefined) {
+    return "invalid";
+  }
   let entryId = id;
   if (entryId === undefined) {
     entryId = (
@@ -113,6 +135,12 @@ export async function saveEntry(
       "update entries set name = $2, photo_url = $3 where id = $1",
       [entryId, name, photo],
     );
+  }
+  if (input.blurOrder !== undefined) {
+    await tx.query("update entries set blur_order = $2 where id = $1", [
+      entryId,
+      input.blurOrder,
+    ]);
   }
   for (const [attrId, items] of Object.entries(values)) {
     await tx.query(

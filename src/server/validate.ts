@@ -7,6 +7,7 @@ import {
   MAX_NAME,
   MAX_VALUE_LENGTH,
 } from "../game/limits.ts";
+import { isBlurOrder, isTryCount } from "../game/blur.ts";
 import type { GamePatch } from "./games.ts";
 import type { EntryInput } from "./entries.ts";
 
@@ -17,13 +18,21 @@ export const nameIn = (v: unknown, max: number): string | undefined =>
     : undefined;
 
 // The game fields of a PATCH body; undefined when any is malformed. `maxSkip` is the largest
-// skip period the roster allows. A coverUrl is only shape-checked here.
+// skip period the roster allows; `blur` whether the game is a Blur game, the only kind with a
+// try count. A coverUrl is only shape-checked here.
 export function parseGamePatch(
   body: Record<string, unknown>,
   maxSkip: number,
+  blur: boolean = false,
 ): GamePatch | undefined {
-  const { name, description, skipPeriod, coverUrl } = body;
+  const { name, description, skipPeriod, coverUrl, blurTries } = body;
   const patch: GamePatch = {};
+  if (blurTries !== undefined) {
+    if (!blur || !isTryCount(blurTries)) {
+      return undefined;
+    }
+    patch.blurTries = blurTries;
+  }
   if (name !== undefined) {
     const title = nameIn(name, MAX_NAME);
     if (title === undefined) {
@@ -67,8 +76,14 @@ export function parseGamePatch(
 export function parseEntryInput(
   body: Record<string, unknown>,
 ): EntryInput | undefined {
-  const { name, photo, values } = body;
+  const { name, photo, values, blurOrder } = body;
   const out: EntryInput = {};
+  if (blurOrder !== undefined) {
+    if (!isBlurOrder(blurOrder)) {
+      return undefined;
+    }
+    out.blurOrder = blurOrder;
+  }
   if (name !== undefined) {
     const title = nameIn(name, MAX_ENTRY_NAME);
     if (title === undefined) {

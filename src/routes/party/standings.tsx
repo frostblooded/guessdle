@@ -176,7 +176,9 @@ function Round({ view, round }: { view: PartyView; round: FinishedRound }) {
                   ? `${result.guesses} ${result.guesses === 1 ? "guess" : "guesses"} in ${clockTime(result.timeMs!)}`
                   : result.gaveUp
                     ? "Gave up"
-                    : "Did not solve"}
+                    : result.lost
+                      ? "Out of tries"
+                      : "Did not solve"}
               </span>
             </div>
             <div className="party-guesses grid gap-0.5 pb-2 pl-[3.25rem] text-sm">
@@ -186,17 +188,19 @@ function Round({ view, round }: { view: PartyView; round: FinishedRound }) {
                     className="party-squares inline-flex gap-0.5"
                     aria-hidden="true"
                   >
-                    {/* Skip the photo column: it repeats the name's grade */}
-                    {grades.slice(1).map((grade, j) => (
-                      <span
-                        key={j}
-                        className={cn(
-                          "party-square size-3 rounded-[2px]",
-                          correctnessClass(grade),
-                          SQUARE_COLORS[correctnessClass(grade)],
-                        )}
-                      />
-                    ))}
+                    {/* Skip a classic row's photo column: it repeats the name's grade */}
+                    {grades
+                      .slice(view.game.kind === "blur" ? 0 : 1)
+                      .map((grade, j) => (
+                        <span
+                          key={j}
+                          className={cn(
+                            "party-square size-3 rounded-[2px]",
+                            correctnessClass(grade),
+                            SQUARE_COLORS[correctnessClass(grade)],
+                          )}
+                        />
+                      ))}
                   </span>
                   <span>{result.guessNames[i] ?? ""}</span>
                 </div>

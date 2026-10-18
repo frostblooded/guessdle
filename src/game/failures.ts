@@ -18,6 +18,10 @@ export const FAILURES = {
     400,
     "A number attribute takes a number, like 12, -3 or 4.5.",
   ),
+  missing_order: failure(
+    400,
+    "Give the entry an image and pick the order of all nine squares before saving.",
+  ),
   slug_immutable: failure(400, "A game's address cannot be changed."),
   reserved: failure(400, "That address is reserved. Pick another one."),
   unauthorized: failure(401, "Your session ended. Sign in again."),
@@ -38,11 +42,11 @@ export const FAILURES = {
   ),
   incomplete_entries: failure(
     409,
-    "Some entries are missing values. Fill in every attribute of every entry before submitting.",
+    "Some entries are missing values (in a Blur game, an image or its square order). Fill in every entry before submitting.",
   ),
   game_paused: failure(
     409,
-    "This game is paused while some of its entries are missing values. It comes back once they are filled in.",
+    "This game is paused while some of its entries are missing values (in a Blur game, an image or its square order). It comes back once they are filled in.",
   ),
   invalid_state: failure(
     409,
