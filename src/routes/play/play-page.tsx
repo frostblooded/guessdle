@@ -252,6 +252,7 @@ function Game({ slug }: { slug: string }) {
   return (
     <>
       <PageHead
+        centered
         titleId="game-title"
         title={playable?.name ?? "Guess today's answer"}
         lede={
@@ -295,7 +296,7 @@ function Game({ slug }: { slug: string }) {
             />
             <Button
               id="submit-new-guess-button"
-              className="h-11"
+              className="h-11 px-5 font-bold uppercase"
               disabled={cannotPlay || loading}
               onClick={() => void submit()}
             >

@@ -29,7 +29,7 @@ const background = (page: Page): Promise<string> =>
 
 const themeButton = (page: Page): Locator => page.locator("#theme-button");
 
-const LIGHT_BG = "rgb(250, 250, 250)";
+const LIGHT_BG = "rgb(255, 255, 255)";
 
 test.describe("dark OS preference, auto mode", () => {
   test.use({ colorScheme: "dark" });
@@ -216,4 +216,18 @@ test("the header fits a phone: theme and account controls beside the brand, nav 
   expect(theme.x + theme.width).toBeLessThanOrEqual(signIn.x);
   expect(signIn.x + signIn.width).toBeLessThanOrEqual(360);
   expect(nav.y).toBeGreaterThanOrEqual(brand.y + brand.height - 1);
+});
+
+test("the site uses the self-hosted typewriter font", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("h1").waitFor();
+  const font = await page.evaluate(async () => {
+    await document.fonts.ready;
+    return {
+      family: getComputedStyle(document.body).fontFamily,
+      loaded: document.fonts.check('16px "Courier Prime"'),
+    };
+  });
+  expect(font.family).toMatch(/^"Courier Prime"/);
+  expect(font.loaded).toBe(true);
 });

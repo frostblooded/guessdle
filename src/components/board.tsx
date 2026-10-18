@@ -33,7 +33,7 @@ export function BoardRow({
 }
 
 const tileBase =
-  "cell flex min-h-12 items-center justify-center rounded-lg px-1 py-1.5 text-center text-xs leading-tight font-semibold [overflow-wrap:anywhere] sm:min-h-16 sm:px-2 sm:text-sm";
+  "cell flex min-h-12 items-center justify-center rounded-lg px-1 py-1.5 text-center text-xs leading-tight font-semibold [overflow-wrap:anywhere] sm:min-h-16 sm:px-2 sm:text-base";
 
 export function TitleTile({ className, ...props }: ComponentProps<"div">) {
   return (
@@ -76,7 +76,7 @@ export function GradeTile({
     <div
       className={cn(
         tileBase,
-        "guess-result-cell text-white shadow-sm",
+        "guess-result-cell font-bold text-white",
         grade,
         TILE_COLORS[grade],
         className,

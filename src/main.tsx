@@ -4,6 +4,8 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { App } from "./App.tsx";
 import { wipeLegacyState } from "./game/game-state.ts";
+import "@fontsource/courier-prime/400.css";
+import "@fontsource/courier-prime/700.css";
 import "./styles.css";
 
 // One-time cleanup of the old un-namespaced browser guesses (spec #66, story 73)

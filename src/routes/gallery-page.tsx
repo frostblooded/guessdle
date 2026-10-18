@@ -82,7 +82,7 @@ function Card({ card, featured }: { card: GameCard; featured: boolean }) {
       <Link
         to={`/g/${encodeURIComponent(card.slug)}`}
         className={cn(
-          "group flex h-full flex-col overflow-hidden rounded-xl border bg-card text-card-foreground no-underline shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:-translate-y-0.5",
+          "group flex h-full flex-col overflow-hidden rounded-lg border-2 border-tile bg-card text-card-foreground no-underline transition-colors hover:bg-secondary",
           featured && "lg:flex-row",
         )}
       >
@@ -95,7 +95,7 @@ function Card({ card, featured }: { card: GameCard; featured: boolean }) {
             featured && "lg:justify-center lg:p-8",
           )}
         >
-          <h2 className="flex flex-wrap items-center gap-2 text-lg font-semibold tracking-tight group-hover:text-primary">
+          <h2 className="flex flex-wrap items-center gap-2 text-xl font-bold tracking-wide uppercase">
             {card.name}
             {featured && <Badge variant="default">Original</Badge>}
           </h2>
@@ -119,6 +119,7 @@ export function GalleryPage() {
   return (
     <>
       <PageHead
+        centered
         title="Pick a game"
         lede={
           <>

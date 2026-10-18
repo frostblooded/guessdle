@@ -46,16 +46,16 @@ function Header() {
       >
         Skip to content
       </a>
-      <div className="mx-auto grid max-w-5xl grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-1 px-4 py-2 sm:flex sm:h-16 sm:py-0">
+      <div className="mx-auto grid max-w-5xl grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-1 px-4 py-2 md:flex md:h-16 md:py-0">
         <Link
           className="brand flex items-center gap-2 text-lg font-bold tracking-tight text-foreground no-underline"
           to="/"
         >
           <PawMark />
-          <span>Guessdle</span>
+          <span className="uppercase tracking-wider">Guessdle</span>
         </Link>
         <nav
-          className="nav col-span-2 row-start-2 flex gap-1 sm:col-auto sm:row-auto"
+          className="nav col-span-2 row-start-2 flex gap-1 md:col-auto md:row-auto"
           aria-label="Main"
         >
           {LINKS.map(([to, label]) => (
@@ -63,13 +63,13 @@ function Header() {
               key={to}
               to={to}
               aria-current={current(to)}
-              className="rounded-md bg-background px-3 py-1.5 text-sm font-medium text-muted-foreground no-underline transition-colors hover:text-foreground aria-[current=page]:bg-secondary aria-[current=page]:text-foreground"
+              className="rounded-md bg-background px-3 py-1.5 text-sm lowercase text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline aria-[current=page]:font-bold aria-[current=page]:text-foreground aria-[current=page]:underline"
             >
               {label}
             </Link>
           ))}
         </nav>
-        <div className="tools flex min-w-0 items-center justify-end gap-2 sm:ml-auto">
+        <div className="tools flex min-w-0 items-center justify-end gap-2 md:ml-auto">
           <ThemeButton />
           <AccountArea />
         </div>
@@ -92,7 +92,7 @@ function Footer() {
               key={to}
               to={to}
               aria-current={current(to)}
-              className="text-muted-foreground hover:text-foreground aria-[current=page]:text-foreground"
+              className="lowercase text-muted-foreground hover:text-foreground aria-[current=page]:text-foreground"
             >
               {label}
             </Link>
