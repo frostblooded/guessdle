@@ -6,11 +6,13 @@ import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
 import { Input, Label } from "../../components/ui/input.tsx";
+import { readGuessMode, type GuessMode } from "../../game/guess-mode.ts";
 import { MAX_NICKNAME } from "../../game/limits.ts";
 import { CODE_LENGTH, normalizeCode } from "../../game/party.ts";
 import { useSignedIn } from "../../lib/use-signed-in.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { api, errorText } from "../../manage-client.ts";
+import { ModeSwitch } from "../play/guess-form.tsx";
 import { setToken } from "./tokens.ts";
 
 export const LEDE =
@@ -110,6 +112,10 @@ export function HostForm({ slug }: { slug: string }) {
   const user = useSignedIn(`/party?host=${encodeURIComponent(slug)}`);
   const [game, setGame] = useState<string | null>(null);
   const [nickname, setNickname] = useState<string | null>(null);
+  // How every player will guess; starts as the host's own remembered mode
+  const [guessMode, setGuessMode] = useState<GuessMode>(() =>
+    readGuessMode(localStorage),
+  );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   useTitle(game ? `Host a ${game} party - Guessdle` : "Party - Guessdle");
@@ -134,7 +140,7 @@ export function HostForm({ slug }: { slug: string }) {
     const reply = await api(
       "POST",
       `/api/games/${encodeURIComponent(slug)}/parties`,
-      { nickname: shown },
+      { nickname: shown, guessMode },
     );
     if (reply?.status === 201) {
       const code = String(reply.data["code"]);
@@ -169,6 +175,11 @@ export function HostForm({ slug }: { slug: string }) {
             autoComplete="nickname"
             value={shown}
             onChange={(event) => setNickname(event.target.value)}
+          />
+          <ModeSwitch
+            mode={guessMode}
+            onChange={setGuessMode}
+            label="Everyone guesses by"
           />
           <Button id="host-button" type="submit" disabled={busy}>
             Open party

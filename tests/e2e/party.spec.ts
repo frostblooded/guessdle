@@ -21,6 +21,7 @@ const SLUG = "petdle";
 async function hostParty(
   page: Page,
   nickname: string = "Ana",
+  select: boolean = false,
 ): Promise<string> {
   await page.request.post("/api/test/login", { data: { email: newEmail() } });
   await page.goto("/g/petdle");
@@ -28,6 +29,9 @@ async function hostParty(
   await expect(page).toHaveURL(new RegExp(`/party\\?host=${SLUG}$`));
   await expect(page.locator("#host-form")).toBeVisible();
   await page.locator("#host-nickname").fill(nickname);
+  if (select) {
+    await page.locator("#guess-mode-select").click();
+  }
   await page.locator("#host-button").click();
   await expect(page).toHaveURL(/\/party\/[A-Z]{4}$/);
   return page.url().slice(-4);
@@ -142,6 +146,31 @@ test("a late joiner plays the live round, and the host can remove a player", asy
   await expect(page.locator(".party-player")).toHaveCount(1);
   await expect(late.locator("#notice")).toContainText("removed you");
   await expect(late.locator("#join-form")).toBeVisible();
+});
+
+test("every player guesses the way the host picked, with no switch of their own", async ({
+  page,
+  browser,
+  baseURL,
+}) => {
+  const code = await hostParty(page, "Ana", true);
+  await page.locator("#start-round").click();
+
+  const guest = await phone(browser, baseURL!);
+  await guest.goto(`/party/${code}`);
+  await guest.locator("#join-nickname").fill("Cy");
+  await guest.locator("#join-button").click();
+  await expect(guest.locator("#select-guess-button")).toBeVisible();
+  await expect(guest.locator("#guess-mode")).toHaveCount(0);
+  await expect(guest.locator("#new-guess-input")).toHaveCount(0);
+
+  const name = GUESS_DATA[0]!.name;
+  await guest.locator("#select-guess-button").click();
+  await guest
+    .getByRole("button", { name: `Guess ${name}`, exact: true })
+    .click();
+  await expect(guest.locator("#select-list")).toHaveCount(0);
+  await expect(guest.locator("#guess-results-container")).toContainText(name);
 });
 
 test("the code form finds a party, and an unknown code says so", async ({
