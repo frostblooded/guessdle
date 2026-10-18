@@ -5,18 +5,18 @@ import { Link, useParams } from "react-router";
 import { EmptyState, PageHead } from "../../components/page.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { buttonVariants } from "../../components/ui/button.tsx";
-import { localStatus, type DaysResponse } from "../../game/days.ts";
+import { statusOf, type DaysResponse } from "../../game/days.ts";
 import { failureText, UNREACHABLE } from "../../game/failures.ts";
 import {
-  createGameState,
   gameStorage,
   pastDayStorage,
+  readProgress,
 } from "../../game/game-state.ts";
 import { gameKey, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { DayList } from "./day-list.tsx";
 import { GameNotFound } from "./past-day.tsx";
-import { loadGame } from "./play-page.tsx";
+import { loadGame } from "./load-game.ts";
 
 // The list, "missing" for no such game, or the text of why it could not be loaded
 async function loadDays(
@@ -36,22 +36,18 @@ async function loadDays(
   }
 }
 
-// An anonymous player's statuses, read from the browser's Game State of each day
+// An anonymous player's statuses, read (never written) from the browser's Game State of each day
 function withLocalStatuses(slug: string, list: DaysResponse): DaysResponse {
   const now = new Date();
   return {
     ...list,
     days: list.days.map((item) => {
-      const storage =
-        item.day === list.today
-          ? gameStorage(localStorage, slug)
-          : pastDayStorage(localStorage, slug, item.day);
-      const state = createGameState(
-        storage,
-        () => now,
-        item.day === list.today,
-      );
-      return { ...item, status: localStatus(state) };
+      const today = item.day === list.today;
+      const storage = today
+        ? gameStorage(localStorage, slug)
+        : pastDayStorage(localStorage, slug, item.day);
+      const played = readProgress(storage, () => now, today);
+      return { ...item, status: statusOf(played, list.tries) };
     }),
   };
 }

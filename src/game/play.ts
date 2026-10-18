@@ -1,5 +1,4 @@
 // Anonymous play: the browser keeps pet ids, the server grades them.
-import { FAILURES } from "./failures.ts";
 import type { FreeHint, HintChoices, HintKind } from "./free-hint.ts";
 import {
   isAnswerRow,
@@ -76,9 +75,13 @@ export interface LoadFailure {
 // A POST the server did not accept: too many requests, or the text of why not
 type Refused = { kind: "rate_limited" } | { kind: "error"; message: string };
 
+// What the Play page says for any rate-limited load, guess, give-up or merge, anonymous or signed in
+export const RATE_LIMITED =
+  "Too many requests in a short time. Wait a minute, then try again.";
+
 // The player's text for a refused POST
 export const refusalText = (refused: Refused): string =>
-  refused.kind === "error" ? refused.message : FAILURES.rate_limited.text;
+  refused.kind === "error" ? refused.message : RATE_LIMITED;
 
 export type SubmitResult =
   | { kind: "invalid" }

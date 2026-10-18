@@ -95,7 +95,7 @@ describe("build output is wired through the pages and the deploy", () => {
     assert.match(conf, /location = \/ \{[^}]*try_files \/index\.html =404;/);
     assert.match(
       conf,
-      /location ~ \^\/\(login\|verify\|admin\|how-to-play\|create\|my-games\|profile\)\$ \{[^}]*try_files \/index\.html =404;/,
+      /location ~ \^\/\(login\|verify\|admin\|how-to-play\|create\|my-games\|profile\|settings\)\$ \{[^}]*try_files \/index\.html =404;/,
     );
     assert.match(
       conf,

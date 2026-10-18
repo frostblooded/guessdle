@@ -2,6 +2,7 @@
 import { isAnswerRow, type GradedAttribute } from "./game.ts";
 import type { HintKind } from "./free-hint.ts";
 import {
+  RATE_LIMITED,
   revealIn,
   type HintResult,
   type HintState,
@@ -65,6 +66,9 @@ export function createServerPlay({
   const play: Play = {
     async load(): Promise<Loaded | LoadFailure> {
       const res = await call(fetch, `${base}${query}`);
+      if (res?.status === 429) {
+        return { failure: RATE_LIMITED };
+      }
       if (res?.status !== 200) {
         return { failure: failureMessage(res) };
       }

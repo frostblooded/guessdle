@@ -6,7 +6,7 @@ A site of Wordle-style daily guessing games. Pick a game and guess its entry of 
 
 ## How it works
 
-- React single-page app (`index.html` loads `src/main.tsx`; routes in `src/App.tsx`): `/` the gallery, `/g/<slug>` Play, `/g/<slug>/edit` the editor, `/create`, `/my-games`, `/how-to-play`, `/login`, `/verify` (the emailed link lands here), `/admin`, and `/party` plus `/party/<CODE>` (party mode). Built by Vite into `dist/`, styled with Tailwind and shadcn/ui components (ADR 0018).
+- React single-page app (`index.html` loads `src/main.tsx`; routes in `src/App.tsx`): `/` the gallery, `/g/<slug>` Play, `/g/<slug>/edit` the editor, `/create`, `/my-games`, `/settings` (approval email switches), `/how-to-play`, `/login`, `/verify` (the emailed link lands here), `/admin`, and `/party` plus `/party/<CODE>` (party mode). Built by Vite into `dist/`, styled with Tailwind and shadcn/ui components (ADR 0018).
 - Express API (`src/server/`) on Postgres. The daily answer is drawn at random on first request and stored per day, graded server-side and never sent to the browser until a win or give-up (ADRs 0008-0010).
 - Anonymous progress is kept in `localStorage`; signing in with an emailed link stores it on the server. Both reset each day.
 - `scripts/server.mjs` serves the static files and mounts the API for local development (needs Postgres, see `docs/deploy.md`).

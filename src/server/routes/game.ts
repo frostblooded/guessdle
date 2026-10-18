@@ -26,6 +26,7 @@ import {
   REFUSAL_STATUS,
   revealOf,
   takeHint,
+  triesOf,
   view,
   type GameContext,
   type GameView,
@@ -122,7 +123,11 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       day,
       loaded.user?.id ?? null,
     );
-    res.json({ today: day, days } satisfies DaysResponse);
+    res.json({
+      today: day,
+      tries: triesOf(loaded.game),
+      days,
+    } satisfies DaysResponse);
   });
 
   // Stateless grading for anonymous players. The answer is revealed only to a

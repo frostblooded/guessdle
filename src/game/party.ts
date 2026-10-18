@@ -22,7 +22,7 @@ import {
   type GradedAttribute,
 } from "./game.ts";
 import { MAX_NICKNAME } from "./limits.ts";
-import type { GameKind } from "./blur.ts";
+import { outOfTries, type GameKind } from "./blur.ts";
 
 // No I or O, so a code read aloud or off a screen is never mistaken for 1 or 0
 export const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -104,10 +104,7 @@ export function progressOf(round: RoundData, playerId: number): Progress {
     guesses: mine.length,
     solved: solving !== undefined,
     gaveUp: round.giveUps.some((g) => g.playerId === playerId),
-    lost:
-      solving === undefined &&
-      round.tries !== undefined &&
-      mine.length >= round.tries,
+    lost: outOfTries(round.tries, mine.length, solving !== undefined),
     timeMs: solving ? solving.at - round.startedAt : null,
   };
 }
