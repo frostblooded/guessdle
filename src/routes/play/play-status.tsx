@@ -4,14 +4,12 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router";
-import {
-  ReviewButtons,
-  type Review,
-} from "../../components/review-buttons.tsx";
+import { ReviewButtons } from "../../components/review-buttons.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { buttonVariants } from "../../components/ui/button.tsx";
 import { statusNotice, type Details } from "../../game/editor.ts";
 import { MIN_ENTRIES } from "../../game/limits.ts";
+import { gameKey } from "../../lib/api.ts";
 
 // What GET /api/games/:slug tells this viewer; the server leaves out `status` for other players
 export interface StatusView {
@@ -23,19 +21,14 @@ export interface StatusView {
 
 export function PlayStatus({ slug, view }: { slug: string; view: StatusView }) {
   const client = useQueryClient();
-  // Set once this page reviewed the game, so the notice and buttons change at once
-  const [reviewed, setReviewed] = useState<{
-    status: Review;
-    reason: string;
-  } | null>(null);
   const [error, setError] = useState("");
-  const status = reviewed?.status ?? view.status;
+  const { status } = view;
   const notice =
     status === undefined
       ? ""
       : statusNotice({
           status,
-          rejectReason: reviewed?.reason ?? view.rejectReason ?? "",
+          rejectReason: view.rejectReason ?? "",
           // The board's own notice already says when entries are missing
           entryCount: MIN_ENTRIES,
         });
@@ -53,7 +46,7 @@ export function PlayStatus({ slug, view }: { slug: string; view: StatusView }) {
             {notice}
           </Alert>
         )}
-        {view.canApprove && reviewed === null && (
+        {view.canApprove && (
           <span className="play-status flex gap-2">
             <ReviewButtons
               slug={slug}
@@ -62,7 +55,18 @@ export function PlayStatus({ slug, view }: { slug: string; view: StatusView }) {
               rejectId="reject-button"
               onDone={async (review, reason) => {
                 setError("");
-                setReviewed({ status: review, reason });
+                // Into the game's cached copy, so the notice and buttons change at once and a
+                // later visit does not bring back the pending state
+                client.setQueryData<unknown>(gameKey(slug), (game: unknown) =>
+                  typeof game === "object" && game !== null
+                    ? {
+                        ...game,
+                        status: review,
+                        rejectReason: reason,
+                        canApprove: false,
+                      }
+                    : game,
+                );
                 // The header's Admin count drops at once, not on the next page load
                 await client.invalidateQueries({ queryKey: ["me"] });
               }}

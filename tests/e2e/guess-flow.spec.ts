@@ -165,7 +165,10 @@ test("a picked suggestion the server could not grade stays in the box", async ({
     .filter({ hasText: new RegExp(`^${wrongName}$`) })
     .click();
 
-  await expect(page.locator("#notice")).toContainText("could not be checked");
+  // The request got no answer, so the notice blames the connection
+  await expect(page.locator("#notice")).toContainText(
+    "Could not reach the server",
+  );
   await expect(rows(page)).toHaveCount(0);
   await expect(input(page)).toHaveValue(wrongName);
 });
