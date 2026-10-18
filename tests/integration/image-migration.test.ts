@@ -8,9 +8,9 @@ import { migrate } from "../../src/server/migrate.ts";
 import { startDb } from "./postgres.ts";
 import type { TestDb } from "./postgres.ts";
 
-const IMAGE_MIGRATION = "013_image_attributes.sql";
+const IMAGE_MIGRATION = "014_image_attributes.sql";
 
-// Migration 013 on games made before it: classic photos become Photo Image values
+// Migration 014 on games made before it: classic photos become Photo Image values
 describe("the Image attribute migration", () => {
   let db: TestDb;
   let dir: string;
@@ -38,7 +38,7 @@ describe("the Image attribute migration", () => {
     db = await startDb();
     dir = await mkdtemp(join(tmpdir(), "migrations-"));
     const files = (await readdir(MIGRATIONS_DIR)).filter(
-      (f) => f.endsWith(".sql") && Number(f.split("_")[0]) < 13,
+      (f) => f.endsWith(".sql") && Number(f.split("_")[0]) < 14,
     );
     for (const f of files) {
       await copyFile(join(MIGRATIONS_DIR, f), join(dir, f));
