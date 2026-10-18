@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router";
 import { EmptyState, MessageCard, PageHead } from "../../components/page.tsx";
+import { useCrop } from "../../components/crop-dialog.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button, buttonVariants } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
@@ -118,6 +119,7 @@ function Editor({
   const [savedText, setSavedText] = useState("");
   const [flowError, setFlowError] = useState("");
   const [busy, setBusy] = useState(false);
+  const { crop, dialog } = useCrop(setError);
 
   useTitle(`Edit ${saved.name} - Guessdle`);
 
@@ -165,10 +167,14 @@ function Editor({
     }
     setError("");
     setSavedText("");
+    const cropped = await crop(file, "cover");
+    if (!cropped) {
+      return;
+    }
     const up = await api<{ url?: string }>(
       "POST",
       "/api/uploads?kind=cover",
-      file,
+      cropped,
     );
     if (up?.status === 200 && up.data.url) {
       await save({ coverUrl: up.data.url });
@@ -193,6 +199,7 @@ function Editor({
   return (
     <>
       <Head slug={saved.slug} name={saved.name} />
+      {dialog}
       <div id="editor" className="space-y-6">
         <div className="editor-bar flex flex-wrap items-start gap-3">
           <div className="min-w-0 flex-1 space-y-2 empty:hidden">
@@ -283,7 +290,7 @@ function Editor({
                   {saved.cover && (
                     <img
                       id="cover-preview"
-                      className="cover-preview aspect-[2/1] w-full rounded-lg border object-cover"
+                      className="cover-preview aspect-[16/7] w-full rounded-lg border object-cover"
                       src={saved.cover}
                       alt=""
                     />

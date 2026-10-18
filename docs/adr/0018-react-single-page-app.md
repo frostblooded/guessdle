@@ -1,6 +1,6 @@
-# 0017: React single-page app
+# 0018: React single-page app
 
-Status: accepted. Supersedes ADR 0012 (multi-page front-end) except its URLs, the `/admin` gate and the magic-link flow, which stay as they were. Builds on ADR 0016 (Vite).
+Status: accepted. Supersedes ADR 0012 (multi-page front-end) except its URLs, the `/admin` gate and the magic-link flow, which stay as they were. Builds on ADR 0017 (Vite).
 
 The front-end is one React app. `index.html` is the only page: it holds the inline theme script (ADR 0006), the site-wide `<title>` and description, and `<div id="root">`; `src/main.tsx` mounts `src/App.tsx`.
 

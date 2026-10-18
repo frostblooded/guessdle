@@ -31,14 +31,15 @@ import { createServerPlay } from "../../game/server-play.ts";
 import { browserFetch, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { GuessBox } from "./guess-box.tsx";
+import { PlayActions, PlayStatus, type StatusView } from "./play-status.tsx";
 import { ResultBanner, type Result } from "./result-banner.tsx";
 
-interface PlayableGame {
+type PlayableGame = {
   name: string;
   canEdit: boolean;
   attributes: GameAttribute[];
   entries: EntryRef[];
-}
+} & StatusView;
 
 // The game's attributes and entries, "missing" for no such game, or null when it could not be loaded
 async function loadGame(
@@ -260,17 +261,14 @@ function Game({ slug }: { slug: string }) {
           </p>
         }
         actions={
-          playable?.canEdit && (
-            <Link
-              id="edit-link"
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-              to={`/g/${encodeURIComponent(slug)}/edit`}
-            >
-              Edit game
-            </Link>
-          )
+          <PlayActions
+            slug={slug}
+            canHost={playable !== null && !tooSmall}
+            canEdit={playable?.canEdit === true}
+          />
         }
       />
+      {playable && <PlayStatus slug={slug} view={playable} />}
       <Alert id="notice" variant="warn" role="status" className="mb-4">
         {shownNotice}
       </Alert>

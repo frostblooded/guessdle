@@ -8,10 +8,11 @@ import { HowToPlayPage } from "./routes/how-to-play-page.tsx";
 import { LoginPage } from "./routes/login-page.tsx";
 import { MyGamesPage } from "./routes/my-games-page.tsx";
 import { NotFoundPage } from "./routes/not-found-page.tsx";
+import { PartyPage } from "./routes/party/party-page.tsx";
 import { PlayPage } from "./routes/play/play-page.tsx";
 import { VerifyPage } from "./routes/verify-page.tsx";
 
-// The same paths the dev server and nginx answer with 200 (ADR 0017); anything else is a 404 there and here
+// The same paths the dev server and nginx answer with 200 (ADR 0018); anything else is a 404 there and here
 export function App({ legacyWiped }: { legacyWiped: boolean }) {
   const { pathname } = useLocation();
   // Trailing slashes are not special-cased (ADR 0012): /login/ is not /login
@@ -35,6 +36,8 @@ export function App({ legacyWiped }: { legacyWiped: boolean }) {
           <Route caseSensitive path="/login" element={<LoginPage />} />
           <Route caseSensitive path="/verify" element={<VerifyPage />} />
           <Route caseSensitive path="/admin" element={<AdminPage />} />
+          <Route caseSensitive path="/party" element={<PartyPage />} />
+          <Route caseSensitive path="/party/:code" element={<PartyPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       )}

@@ -10,6 +10,8 @@ export interface PartySocket {
   send(msg: ClientMessage): boolean;
   // Reconnects at once, e.g. with a new token after joining
   restart(): void;
+  // Closes for good: the page is leaving the party
+  close(): void;
 }
 
 export function openPartySocket(
@@ -73,6 +75,12 @@ export function openPartySocket(
       ws = null;
       old?.close();
       connect();
+    },
+    close(): void {
+      clearTimeout(timer);
+      const old = ws;
+      ws = null;
+      old?.close();
     },
   };
 }
