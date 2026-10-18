@@ -16,6 +16,7 @@ import { createPartyHub, type PartyHub } from "./party-hub.ts";
 import { shellRoutes } from "./routes/shell.ts";
 import { uploadRoutes } from "./routes/uploads.ts";
 import { blurRoutes } from "./routes/blur.ts";
+import { settingsRoutes } from "./routes/settings.ts";
 
 export interface AppDeps {
   pool: pg.Pool;
@@ -109,6 +110,7 @@ export function createApp({
   answersRoutes(app, ctx);
   partyRoutes(app, ctx, hub);
   blurRoutes(app, ctx, uploadsDir);
+  settingsRoutes(app, ctx);
   shellRoutes(app, ctx, shellDir);
 
   app.use("/api", (_req, res) => {

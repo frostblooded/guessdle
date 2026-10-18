@@ -6,11 +6,14 @@ import {
   enteredPending,
   gameLifecycle,
   moveTarget,
+  ownerMailFor,
   RESETS_STATUS,
   statusAfterEdit,
   type EditKind,
 } from "../src/server/lifecycle.ts";
 import type { MailConfig } from "../src/server/mailer.ts";
+import { ownerMessage } from "../src/server/owner-mail.ts";
+import type { MailSettings } from "../src/mail-settings.ts";
 
 const STATUSES: GameStatus[] = ["draft", "pending", "approved", "rejected"];
 const KINDS = Object.keys(RESETS_STATUS) as EditKind[];
@@ -76,8 +79,63 @@ describe("moves", () => {
   });
 });
 
-// A scripted pool: the game is at `status`; records the statements and the mails
-function fake(status: GameStatus, entryCount: number = 2) {
+describe("which changes mail the owner", () => {
+  it("approve and reject mail the owner, submit and unpublish do not", () => {
+    assert.equal(ownerMailFor("approve", "pending", "approved"), "approved");
+    assert.equal(ownerMailFor("reject", "pending", "rejected"), "rejected");
+    assert.equal(ownerMailFor("submit", "draft", "pending"), undefined);
+    assert.equal(ownerMailFor("submit", "rejected", "pending"), undefined);
+    assert.equal(ownerMailFor("unpublish", "approved", "pending"), undefined);
+  });
+  it("only an edit that takes an approved game back to pending mails", () => {
+    assert.equal(ownerMailFor("edit", "approved", "pending"), "review");
+    assert.equal(ownerMailFor("edit", "rejected", "pending"), undefined);
+    assert.equal(ownerMailFor("edit", "approved", "approved"), undefined);
+    assert.equal(ownerMailFor("edit", "draft", "draft"), undefined);
+  });
+});
+
+describe("owner mail text", () => {
+  const notice = {
+    gameId: 1,
+    slug: "pets",
+    name: "Pets",
+    reason: "Blurry photos",
+  };
+  for (const kind of ["approved", "rejected", "review"] as const) {
+    it(`${kind} names the game and links to the settings page`, () => {
+      const { subject, text } = ownerMessage("https://x.test", {
+        ...notice,
+        kind,
+      });
+      assert.match(subject, /"Pets"/);
+      assert.match(text, /https:\/\/x\.test\/g\/pets/);
+      assert.match(text, /https:\/\/x\.test\/settings/);
+    });
+  }
+  it("a rejection carries the reason", () => {
+    const { text } = ownerMessage("https://x.test", {
+      ...notice,
+      kind: "rejected",
+    });
+    assert.match(text, /Reason: Blurry photos/);
+  });
+});
+
+const ALL_ON: MailSettings = {
+  all: true,
+  approved: true,
+  rejected: true,
+  review: true,
+};
+
+// A scripted pool: the game is at `status`; records the statements and the mails.
+// The owner o@x.test has the switches `owner`.
+function fake(
+  status: GameStatus,
+  entryCount: number = 2,
+  owner: MailSettings = ALL_ON,
+) {
   const log: string[] = [];
   const sent: string[] = [];
   const run = (sql: string): { rows: unknown[]; rowCount: number } => {
@@ -86,7 +144,13 @@ function fake(status: GameStatus, entryCount: number = 2) {
       return { rows: [{ status }], rowCount: 1 };
     }
     if (sql.includes("returning slug")) {
-      return { rows: [{ slug: "pets", name: "Pets" }], rowCount: 1 };
+      return {
+        rows: [{ slug: "pets", name: "Pets", reason: "why" }],
+        rowCount: 1,
+      };
+    }
+    if (sql.includes("join users u on u.id = g.owner_id")) {
+      return { rows: [{ email: "o@x.test", ...owner }], rowCount: 1 };
     }
     if (sql.includes("count(*)")) {
       return { rows: [{ n: entryCount }], rowCount: 1 };
@@ -114,11 +178,21 @@ function fake(status: GameStatus, entryCount: number = 2) {
 const game = { id: 1, slug: "pets", name: "Pets" } as GameRow;
 
 describe("gameLifecycle.edit", () => {
-  it("mails every admin once when an approved game is reset to pending", async () => {
+  it("mails every admin and the owner once when an approved game is reset to pending", async () => {
     const f = fake("approved");
     await gameLifecycle(f.pool, f.mail).edit(game, "entries", async () => "x");
-    assert.deepEqual(f.sent, ["a@x.test", "b@x.test"]);
+    assert.deepEqual(f.sent, ["a@x.test", "b@x.test", "o@x.test"]);
     assert.ok(f.log.includes("commit"));
+  });
+  it("mails the admins but not the owner when a rejected game is edited", async () => {
+    const f = fake("rejected");
+    await gameLifecycle(f.pool, f.mail).edit(game, "details", async () => 1);
+    assert.deepEqual(f.sent, ["a@x.test", "b@x.test"]);
+  });
+  it("skips the owner who turned review mails off", async () => {
+    const f = fake("approved", 2, { ...ALL_ON, review: false });
+    await gameLifecycle(f.pool, f.mail).edit(game, "entries", async () => 1);
+    assert.deepEqual(f.sent, ["a@x.test", "b@x.test"]);
   });
   for (const status of ["draft", "pending"] as const) {
     it(`does not mail for an edit of a ${status} game`, async () => {
@@ -190,17 +264,33 @@ describe("gameLifecycle.move", () => {
   ) => {
     const f = fake(status);
     const out = await gameLifecycle(f.pool, f.mail).move(game, move, "why");
-    return [out, f.sent.length] as const;
+    return [out, f.sent] as const;
   };
-  it("submit and unpublish mail the admins, approve and reject do not", async () => {
-    assert.deepEqual(await mailed("draft", "submit"), ["ok", 2]);
-    assert.deepEqual(await mailed("approved", "unpublish"), ["ok", 2]);
-    assert.deepEqual(await mailed("pending", "approve"), ["ok", 0]);
-    assert.deepEqual(await mailed("pending", "reject"), ["ok", 0]);
+  it("submit and unpublish mail the admins, approve and reject the owner", async () => {
+    const admins = ["a@x.test", "b@x.test"];
+    assert.deepEqual(await mailed("draft", "submit"), ["ok", admins]);
+    assert.deepEqual(await mailed("approved", "unpublish"), ["ok", admins]);
+    assert.deepEqual(await mailed("pending", "approve"), ["ok", ["o@x.test"]]);
+    assert.deepEqual(await mailed("pending", "reject"), ["ok", ["o@x.test"]]);
   });
   it("refuses a move from the wrong state without mailing", async () => {
-    assert.deepEqual(await mailed("approved", "submit"), ["invalid_state", 0]);
+    assert.deepEqual(await mailed("approved", "submit"), ["invalid_state", []]);
   });
+  for (const [move, kind] of [
+    ["approve", "approved"],
+    ["reject", "rejected"],
+  ] as const) {
+    it(`does not mail the owner on ${move} when ${kind} or all mails are off`, async () => {
+      for (const off of [
+        { ...ALL_ON, [kind]: false },
+        { ...ALL_ON, all: false },
+      ]) {
+        const f = fake("pending", 2, off);
+        await gameLifecycle(f.pool, f.mail).move(game, move, "why");
+        assert.deepEqual(f.sent, []);
+      }
+    });
+  }
   it("refuses to submit with too few entries", async () => {
     const f = fake("draft", 1);
     assert.equal(

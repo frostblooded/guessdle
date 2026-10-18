@@ -66,6 +66,11 @@ describe("approval flow", () => {
       );
     }
   };
+  // Mails to anyone but ann, the owner of every test game
+  const adminMails = (): Mail[] =>
+    sent.filter((m) => m.to !== "ann@example.test");
+  const ownerMails = (): Mail[] =>
+    sent.filter((m) => m.to === "ann@example.test");
   const statusOf = async (slug = SLUG): Promise<string> =>
     (await db.pool.query("select status from games where slug = $1", [slug]))
       .rows[0].status;
@@ -264,7 +269,7 @@ describe("approval flow", () => {
         await patchName();
         await patchName();
         assert.equal(await statusOf(), "pending", from);
-        assert.equal(sent.length, 1, from);
+        assert.equal(adminMails().length, 1, from);
       }
     });
 
@@ -274,10 +279,10 @@ describe("approval flow", () => {
         name: "Color",
         type: "text",
       });
-      assert.equal(sent.length, 1);
+      assert.equal(adminMails().length, 1);
       await db.pool.query("update games set status = 'approved'");
       await addEntry();
-      assert.equal(sent.length, 2);
+      assert.equal(adminMails().length, 2);
       await db.pool.query("update games set status = 'rejected'");
       const id = (
         await db.pool.query(
@@ -285,7 +290,103 @@ describe("approval flow", () => {
         )
       ).rows[0].id;
       await request("DELETE", `/api/games/${SLUG}/entries/${id}`, ann);
-      assert.equal(sent.length, 3);
+      assert.equal(adminMails().length, 3);
+    });
+  });
+
+  describe("email to the owner", () => {
+    const approve = (): Promise<unknown> =>
+      request("POST", `/api/admin/games/${SLUG}/approve`, admin, {});
+    const reject = (): Promise<unknown> =>
+      request("POST", `/api/admin/games/${SLUG}/reject`, admin, {
+        reason: "Blurry photos",
+      });
+    const settings = (body: unknown, cookie = ann) =>
+      request("PUT", "/api/settings/mail", cookie, body);
+    const ON = { all: true, approved: true, rejected: true, review: true };
+
+    it("mails the owner when an admin approves the game", async () => {
+      await makeGame("pending");
+      await approve();
+      assert.deepEqual(
+        sent.map((m) => m.to),
+        ["ann@example.test"],
+      );
+      assert.match(sent[0]!.subject, /"Game zoo" is approved/);
+      assert.match(sent[0]!.text, /https:\/\/guess\.test\/g\/zoo/);
+      assert.match(sent[0]!.text, /https:\/\/guess\.test\/settings/);
+    });
+
+    it("mails the owner the reason when an admin rejects the game", async () => {
+      await makeGame("pending");
+      await reject();
+      assert.equal(ownerMails().length, 1);
+      assert.match(ownerMails()[0]!.text, /Reason: Blurry photos/);
+    });
+
+    it("mails the owner when an edit sends an approved game back for review", async () => {
+      await makeGame("approved");
+      await request("PATCH", `/api/games/${SLUG}`, ann, { name: "Renamed" });
+      assert.equal(ownerMails().length, 1);
+      assert.match(ownerMails()[0]!.subject, /"Renamed" is waiting/);
+    });
+
+    it("does not mail the owner for their own submit or unpublish", async () => {
+      await makeGame("draft");
+      await request("POST", `/api/games/${SLUG}/submit`, ann, {});
+      await approve();
+      sent = [];
+      await request("POST", `/api/games/${SLUG}/unpublish`, ann, {});
+      assert.equal(ownerMails().length, 0);
+    });
+
+    it("starts with every switch on", async () => {
+      const res = await request("GET", "/api/settings/mail", ann);
+      assert.deepEqual([res.status, res.body], [200, ON]);
+    });
+
+    it("saves the switches and honours them", async () => {
+      const res = await settings({ ...ON, approved: false });
+      assert.deepEqual(
+        [res.status, res.body],
+        [200, { ...ON, approved: false }],
+      );
+      await makeGame("pending");
+      await approve();
+      assert.equal(ownerMails().length, 0);
+      await db.pool.query("update games set status = 'pending'");
+      await reject();
+      assert.equal(ownerMails().length, 1);
+    });
+
+    it("sends nothing while the master switch is off, and keeps the others", async () => {
+      await settings({ ...ON, all: false });
+      await makeGame("pending");
+      await reject();
+      assert.equal(ownerMails().length, 0);
+      assert.deepEqual((await request("GET", "/api/settings/mail", ann)).body, {
+        ...ON,
+        all: false,
+      });
+    });
+
+    it("keeps each user's switches to themselves", async () => {
+      await settings({ ...ON, all: false }, admin);
+      assert.deepEqual(
+        (await request("GET", "/api/settings/mail", ann)).body,
+        ON,
+      );
+    });
+
+    it("refuses a partial or wrong-typed body and signed-out visitors", async () => {
+      for (const body of [{ all: false }, { ...ON, review: "no" }, []]) {
+        assert.equal((await settings(body)).status, 400);
+      }
+      assert.equal((await request("GET", "/api/settings/mail")).status, 401);
+      assert.equal(
+        (await request("PUT", "/api/settings/mail", undefined, ON)).status,
+        401,
+      );
     });
   });
 
@@ -338,7 +439,7 @@ describe("approval flow", () => {
         [SLUG],
       );
       assert.deepEqual(rows, [{ status: "approved", reject_reason: "" }]);
-      assert.equal(sent.length, 0);
+      assert.equal(adminMails().length, 0);
     });
 
     it("tells only the owner and admins the status and rejection reason", async () => {
