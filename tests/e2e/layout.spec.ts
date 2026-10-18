@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { GUESS_DATA } from "./roster.ts";
-import { findAnswerName, submitGuess } from "./helpers.ts";
+import { findAnswerName, submitGuess, winGame } from "./helpers.ts";
 
 // Phones (small to large, portrait and landscape) and a small tablet
 const VIEWPORTS = [
@@ -151,9 +151,21 @@ for (const { name, width, height } of VIEWPORTS) {
       const answerName = await findAnswerName(request);
       const wrong = WORST_GUESSES.find((guess) => guess !== answerName)!;
       await submitGuess(page, wrong);
-      await submitGuess(page, answerName);
+      await winGame(page, answerName);
       await expect(page.locator("#victory-title")).toBeVisible();
       await expectNoProblems(page);
+    });
+
+    test("victory stats popup", async ({ page, request }) => {
+      const answerName = await findAnswerName(request);
+      await submitGuess(page, answerName);
+      const dialog = page.locator("#stats-dialog");
+      await expect(dialog.locator("#stats-guess-chart")).toBeVisible();
+      const box = await dialog.boundingBox();
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+      expect(box!.y).toBeGreaterThanOrEqual(0);
+      expect(box!.y + box!.height).toBeLessThanOrEqual(height);
     });
 
     test("reset confirmation dialog", async ({ page, request }) => {
