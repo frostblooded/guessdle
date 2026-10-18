@@ -74,6 +74,10 @@ test("keyboard users can reach and use the account menu", async ({ page }) => {
   await page.keyboard.press("Enter");
   await expect(page.locator("#user-menu-panel")).toBeVisible();
   await page.keyboard.press("Tab");
+  await expect(
+    page.getByRole("link", { name: "Profile and playlists" }),
+  ).toBeFocused();
+  await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "My games" })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.locator("#logout-button")).toBeFocused();
