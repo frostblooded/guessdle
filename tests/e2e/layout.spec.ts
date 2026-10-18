@@ -176,13 +176,10 @@ for (const { name, width, height } of VIEWPORTS) {
       const list = await page.locator("[role=listbox]").boundingBox();
       expect(list!.x).toBeGreaterThanOrEqual(0);
       expect(list!.x + list!.width).toBeLessThanOrEqual(width);
-      // The open list overlays the Reset button by design
+      // The open list overlays the buttons below the box by design
       const problems = await page.evaluate(findLayoutProblems);
       expect(
-        problems.filter(
-          (p) =>
-            p !== "#reset-guesses-button is covered by #autoComplete_result_0",
-        ),
+        problems.filter((p) => !/ is covered by #guess-option-\d+$/.test(p)),
       ).toEqual([]);
     });
 

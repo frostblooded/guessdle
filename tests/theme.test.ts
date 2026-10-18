@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import {
-  initTheme,
+  applyThemeMode,
   nextThemeMode,
   readThemeMode,
   THEME_STORAGE_KEY,
+  themeLabel,
   writeThemeMode,
   type ThemeStorage,
 } from "../src/theme.ts";
@@ -70,66 +71,24 @@ describe("theme mode", () => {
   });
 });
 
-describe("initTheme", () => {
-  function setup(
-    initial?: string,
-    storage: ThemeStorage & { raw(): string | null } = memoryStorage(initial),
-  ) {
-    const root = { dataset: {} as Record<string, string | undefined> };
-    const attrs: Record<string, string> = {};
-    let click: () => void = () => {};
-    const button = {
-      textContent: null as string | null,
-      setAttribute: (name: string, value: string): void => {
-        attrs[name] = value;
-      },
-      addEventListener: (_type: "click", listener: () => void): void => {
-        click = listener;
-      },
+describe("applyThemeMode", () => {
+  it("auto removes data-theme so the OS decides", () => {
+    const root = {
+      dataset: { theme: "dark" } as Record<string, string | undefined>,
     };
-    initTheme(root, button, storage);
-    return { root, button, attrs, storage, click: () => click() };
+    applyThemeMode(root, "auto");
+    assert.equal("theme" in root.dataset, false);
+  });
+
+  for (const mode of ["light", "dark"] as const) {
+    it(`${mode} forces data-theme`, () => {
+      const root = { dataset: {} as Record<string, string | undefined> };
+      applyThemeMode(root, mode);
+      assert.equal(root.dataset["theme"], mode);
+    });
   }
 
-  it("shows auto with no data-theme when nothing is stored", () => {
-    const { root, button, attrs } = setup();
-    assert.equal("theme" in root.dataset, false);
-    assert.equal(button.textContent, "Theme: auto");
-    assert.equal(attrs["aria-label"], "Theme: auto. Click to change.");
-  });
-
-  it("applies a stored mode on load", () => {
-    const { root, button } = setup("dark");
-    assert.equal(root.dataset["theme"], "dark");
-    assert.equal(button.textContent, "Theme: dark");
-  });
-
-  it("cycles on click, updating page and storage", () => {
-    const t = setup();
-    t.click();
-    assert.equal(t.root.dataset["theme"], "light");
-    assert.equal(t.storage.raw(), "light");
-    t.click();
-    assert.equal(t.root.dataset["theme"], "dark");
-    assert.equal(t.button.textContent, "Theme: dark");
-    t.click();
-    assert.equal("theme" in t.root.dataset, false);
-    assert.equal(t.storage.raw(), "auto");
-    assert.equal(t.attrs["aria-label"], "Theme: auto. Click to change.");
-  });
-
-  it("still cycles for this page view when storage is blocked", () => {
-    const blocked: ThemeStorage & { raw(): string | null } = {
-      getItem: () => {
-        throw new Error("blocked");
-      },
-      setItem: () => {
-        throw new Error("blocked");
-      },
-      raw: () => null,
-    };
-    const t = setup(undefined, blocked);
-    t.click();
-    assert.equal(t.root.dataset["theme"], "light");
+  it("labels the button with the mode", () => {
+    assert.equal(themeLabel("auto"), "Theme: auto");
   });
 });
