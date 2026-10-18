@@ -46,7 +46,9 @@ export function partyRoutes(
       return;
     }
     const nickname = cleanNickname(bodyOf(req)["nickname"]);
-    if (nickname === null) {
+    // How every player picks a guess; typing unless the host chose selection
+    const guessMode = bodyOf(req)["guessMode"] ?? "type";
+    if (nickname === null || (guessMode !== "type" && guessMode !== "select")) {
       fail(res, "invalid");
       return;
     }
@@ -55,6 +57,7 @@ export function partyRoutes(
       loaded.game,
       user.id,
       nickname,
+      guessMode,
       now(),
       random,
     );

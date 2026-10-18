@@ -14,6 +14,7 @@ import {
 } from "./game.ts";
 import { MAX_NICKNAME, MIN_ENTRIES } from "./limits.ts";
 import { outOfTries, type GameKind } from "./blur.ts";
+import type { GuessMode } from "./guess-mode.ts";
 
 // No I or O, so a code read aloud or off a screen is never mistaken for 1 or 0
 export const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -195,6 +196,8 @@ export interface PartyView {
     attributes: GameAttribute[];
     // A Blur game's entries come without photos
     entries: EntryRef[];
+    // How every player picks a guess, set by the host when opening the party
+    guessMode: GuessMode;
   };
   ended: boolean;
   // The viewer's own player, or null for a visitor who has not joined
@@ -231,7 +234,13 @@ export interface FinishedRound {
 
 export interface ViewInput {
   code: string;
-  game: { slug: string; name: string; kind?: GameKind; blurTries?: number };
+  game: {
+    slug: string;
+    name: string;
+    kind?: GameKind;
+    blurTries?: number;
+    guessMode?: GuessMode;
+  };
   attributes: readonly GameAttribute[];
   // Active entries (offered to guess) and every entry (so old guesses still resolve)
   entries: readonly Entry[];
@@ -317,6 +326,7 @@ export function partyView(input: ViewInput): PartyView {
     game: {
       ...input.game,
       kind,
+      guessMode: input.game.guessMode ?? "type",
       attributes: [...attributes],
       entries: input.entries.map((e) =>
         kind === "blur"
