@@ -6,6 +6,7 @@ import {
   type StateStorage,
   gameStorage,
   pastDayStorage,
+  readProgress,
   forgetAllGames,
   wipeLegacyState,
 } from "../src/game/game-state.ts";
@@ -348,5 +349,53 @@ describe("forgetAllGames", () => {
     storage.setItem("theme", "dark");
     forgetAllGames(storage);
     assert.deepEqual([...storage.items.keys()], ["theme"]);
+  });
+});
+
+describe("readProgress", () => {
+  it("reads what was played without writing a key", () => {
+    state.addUsedGuess(3);
+    state.addUsedGuess(4);
+    state.setGaveUp();
+    const before = new Map(storage.items);
+    assert.deepEqual(
+      readProgress(storage, () => today, true),
+      {
+        won: false,
+        gaveUp: true,
+        guesses: 2,
+      },
+    );
+    assert.deepEqual(storage.items, before);
+  });
+
+  it("today's board from another day reads as unplayed, and stays stored", () => {
+    state.addUsedGuess(3);
+    state.setWon();
+    today = TUESDAY;
+    assert.deepEqual(
+      readProgress(storage, () => today, true),
+      {
+        won: false,
+        gaveUp: false,
+        guesses: 0,
+      },
+    );
+    assert.equal(storage.getItem("usedGuesses"), "[3]");
+    // A past day's board never expires
+    assert.deepEqual(
+      readProgress(storage, () => today, false),
+      {
+        won: true,
+        gaveUp: false,
+        guesses: 1,
+      },
+    );
+  });
+
+  it("a board never played writes nothing either", () => {
+    const empty = new MemoryStorage();
+    readProgress(pastDayStorage(empty, "pets", 3), () => today, false);
+    assert.equal(empty.length, 0);
   });
 });

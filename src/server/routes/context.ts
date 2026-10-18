@@ -3,9 +3,10 @@ import type { Request, Response } from "express";
 import type pg from "pg";
 import { FAILURES, type FailureCode } from "../../game/failures.ts";
 import type { Entry } from "../../game/game.ts";
-import { isImageGame, minEntriesOf } from "../../game/blur.ts";
+import { isImageGame } from "../../game/blur.ts";
 import { dateOfDay, dayNumber, ensureAnswer, todayIn } from "../answers.ts";
 import {
+  playBlocker,
   resolveGame,
   type LoadedGame,
   type Need,
@@ -120,17 +121,12 @@ export async function todaysAnswer(
   date: string,
   day: number,
 ): Promise<Entry | undefined> {
-  // Only the owner and admins reach a game this small; no answer can be drawn from it
-  if (roster.entries.length < minEntriesOf(game.kind)) {
+  // Only the owner and admins reach a game too small to draw an answer from
+  const blocker = playBlocker(game, roster);
+  if (blocker) {
     res
-      .status(FAILURES.not_enough_entries.status)
-      .json({ error: "not_enough_entries" satisfies FailureCode, day });
-    return undefined;
-  }
-  if (roster.incomplete > 0) {
-    res
-      .status(FAILURES.game_paused.status)
-      .json({ error: "game_paused" satisfies FailureCode, day });
+      .status(FAILURES[blocker].status)
+      .json({ error: blocker satisfies FailureCode, day });
     return undefined;
   }
   const answerId = await ensureAnswer(

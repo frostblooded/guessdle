@@ -15,6 +15,7 @@ const STATUS: Record<
 > = {
   won: { text: "Won", variant: "success" },
   "gave-up": { text: "Gave up", variant: "error" },
+  lost: { text: "Lost", variant: "error" },
   playing: { text: "In progress", variant: "warn" },
   unplayed: { text: "Not played", variant: "outline" },
 };
