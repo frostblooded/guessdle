@@ -118,13 +118,13 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         return;
       }
       const ids = bodyOf(req)["ids"];
-      const day = await playDayOf(ctx, req, res, loaded);
-      if (!day) {
+      // A malformed list is refused before the day's answer is drawn
+      const valid = (): boolean => isIdList(loaded.game, loaded.roster, ids);
+      const day = await playDayOf(ctx, req, res, loaded, valid);
+      if (!day || !isIdList(loaded.game, loaded.roster, ids)) {
         return;
       }
-      const board = isIdList(loaded.game, loaded.roster, ids)
-        ? boardOf(day, ids)
-        : "invalid";
+      const board = boardOf(day, ids);
       if (typeof board === "string") {
         res.status(REFUSAL_STATUS[board]).json({ error: board, day: day.day });
         return;
@@ -172,12 +172,16 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
           ? `anon:${body["player"]}`
           : null;
       const ids = body["ids"];
-      const day = await playDayOf(ctx, req, res, loaded);
-      if (!day) {
-        return;
-      }
-      if (player === null || (!user && !isIdList(day.game, day.roster, ids))) {
-        res.status(400).json({ error: "invalid", day: day.day });
+      const day = await playDayOf(
+        ctx,
+        req,
+        res,
+        loaded,
+        () =>
+          player !== null &&
+          (user !== null || isIdList(loaded.game, loaded.roster, ids)),
+      );
+      if (!day || player === null) {
         return;
       }
       // A signed-in win is the stored guesses; an anonymous one the ids sent

@@ -26,7 +26,8 @@ export interface PlayDay {
 export type DayRefusal =
   | { refusal: "no_such_day" }
   | {
-      refusal: "not_enough_entries" | "game_paused" | "answer_missing";
+      refusal:
+        "invalid" | "not_enough_entries" | "game_paused" | "answer_missing";
       day: number;
     };
 
@@ -69,17 +70,22 @@ export function dayOf(
   };
 }
 
-// The day `raw` names with its answer, drawn (and stored) on first request
+// The day `raw` names with its answer, drawn (and stored) on first request. `accepts` checks
+// the rest of the request once the day is known: a request it refuses ("invalid") draws nothing.
 export async function openDay(
   { pool, random, ...clock }: Clock & { pool: pg.Pool; random: () => number },
   { game, roster }: Pick<LoadedGame, "game" | "roster">,
   raw: unknown,
+  accepts: () => boolean = () => true,
 ): Promise<PlayDay | DayRefusal> {
   const played = dayOf(clock, game, raw);
   if (!played) {
     return { refusal: "no_such_day" };
   }
   const { date, day } = played;
+  if (!accepts()) {
+    return { refusal: "invalid", day };
+  }
   // Only the owner and admins reach a game too small to draw an answer from
   const blocker = playBlocker(game, roster);
   if (blocker) {

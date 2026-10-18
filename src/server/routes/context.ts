@@ -76,14 +76,15 @@ export const loadGame = (
 ): Promise<LoadedGame | undefined> => guardGame(ctx, req, res, "play");
 
 // The Day of play a request names (`?day=N`, today when absent) with its answer, or the
-// refusal sent and undefined
+// refusal sent and undefined. `accepts` validates the rest of the request (openDay).
 export async function playDayOf(
   ctx: AppContext,
   req: Request,
   res: Response,
   loaded: LoadedGame,
+  accepts?: () => boolean,
 ): Promise<PlayDay | undefined> {
-  const out = await openDay(ctx, loaded, queryOf(req)["day"]);
+  const out = await openDay(ctx, loaded, queryOf(req)["day"], accepts);
   if ("refusal" in out) {
     sendRefusal(res, out);
     return undefined;
