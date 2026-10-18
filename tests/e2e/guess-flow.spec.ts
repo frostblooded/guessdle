@@ -51,7 +51,12 @@ test("a correct guess shows the victory banner with the answer", async ({
 test("a free hint opens after 3 wrong guesses and stays after a reload", async ({
   page,
 }) => {
-  const wrong = names.filter((name) => name !== answerName).slice(0, 3);
+  // Pets whose colors differ from the answer's, so Colors stays unmatched and the hint has a draw
+  const colorsOf = (name: string): string =>
+    [...GUESS_DATA.find((pet) => pet.name === name)!.colors].sort().join();
+  const wrong = names
+    .filter((name) => colorsOf(name) !== colorsOf(answerName))
+    .slice(0, 3);
   const hint = page.locator("#free-hint");
   await submitGuess(page, wrong[0]!);
   await submitGuess(page, wrong[1]!);
