@@ -91,6 +91,9 @@ test("a host and a phone play a round, then the party ends on a podium", async (
   for (const p of [page, guest]) {
     await expect(p.locator(".party-round")).toHaveCount(1);
     await expect(p.locator(".party-result").first()).toContainText("Bo");
+    await expect(p.locator(".party-result").first()).toContainText(
+      /guess(es)? in \d+:\d\d/,
+    );
     await expect(p.locator(".party-player").first()).toContainText("2 points");
   }
   await expect(page.locator("#start-round")).toHaveText("Start round 2");

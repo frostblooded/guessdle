@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "../../components/ui/table.tsx";
 import { getJson } from "../../lib/api.ts";
+import { useDelayed } from "../../lib/use-delayed.ts";
 import { api } from "../../manage-client.ts";
 
 interface GameItem {
@@ -57,11 +58,14 @@ export function GamesPanel({ active }: { active: boolean }) {
   const games = (list.data?.games ?? []).filter(
     (game) => status === "" || game.status === status,
   );
+  const slow = useDelayed(list.isPending);
   const message = list.isError
     ? LOAD_FAILED
     : (failed ??
       (list.isPending
-        ? "Loading games…"
+        ? slow
+          ? "Loading games…"
+          : null
         : games.length === 0
           ? "No games match."
           : null));
