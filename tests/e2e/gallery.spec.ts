@@ -94,6 +94,7 @@ test("a gallery card shows the game's cover, a collage of entry photos without o
     cover,
     photos,
     entryCount: 5,
+    kind: "classic",
   });
   await page.route("**/api/games", (route) =>
     route.fulfill({
@@ -134,4 +135,35 @@ test("the original game, which has no cover, shows a collage of its pets on the 
   await page.goto("/g/petdle");
   await expect(page.locator("#loading-state")).toBeHidden();
   await expect(page.locator(".game-banner")).toHaveCount(0);
+});
+
+test("every gallery card names its game type in the footer, classic and blur alike", async ({
+  page,
+}) => {
+  const card = (slug: string, kind: string): object => ({
+    slug,
+    name: slug,
+    description: "",
+    cover: "",
+    photos: [],
+    entryCount: 3,
+    kind,
+  });
+  await page.route("**/api/games", (route) =>
+    route.fulfill({
+      json: [card("tabled", "classic"), card("blurry", "blur")],
+    }),
+  );
+  await page.goto("/");
+  const cards = page.locator(".game-card");
+  await expect(cards).toHaveCount(2);
+  await expect(cards.nth(0).locator(".fine-print")).toHaveText(
+    "Classic·3 entries",
+  );
+  await expect(cards.nth(1).locator(".fine-print")).toHaveText(
+    "Blur·3 entries",
+  );
+  await expect(cards.nth(1).locator(".game-kind svg")).toHaveCount(1);
+  // The type lives only in the footer, not as a badge by the name
+  await expect(cards.locator("h2 .badge")).toHaveCount(0);
 });
