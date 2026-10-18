@@ -71,7 +71,10 @@ function fakeServer(game?: Response) {
         ...(ids.includes(ANSWER) && { answer: "Dido" }),
       });
     }
-    if (url === "/api/games/pets/result") {
+    if (
+      url === "/api/games/pets/result" ||
+      url === "/api/games/pets/result?day=3"
+    ) {
       const { ids } = JSON.parse(String(init?.body)) as { ids: number[] };
       return json(200, {
         day: 1,
@@ -336,23 +339,36 @@ describe("PlayPage on a past day", () => {
       [1],
     );
     assert.equal(localStorage.getItem("game:pets:usedGuesses"), null);
-    assert.equal(screen.queryByRole("button", { name: "Reset" }), null);
   });
 
-  it("a finished past day is a record: no reset, and no stats", async () => {
+  it("a past day's win records its stats for that day and can be reset", async () => {
     const server = fakeServer();
     vi.stubGlobal("fetch", server);
     renderPlay("/g/pets/day/3");
     await screen.findByText(/No guesses yet/);
     await guess("Dido");
-    await screen.findByText("You did it!");
-    assert.ok(!server.mock.calls.some(([url]) => url.includes("/result")));
-    assert.equal(screen.queryByRole("button", { name: "See stats" }), null);
-    assert.equal(screen.queryByRole("dialog"), null);
-    assert.equal(
-      screen.queryByRole("button", { name: "Reset today's game" }),
-      null,
+    await screen.findByRole("dialog");
+    assert.ok(
+      server.mock.calls.some(([url]) => url === "/api/games/pets/result?day=3"),
     );
+    await waitFor(() =>
+      assert.equal(
+        document.querySelector("#stats-players")!.textContent,
+        "3 players solved it.",
+      ),
+    );
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => assert.equal(screen.queryByRole("dialog"), null));
+    assert.ok(screen.getByRole("button", { name: "See stats" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Reset this game" }),
+    );
+    const dialog = await screen.findByRole("alertdialog");
+    assert.match(dialog.textContent ?? "", /Reset this day's guesses\?/);
+    assert.match(dialog.textContent ?? "", /only count your first attempt/);
+    await userEvent.click(screen.getByRole("button", { name: "Reset" }));
+    await screen.findByText(/No guesses yet/);
+    assert.equal(localStorage.getItem("game:pets:day:3:usedGuesses"), null);
   });
 
   it("a day after today does not exist yet", async () => {

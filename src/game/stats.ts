@@ -136,15 +136,17 @@ export const isPlayerToken = (value: unknown): value is string =>
   typeof value === "string" && /^[A-Za-z0-9-]{16,64}$/.test(value);
 
 // Records the player's win (only the first one of the day counts) and returns
-// today's stats, or null if the server could not be reached
+// the day's stats, or null if the server could not be reached
 export async function fetchStats(
   fetch: Fetch,
   slug: string,
   body: { ids: number[]; seconds: number | null; player: string },
+  // A past day's Day Number; today when absent
+  day?: number,
 ): Promise<DayStats | null> {
   const res = await call(
     fetch,
-    `/api/games/${encodeURIComponent(slug)}/result`,
+    `/api/games/${encodeURIComponent(slug)}/result${day === undefined ? "" : `?day=${day}`}`,
     body,
   );
   return res?.ok ? (res.data as DayStats) : null;
