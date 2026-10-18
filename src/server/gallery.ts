@@ -26,6 +26,11 @@ export interface GalleryCard {
   kind: GameKind;
 }
 
+// SQL for the first Image value of the entry aliased `alias` (null when it has none)
+const FIRST_IMAGE = (alias: string): string =>
+  `(select v.value from entry_values v join attributes a on a.id = v.attribute_id
+     where v.entry_id = ${alias}.id and a.type = 'image' order by a.position, a.id limit 1)`;
+
 // Which gallery games a list shows: all of them, one owner's, or one playlist's in its order
 export type GalleryScope =
   | { ownerId: number; playlistId?: never }
@@ -45,9 +50,10 @@ export async function listGallery(
   const { rows } = await q.query<GalleryCard>(
     `select g.slug, g.name, g.description, g.cover_url as cover,
        case when g.cover_url = '' then array(
-         select p.photo_url from entries p
-         where p.game_id = g.id and p.deleted_at is null and p.photo_url <> ''
-         order by p.id limit $2
+         select x.photo from (
+           select p.id, coalesce(nullif(p.photo_url, ''), ${FIRST_IMAGE("p")}) as photo
+           from entries p where p.game_id = g.id and p.deleted_at is null) x
+         where x.photo is not null order by x.id limit $2
        ) else '{}'::text[] end as photos,
        count(e.id)::int as "entryCount", g.kind
      from games g join entries e on e.game_id = g.id and e.deleted_at is null
