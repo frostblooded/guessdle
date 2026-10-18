@@ -2,31 +2,29 @@
 import express from "express";
 import type { Express, Request, Response } from "express";
 import type pg from "pg";
-import { gradeIds } from "../../game/game.ts";
-import {
-  hintChoices,
-  isHintKind,
-  pickHint,
-  revealHint,
-} from "../../game/free-hint.ts";
+import { isHintKind, pickHint, revealHint } from "../../game/free-hint.ts";
 import type { DaysResponse } from "../../game/days.ts";
 import { listDays } from "../days.ts";
-import { isPlayerToken, MAX_SECONDS } from "../../game/stats.ts";
+import { isPlayerToken } from "../../game/stats.ts";
 import { listGallery } from "../games.ts";
-import { canApprove, canManage, type LoadedGame } from "../access.ts";
+import { canApprove, canManage } from "../access.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
-import { dayStats, recordResult } from "../results.ts";
+import {
+  boardOf,
+  openDay,
+  recordWin,
+  revealOf,
+  todayOf,
+  triesOf,
+} from "../play-day.ts";
 import {
   addGuess,
   changeGame,
   giveUp,
-  isLost,
   mergeLocal,
   resetGame,
   REFUSAL_STATUS,
-  revealOf,
   takeHint,
-  triesOf,
   view,
   type GameContext,
   type GameView,
@@ -34,36 +32,16 @@ import {
 } from "../user-game.ts";
 import {
   bodyOf,
-  dayOf,
-  fail as failWith,
   isIdList,
   loadGame,
-  todayOf,
-  todaysAnswer,
+  playDayOf,
+  sendRefusal,
   type AppContext,
 } from "./context.ts";
 
 export function gameRoutes(app: Express, ctx: AppContext): void {
   const { pool, now } = ctx;
   const base = "/api/games/:slug";
-
-  // The game and the day a request plays (today, or a past day named by ?day=N), or the
-  // failure sent and undefined
-  const playedDay = async (
-    req: Request,
-    res: Response,
-  ): Promise<{ loaded: LoadedGame; date: string; day: number } | undefined> => {
-    const loaded = await loadGame(ctx, req, res);
-    if (!loaded) {
-      return undefined;
-    }
-    const played = dayOf(ctx, req, loaded.game);
-    if (!played) {
-      failWith(res, "no_such_day");
-      return undefined;
-    }
-    return { loaded, date: played.date, day: played.day };
-  };
 
   app.get("/api/games", async (_req, res) => {
     res.set("Cache-Control", "no-store");
@@ -112,19 +90,20 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
     if (!loaded) {
       return;
     }
-    const { date, day } = todayOf(ctx, loaded.game);
     // Drawing today's answer fills every earlier day too
-    if (!(await todaysAnswer(ctx, res, loaded, date, day))) {
+    const today = await openDay(ctx, loaded, undefined);
+    if ("refusal" in today) {
+      sendRefusal(res, today);
       return;
     }
     const days = await listDays(
       pool,
       loaded.game,
-      day,
+      today.day,
       loaded.user?.id ?? null,
     );
     res.json({
-      today: day,
+      today: today.day,
       tries: triesOf(loaded.game),
       days,
     } satisfies DaysResponse);
@@ -136,54 +115,30 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
     `${base}/grade`,
     express.json({ limit: "10kb" }),
     async (req, res) => {
-      const played = await playedDay(req, res);
-      if (!played) {
+      const loaded = await loadGame(ctx, req, res);
+      if (!loaded) {
         return;
       }
-      const { loaded, date, day } = played;
-      const { game, roster } = loaded;
-      const fail = (status: number, error: string): void => {
-        res.status(status).json({ error, day });
-      };
       const ids = bodyOf(req)["ids"];
-      if (!isIdList(game, roster, ids)) {
-        fail(400, "invalid");
+      // A malformed list is refused before the day's answer is drawn
+      const valid = (): boolean => isIdList(loaded.game, loaded.roster, ids);
+      const day = await playDayOf(ctx, req, res, loaded, valid);
+      if (!day || !isIdList(loaded.game, loaded.roster, ids)) {
         return;
       }
-
-      const answer = await todaysAnswer(ctx, res, loaded, date, day);
-      if (!answer) {
+      const board = boardOf(day, ids);
+      if (typeof board === "string") {
+        res.status(REFUSAL_STATUS[board]).json({ error: board, day: day.day });
         return;
       }
-
-      const graded = gradeIds(
-        roster.attributes,
-        roster.all,
-        answer,
-        ids,
-        game.kind,
-      );
-      if (graded.kind === "invalid") {
-        fail(400, "invalid");
-        return;
-      }
-      if (graded.kind === "duplicate") {
-        fail(409, "duplicate");
-        return;
-      }
-      const lost = isLost(game, ids, graded.victory);
-      // The browser knows whether it already used its hint, and hides these then
-      const hints =
-        game.kind === "classic" && !graded.victory
-          ? hintChoices(roster.attributes, answer, graded.rows)
-          : null;
       res.json({
-        day,
-        rows: graded.rows,
-        victory: graded.victory,
-        ...(lost && { lost: true }),
-        ...((graded.victory || lost) && revealOf(game, answer)),
-        ...(hints && { hints }),
+        day: day.day,
+        rows: board.rows,
+        victory: board.victory,
+        ...(board.lost && { lost: true }),
+        ...board.reveal,
+        // The browser knows whether it already used its hint, and hides these then
+        ...(board.hints && { hints: board.hints }),
       });
     },
   );
@@ -194,49 +149,48 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
     `${base}/hint`,
     express.json({ limit: "10kb" }),
     async (req, res) => {
-      const played = await playedDay(req, res);
-      if (!played) {
+      const loaded = await loadGame(ctx, req, res);
+      if (!loaded) {
         return;
       }
-      const { loaded, date, day } = played;
-      const { game, roster } = loaded;
       const { ids, kind } = bodyOf(req);
-      if (!isIdList(game, roster, ids) || !isHintKind(kind)) {
-        res.status(400).json({ error: "invalid", day });
+      const day = await playDayOf(
+        ctx,
+        req,
+        res,
+        loaded,
+        () => isIdList(loaded.game, loaded.roster, ids) && isHintKind(kind),
+      );
+      if (!day || !isHintKind(kind)) {
         return;
       }
-      const answer = await todaysAnswer(ctx, res, loaded, date, day);
-      if (!answer) {
+      const board = boardOf(day, ids as number[]);
+      if (typeof board === "string") {
+        res.status(400).json({ error: "invalid", day: day.day });
         return;
       }
-      const graded = gradeIds(roster.attributes, roster.all, answer, ids);
-      if (graded.kind !== "graded") {
-        res.status(400).json({ error: "invalid", day });
-        return;
-      }
+      const { attributes } = day.roster;
       const pick =
-        game.kind === "classic" && !graded.victory
-          ? pickHint(roster.attributes, answer, graded.rows, kind, ctx.random)
-          : null;
-      const hint = pick && revealHint(roster.attributes, answer, pick);
+        board.hints &&
+        pickHint(attributes, day.answer, board.rows, kind, ctx.random);
+      const hint = pick && revealHint(attributes, day.answer, pick);
       if (!hint) {
-        res.status(409).json({ error: "no_hint", day });
+        res.status(409).json({ error: "no_hint", day: day.day });
         return;
       }
-      res.json({ day, hint });
+      res.json({ day: day.day, hint });
     },
   );
 
   // Stateless and open to anyone by decision (spec #38): reveals the day's answer
   app.post(`${base}/give-up`, async (req, res) => {
-    const played = await playedDay(req, res);
-    if (!played) {
+    const loaded = await loadGame(ctx, req, res);
+    if (!loaded) {
       return;
     }
-    const { loaded, date, day } = played;
-    const answer = await todaysAnswer(ctx, res, loaded, date, day);
-    if (answer) {
-      res.json({ day, ...revealOf(loaded.game, answer) });
+    const day = await playDayOf(ctx, req, res, loaded);
+    if (day) {
+      res.json({ day: day.day, ...revealOf(day.game, day.answer) });
     }
   });
 
@@ -254,13 +208,6 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       if (!loaded) {
         return;
       }
-      const { game, roster } = loaded;
-      const played = dayOf(ctx, req, game);
-      if (!played) {
-        failWith(res, "no_such_day");
-        return;
-      }
-      const { date, day, past } = played;
       const body = bodyOf(req);
       const player = user
         ? `user:${user.id}`
@@ -268,50 +215,28 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
           ? `anon:${body["player"]}`
           : null;
       const ids = body["ids"];
-      if (player === null || (!user && !isIdList(game, roster, ids))) {
-        res.status(400).json({ error: "invalid", day });
-        return;
-      }
-      const answer = await todaysAnswer(ctx, res, loaded, date, day);
-      if (!answer) {
-        return;
-      }
-      const won = user
-        ? (
-            await view(pool, {
-              game,
-              roster,
-              answer,
-              userId: user.id,
-              date,
-              day,
-              past,
-            })
-          ).ids
-        : (ids as number[]);
-      const graded = gradeIds(
-        roster.attributes,
-        roster.all,
-        answer,
-        won,
-        game.kind,
+      const day = await playDayOf(
+        ctx,
+        req,
+        res,
+        loaded,
+        () =>
+          player !== null &&
+          (user !== null || isIdList(loaded.game, loaded.roster, ids)),
       );
-      if (graded.kind !== "graded" || won.at(-1) !== answer.id) {
-        res.status(409).json({ error: "not_won", day });
+      if (!day || player === null) {
         return;
       }
-      const seconds = body["seconds"];
-      const key = { gameId: game.id, date, player };
-      await recordResult(pool, key, {
-        guesses: won.length,
-        seconds:
-          Number.isInteger(seconds) &&
-          (seconds as number) >= 0 &&
-          (seconds as number) <= MAX_SECONDS
-            ? (seconds as number)
-            : null,
-      });
-      res.json(await dayStats(pool, key, day));
+      // A signed-in win is the stored guesses; an anonymous one the ids sent
+      const won = user
+        ? (await view(pool, { ...day, userId: user.id })).ids
+        : (ids as number[]);
+      const stats = await recordWin(pool, day, player, won, body["seconds"]);
+      if (stats === "not_won") {
+        res.status(409).json({ error: "not_won", day: day.day });
+        return;
+      }
+      res.json(stats);
     },
   );
 
@@ -331,28 +256,17 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         res.status(401).json({ error: "unauthorized" });
         return;
       }
-      const loaded: LoadedGame | undefined = await loadGame(ctx, req, res);
+      const loaded = await loadGame(ctx, req, res);
       if (!loaded) {
         return;
       }
-      const played = dayOf(ctx, req, loaded.game);
-      if (!played) {
-        failWith(res, "no_such_day");
-        return;
-      }
-      const { date, day, past } = played;
-      const answer = await todaysAnswer(ctx, res, loaded, date, day);
-      if (!answer) {
+      const day = await playDayOf(ctx, req, res, loaded);
+      if (!day) {
         return;
       }
       await handler({
-        game: loaded.game,
-        roster: loaded.roster,
-        answer,
+        ...day,
         userId: user.id,
-        date,
-        day,
-        past,
         user,
         body: bodyOf(req),
         res,

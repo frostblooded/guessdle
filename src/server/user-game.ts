@@ -1,7 +1,6 @@
 // A signed-in player's Game State for one day, stored in Postgres.
 import type pg from "pg";
 import {
-  hintChoices,
   isHintKind,
   pickHint,
   revealHint,
@@ -10,14 +9,9 @@ import {
   type HintKind,
   type HintPick,
 } from "../game/free-hint.ts";
-import {
-  gradeIds,
-  SKIP,
-  type Entry,
-  type GradedAttribute,
-} from "../game/game.ts";
-import { outOfTries } from "../game/blur.ts";
+import { SKIP, type GradedAttribute } from "../game/game.ts";
 import type { GameRow, Roster } from "./games.ts";
+import { boardOf, isLost, triesOf, type PlayDay } from "./play-day.ts";
 
 export interface GameView {
   day: number;
@@ -44,28 +38,6 @@ const isGuessId = (game: GameRow, roster: Roster, id: unknown): boolean =>
   (id === SKIP && game.kind === "blur") ||
   roster.entries.some((e) => e.id === id);
 
-// A Blur game's tries, null for a classic game with unlimited guesses
-export const triesOf = (game: GameRow): number | null =>
-  game.kind === "blur" ? game.blurTries : null;
-
-// The answer as a finished day reveals it: its name, its description when it has one, and a
-// Blur game's whole image
-export const revealOf = (
-  game: GameRow,
-  answer: Entry,
-): { answer: string; answerPhoto?: string; answerDescription?: string } => ({
-  answer: answer.name,
-  ...(game.kind === "blur" && { answerPhoto: answer.photo }),
-  ...(answer.description && { answerDescription: answer.description }),
-});
-
-// Whether `ids` used up a Blur game's tries without the answer
-export const isLost = (
-  game: GameRow,
-  ids: readonly number[],
-  victory: boolean,
-): boolean => outOfTries(triesOf(game), ids.length, victory);
-
 // Each refusal and the HTTP status it answers with
 export const REFUSAL_STATUS = {
   invalid: 400,
@@ -83,23 +55,14 @@ export type GameOutcome = { kind: "ok"; view: GameView } | { kind: Refusal };
 
 type Q = Pick<pg.Pool, "query">;
 
-// Who is playing which day, and against which answer
-export interface GameContext {
-  game: GameRow;
-  roster: Roster;
-  answer: Entry;
+// Who is playing which Day of play
+export interface GameContext extends PlayDay {
   userId: number;
-  date: string;
-  day: number;
-  // An archive day (not today), played from the Past days list
-  past: boolean;
 }
 
 // Graded on read against the current answer, so an overridden answer applies at once
-export async function view(
-  q: Q,
-  { game, roster, answer, userId, date, day }: GameContext,
-): Promise<GameView> {
+export async function view(q: Q, ctx: GameContext): Promise<GameView> {
+  const { game, userId, date, day } = ctx;
   const guesses = await q.query<{ entry_id: number }>(
     // A skip is stored with no entry (migration 011)
     `select coalesce(entry_id, ${SKIP})::int as entry_id from user_guesses
@@ -113,37 +76,24 @@ export async function view(
         [userId, game.id, date],
       )
     ).rowCount === 1;
-  // Soft-deleted entries still resolve, so past guesses keep their rows
   const ids = guesses.rows.map((row) => row.entry_id);
-  const graded = gradeIds(
-    roster.attributes,
-    roster.all,
-    answer,
-    ids,
-    game.kind,
-  );
-  if (graded.kind !== "graded") {
+  const board = boardOf(ctx, ids, gaveUp);
+  if (typeof board === "string") {
     // Stored rows are never duplicated
     throw new Error("stored guesses are not gradable");
   }
-  const lost = isLost(game, ids, graded.victory);
-  const over = graded.victory || gaveUp || lost;
   const pick = await storedHint(q, userId, game.id, date);
-  const hint = pick && revealHint(roster.attributes, answer, pick);
-  const hints =
-    game.kind === "classic" && !over && !hint
-      ? hintChoices(roster.attributes, answer, graded.rows)
-      : null;
+  const hint = pick && revealHint(ctx.roster.attributes, ctx.answer, pick);
   return {
     day,
     ids,
-    rows: graded.rows,
-    victory: graded.victory,
+    rows: board.rows,
+    victory: board.victory,
     gaveUp,
-    ...(lost && { lost: true as const }),
-    ...(over && revealOf(game, answer)),
+    ...(board.lost && { lost: true as const }),
+    ...board.reveal,
     ...(hint && { hint }),
-    ...(hints && { hints }),
+    ...(!hint && board.hints && { hints: board.hints }),
   };
 }
 
