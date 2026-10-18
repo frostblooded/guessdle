@@ -247,7 +247,7 @@ describe("victory stats", () => {
         );
         // A Blur entry needs a photo and a clearing order to be playable
         await db.pool.query(
-          "update entries set blur_order = '{0,1,2,3,4,5,6,7,8}' where game_id = (select id from games where slug = $1)",
+          "update entries set blur_order = '{0,1,2,3,4,5,6,7,8}', photo_url = '/uploads/x.webp' where game_id = (select id from games where slug = $1)",
           [GAME],
         );
       });
@@ -257,7 +257,7 @@ describe("victory stats", () => {
           [GAME],
         );
         await db.pool.query(
-          "update entries set blur_order = null where game_id = (select id from games where slug = $1)",
+          "update entries set blur_order = null, photo_url = '' where game_id = (select id from games where slug = $1)",
           [GAME],
         );
       });
