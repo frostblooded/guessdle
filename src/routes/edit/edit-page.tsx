@@ -13,14 +13,15 @@ import {
   TabsList,
   TabsTrigger,
 } from "../../components/ui/tabs.tsx";
-import { statusNotice, type Details } from "../../game/editor.ts";
-import { MAX_DESCRIPTION, MAX_NAME, MIN_ENTRIES } from "../../game/limits.ts";
+import type { Details } from "../../game/editor.ts";
+import { MAX_DESCRIPTION, MAX_NAME } from "../../game/limits.ts";
 import { api, errorText } from "../../manage-client.ts";
 import { useSignedIn } from "../../lib/use-signed-in.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { AnswersPanel } from "./answers-panel.tsx";
 import { AttributesPanel } from "./attributes-panel.tsx";
 import { EntriesPanel } from "./entries-panel.tsx";
+import { StatusBar } from "./status-bar.tsx";
 import { IMAGE_TYPES, type Attribute, type Entry } from "./types.ts";
 
 type Loaded =
@@ -117,7 +118,6 @@ function Editor({
   const [tab, setTab] = useState("details");
   const [error, setError] = useState("");
   const [savedText, setSavedText] = useState("");
-  const [flowError, setFlowError] = useState("");
   const [busy, setBusy] = useState(false);
   const { crop, dialog } = useCrop(setError);
 
@@ -183,63 +183,18 @@ function Editor({
     }
   };
 
-  // Submit and unpublish move the status; the server answers with the fresh details
-  const flow = async (action: "submit" | "unpublish"): Promise<void> => {
-    const out = await api<Details>("POST", `${base}/${action}`, {});
-    if (out?.status === 200) {
-      setDetails(out.data);
-    }
-    setFlowError(out?.status === 200 ? "" : errorText(out));
-  };
-
-  const notice = statusNotice(details);
-  // A rejected game resubmits by editing, but a plain Submit is allowed too
-  const canSubmit = details.status === "draft" || details.status === "rejected";
-
   return (
     <>
       <Head slug={saved.slug} name={saved.name} />
       {dialog}
       <div id="editor" className="space-y-6">
-        <div className="editor-bar flex flex-wrap items-start gap-3">
-          <div className="min-w-0 flex-1 space-y-2 empty:hidden">
-            {notice && (
-              <Alert
-                id="status-notice"
-                variant={details.status === "rejected" ? "error" : "warn"}
-                role="status"
-                data-status={details.status}
-              >
-                {notice}
-              </Alert>
-            )}
-            {flowError && (
-              <Alert id="flow-error" variant="error" role="alert">
-                {flowError}
-              </Alert>
-            )}
-          </div>
-          <div className="editor-actions flex flex-wrap gap-2">
-            {canSubmit && (
-              <Button
-                id="submit-button"
-                disabled={details.entryCount < MIN_ENTRIES}
-                onClick={() => void flow("submit")}
-              >
-                Submit for approval
-              </Button>
-            )}
-            {details.status === "approved" && (
-              <Button
-                id="unpublish-button"
-                variant="secondary"
-                onClick={() => void flow("unpublish")}
-              >
-                Unpublish
-              </Button>
-            )}
-          </div>
-        </div>
+        <StatusBar
+          base={base}
+          details={details}
+          name={saved.name}
+          onDetails={setDetails}
+          onReviewed={refreshStatus}
+        />
         <Tabs value={tab} onValueChange={setTab} className="space-y-4">
           <TabsList aria-label="Editor sections">
             {TABS.map(([value, label, panel]) => (

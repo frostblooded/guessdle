@@ -1,16 +1,21 @@
 // Play's extras for the game's people: the status line for the owner and admins (issue #87), the
-// admin's Approve button on a pending game (issue #88), and the head's Host a party / Edit links.
+// admin's Approve and Reject buttons on a pending game (issue #88), and the head's Host a party /
+// Edit links.
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router";
+import {
+  ReviewButtons,
+  type Review,
+} from "../../components/review-buttons.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
-import { Button, buttonVariants } from "../../components/ui/button.tsx";
+import { buttonVariants } from "../../components/ui/button.tsx";
 import { statusNotice, type Details } from "../../game/editor.ts";
 import { MIN_ENTRIES } from "../../game/limits.ts";
-import { api, errorText } from "../../manage-client.ts";
 
 // What GET /api/games/:slug tells this viewer; the server leaves out `status` for other players
 export interface StatusView {
+  name?: string;
   status?: Details["status"];
   rejectReason?: string;
   canApprove?: boolean;
@@ -18,38 +23,22 @@ export interface StatusView {
 
 export function PlayStatus({ slug, view }: { slug: string; view: StatusView }) {
   const client = useQueryClient();
-  // Set once this page approved the game, so the notice and button go at once
-  const [approved, setApproved] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // Set once this page reviewed the game, so the notice and buttons change at once
+  const [reviewed, setReviewed] = useState<{
+    status: Review;
+    reason: string;
+  } | null>(null);
   const [error, setError] = useState("");
-  const status = approved ? "approved" : view.status;
+  const status = reviewed?.status ?? view.status;
   const notice =
     status === undefined
       ? ""
       : statusNotice({
           status,
-          rejectReason: view.rejectReason ?? "",
+          rejectReason: reviewed?.reason ?? view.rejectReason ?? "",
           // The board's own notice already says when entries are missing
           entryCount: MIN_ENTRIES,
         });
-
-  const approve = async (): Promise<void> => {
-    setBusy(true);
-    const out = await api(
-      "POST",
-      `/api/admin/games/${encodeURIComponent(slug)}/approve`,
-      {},
-    );
-    setBusy(false);
-    if (out?.status !== 200) {
-      setError(errorText(out));
-      return;
-    }
-    setError("");
-    setApproved(true);
-    // The header's Admin count drops at once, not on the next page load
-    await client.invalidateQueries({ queryKey: ["me"] });
-  };
 
   return (
     <>
@@ -64,16 +53,22 @@ export function PlayStatus({ slug, view }: { slug: string; view: StatusView }) {
             {notice}
           </Alert>
         )}
-        {view.canApprove && !approved && (
-          <Button
-            id="approve-button"
-            size="sm"
-            className="play-status"
-            disabled={busy}
-            onClick={() => void approve()}
-          >
-            Approve
-          </Button>
+        {view.canApprove && reviewed === null && (
+          <span className="play-status flex gap-2">
+            <ReviewButtons
+              slug={slug}
+              name={view.name ?? slug}
+              approveId="approve-button"
+              rejectId="reject-button"
+              onDone={async (review, reason) => {
+                setError("");
+                setReviewed({ status: review, reason });
+                // The header's Admin count drops at once, not on the next page load
+                await client.invalidateQueries({ queryKey: ["me"] });
+              }}
+              onFail={setError}
+            />
+          </span>
         )}
       </div>
       <Alert
