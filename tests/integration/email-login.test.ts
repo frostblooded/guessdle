@@ -259,6 +259,7 @@ describe("email magic-link sign-in", () => {
       assert.deepEqual(await me(cookieOf(res)), {
         name: "ann@x.test",
         email: "ann@x.test",
+        username: null,
         admin: false,
       });
       assert.equal(await count("users"), 1);
@@ -351,6 +352,7 @@ describe("email magic-link sign-in", () => {
       assert.deepEqual(await me(cookieOf(res)), {
         name: "Ann G",
         email: "Ann@X.test",
+        username: null,
         admin: false,
       });
       assert.equal(await count("users", "google_sub = 'g-1'"), 1);

@@ -102,6 +102,7 @@ describe("Sessions and CSRF protection", () => {
       assert.deepEqual(body.user, {
         name: "ann@x.test",
         email: "ann@x.test",
+        username: null,
         admin: false,
       });
     });
@@ -358,6 +359,7 @@ describe("Sessions and CSRF protection", () => {
       assert.deepEqual((await me(token, testUrl)).user, {
         name: "Ann",
         email: "ann@x.test",
+        username: null,
         admin: false,
       });
     });

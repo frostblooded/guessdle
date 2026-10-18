@@ -2,6 +2,7 @@
 // admin's Approve and Reject buttons on a pending game (issue #88), and the head's Host a party /
 // Edit links.
 import { useQueryClient } from "@tanstack/react-query";
+import { SaveButton } from "../../components/save-to-playlist.tsx";
 import { useState } from "react";
 import { Link } from "react-router";
 import { ReviewButtons } from "../../components/review-buttons.tsx";
@@ -88,18 +89,22 @@ export function PlayStatus({ slug, view }: { slug: string; view: StatusView }) {
 }
 
 // The head's buttons: Host a party on any playable game (issue #90), Edit for its people
+// `saveName` is the game's name once it is playable: the Save to a playlist button shows then
 export function PlayActions({
   slug,
   canHost,
   canEdit,
+  saveName,
 }: {
   slug: string;
   canHost: boolean;
   canEdit: boolean;
+  saveName?: string | undefined;
 }) {
   const outline = buttonVariants({ variant: "outline", size: "sm" });
   return (
     <>
+      {saveName !== undefined && <SaveButton slug={slug} name={saveName} />}
       {canHost && (
         <Link
           id="party-host-link"

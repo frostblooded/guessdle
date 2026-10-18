@@ -24,6 +24,7 @@ function renderAs(user: AccountUser | null): void {
 const ADMIN: AccountUser = {
   name: "Niki",
   email: "niki@example.test",
+  username: null,
   admin: true,
   pending: 2,
 };
@@ -58,6 +59,30 @@ describe("AccountArea", () => {
       await screen.findByRole("button", { name: "Account menu for Niki" }),
     );
     assert.equal(screen.queryByRole("link", { name: /Admin/ }), null);
+  });
+
+  it("links Profile to the username's page, or to /profile to pick one", async () => {
+    renderAs({ ...ADMIN, username: "niki" });
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Account menu for Niki" }),
+    );
+    assert.equal(
+      screen
+        .getByRole("link", { name: "Profile and playlists" })
+        .getAttribute("href"),
+      "/u/niki",
+    );
+    cleanup();
+    renderAs(ADMIN);
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Account menu for Niki" }),
+    );
+    assert.equal(
+      screen
+        .getByRole("link", { name: "Profile and playlists" })
+        .getAttribute("href"),
+      "/profile",
+    );
   });
 
   it("Escape closes the menu and returns focus to its button", async () => {
