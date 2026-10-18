@@ -1,4 +1,5 @@
-// "Reset today's guesses?": asks before Play clears the board, then hands focus back to the button that asked.
+// "Reset today's guesses?": asks before Play clears the board, says only the first attempt counts in the
+// stats, then hands focus back to the button that asked.
 import type { RefObject } from "react";
 import {
   AlertDialog,
@@ -15,11 +16,14 @@ export function ResetDialog({
   onOpenChange,
   onConfirm,
   opener,
+  past,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
   opener: RefObject<HTMLButtonElement | null>;
+  // A past day's board rather than today's
+  past: boolean;
 }) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -30,9 +34,12 @@ export function ResetDialog({
           opener.current?.focus();
         }}
       >
-        <AlertDialogTitle>Reset today&apos;s guesses?</AlertDialogTitle>
+        <AlertDialogTitle>
+          {past ? "Reset this day's guesses?" : "Reset today's guesses?"}
+        </AlertDialogTitle>
         <AlertDialogDescription>
-          The Daily Answer stays the same; you start with a fresh board.
+          The answer stays the same; you start with a fresh board. The stats
+          only count your first attempt, so winning again will not change them.
         </AlertDialogDescription>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>

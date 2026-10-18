@@ -1,4 +1,4 @@
-// The victory popup: congratulations, the player's guesses and time, and how today's winners did.
+// The victory popup: congratulations, the player's guesses and time, and how the day's winners did.
 import {
   Dialog,
   DialogContent,
@@ -104,7 +104,15 @@ function comparison(percent: number | null, better: string): string | null {
   return percent === null ? null : `${better} than ${percent}% of players`;
 }
 
-export function StatsPanel({ stats }: { stats: DayStats }) {
+// `past`: the stats of a past day (anyone who won it, then or later), not today
+export function StatsPanel({
+  stats,
+  past = false,
+}: {
+  stats: DayStats;
+  past?: boolean;
+}) {
+  const when = past ? "" : " today";
   const { you } = stats;
   const others = stats.players - (you === null ? 0 : 1);
   const hasTimes = stats.times.some((n) => n > 0);
@@ -134,8 +142,8 @@ export function StatsPanel({ stats }: { stats: DayStats }) {
       )}
       <p id="stats-players" className="text-center text-sm">
         {others === 0
-          ? "You are the first to solve it today."
-          : `${players(stats.players)} solved it today.`}
+          ? `You are the first to solve it${when}.`
+          : `${players(stats.players)} solved it${when}.`}
       </p>
       <BarChart
         id="stats-guess-chart"
@@ -157,6 +165,7 @@ export function StatsDialog({
   stats,
   failed,
   returnFocusId,
+  past = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -165,7 +174,9 @@ export function StatsDialog({
   failed: boolean;
   // Gets focus back on close: the popup may have opened on its own, from a guess box that is gone
   returnFocusId: string;
+  past?: boolean;
 }) {
+  const which = past ? "this day's" : "today's";
   const you = stats?.you;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -187,12 +198,12 @@ export function StatsDialog({
           </DialogDescription>
         </div>
         {stats ? (
-          <StatsPanel stats={stats} />
+          <StatsPanel stats={stats} past={past} />
         ) : (
           <p id="stats-status" className="text-sm text-muted-foreground">
             {failed
-              ? "Could not load today's stats. Try again in a moment."
-              : "Loading today's stats…"}
+              ? `Could not load ${which} stats. Try again in a moment.`
+              : `Loading ${which} stats…`}
           </p>
         )}
       </DialogContent>
