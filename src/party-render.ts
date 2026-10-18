@@ -49,7 +49,12 @@ export function renderPlayers(
       progress ? progressLabel(progress) : "",
     );
     row.append(
-      el("span", "party-place", ordinal(player.place)),
+      // No place before the first round has a result
+      el(
+        "span",
+        "party-place",
+        view.history.length > 0 ? ordinal(player.place) : "",
+      ),
       name,
       detail,
       el("span", "party-points", points(player.points)),
