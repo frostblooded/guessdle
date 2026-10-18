@@ -1,12 +1,31 @@
 // The editor's Attributes tab: each attribute is a column on the board. Edits stay here until
-// Save sends the whole list at once.
-import { useState, type FormEvent } from "react";
+// Save sends the whole list at once. Rows reorder by drag handle or the up and down arrows.
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { ArrowDown, ArrowUp, GripVertical } from "lucide-react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Input, NativeSelect } from "../../components/ui/input.tsx";
 import { erasedBy } from "../../game/editor.ts";
 import { FAILURES } from "../../game/failures.ts";
 import { MAX_ATTRIBUTE_NAME } from "../../game/limits.ts";
+import { cn } from "../../lib/utils.ts";
 import { api, errorText, type Reply } from "../../manage-client.ts";
 import type { Attribute } from "./types.ts";
 
@@ -27,6 +46,49 @@ interface Draft {
 let nextKey = 0;
 const draftsOf = (attributes: Attribute[]): Draft[] =>
   attributes.map((a) => ({ key: `saved-${a.id}`, ...a }));
+// One list row; its handle drags it
+function SortableRow({
+  id,
+  label,
+  children,
+}: {
+  id: string;
+  label: string;
+  children: ReactNode;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+  return (
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={cn(
+        "attr-row flex flex-wrap items-center gap-2 border-b bg-background pb-2 last:border-b-0 sm:border-b-0 sm:pb-0",
+        isDragging && "relative z-10 shadow-md",
+      )}
+    >
+      <button
+        ref={setActivatorNodeRef}
+        type="button"
+        className="drag-handle cursor-grab touch-none rounded p-1 text-muted-foreground hover:text-foreground"
+        aria-label={`Drag ${label}`}
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="size-4" aria-hidden />
+      </button>
+      {children}
+    </li>
+  );
+}
+
 const sameName = (a: string, b: string): boolean =>
   a.trim().toLowerCase() === b.trim().toLowerCase();
 
@@ -58,6 +120,22 @@ export function AttributesPanel({
     setDrafts((list) =>
       list.map((d) => (d.key === key ? { ...d, ...change } : d)),
     );
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+  const move = (from: number, to: number): void =>
+    setDrafts((list) => arrayMove(list, from, to));
+  const dragEnd = ({ active, over }: DragEndEvent): void => {
+    const from = drafts.findIndex((d) => d.key === active.id);
+    const to = drafts.findIndex((d) => d.key === over?.id);
+    if (from !== to && to !== -1) {
+      move(from, to);
+    }
+  };
 
   const add = (event: FormEvent): void => {
     event.preventDefault();
@@ -108,51 +186,78 @@ export function AttributesPanel({
         Each attribute is a column on the board. Number columns tell players
         whether the answer is higher or lower. Changes apply when you press
         Save; removing an attribute or changing its type erases its values from
-        every entry.
+        every entry. Drag a row or use its arrows to change the column order;
+        reordering alone does not send the game back for review.
       </p>
-      <ul id="attr-list" className="attr-list space-y-2">
-        {drafts.map((draft) => (
-          <li
-            key={draft.key}
-            className="attr-row flex flex-wrap items-center gap-2"
-          >
-            <Input
-              className="min-w-40 flex-1"
-              maxLength={MAX_ATTRIBUTE_NAME}
-              value={draft.name}
-              aria-label={`Name of ${draft.name}`}
-              onChange={(event) =>
-                update(draft.key, { name: event.target.value })
-              }
-            />
-            <NativeSelect
-              value={draft.type}
-              aria-label={`Type of ${draft.name}`}
-              onChange={(event) =>
-                update(draft.key, {
-                  type: event.target.value as Attribute["type"],
-                })
-              }
-            >
-              {TYPES.map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </NativeSelect>
-            <Button
-              variant="outline"
-              size="sm"
-              aria-label={`Remove ${draft.name}`}
-              onClick={() =>
-                setDrafts((list) => list.filter((d) => d.key !== draft.key))
-              }
-            >
-              Remove
-            </Button>
-          </li>
-        ))}
-      </ul>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={dragEnd}
+      >
+        <SortableContext
+          items={drafts.map((d) => d.key)}
+          strategy={verticalListSortingStrategy}
+        >
+          <ul id="attr-list" className="attr-list space-y-2">
+            {drafts.map((draft, i) => (
+              <SortableRow key={draft.key} id={draft.key} label={draft.name}>
+                <Input
+                  className="min-w-40 flex-1"
+                  maxLength={MAX_ATTRIBUTE_NAME}
+                  value={draft.name}
+                  aria-label={`Name of ${draft.name}`}
+                  onChange={(event) =>
+                    update(draft.key, { name: event.target.value })
+                  }
+                />
+                <NativeSelect
+                  value={draft.type}
+                  aria-label={`Type of ${draft.name}`}
+                  onChange={(event) =>
+                    update(draft.key, {
+                      type: event.target.value as Attribute["type"],
+                    })
+                  }
+                >
+                  {TYPES.map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </NativeSelect>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label={`Move ${draft.name} up`}
+                  disabled={i === 0}
+                  onClick={() => move(i, i - 1)}
+                >
+                  <ArrowUp aria-hidden />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label={`Move ${draft.name} down`}
+                  disabled={i === drafts.length - 1}
+                  onClick={() => move(i, i + 1)}
+                >
+                  <ArrowDown aria-hidden />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  aria-label={`Remove ${draft.name}`}
+                  onClick={() =>
+                    setDrafts((list) => list.filter((d) => d.key !== draft.key))
+                  }
+                >
+                  Remove
+                </Button>
+              </SortableRow>
+            ))}
+          </ul>
+        </SortableContext>
+      </DndContext>
       <form
         id="attr-form"
         className="attr-row flex flex-wrap items-center gap-2"
