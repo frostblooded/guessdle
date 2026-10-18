@@ -1,15 +1,19 @@
 // PostToolUse hook: lint-fix then format the file Claude just edited. Prettier skips .prettierignore'd files.
 // Lint errors left after --fix go to stderr with exit 2 so Claude sees them.
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 let input = "";
 for await (const chunk of process.stdin) input += chunk;
 const file = JSON.parse(input).tool_input?.file_path;
-if (!file) process.exit(0);
+// Before npm ci (a fresh cloud session) there is nothing to run
+if (!file || !existsSync(new URL("../../node_modules/", import.meta.url))) {
+  process.exit(0);
+}
 const bin = (path) => fileURLToPath(new URL(path, import.meta.url));
 let lintErrors = "";
-if (/\.(ts|mjs)$/.test(file)) {
+if (/\.(tsx?|mjs)$/.test(file)) {
   const lint = spawnSync(
     process.execPath,
     [
