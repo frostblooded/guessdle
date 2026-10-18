@@ -38,7 +38,7 @@ export interface AppDeps {
   uploadQuotaBytes?: number;
   // Per-user budget for creating and editing games per window
   writeLimit?: RateLimit;
-  // Folder holding game.html, the shell served at /g/<slug>
+  // Folder holding index.html, the app shell served at /g/<slug>
   shellDir?: string;
 }
 
