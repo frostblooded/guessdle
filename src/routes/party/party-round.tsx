@@ -5,9 +5,14 @@ import { BoardRow, GuessRow, TitleTile } from "../../components/board.tsx";
 import { BlurGuesses, BlurView } from "../../components/blur-view.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
-import { findEntryId, isAnswerRow, nameCell } from "../../game/game.ts";
+import {
+  findEntryId,
+  guessedNames,
+  isAnswerRow,
+  SKIP,
+} from "../../game/game.ts";
 import type { LiveRound, PartyView } from "../../game/party.ts";
-import { GuessPanel, useGuessMode } from "../play/guess-panel.tsx";
+import { GuessForm, useGuessMode } from "../play/guess-form.tsx";
 import { SelectList } from "../play/select-list.tsx";
 
 type Board = NonNullable<LiveRound["yours"]>;
@@ -34,7 +39,7 @@ export function PartyRound({
   // Selection mode's list, in place of the board
   const listing = modes.selecting && !done;
   const entries = view.game.entries;
-  const used = new Set(mine.rows.map((row) => nameCell(row).value));
+  const used = guessedNames(mine.rows);
   const blur = view.game.kind === "blur" ? (view.game.blurTries ?? 1) : null;
   const newestFirst = [...mine.rows].reverse();
   const unguessed = entries.filter((e) => !used.has(e.name));
@@ -104,13 +109,13 @@ export function PartyRound({
       )}
       {!done && (
         <Card id="guess-card" className="play-card mb-6 gap-3 p-4 sm:p-5">
-          <GuessPanel
+          <GuessForm
             modes={modes}
             names={names}
             value={guess}
             onChange={setGuess}
             onSubmit={submit}
-            disabled={false}
+            onSkip={blur === null ? undefined : () => onGuess(SKIP)}
           />
           <div className="game-actions flex justify-end">
             <Button
@@ -126,9 +131,8 @@ export function PartyRound({
       )}
       {listing && (
         <SelectList
-          entries={unguessed.map((e) => ({ ...e, values: e.values ?? [] }))}
-          attributes={blur === null ? view.game.attributes : []}
-          photos={blur === null}
+          entries={unguessed}
+          attributes={blur === null ? view.game.attributes : null}
           onPick={submit}
         />
       )}

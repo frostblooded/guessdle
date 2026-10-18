@@ -51,18 +51,18 @@ function SortTitle({
 
 export function SelectList({
   entries,
-  attributes,
-  photos,
+  attributes: shownAttributes,
   onPick,
 }: {
   // The entries not guessed yet
   entries: readonly ListEntry[];
-  // A classic game's attributes; a Blur game has none to show
-  attributes: readonly GameAttribute[];
-  // False for a Blur game: its photos are the answers
-  photos: boolean;
+  // A classic game's attributes; null for a Blur game, which lists names only (its photos are
+  // the answers)
+  attributes: readonly GameAttribute[] | null;
   onPick: (name: string) => void;
 }) {
+  const photos = shownAttributes !== null;
+  const attributes = shownAttributes ?? [];
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<ListSort>({ column: -1, descending: false });
   const shown = listEntries(
@@ -150,7 +150,7 @@ export function SelectList({
                 </span>
                 {attributes.map((_, i) => (
                   <span key={i} className={cn(cellBase, "bg-muted")}>
-                    {cellText(entry.values[i])}
+                    {cellText(entry.values?.[i])}
                   </span>
                 ))}
               </button>

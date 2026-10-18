@@ -27,7 +27,6 @@ const meta = {
       { name: "Age", type: "number" },
       { name: "Owners", type: "list" },
     ],
-    photos: true,
     onPick: fn(),
   },
 } satisfies Meta<typeof SelectList>;
@@ -40,7 +39,6 @@ export const Classic: Story = {};
 export const Blur: Story = {
   args: {
     entries: NAMES.map((name) => ({ name, photo: "", values: [] })),
-    attributes: [],
-    photos: false,
+    attributes: null,
   },
 };

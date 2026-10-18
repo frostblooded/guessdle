@@ -1,6 +1,8 @@
-// Where the player makes a guess, shared by Play and party rounds: the Type / Select switch, then
-// the autocomplete box with its Guess button, or in selection mode the button that opens the list.
+// The guess controls, shared by Play and party rounds: the Type / Select switch, then the guess box
+// and its Guess button, or in selection mode the button that opens the list of every entry; with
+// a Skip button under them for games that allow skipping (Blur games, ADR 0019).
 import { useState } from "react";
+import { SkipButton } from "../../components/skip-button.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import {
   readGuessMode,
@@ -74,14 +76,16 @@ function ModeSwitch({
   );
 }
 
-export function GuessPanel({
+export function GuessForm({
   modes,
   names,
   value,
   onChange,
   onSubmit,
-  disabled,
-  guessDisabled = disabled,
+  onSkip,
+  disabled = false,
+  busy = false,
+  hidden = false,
 }: {
   modes: GuessModeState;
   // The names not guessed yet
@@ -89,14 +93,18 @@ export function GuessPanel({
   value: string;
   onChange: (value: string) => void;
   onSubmit: (name: string) => void;
-  disabled: boolean;
-  // The Guess button and the list button; disabled too while the game loads
-  guessDisabled?: boolean;
+  // Shown only when given
+  onSkip?: (() => void) | undefined;
+  // Nothing can be guessed (the game is closed)
+  disabled?: boolean;
+  // Still loading: the box takes typing but nothing is sent yet
+  busy?: boolean;
+  hidden?: boolean;
 }) {
   return (
     <>
-      <ModeSwitch mode={modes.mode} onChange={modes.setMode} />
-      <div id="new-guess-row" className="guess-row flex gap-2">
+      {!hidden && <ModeSwitch mode={modes.mode} onChange={modes.setMode} />}
+      <div id="new-guess-row" className="guess-row flex gap-2" hidden={hidden}>
         {modes.mode === "type" ? (
           <>
             <GuessBox
@@ -109,7 +117,7 @@ export function GuessPanel({
             <Button
               id="submit-new-guess-button"
               className="h-11 px-5 font-bold uppercase"
-              disabled={guessDisabled}
+              disabled={disabled || busy}
               onClick={() => onSubmit(value)}
             >
               Guess
@@ -122,13 +130,16 @@ export function GuessPanel({
             variant={modes.selecting ? "outline" : "default"}
             aria-expanded={modes.selecting}
             aria-controls="select-list"
-            disabled={guessDisabled}
+            disabled={disabled || busy}
             onClick={() => modes.setSelecting(!modes.selecting)}
           >
             {modes.selecting ? "Back to my guesses" : "Select next guess"}
           </Button>
         )}
       </div>
+      {onSkip && !hidden && (
+        <SkipButton disabled={disabled || busy} onSkip={onSkip} />
+      )}
     </>
   );
 }

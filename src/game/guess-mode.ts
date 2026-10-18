@@ -39,7 +39,7 @@ export function writeGuessMode(
 export interface ListEntry {
   name: string;
   photo: string;
-  values: readonly AttributeValue[];
+  values?: readonly AttributeValue[] | undefined;
 }
 
 // The column the list is sorted by: -1 for the name, else an attribute's index
@@ -70,8 +70,8 @@ export function listEntries<T extends ListEntry>(
     if (sort.column < 0) {
       return byName(a, b);
     }
-    const x = a.values[sort.column];
-    const y = b.values[sort.column];
+    const x = a.values?.[sort.column];
+    const y = b.values?.[sort.column];
     if (types[sort.column] === "number") {
       return Number(cellText(x)) - Number(cellText(y));
     }

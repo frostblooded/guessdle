@@ -1,5 +1,4 @@
-import { MIN_ENTRIES } from "./limits.ts";
-import type { GameKind } from "./blur.ts";
+import { minEntriesOf, type GameKind } from "./blur.ts";
 
 // Editor wording that depends on a game's status (pure, so it is unit tested).
 
@@ -24,9 +23,9 @@ export interface Details {
 // Shared by the editor and the Play page, which knows only these fields
 export function statusNotice(
   d: Pick<Details, "status" | "rejectReason" | "entryCount"> &
-    Partial<Pick<Details, "incompleteCount">>,
+    Partial<Pick<Details, "incompleteCount" | "kind">>,
 ): string {
-  const missing = Math.max(0, MIN_ENTRIES - d.entryCount);
+  const missing = Math.max(0, minEntriesOf(d.kind ?? "classic") - d.entryCount);
   const incomplete = d.incompleteCount ?? 0;
   const paused =
     incomplete > 0

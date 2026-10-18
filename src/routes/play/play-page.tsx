@@ -8,22 +8,20 @@ import { PageHead } from "../../components/page.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
-import { FAILURES, failureText, UNREACHABLE } from "../../game/failures.ts";
+import { FAILURES } from "../../game/failures.ts";
 import {
   findEntryId,
+  guessedNames,
+  SKIP,
   isAnswerRow,
-  nameCell,
-  type EntryRef,
-  type GameAttribute,
   type GradedAttribute,
 } from "../../game/game.ts";
-import { MIN_ENTRIES } from "../../game/limits.ts";
 import { openPlay } from "../../game/open-play.ts";
 import type { Play } from "../../game/play.ts";
-import type { GameKind } from "../../game/blur.ts";
+import { minEntriesOf } from "../../game/blur.ts";
 import { browserFetch, gameKey, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
-import { GuessPanel, useGuessMode } from "./guess-panel.tsx";
+import { GuessForm, useGuessMode } from "./guess-form.tsx";
 import {
   GameNotFound,
   NoSuchDay,
@@ -31,47 +29,13 @@ import {
   PastDaysLink,
 } from "./past-day.tsx";
 import { boardUrl, PlayResults } from "./play-results.tsx";
-import { PlayActions, PlayStatus, type StatusView } from "./play-status.tsx";
+import { loadGame } from "./load-game.ts";
+import { PlayActions, PlayStatus } from "./play-status.tsx";
 import { ResetDialog } from "./reset-dialog.tsx";
 import { ResultBanner, resultOf, type Result } from "./result-banner.tsx";
 import { SelectList } from "./select-list.tsx";
 import { StatsDialog } from "./stats-dialog.tsx";
 import { useVictoryStats } from "./use-victory-stats.ts";
-
-export type PlayableGame = {
-  name: string;
-  // Today's Day Number; past days are 0 up to it
-  today: number;
-  // Day 0's date, "YYYY-MM-DD"
-  startDate: string;
-  canEdit: boolean;
-  // Some entries miss values, so the game cannot be played for now
-  paused: boolean;
-  kind: GameKind;
-  // Blur games: tries per day
-  blurTries?: number;
-  attributes: GameAttribute[];
-  // A Blur game's entries come without photos
-  entries: EntryRef[];
-} & StatusView;
-
-// The game's attributes and entries, "missing" for no such game, or the text of why it could not be loaded
-export async function loadGame(
-  slug: string,
-): Promise<PlayableGame | "missing" | string> {
-  try {
-    const res = await fetch(`/api/games/${encodeURIComponent(slug)}`);
-    if (res.status === 404) {
-      return "missing";
-    }
-    const data = (await res.json().catch(() => null)) as unknown;
-    return res.ok
-      ? (data as PlayableGame)
-      : failureText((data as { error?: unknown } | null)?.error, res.status);
-  } catch {
-    return UNREACHABLE;
-  }
-}
 
 const now = (): Date => new Date();
 
@@ -108,7 +72,8 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const gameFailure =
     typeof game === "string" && game !== "missing" ? game : null;
   const roster = playable?.entries ?? [];
-  const tooSmall = playable !== null && roster.length < MIN_ENTRIES;
+  const tooSmall =
+    playable !== null && roster.length < minEntriesOf(playable.kind);
   // Not playable for now: too few entries, or paused
   const closed = tooSmall || playable?.paused === true;
   // A past day the game has; today's and later Day Numbers are handled below
@@ -183,7 +148,14 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
 
   async function submit(name: string): Promise<void> {
     const id = findEntryId(roster, name);
-    if (id === null || submitting.current || !play.current) {
+    if (id !== null) {
+      await submitId(id);
+    }
+  }
+
+  // Sends a guess by entry id, or SKIP
+  async function submitId(id: number): Promise<void> {
+    if (submitting.current || !play.current) {
       return;
     }
     submitting.current = true;
@@ -197,11 +169,13 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
           ? res.message
           : null,
     );
-    // The typed guess stays when the server could not grade it, to retry
+    // The typed guess stays when the server could not grade it, to retry, and on a skip
     if (res.kind !== "accepted" && res.kind !== "duplicate") {
       return;
     }
-    setGuess("");
+    if (id !== SKIP) {
+      setGuess("");
+    }
     modes.setSelecting(false);
     if (res.kind === "duplicate") {
       return;
@@ -271,7 +245,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const loading = !cannotPlay && !ready;
   const finished = result !== null;
   // Each row names its guess; those names leave the suggestions
-  const used = new Set(rows.map((row) => nameCell(row).value));
+  const used = guessedNames(rows);
   const blur = playable?.kind === "blur" ? (playable.blurTries ?? 1) : null;
   const wrong = rows.filter((row) => !isAnswerRow(row)).length;
   const unguessed = roster.filter((entry) => !used.has(entry.name));
@@ -352,17 +326,17 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
           />
         )}
         <Card className="play-card mb-6 gap-3 p-4 sm:p-5">
-          <div className="flex flex-col gap-3" hidden={finished}>
-            <GuessPanel
-              modes={modes}
-              names={names}
-              value={guess}
-              onChange={setGuess}
-              onSubmit={(name) => void submit(name)}
-              disabled={cannotPlay}
-              guessDisabled={cannotPlay || loading}
-            />
-          </div>
+          <GuessForm
+            modes={modes}
+            names={names}
+            value={guess}
+            onChange={setGuess}
+            onSubmit={(name) => void submit(name)}
+            onSkip={blur === null ? undefined : () => void submitId(SKIP)}
+            disabled={cannotPlay}
+            busy={loading}
+            hidden={finished}
+          />
           <div
             className="game-actions flex flex-wrap justify-center gap-2"
             hidden={!finished}
@@ -405,12 +379,8 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
         />
         {modes.selecting && !finished && !cannotPlay ? (
           <SelectList
-            entries={unguessed.map((entry) => ({
-              ...entry,
-              values: entry.values ?? [],
-            }))}
-            attributes={blur === null ? (playable?.attributes ?? []) : []}
-            photos={blur === null}
+            entries={unguessed}
+            attributes={blur === null ? (playable?.attributes ?? []) : null}
             onPick={(name) => void submit(name)}
           />
         ) : (
