@@ -21,7 +21,7 @@ import {
 import { openPlay } from "../../game/open-play.ts";
 import type { Play } from "../../game/play.ts";
 import { minEntriesOf, type GameKind } from "../../game/blur.ts";
-import { browserFetch, useMe } from "../../lib/api.ts";
+import { browserFetch, gameKey, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { GuessForm } from "./guess-form.tsx";
 import {
@@ -80,7 +80,7 @@ export const RATE_LIMITED =
 // `day`: a past day's Day Number from the address, or null for today
 function Game({ slug, day }: { slug: string; day: number | null }) {
   const { data: game, isPending } = useQuery({
-    queryKey: ["game", slug],
+    queryKey: gameKey(slug),
     queryFn: () => loadGame(slug),
     staleTime: Infinity,
   });
