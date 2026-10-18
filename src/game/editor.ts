@@ -11,6 +11,8 @@ export interface Details {
   rejectReason: string;
   skipPeriod: number | null;
   entryCount: number;
+  // An admin looking at a pending game
+  canApprove?: boolean;
 }
 
 // Shared by the editor and the Play page, which knows only these fields

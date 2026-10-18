@@ -2,6 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router";
+import { ReviewButtons } from "../../components/review-buttons.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import {
@@ -98,28 +99,15 @@ export function QueuePanel({ active }: { active: boolean }) {
                 </TableCell>
                 <TableCell>
                   <span className="flex justify-end gap-2">
-                    <Button
-                      className="queue-approve"
-                      size="sm"
-                      onClick={() => void act("POST", `${slug}/approve`)}
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      className="queue-reject"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const reason = prompt(
-                          `Why is "${game.name}" rejected?`,
-                        )?.trim();
-                        if (reason) {
-                          void act("POST", `${slug}/reject`, { reason });
-                        }
+                    <ReviewButtons
+                      slug={game.slug}
+                      name={game.name}
+                      onDone={async () => {
+                        setFailed(false);
+                        await queue.refetch();
                       }}
-                    >
-                      Reject
-                    </Button>
+                      onFail={() => setFailed(true)}
+                    />
                     <Button
                       className="queue-delete"
                       variant="destructive"

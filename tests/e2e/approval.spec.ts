@@ -58,8 +58,9 @@ test("submit, admin reject, resubmit, approve, unpublish", async ({
     "href",
     `/g/${slug}`,
   );
-  admin.once("dialog", (dialog) => void dialog.accept("Too vague"));
   await row.getByRole("button", { name: "Reject" }).click();
+  await admin.getByLabel("Reason").fill("Too vague");
+  await admin.getByRole("button", { name: "Reject game" }).click();
   await expect(row).toBeHidden();
 
   await page.reload();
