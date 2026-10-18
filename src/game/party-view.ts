@@ -1,6 +1,7 @@
 // Party mode (ADR 0016): what each phone is sent of a party, built from its players and rounds.
 // A live round shows only counts, a finished round everything.
 import type { GameKind } from "./blur.ts";
+import type { GuessMode } from "./guess-mode.ts";
 import type { Correctness } from "./correctness.ts";
 import {
   gradeGuess,
@@ -38,6 +39,8 @@ export interface PartyView {
     // Quiz games: how many questions there are, one per round
     questions?: number;
     attributes: GameAttribute[];
+    // How every player picks a guess, set by the host when opening the party
+    guessMode: GuessMode;
     // A Blur game's entries come without photos
     entries: EntryRef[];
   };
@@ -90,6 +93,7 @@ export interface ViewInput {
     kind?: GameKind;
     blurTries?: number;
     questions?: number;
+    guessMode?: GuessMode;
   };
   attributes: readonly GameAttribute[];
   // Active entries (offered to guess) and every entry (so old guesses still resolve)
@@ -208,6 +212,7 @@ export function partyView(input: ViewInput): PartyView {
     game: {
       ...input.game,
       kind,
+      guessMode: input.game.guessMode ?? "type",
       attributes: [...attributes],
       entries: input.entries.map((e) =>
         kind !== "classic"

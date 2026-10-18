@@ -16,6 +16,7 @@ import {
   rightAnswerText,
   scoreAnswer,
 } from "../game/quiz.ts";
+import type { GuessMode } from "../game/guess-mode.ts";
 import { hash } from "./auth.ts";
 import {
   findGameById,
@@ -37,6 +38,7 @@ export interface PartyRow {
   gameId: number;
   hostUserId: number;
   ended: boolean;
+  guessMode: GuessMode;
 }
 
 const newToken = (): string => randomBytes(24).toString("base64url");
@@ -76,7 +78,7 @@ export async function findParty(
   await sweepParties(q, now, code);
   const { rows } = await q.query<PartyRow>(
     `select id::int, code, game_id::int as "gameId", host_user_id::int as "hostUserId",
-       ended_at is not null as ended
+       ended_at is not null as ended, guess_mode as "guessMode"
      from parties where code = $1`,
     [code],
   );
@@ -99,6 +101,7 @@ export async function createParty(
   game: GameRow,
   hostUserId: number,
   nickname: string,
+  guessMode: GuessMode,
   now: Date,
   random: () => number,
 ): Promise<{ code: string; token: string } | CreateRefusal> {
@@ -109,9 +112,9 @@ export async function createParty(
   for (;;) {
     const code = randomCode(random);
     const { rows } = await q.query<{ id: number }>(
-      `insert into parties (code, game_id, host_user_id, created_at, last_activity)
-       values ($1, $2, $3, $4, $4) on conflict (code) do nothing returning id::int`,
-      [code, game.id, hostUserId, now],
+      `insert into parties (code, game_id, host_user_id, created_at, last_activity, guess_mode)
+       values ($1, $2, $3, $4, $4, $5) on conflict (code) do nothing returning id::int`,
+      [code, game.id, hostUserId, now, guessMode],
     );
     if (rows[0]) {
       const token = newToken();
@@ -330,6 +333,7 @@ export async function viewsOf(
           kind: game.kind,
           ...(game.kind === "blur" && { blurTries: game.blurTries }),
           ...(game.kind === "quiz" && { questions: roster.entries.length }),
+          guessMode: party.guessMode,
         },
         attributes: roster.attributes,
         // A Quiz round sends its own question

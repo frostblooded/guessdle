@@ -140,6 +140,10 @@ describe("quiz games", () => {
       name: "Renamed",
     });
     assert.deepEqual(renamed.body[0].quiz, CHOICE.quiz);
+    // Deleting one leaves the other
+    const left = await request("DELETE", `${G}/entries/${list[1].id}`, ann);
+    assert.equal(left.status, 200);
+    assert.equal(left.body.length, 1);
     // A classic game takes no answer
     await request("POST", "/api/games", ann, { name: "Classic" });
     assert.equal(

@@ -7,6 +7,7 @@ const LOCAL_STORAGE_USED_GUESSES_STRING: string = "usedGuesses";
 // Only a hint for the Past days list: the board's victory always comes from the server
 const LOCAL_STORAGE_VICTORY_STRING: string = "victory";
 const LOCAL_STORAGE_DAY_STRING: string = "day";
+const LOCAL_STORAGE_REVISION_STRING: string = "revision";
 const LOCAL_STORAGE_GAVE_UP_STRING: string = "gaveUp";
 const LOCAL_LAST_PLAYED_STRING: string = "lastPlayed";
 
@@ -24,7 +25,9 @@ export interface GameState {
   setUsedGuesses(guesses: number[]): void;
   // Server Day Number the guesses were graded on, null until a response says
   getDay(): number | null;
-  setDay(day: number): void;
+  // The answer's revision the guesses were graded on, null until a response says
+  getRevision(): number | null;
+  setDay(day: number, revision?: number): void;
   // Whether the player gave up today (the answer was revealed)
   getGaveUp(): boolean;
   setGaveUp(): void;
@@ -178,6 +181,7 @@ export function createGameState(
     storage.removeItem(LOCAL_STORAGE_VICTORY_STRING);
     storage.removeItem(LOCAL_STORAGE_USED_GUESSES_STRING);
     storage.removeItem(LOCAL_STORAGE_DAY_STRING);
+    storage.removeItem(LOCAL_STORAGE_REVISION_STRING);
     storage.removeItem(LOCAL_STORAGE_GAVE_UP_STRING);
   }
   storage.setItem(LOCAL_LAST_PLAYED_STRING, JSON.stringify(today));
@@ -206,8 +210,19 @@ export function createGameState(
         : null;
     },
 
-    setDay(day: number): void {
+    getRevision(): number | null {
+      const value: unknown = readJson(storage, LOCAL_STORAGE_REVISION_STRING);
+      return Number.isInteger(value) ? (value as number) : null;
+    },
+
+    setDay(day: number, revision?: number): void {
       storage.setItem(LOCAL_STORAGE_DAY_STRING, JSON.stringify(day));
+      if (revision !== undefined) {
+        storage.setItem(
+          LOCAL_STORAGE_REVISION_STRING,
+          JSON.stringify(revision),
+        );
+      }
     },
 
     getGaveUp(): boolean {
@@ -231,6 +246,7 @@ export function createGameState(
       storage.removeItem(LOCAL_STORAGE_GAVE_UP_STRING);
       storage.removeItem(LOCAL_STORAGE_USED_GUESSES_STRING);
       storage.removeItem(LOCAL_STORAGE_DAY_STRING);
+      storage.removeItem(LOCAL_STORAGE_REVISION_STRING);
     },
   };
 }

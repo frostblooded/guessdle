@@ -19,6 +19,7 @@ import { blurRoutes } from "./routes/blur.ts";
 import { quizRoutes } from "./routes/quiz.ts";
 import { playlistRoutes } from "./routes/playlists.ts";
 import { settingsRoutes } from "./routes/settings.ts";
+import { tutorialRoutes } from "./routes/tutorial.ts";
 
 export interface AppDeps {
   pool: pg.Pool;
@@ -115,6 +116,7 @@ export function createApp({
   blurRoutes(app, ctx, uploadsDir);
   playlistRoutes(app, ctx, writeLimit);
   settingsRoutes(app, ctx);
+  tutorialRoutes(app, ctx);
   shellRoutes(app, ctx, shellDir);
 
   app.use("/api", (_req, res) => {
