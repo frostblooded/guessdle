@@ -715,6 +715,8 @@ describe("signed-in Game State on the server", () => {
       assert.equal(graded.answer, "Ati");
       const giveUp = await fetch(`${url}${G}/give-up${P}`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
       });
       assert.deepEqual(await giveUp.json(), { day: PAST, answer: "Ati" });
     });
