@@ -354,7 +354,10 @@ describe("approval flow", () => {
       await makeGame("pending");
       await approve();
       assert.equal(ownerMails().length, 0);
-      await db.pool.query("update games set status = 'pending'");
+      await db.pool.query(
+        "update games set status = 'pending' where slug = $1",
+        [SLUG],
+      );
       await reject();
       assert.equal(ownerMails().length, 1);
     });
