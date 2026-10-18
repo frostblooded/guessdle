@@ -5,6 +5,7 @@ import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import { WebSocketServer, type WebSocket } from "ws";
 import {
+  CLOSE_REMOVED,
   normalizeCode,
   parseClientMessage,
   type ServerMessage,
@@ -30,7 +31,6 @@ const WINDOW_MS = 10_000;
 const MAX_SOCKETS_PER_PARTY = 100;
 
 // Close codes the party page reads
-export const CLOSE_REMOVED = 4001;
 export const CLOSE_TOO_FAST = 4008;
 export const CLOSE_NO_HELLO = 4002;
 

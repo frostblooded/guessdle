@@ -16,7 +16,7 @@ const PAGES = new Set([
   "my-games",
 ]);
 const ALLOWED =
-  /^\/(index\.html|game\.html|login\.html|verify\.html|admin\.html|how-to-play\.html|create\.html|my-games\.html|edit\.html|favicon\.ico|(dist|howto|uploads)\/.+)$/;
+  /^\/(index\.html|game\.html|login\.html|verify\.html|admin\.html|how-to-play\.html|create\.html|my-games\.html|edit\.html|party\.html|favicon\.ico|(dist|howto|uploads)\/.+)$/;
 
 const TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -35,6 +35,8 @@ function pageFor(urlPath) {
   if (/^\/g\/[^/]+$/.test(urlPath)) return "game.html";
   // /g/<slug>/edit is the editor shell
   if (/^\/g\/[^/]+\/edit$/.test(urlPath)) return "edit.html";
+  // /party and /party/<CODE> are the party page (it reads the code from the path)
+  if (/^\/party(\/[A-Za-z]+)?$/.test(urlPath)) return "party.html";
   const name = urlPath.slice(1);
   return PAGES.has(name) ? `${name}.html` : null;
 }
