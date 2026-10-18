@@ -286,7 +286,7 @@ describe("games in the database", () => {
         name: "Ati",
         photo: "/photos/ati.jpg",
         // For the selection list
-        values: [["Black", "Orange", "White"], ["Niki"]],
+        values: ["/photos/ati.jpg", ["Black", "Orange", "White"], ["Niki"]],
       });
     });
 
