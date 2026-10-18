@@ -128,6 +128,43 @@ async function fillThrough(
   }
 }
 
+// The entry stored for `date`, null when unstored
+async function storedEntry(
+  client: Client,
+  game: GameRow,
+  date: string,
+): Promise<number | null> {
+  const { rows } = await client.query<{ entry_id: number }>(
+    "select entry_id::int from daily_answers where game_id = $1 and day = $2",
+    [game.id, date],
+  );
+  return rows[0]?.entry_id ?? null;
+}
+
+// After `date`'s answer changed from `before`: if players could have played it (it was
+// stored) and it is now another entry, everyone starts that day over. Its guesses,
+// give-ups and results go, and the revision tells browsers to drop their boards.
+async function restartIfChanged(
+  client: Client,
+  game: GameRow,
+  date: string,
+  before: number | null,
+): Promise<void> {
+  if (before === null || before === (await storedEntry(client, game, date))) {
+    return;
+  }
+  await client.query(
+    "update daily_answers set revision = revision + 1 where game_id = $1 and day = $2",
+    [game.id, date],
+  );
+  for (const table of ["user_guesses", "user_give_ups", "game_results"]) {
+    await client.query(`delete from ${table} where game_id = $1 and day = $2`, [
+      game.id,
+      date,
+    ]);
+  }
+}
+
 // Re-draws every non-override day from `fromDate` on, in order, over the stored
 // history before it; overrides stay and count as history.
 async function redrawFrom(
@@ -159,7 +196,13 @@ async function redrawFrom(
   }
 }
 
-// The entry id stored for `date`. If it is missing, first generates every
+export interface DayAnswer {
+  entryId: number;
+  // Bumped each time the answer changed after the day was stored (migration 015)
+  revision: number;
+}
+
+// The answer stored for `date`. If it is missing, first generates every
 // missing day up to it, in order, in one transaction under the game's advisory
 // lock, so concurrent first requests store one answer. Null only for a date
 // before the start.
@@ -169,15 +212,12 @@ export async function ensureAnswer(
   ids: readonly number[],
   date: string,
   random: () => number,
-): Promise<number | null> {
+): Promise<DayAnswer | null> {
   const select =
-    "select entry_id::int from daily_answers where game_id = $1 and day = $2";
-  const stored = await pool.query<{ entry_id: number }>(select, [
-    game.id,
-    date,
-  ]);
+    'select entry_id::int as "entryId", revision from daily_answers where game_id = $1 and day = $2';
+  const stored = await pool.query<DayAnswer>(select, [game.id, date]);
   if (stored.rows[0]) {
-    return stored.rows[0].entry_id;
+    return stored.rows[0];
   }
   return locked(pool, game, async (client) => {
     await fillThrough(
@@ -187,11 +227,8 @@ export async function ensureAnswer(
       dayNumber(date, game.startDate),
       random,
     );
-    const result = await client.query<{ entry_id: number }>(select, [
-      game.id,
-      date,
-    ]);
-    return result.rows[0]?.entry_id ?? null;
+    const result = await client.query<DayAnswer>(select, [game.id, date]);
+    return result.rows[0] ?? null;
   });
 }
 
@@ -235,7 +272,8 @@ export async function peekDays(
 }
 
 // Overrides `date` (today or later; the caller checks) with `entryId`. An unstored
-// day fills the gap first. Later non-override days are re-drawn.
+// day fills the gap first. Later non-override days are re-drawn. A changed answer
+// restarts the day for everyone.
 export function setOverride(
   pool: pg.Pool,
   game: GameRow,
@@ -246,12 +284,14 @@ export function setOverride(
 ): Promise<void> {
   return locked(pool, game, async (client) => {
     const day = dayNumber(date, game.startDate);
+    const before = await storedEntry(client, game, date);
     await fillThrough(client, game, ids, day - 1, random);
     await client.query(
       `insert into daily_answers (game_id, day, entry_id, source) values ($1, $2, $3, 'override')
        on conflict (game_id, day) do update set entry_id = excluded.entry_id, source = 'override'`,
       [game.id, date, entryId],
     );
+    await restartIfChanged(client, game, date, before);
     await redrawFrom(
       client,
       game,
@@ -263,6 +303,7 @@ export function setOverride(
 }
 
 // Turns an override back into a generated answer; false when `date` is not an override.
+// A re-drawn answer that differs restarts the day for everyone.
 export function clearOverride(
   pool: pg.Pool,
   game: GameRow,
@@ -271,6 +312,7 @@ export function clearOverride(
   random: () => number,
 ): Promise<boolean> {
   return locked(pool, game, async (client) => {
+    const before = await storedEntry(client, game, date);
     const { rowCount } = await client.query(
       "update daily_answers set source = 'generated' where game_id = $1 and day = $2 and source = 'override'",
       [game.id, date],
@@ -279,6 +321,7 @@ export function clearOverride(
       return false;
     }
     await redrawFrom(client, game, ids, date, random);
+    await restartIfChanged(client, game, date, before);
     return true;
   });
 }

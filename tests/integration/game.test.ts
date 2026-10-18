@@ -91,6 +91,7 @@ describe("signed-in Game State on the server", () => {
       assert.equal(status, 200);
       assert.deepEqual(body, {
         day: 427,
+        revision: 0,
         ids: [],
         rows: [],
         victory: false,
@@ -312,6 +313,7 @@ describe("signed-in Game State on the server", () => {
       assert.equal(status, 200);
       assert.deepEqual(body, {
         day: 427,
+        revision: 0,
         ids: [],
         rows: [],
         victory: false,
@@ -718,7 +720,11 @@ describe("signed-in Game State on the server", () => {
         headers: { "Content-Type": "application/json" },
         body: "{}",
       });
-      assert.deepEqual(await giveUp.json(), { day: PAST, answer: "Ati" });
+      assert.deepEqual(await giveUp.json(), {
+        day: PAST,
+        revision: 0,
+        answer: "Ati",
+      });
     });
 
     it("the game says which day is today and when day 0 was", async () => {

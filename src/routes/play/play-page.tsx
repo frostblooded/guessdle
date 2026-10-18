@@ -19,6 +19,7 @@ import {
 } from "../../game/game.ts";
 import { openPlay } from "../../game/open-play.ts";
 import {
+  ANSWER_CHANGED,
   RATE_LIMITED,
   refusalText,
   type GiveUpResult,
@@ -74,6 +75,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const [rows, setRows] = useState<GradedAttribute[][]>([]);
   const [result, setResult] = useState<Result>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [restarted, setRestarted] = useState(false);
   const [ready, setReady] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [guess, setGuess] = useState("");
@@ -152,6 +154,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
         now,
         fetch: browserFetch,
         onNewDay: clearBoard,
+        onAnswerChanged: () => setRestarted(true),
       });
       if (rateLimited) {
         setNotice(RATE_LIMITED);
@@ -250,7 +253,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
         ? `${FAILURES.not_enough_entries.text} It has ${roster.length} now.`
         : closed
           ? FAILURES.game_paused.text
-          : notice;
+          : (notice ?? (restarted ? ANSWER_CHANGED : null));
   const loading = !cannotPlay && !ready;
   const finished = result !== null;
   // Each row names its guess; those names leave the suggestions

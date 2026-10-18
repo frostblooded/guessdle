@@ -27,6 +27,7 @@ const MONDAY = new Date(2025, 9, 6, 12);
 // A fake of POST /api/grade backed by the real grading core
 class FakeServer {
   day: number = 100;
+  revision: number = 0;
   down: boolean = false;
   requests: number[][] = [];
 
@@ -47,7 +48,11 @@ class FakeServer {
       return {
         ok: true,
         status: 200,
-        json: async () => ({ day: this.day, answer: answer.name }),
+        json: async () => ({
+          day: this.day,
+          revision: this.revision,
+          answer: answer.name,
+        }),
       };
     }
     assert.equal(url, `/api/games/${SLUG}/grade`);
@@ -66,6 +71,7 @@ class FakeServer {
       status: 200,
       json: async () => ({
         day: this.day,
+        revision: this.revision,
         rows: graded.rows,
         victory: graded.victory,
         ...(graded.victory && { answer: answer.name }),
@@ -258,7 +264,7 @@ describe("load", () => {
   });
 });
 
-const withHook = (onNewDay: () => void) =>
+const withHook = (onNewDay: () => void, onAnswerChanged?: () => void) =>
   createPlay({
     slug: SLUG,
     roster: GUESS_DATA,
@@ -266,6 +272,7 @@ const withHook = (onNewDay: () => void) =>
     now: () => MONDAY,
     fetch: server.fetch,
     onNewDay,
+    ...(onAnswerChanged && { onAnswerChanged }),
   });
 
 describe("giveUp", () => {
@@ -445,6 +452,27 @@ describe("day rollover", () => {
     let started = 0;
     await withHook(() => started++).load();
     assert.equal(started, 1);
+  });
+
+  it("starts over and tells the page when the day's answer changed", async () => {
+    await open().submit(one!.id);
+    server.revision = 1;
+    let started = 0;
+    let changed = 0;
+    const loaded = await withHook(
+      () => started++,
+      () => changed++,
+    ).load();
+    assert.deepEqual(loaded, { rows: [], victory: false });
+    assert.equal(started, 1);
+    assert.equal(changed, 1);
+    const play = withHook(
+      () => started++,
+      () => changed++,
+    );
+    assert.deepEqual(play.getUsedGuesses(), []);
+    assert.equal((await play.submit(two!.id)).kind, "accepted");
+    assert.equal(changed, 1);
   });
 
   it("does not signal when the day is unchanged", async () => {

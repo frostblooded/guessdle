@@ -1,6 +1,15 @@
 // The editor's Answers tab: Answer History and Overrides by real calendar date.
 import { useEffect, useState, type FormEvent } from "react";
 import { Alert } from "../../components/ui/alert.tsx";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogTitle,
+} from "../../components/ui/alert-dialog.tsx";
 import { Badge } from "../../components/ui/badge.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Input, Label, NativeSelect } from "../../components/ui/input.tsx";
@@ -72,6 +81,8 @@ export function AnswersPanel({
   const [days, setDays] = useState<AnswerDay[]>([]);
   const [editing, setEditing] = useState<AnswerDay | null>(null);
   const [pick, setPick] = useState("");
+  // A change to today's answer waiting for the owner to confirm the restart
+  const [confirming, setConfirming] = useState<"PUT" | "DELETE" | null>(null);
 
   const load = async (query: string): Promise<AnswerList | null> => {
     const out = await api<AnswerList>("GET", `${base}/answers${query}`);
@@ -149,9 +160,24 @@ export function AnswersPanel({
     await reload();
   };
 
+  const save = (method: "PUT" | "DELETE"): void => {
+    void apply(method, method === "PUT" ? { entryId: Number(pick) } : {});
+  };
+  // Changing today's answer restarts the day for every player, so it asks first
+  const saveOrAsk = (method: "PUT" | "DELETE"): void => {
+    const changesToday =
+      editing!.today &&
+      (method === "DELETE" || Number(pick) !== editing!.entryId);
+    if (changesToday) {
+      setConfirming(method);
+    } else {
+      save(method);
+    }
+  };
+
   const saveOverride = (event: FormEvent): void => {
     event.preventDefault();
-    void apply("PUT", { entryId: Number(pick) });
+    saveOrAsk("PUT");
   };
 
   return (
@@ -297,7 +323,7 @@ export function AnswersPanel({
                 <Button
                   id="override-clear"
                   variant="secondary"
-                  onClick={() => void apply("DELETE", {})}
+                  onClick={() => saveOrAsk("DELETE")}
                 >
                   Clear override
                 </Button>
@@ -313,6 +339,34 @@ export function AnswersPanel({
           </form>
         )}
       </div>
+      <AlertDialog
+        open={confirming !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfirming(null);
+          }
+        }}
+      >
+        <AlertDialogContent id="restart-dialog">
+          <AlertDialogTitle>Change today's answer?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {confirming === "DELETE"
+              ? "If the re-drawn answer is a different entry, every"
+              : "Every"}{" "}
+            player's guesses and today's stats for this game are reset, and
+            everyone starts today over. This can't be undone.
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              value="confirm"
+              onClick={() => save(confirming!)}
+            >
+              {confirming === "DELETE" ? "Clear override" : "Save override"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

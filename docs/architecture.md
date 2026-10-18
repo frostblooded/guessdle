@@ -41,7 +41,7 @@ Stored server-side per game (`daily_answers` keyed by game and date, `src/server
 
 ## Admin
 
-`/api/admin/users|backup|queue|games` and the `/admin` page (`src/routes/admin/`, tabs Users, Backups, Approval queue, All games). Answers peek/override is per game, owner or admin, in the editor's Answers tab (`src/routes/edit/answers-panel.tsx`; Answer History from a week back, real dates) over `/api/games/:slug/answers`: peek and override answers (today or future only; later generated days are re-drawn). Changing a game's skip period (0..N-1) re-draws its future generated days only (`redrawFuture`). Admin also: promote or demote users (no self or last-admin demotion), show backup age.
+`/api/admin/users|backup|queue|games` and the `/admin` page (`src/routes/admin/`, tabs Users, Backups, Approval queue, All games). Answers peek/override is per game, owner or admin, in the editor's Answers tab (`src/routes/edit/answers-panel.tsx`; Answer History from a week back, real dates) over `/api/games/:slug/answers`: peek and override answers (today or future only; later generated days are re-drawn). An override or a cleared override that changes a stored day's entry restarts that day for everyone (`restartIfChanged`): its guesses, give-ups and results are deleted and `daily_answers.revision` goes up; grade, give-up and state responses carry the revision, so browsers drop a board played on an older one and say so, and a merge of one is refused. The editor confirms before changing today's answer. Changing a game's skip period (0..N-1) re-draws its future generated days only (`redrawFuture`). Admin also: promote or demote users (no self or last-admin demotion), show backup age.
 
 ## Approval
 

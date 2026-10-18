@@ -15,6 +15,8 @@ export interface PlayDay {
   game: GameRow;
   roster: Roster;
   answer: Entry;
+  // Bumped each time an override changed the day's answer (migration 015)
+  revision: number;
   // "YYYY-MM-DD" in the server time zone, and its Day Number
   date: string;
   day: number;
@@ -91,16 +93,16 @@ export async function openDay(
   if (blocker) {
     return { refusal: blocker, day };
   }
-  const answerId = await ensureAnswer(
+  const stored = await ensureAnswer(
     pool,
     game,
     roster.entries.map((entry) => entry.id),
     date,
     random,
   );
-  const answer = roster.all.find((entry) => entry.id === answerId);
+  const answer = roster.all.find((entry) => entry.id === stored?.entryId);
   return answer
-    ? { game, roster, answer, ...played }
+    ? { game, roster, answer, revision: stored!.revision, ...played }
     : { refusal: "answer_missing", day };
 }
 

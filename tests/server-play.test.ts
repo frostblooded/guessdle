@@ -17,6 +17,7 @@ const [, one, two] = GUESS_DATA;
 // A fake of the /api/game routes holding one player's state
 class FakeServer {
   day: number = 100;
+  revision: number = 0;
   ids: number[] = [];
   gaveUp: boolean = false;
   down: boolean = false;
@@ -30,6 +31,7 @@ class FakeServer {
     const g = graded as Extract<typeof graded, { kind: "graded" }>;
     return {
       day: this.day,
+      revision: this.revision,
       ids: this.ids,
       rows: g.rows,
       victory: g.victory,
@@ -263,6 +265,44 @@ describe("submit", () => {
     assert.equal(result.kind, "accepted");
     assert.equal(newDays, 1);
     assert.deepEqual(play.getUsedGuesses(), [two!.id]);
+  });
+});
+
+describe("a changed answer", () => {
+  const storage = new Map<string, string>();
+  const openStored = (onAnswerChanged: () => void) =>
+    createServerPlay({
+      slug: SLUG,
+      fetch: server.fetch,
+      onNewDay: () => newDays++,
+      onAnswerChanged,
+      storage: {
+        getItem: (key) => storage.get(key) ?? null,
+        setItem: (key, value) => void storage.set(key, value),
+        removeItem: (key) => void storage.delete(key),
+      },
+    });
+
+  it("tells the page once when progress this browser saw was wiped", async () => {
+    let changed = 0;
+    await openStored(() => changed++).submit(one!.id);
+    // The owner changed the answer: the server wiped the guesses
+    server.revision = 1;
+    server.ids = [];
+    await loadedOf(openStored(() => changed++));
+    assert.equal(changed, 1);
+    assert.equal(newDays, 1);
+    await loadedOf(openStored(() => changed++));
+    assert.equal(changed, 1);
+  });
+
+  it("says nothing when the browser saw no progress", async () => {
+    storage.clear();
+    let changed = 0;
+    await loadedOf(openStored(() => changed++));
+    server.revision = 1;
+    await loadedOf(openStored(() => changed++));
+    assert.equal(changed, 0);
   });
 });
 
