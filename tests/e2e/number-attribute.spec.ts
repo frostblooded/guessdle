@@ -41,7 +41,7 @@ test("a wrong number shows which way the answer is; a blank pauses the game", as
 
   await page.goto(`/g/${slug}`);
   await submitGuess(page, wrong);
-  const cell = page.locator(".guess-result-row .cell").nth(2);
+  const cell = page.locator(".guess-result-row .cell").nth(1);
   await expect(cell).toHaveClass(/incorrect/);
   const hint = sizes[answer]! > sizes[wrong]! ? "higher" : "lower";
   await expect(cell.locator(`[data-hint="${hint}"]`)).toBeVisible();

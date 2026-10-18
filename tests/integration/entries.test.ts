@@ -217,29 +217,76 @@ describe("game entries", () => {
     assert.equal(await status(), "pending");
   });
 
-  it("replacing or removing a photo deletes the old upload", async () => {
-    const name = (n: number): string => n.toString(16).padStart(32, "0");
-    const uid = (await db.pool.query("select id from users limit 1")).rows[0]
-      .id;
-    for (const n of [1, 2]) {
-      await db.pool.query(
-        "insert into uploads (name, user_id, bytes, created_at) values ($1, $2, 10, now())",
-        [`${name(n)}.webp`, uid],
-      );
-    }
-    const first = `/uploads/${name(1)}.webp`;
-    const second = `/uploads/${name(2)}.webp`;
-    await add({ name: "Rex", photo: first });
-    const id = (await one("Rex")).id;
+  describe("Image attributes", () => {
+    const fileName = (n: number): string => n.toString(16).padStart(32, "0");
+    const file = (n: number): string => `/uploads/${fileName(n)}.webp`;
+    let photoId: number;
+    beforeEach(async () => {
+      const uid = (await db.pool.query("select id from users limit 1")).rows[0]
+        .id;
+      for (const n of [1, 2]) {
+        await db.pool.query(
+          "insert into uploads (name, user_id, bytes, created_at) values ($1, $2, 10, now())",
+          [`${fileName(n)}.webp`, uid],
+        );
+      }
+      const attrs = (
+        await request("POST", "/api/games/ann-game/attributes", ann, {
+          name: "Photo",
+          type: "image",
+        })
+      ).body;
+      photoId = attrs.find((a: Body) => a.type === "image").id;
+    });
     const left = async (): Promise<string[]> =>
       (await db.pool.query("select name from uploads order by name")).rows.map(
         (r) => r.name,
       );
-    await request("PATCH", `${E}/${id}`, ann, { photo: second });
-    assert.deepEqual(await left(), [`${name(2)}.webp`]);
-    assert.equal((await one("Rex")).photo, second);
-    await request("PATCH", `${E}/${id}`, ann, { photo: "" });
-    assert.deepEqual(await left(), []);
+
+    it("may stay blank without pausing the game", async () => {
+      assert.equal((await add({ name: "Rex" })).status, 200);
+      assert.equal((await add({ name: "Fido" })).status, 200);
+      const game = await request("GET", "/api/games/ann-game", ann);
+      assert.equal(game.body.paused, false);
+      assert.equal(game.body.entries[0].photo, "");
+    });
+
+    it("stores one upload URL, the entry's photo for players", async () => {
+      await add({ name: "Rex", values: { [photoId]: file(1) } });
+      assert.deepEqual((await one("Rex")).values[photoId], [file(1)]);
+      const game = await request("GET", "/api/games/ann-game", ann);
+      assert.equal(game.body.entries[0].photo, file(1));
+      const two = await add({
+        name: "Two",
+        values: { [photoId]: [file(1), file(2)] },
+      });
+      assert.equal(two.status, 400);
+    });
+
+    it("refuses a file that is not the user's upload", async () => {
+      const res = await add({
+        name: "Rex",
+        values: { [photoId]: "/uploads/" + "f".repeat(32) + ".webp" },
+      });
+      assert.equal(res.status, 400);
+    });
+
+    it("replacing or removing a picture deletes the old upload", async () => {
+      await add({ name: "Rex", values: { [photoId]: file(1) } });
+      const id = (await one("Rex")).id;
+      await request("PATCH", `${E}/${id}`, ann, {
+        values: { [photoId]: file(2) },
+      });
+      assert.deepEqual(await left(), [`${fileName(2)}.webp`]);
+      assert.deepEqual((await one("Rex")).values[photoId], [file(2)]);
+      await request("PATCH", `${E}/${id}`, ann, { values: { [photoId]: "" } });
+      assert.deepEqual(await left(), []);
+    });
+
+    it("refuses a photo on a classic entry: its pictures are Image values", async () => {
+      const res = await add({ name: "Rex", photo: file(1) });
+      assert.equal(res.status, 400);
+    });
   });
 
   it("soft delete hides the entry, keeps history, clears future overrides", async () => {

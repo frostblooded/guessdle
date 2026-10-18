@@ -1,7 +1,6 @@
 // Selection mode's list of every entry not guessed yet, shown in place of the board: a name filter,
 // sortable column titles and one compact row per entry. Tapping a row guesses it at once.
 import { useState } from "react";
-import { boardColumns } from "../../components/board.tsx";
 import { Input } from "../../components/ui/input.tsx";
 import {
   cellText,
@@ -10,7 +9,7 @@ import {
   type ListEntry,
   type ListSort,
 } from "../../game/guess-mode.ts";
-import type { GameAttribute } from "../../game/game.ts";
+import { boardColumns, type GameAttribute } from "../../game/game.ts";
 import { cn } from "../../lib/utils.ts";
 
 const cellBase =
@@ -49,33 +48,50 @@ function SortTitle({
   );
 }
 
+// An Image column's title: not sortable, and small enough for the picture column
+function ImageTitle({ label }: { label: string }) {
+  return (
+    <div
+      className={cn(
+        cellBase,
+        "min-h-0 truncate bg-tile px-0.5 py-2 text-[0.625rem] font-semibold text-white sm:text-xs",
+      )}
+      title={label}
+    >
+      {label}
+    </div>
+  );
+}
+
 export function SelectList({
   entries,
-  attributes: shownAttributes,
+  attributes,
   onPick,
 }: {
   // The entries not guessed yet
   entries: readonly ListEntry[];
-  // A classic game's attributes; null for a Blur game, which lists names only (its photos are
+  // A classic game's attributes; null for a Blur game, which lists names only (its pictures are
   // the answers)
   attributes: readonly GameAttribute[] | null;
   onPick: (name: string) => void;
 }) {
-  const photos = shownAttributes !== null;
-  const attributes = shownAttributes ?? [];
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<ListSort>({ column: -1, descending: false });
+  const columns = boardColumns(
+    attributes ?? [],
+    attributes ? "classic" : "blur",
+  );
   const shown = listEntries(
     entries,
-    attributes.map((a) => a.type),
+    (attributes ?? []).map((a) => a.type),
     filter,
     sort,
   );
-  const columns = (photos ? 2 : 1) + attributes.length;
-  // Without the photo column every column is equal
-  const grid = photos
-    ? boardColumns(columns)
-    : { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` };
+  const grid = {
+    gridTemplateColumns: columns
+      .map((column) => (column.image ? "var(--photo)" : "minmax(0, 1fr)"))
+      .join(" "),
+  };
   const onSort = (column: number): void => setSort(nextSort(sort, column));
 
   return (
@@ -103,25 +119,28 @@ export function SelectList({
           className="sticky top-0 z-10 grid gap-1 bg-card p-1 [--photo:2.5rem] sm:[--photo:3rem]"
           style={grid}
         >
-          {/* The photo column has no title: "Photo" does not fit its width on a phone */}
-          {photos && <span aria-hidden="true" />}
-          <SortTitle label="Name" column={-1} sort={sort} onSort={onSort} />
-          {attributes.map((attribute, i) => (
-            <SortTitle
-              key={i}
-              label={attribute.name}
-              column={i}
-              sort={sort}
-              onSort={onSort}
-            />
-          ))}
+          {columns.map((column, i) =>
+            column.image ? (
+              <ImageTitle key={i} label={column.title} />
+            ) : (
+              <SortTitle
+                key={i}
+                label={column.title}
+                column={column.attribute ?? -1}
+                sort={sort}
+                onSort={onSort}
+              />
+            ),
+          )}
         </div>
         <ul
           aria-label="Entries"
           className={cn(
             "gap-1 p-1 pt-0",
             // Names only (a Blur game): several to a line
-            columns === 1 ? "grid grid-cols-2 sm:grid-cols-3" : "flex flex-col",
+            columns.length === 1
+              ? "grid grid-cols-2 sm:grid-cols-3"
+              : "flex flex-col",
           )}
         >
           {shown.map((entry) => (
@@ -133,26 +152,38 @@ export function SelectList({
                 aria-label={`Guess ${entry.name}`}
                 onClick={() => onPick(entry.name)}
               >
-                {photos && (
-                  <span className="aspect-square overflow-hidden rounded-md bg-muted">
-                    {entry.photo && (
-                      <img
-                        className="size-full object-cover"
-                        src={entry.photo}
-                        alt=""
-                        loading="lazy"
-                      />
-                    )}
-                  </span>
-                )}
-                <span className={cn(cellBase, "bg-muted font-semibold")}>
-                  {entry.name}
-                </span>
-                {attributes.map((_, i) => (
-                  <span key={i} className={cn(cellBase, "bg-muted")}>
-                    {cellText(entry.values?.[i])}
-                  </span>
-                ))}
+                {columns.map((column, i) => {
+                  const value =
+                    column.attribute === undefined
+                      ? entry.name
+                      : cellText(entry.values?.[column.attribute]);
+                  return column.image ? (
+                    <span
+                      key={i}
+                      className="aspect-square overflow-hidden rounded-md bg-muted"
+                    >
+                      {value && (
+                        <img
+                          className="size-full object-cover"
+                          src={value}
+                          alt=""
+                          loading="lazy"
+                        />
+                      )}
+                    </span>
+                  ) : (
+                    <span
+                      key={i}
+                      className={cn(
+                        cellBase,
+                        "bg-muted",
+                        column.attribute === undefined && "font-semibold",
+                      )}
+                    >
+                      {value}
+                    </span>
+                  );
+                })}
               </button>
             </li>
           ))}

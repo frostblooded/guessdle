@@ -38,7 +38,6 @@ export function writeGuessMode(
 // One entry as the selection list shows it: values in attribute order (none for a Blur game)
 export interface ListEntry {
   name: string;
-  photo: string;
   values?: readonly AttributeValue[] | undefined;
 }
 

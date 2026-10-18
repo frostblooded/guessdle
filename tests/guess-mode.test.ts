@@ -52,9 +52,9 @@ describe("guess mode storage", () => {
 });
 
 const ENTRIES = [
-  { name: "bela", photo: "", values: ["Black", "12", ["Ann", "Bo"]] },
-  { name: "Dido", photo: "", values: ["White", "3", ["Cy"]] },
-  { name: "Abby", photo: "", values: ["White", "100", ["Ann"]] },
+  { name: "bela", values: ["Black", "12", ["Ann", "Bo"]] },
+  { name: "Dido", values: ["White", "3", ["Cy"]] },
+  { name: "Abby", values: ["White", "100", ["Ann"]] },
 ];
 const TYPES = ["text", "number", "list"] as const;
 const names = (list: readonly { name: string }[]): string[] =>

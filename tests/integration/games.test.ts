@@ -101,7 +101,7 @@ describe("games in the database", () => {
   });
 
   describe("the Petdle migration", () => {
-    it("creates Petdle as an ownerless approved game with two List attributes", async () => {
+    it("creates Petdle as an ownerless approved game with its Photo and two List attributes", async () => {
       const { rows } = await db.pool.query(
         `select name, status, owner_id, to_char(start_date, 'YYYY-MM-DD') as start
          from games where slug = 'petdle'`,
@@ -118,9 +118,17 @@ describe("games in the database", () => {
         "select name, type from attributes order by position",
       );
       assert.deepEqual(attrs.rows, [
+        { name: "Photo", type: "image" },
         { name: "Colors", type: "list" },
         { name: "Owners", type: "list" },
       ]);
+    });
+
+    it("moves every classic entry's photo into its Photo Image value", async () => {
+      const blank = await db.pool.query(
+        "select count(*)::int as n from entries where photo_url <> ''",
+      );
+      assert.equal(blank.rows[0].n, 0);
     });
 
     it("tells the page whether the viewer may edit: admins yes, others and anonymous no", async () => {
@@ -142,6 +150,7 @@ describe("games in the database", () => {
       assert.deepEqual(rows, [
         { attr: "Colors", vals: ["Black", "Orange", "White"] },
         { attr: "Owners", vals: ["Antonio", "Tanya"] },
+        { attr: "Photo", vals: ["/photos/kiara.jpg"] },
       ]);
     });
   });
@@ -194,11 +203,25 @@ describe("games in the database", () => {
       await db.pool.query(
         "update games set cover_url = '' where slug = 'gal-bare'",
       );
-      const add = (name: string, photo: string): Promise<unknown> =>
-        db.pool.query(
-          "insert into entries (game_id, name, photo_url) select id, $1, $2 from games where slug = 'gal-bare'",
-          [name, photo],
+      const game = "(select id from games where slug = 'gal-bare')";
+      // Two Image columns: an entry's first non-blank picture counts
+      await db.pool.query(
+        `insert into attributes (game_id, name, type, position)
+         values (${game}, 'Side', 'image', 0), (${game}, 'Front', 'image', 1)`,
+      );
+      const add = async (name: string, photo: string): Promise<void> => {
+        const { rows } = await db.pool.query(
+          `insert into entries (game_id, name) select ${game}, $1 returning id`,
+          [name],
         );
+        if (photo !== "") {
+          await db.pool.query(
+            `insert into entry_values (entry_id, attribute_id, position, value)
+             select $1, id, 0, $2 from attributes where game_id = ${game} and name = 'Front'`,
+            [rows[0].id, photo],
+          );
+        }
+      };
       for (let i = 0; i < 10; i++) {
         await add(`P${i}`, `/uploads/p${i}.webp`);
       }
@@ -250,6 +273,7 @@ describe("games in the database", () => {
       assert.equal(body.slug, GAME);
       assert.equal(body.name, "Petdle");
       assert.deepEqual(body.attributes, [
+        { name: "Photo", type: "image" },
         { name: "Colors", type: "list" },
         { name: "Owners", type: "list" },
       ]);

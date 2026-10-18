@@ -9,15 +9,16 @@ import {
 } from "./correctness.ts";
 import type { GameKind } from "./blur.ts";
 
-export type AttributeType = "text" | "list" | "number";
+export type AttributeType = "text" | "list" | "number" | "image";
 
 export interface GameAttribute {
   name: string;
   type: AttributeType;
 }
 
-// What the client knows of an entry: enough to autocomplete and show a photo, and a classic
-// game sends its values too for the selection list
+// What the client knows of an entry: enough to autocomplete and show a photo. A classic
+// entry's photo is its first Image value (blank when it has none); a Blur entry's is its image.
+// A classic entry carries its values too, for the selection list.
 export interface EntryRef {
   id: number;
   name: string;
@@ -25,28 +26,77 @@ export interface EntryRef {
   values?: AttributeValue[];
 }
 
-// An entry with its values, one per game attribute in attribute order (Text and
-// Number as a string, List as an array)
+// An entry with its values, one per game attribute in attribute order (Text, Number and
+// Image as a string, List as an array; Image holds the upload URL)
 export interface Entry extends EntryRef {
   values: AttributeValue[];
   // Blur games only: the order the grid's squares clear in (cells 0-8), once picked
   blurOrder?: number[];
 }
 
-// One column of a guessed entry, graded against the Daily Answer. Rows list the
-// photo, the name, then the game's Attributes: the table column order. A Blur game's rows
-// hold the name only, so no entry's image reaches the player before the day ends.
+// One column of a guessed entry, graded against the Daily Answer, in boardColumns order. A
+// Blur game's rows hold the name only, so no entry's image reaches the player before the day
+// ends.
 export interface GradedAttribute {
   key: string;
   value: AttributeValue;
+  // An Image column is never colored: correct only on the answer itself, so a winning row
+  // stays all correct
   correctness: Correctness;
   // Number columns only, on a wrong guess
   hint?: Hint;
+  // Image columns only: the value is a picture's URL, shown as is
+  image?: true;
 }
 
-// Every attribute has a value: an entry missing one pauses its game
-export const hasAllValues = (values: readonly AttributeValue[]): boolean =>
-  values.every((value: AttributeValue): boolean => value.length > 0);
+// A board column: its title, whether it shows a picture, and which attribute it holds
+// (undefined for Name)
+export interface BoardColumn {
+  title: string;
+  image: boolean;
+  attribute?: number;
+}
+
+// The guess grid's columns: Name, then a classic game's Attributes in their order. A Blur game
+// shows the name only.
+export function boardColumns(
+  attributes: readonly GameAttribute[],
+  kind: GameKind = "classic",
+): BoardColumn[] {
+  const name: BoardColumn = { title: "Name", image: false };
+  if (kind === "blur") {
+    return [name];
+  }
+  return [
+    name,
+    ...attributes.map((attribute: GameAttribute, i: number): BoardColumn => ({
+      title: attribute.name,
+      image: attribute.type === "image",
+      attribute: i,
+    })),
+  ];
+}
+
+// An entry's first Image value, its photo wherever one picture stands for it (blank: none)
+export const firstImage = (
+  attributes: readonly GameAttribute[],
+  values: readonly AttributeValue[],
+): string =>
+  (values.find(
+    (value: AttributeValue, i: number): boolean =>
+      attributes[i]?.type === "image" && value !== "",
+  ) as string | undefined) ?? "";
+
+// Every attribute but Image (which may stay blank) has a value: an entry missing one pauses
+// its game
+export const hasAllValues = (
+  attributes: readonly GameAttribute[],
+  values: readonly AttributeValue[],
+): boolean =>
+  values.every(
+    (value: AttributeValue, i: number): boolean =>
+      attributes[i]?.type === "image" || value.length > 0,
+  );
 
 // A Blur game's skip (ADR 0019): the id that stands for "no entry" in a guess list. It uses a
 // try like a wrong guess, and any number of them may be made.
@@ -99,29 +149,34 @@ export function gradeGuess(
       },
     ];
   }
-  return [
-    {
-      key: "photo",
-      value: guess.photo,
-      correctness:
-        guess.id === answer.id ? Correctness.Correct : Correctness.Incorrect,
-    },
-    name,
-    ...attributes.map(
-      (attribute: GameAttribute, i: number): GradedAttribute => ({
+  return boardColumns(attributes).map(
+    (column: BoardColumn): GradedAttribute => {
+      const i = column.attribute;
+      if (i === undefined) {
+        return name;
+      }
+      const [value, target] = [guess.values[i]!, answer.values[i]!];
+      const attribute = attributes[i]!;
+      if (attribute.type === "image") {
+        return {
+          key: attribute.name,
+          value,
+          correctness:
+            guess.id === answer.id
+              ? Correctness.Correct
+              : Correctness.Incorrect,
+          image: true,
+        };
+      }
+      return {
         key: attribute.name,
-        value: guess.values[i]!,
+        value,
         ...(attribute.type === "number"
-          ? gradeNumber(guess.values[i] as string, answer.values[i] as string)
-          : {
-              correctness: gradeCorrectness(
-                guess.values[i]!,
-                answer.values[i]!,
-              ),
-            }),
-      }),
-    ),
-  ];
+          ? gradeNumber(value as string, target as string)
+          : { correctness: gradeCorrectness(value, target) }),
+      };
+    },
+  );
 }
 
 export type GradeIdsResult =
