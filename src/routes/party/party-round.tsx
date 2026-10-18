@@ -8,11 +8,12 @@ import { Card } from "../../components/ui/card.tsx";
 import {
   boardColumns,
   findEntryId,
+  guessedNames,
   isAnswerRow,
-  nameCell,
+  SKIP,
 } from "../../game/game.ts";
 import type { LiveRound, PartyView } from "../../game/party.ts";
-import { GuessBox } from "../play/guess-box.tsx";
+import { GuessForm } from "../play/guess-form.tsx";
 
 type Board = NonNullable<LiveRound["yours"]>;
 
@@ -35,7 +36,7 @@ export function PartyRound({
   const [guess, setGuess] = useState("");
   const entries = view.game.entries;
   const done = mine.solved || mine.gaveUp || mine.lost;
-  const used = new Set(mine.rows.map((row) => nameCell(row).value));
+  const used = guessedNames(mine.rows);
   const blur = view.game.kind === "blur" ? (view.game.blurTries ?? 1) : null;
   const newestFirst = [...mine.rows].reverse();
   const names = entries.map((e) => e.name).filter((name) => !used.has(name));
@@ -103,22 +104,13 @@ export function PartyRound({
       )}
       {!done && (
         <Card id="guess-card" className="play-card mb-6 gap-3 p-4 sm:p-5">
-          <div id="new-guess-row" className="guess-row flex gap-2">
-            <GuessBox
-              names={names}
-              value={guess}
-              onChange={setGuess}
-              onSubmit={submit}
-              disabled={false}
-            />
-            <Button
-              id="submit-new-guess-button"
-              className="h-11"
-              onClick={() => submit(guess)}
-            >
-              Guess
-            </Button>
-          </div>
+          <GuessForm
+            names={names}
+            value={guess}
+            onChange={setGuess}
+            onSubmit={submit}
+            onSkip={blur === null ? undefined : () => onGuess(SKIP)}
+          />
           <div className="game-actions flex justify-end">
             <Button
               id="give-up-button"

@@ -6,6 +6,7 @@ import {
   isBlurOrder,
   isGameKind,
   isTryCount,
+  minEntriesOf,
   toggleCell,
 } from "../src/game/blur.ts";
 
@@ -15,6 +16,13 @@ describe("isGameKind", () => {
     assert.ok(isGameKind("blur"));
     assert.ok(!isGameKind("zoom"));
     assert.ok(!isGameKind(undefined));
+  });
+});
+
+describe("minEntriesOf", () => {
+  it("lets a Blur game play with a single entry", () => {
+    assert.equal(minEntriesOf("blur"), 1);
+    assert.equal(minEntriesOf("classic"), 2);
   });
 });
 

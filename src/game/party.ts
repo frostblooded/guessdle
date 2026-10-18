@@ -5,6 +5,8 @@ import type { Correctness } from "./correctness.ts";
 import {
   gradeGuess,
   nameCell,
+  SKIP,
+  skippedRow,
   type Entry,
   type EntryRef,
   type GameAttribute,
@@ -260,7 +262,14 @@ export function partyView(input: ViewInput): PartyView {
     round.guesses
       .filter((g) => g.playerId === playerId)
       .map((g) =>
-        gradeGuess(attributes, entry(round.answerId), entry(g.entryId), kind),
+        g.entryId === SKIP && kind === "blur"
+          ? skippedRow()
+          : gradeGuess(
+              attributes,
+              entry(round.answerId),
+              entry(g.entryId),
+              kind,
+            ),
       );
   const latest = rounds.at(-1);
   const me = players.find((p) => p.id === viewer);
@@ -441,7 +450,7 @@ export const REFUSAL_TEXT: Record<PartyRefusal, string> = {
   finished: "You are done with this round. Wait for the next one.",
   duplicate: "You already guessed that one.",
   party_ended: "This party has ended.",
-  not_enough_entries: `This game needs at least ${MIN_ENTRIES} entries before a round can start.`,
+  not_enough_entries: `This game needs at least ${MIN_ENTRIES} entries (one for a Blur game) before a round can start.`,
   game_paused:
     "This game is paused while some of its entries are missing values.",
   server_error: "The server hit an unexpected problem. Try again in a moment.",

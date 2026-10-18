@@ -163,8 +163,8 @@ export interface GalleryCard {
   name: string;
   description: string;
   cover: string;
-  // Banner collage photos of active entries, by id; only for a classic game without a cover
-  // (a Blur game's photos are its answers)
+  // Banner collage photos of active entries, by id; only for a game without a cover. A Blur
+  // game's photos are its answers, so it gets blurred tiles instead (`blurTileUrl`).
   photos: string[];
   entryCount: number;
   kind: GameKind;
@@ -175,26 +175,37 @@ const FIRST_IMAGE = (alias: string): string =>
   `(select v.value from entry_values v join attributes a on a.id = v.attribute_id
      where v.entry_id = ${alias}.id and a.type = 'image' order by a.position, a.id limit 1)`;
 
-// Approved games with at least MIN_ENTRIES active entries and none missing a value: the original
+// Approved games with enough active entries (MIN_ENTRIES, one for a Blur game) and none missing a value: the original
 // first, then newest first
 export async function listGallery(q: Q): Promise<GalleryCard[]> {
   const { rows } = await q.query<GalleryCard>(
     `select g.slug, g.name, g.description, g.cover_url as cover,
-       case when g.cover_url = '' and g.kind = 'classic' then array(
+       case when g.cover_url = '' then array(
          select x.photo from (
-           select p.id, ${FIRST_IMAGE("p")} as photo from entries p
-           where p.game_id = g.id and p.deleted_at is null) x
+           select p.id, coalesce(nullif(p.photo_url, ''), ${FIRST_IMAGE("p")}) as photo
+           from entries p where p.game_id = g.id and p.deleted_at is null) x
          where x.photo is not null order by x.id limit $2
        ) else '{}'::text[] end as photos,
        count(e.id)::int as "entryCount", g.kind
      from games g join entries e on e.game_id = g.id and e.deleted_at is null
      where g.status = 'approved' and not ${HAS_MISSING_VALUES}
-     group by g.id having count(e.id) >= $1
+     group by g.id having count(e.id) >= case when g.kind = 'blur' then 1 else $1 end
      order by g.slug = 'petdle' desc, g.created_at desc, g.id desc`,
     [MIN_ENTRIES, MAX_TILES],
   );
-  return rows;
+  return rows.map((card) =>
+    card.kind === "blur"
+      ? {
+          ...card,
+          photos: card.photos.map((_, i) => blurTileUrl(card.slug, i)),
+        }
+      : card,
+  );
 }
+
+// Tile n of a Blur game's banner collage: its nth entry photo with a photo, blurred (ADR 0019)
+export const blurTileUrl = (slug: string, n: number): string =>
+  `/api/games/${encodeURIComponent(slug)}/tile/${n}`;
 
 export interface MyGame {
   slug: string;

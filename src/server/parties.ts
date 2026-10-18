@@ -220,7 +220,7 @@ export async function loadData(q: Q, party: PartyRow): Promise<PartyData> {
     entryId: number;
     at: number;
   }>(
-    `select g.round_id::int as "roundId", g.player_id::int as "playerId", g.entry_id::int as "entryId",
+    `select g.round_id::int as "roundId", g.player_id::int as "playerId", coalesce(g.entry_id, 0)::int as "entryId",
        (extract(epoch from g.guessed_at) * 1000)::float8 as at
      from party_guesses g join party_rounds r on r.id = g.round_id
      where r.party_id = $1 order by g.seq`,

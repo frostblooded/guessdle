@@ -2,7 +2,7 @@
 // goes over the party socket (party-hub.ts).
 import express from "express";
 import type { Express, Request, Response } from "express";
-import { MIN_ENTRIES } from "../../game/limits.ts";
+import { minEntriesOf } from "../../game/blur.ts";
 import { cleanNickname, normalizeCode } from "../../game/party.ts";
 import { requestUser } from "../auth.ts";
 import { createParty, findParty, joinParty, viewsOf } from "../parties.ts";
@@ -40,7 +40,7 @@ export function partyRoutes(
     if (!loaded) {
       return;
     }
-    if (loaded.roster.entries.length < MIN_ENTRIES) {
+    if (loaded.roster.entries.length < minEntriesOf(loaded.game.kind)) {
       fail(res, "not_enough_entries");
       return;
     }
