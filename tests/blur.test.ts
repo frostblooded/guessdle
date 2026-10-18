@@ -7,6 +7,7 @@ import {
   isGameKind,
   isTryCount,
   minEntriesOf,
+  outOfTries,
   toggleCell,
 } from "../src/game/blur.ts";
 
@@ -23,6 +24,19 @@ describe("minEntriesOf", () => {
   it("lets a Blur game play with a single entry", () => {
     assert.equal(minEntriesOf("blur"), 1);
     assert.equal(minEntriesOf("classic"), 2);
+  });
+});
+
+describe("outOfTries", () => {
+  it("loses once the guesses reach the tries without the answer", () => {
+    assert.ok(outOfTries(3, 3, false));
+    assert.ok(outOfTries(3, 4, false));
+    assert.ok(!outOfTries(3, 2, false));
+    assert.ok(!outOfTries(3, 3, true));
+  });
+  it("a classic game has no tries to run out of", () => {
+    assert.ok(!outOfTries(null, 50, false));
+    assert.ok(!outOfTries(undefined, 50, false));
   });
 });
 

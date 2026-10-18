@@ -393,6 +393,10 @@ describe("blur games", () => {
         .error,
       "finished",
     );
+    // The Past days list calls the day lost, and passes the tries for the browser's own days
+    const days = (await request("GET", `${G}/days`, bob)).body;
+    assert.equal(days.tries, 3);
+    assert.equal(days.days[0].status, "lost");
   });
 
   it("pauses the game while an entry has no order", async () => {
