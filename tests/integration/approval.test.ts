@@ -229,8 +229,16 @@ describe("approval flow", () => {
   });
 
   describe("email when a game enters pending", () => {
-    const addEntry = (): Promise<unknown> =>
-      request("POST", `/api/games/${SLUG}/entries`, ann, { name: "New one" });
+    // Fills every attribute, since an entry needs them all
+    const addEntry = async (): Promise<unknown> => {
+      const attrs: Body[] = (
+        await request("GET", `/api/games/${SLUG}/attributes`, ann)
+      ).body;
+      return request("POST", `/api/games/${SLUG}/entries`, ann, {
+        name: "New one",
+        values: Object.fromEntries(attrs.map((a) => [a.id, "x"])),
+      });
+    };
     const patchName = (): Promise<unknown> =>
       request("PATCH", `/api/games/${SLUG}`, ann, { name: "Renamed" });
 

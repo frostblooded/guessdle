@@ -2,7 +2,7 @@
 // moves (submit, unpublish, approve, reject) and the admin email on entering pending.
 import type pg from "pg";
 import { MIN_ENTRIES } from "../game/limits.ts";
-import { type GameRow, type GameStatus } from "./games.ts";
+import { HAS_MISSING_VALUES, type GameRow, type GameStatus } from "./games.ts";
 import type { MailConfig } from "./mailer.ts";
 import { withGameLock } from "./tx.ts";
 
@@ -69,7 +69,8 @@ async function mailAdminsPending(
   }
 }
 
-export type MoveResult = "ok" | "invalid_state" | "too_few_entries";
+export type MoveResult =
+  "ok" | "invalid_state" | "too_few_entries" | "incomplete_entries";
 interface Settled {
   result: MoveResult;
   row: { slug: string; name: string } | undefined;
@@ -142,6 +143,13 @@ export function gameLifecycle(pool: pg.Pool, mail?: MailConfig) {
             );
             if (rows[0]!.n < MIN_ENTRIES) {
               return { result: "too_few_entries", row: undefined };
+            }
+            const missing = await tx.query(
+              `select 1 from games g where g.id = $1 and ${HAS_MISSING_VALUES}`,
+              [game.id],
+            );
+            if (missing.rowCount) {
+              return { result: "incomplete_entries", row: undefined };
             }
           }
           // Submit keeps the last rejection reason; the others set it (cleared unless rejecting)

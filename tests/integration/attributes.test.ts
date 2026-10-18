@@ -132,7 +132,7 @@ describe("game attributes", () => {
       { name: "", type: "text" },
       { name: "  ", type: "text" },
       { name: "x".repeat(41), type: "text" },
-      { name: "A", type: "number" },
+      { name: "A", type: "date" },
       { name: "A" },
       { type: "text" },
     ]) {
@@ -170,16 +170,137 @@ describe("game attributes", () => {
     assert.equal((await change(b.id, { name: "a" })).status, 409);
   });
 
-  it("retypes Text to List as a one-item list and List to Text joined by comma", async () => {
-    const [attr] = (await add("Tags")).body;
+  it("retyping erases the attribute's values; a rename keeps them", async () => {
+    const [attr, other] = (await add("Tags")).body.concat(
+      (await add("Other")).body.slice(1),
+    );
     await fill(attr.id, "E1", ["solo"]);
-    await change(attr.id, { type: "list" });
-    assert.deepEqual(await values("Tags"), ["solo"]);
-    await fill(attr.id, "E2", ["v0", "v1", "v2"]);
-    await change(attr.id, { type: "text" });
-    assert.deepEqual(await values("Tags"), ["solo", "v0, v1, v2"]);
+    await fill(other.id, "E1", ["kept"]);
+    await change(attr.id, { name: "Labels" });
+    assert.deepEqual(await values("Labels"), ["solo"]);
+    await change(attr.id, { type: "number" });
+    assert.deepEqual(await values("Labels"), []);
+    assert.deepEqual(await values("Other"), ["kept"]);
     const roster = await request("GET", "/api/games/ann-game", ann);
-    assert.deepEqual(roster.body.attributes, [{ name: "Tags", type: "text" }]);
+    assert.deepEqual(roster.body.attributes, [
+      { name: "Labels", type: "number" },
+      { name: "Other", type: "text" },
+    ]);
+  });
+
+  describe("saving the whole list (the editor's Save)", () => {
+    const save = (attributes: unknown, cookie: string | undefined = ann) =>
+      request("PUT", A, cookie, { attributes });
+
+    it("renames, retypes, removes and adds in one go, in the order given", async () => {
+      await add("Color", "list");
+      await add("Age");
+      const [color, age, owner] = (await add("Owner")).body;
+      await fill(color.id, "E1", ["Red"]);
+      await fill(age.id, "E1", ["3"]);
+      await fill(owner.id, "E1", ["Niki"]);
+      const res = await save([
+        { id: owner.id, name: "Owners", type: "text" },
+        { name: "Size", type: "number" },
+        { id: age.id, name: "Age", type: "number" },
+      ]);
+      assert.equal(res.status, 200);
+      assert.deepEqual(
+        res.body.map((a: Body) => [a.name, a.type]),
+        [
+          ["Owners", "text"],
+          ["Size", "number"],
+          ["Age", "number"],
+        ],
+      );
+      assert.equal(res.body[0].id, owner.id);
+      assert.deepEqual(await values("Owners"), ["Niki"]);
+      assert.deepEqual(await values("Age"), []);
+      assert.equal(
+        (
+          await db.pool.query(
+            "select 1 from entry_values where attribute_id = $1",
+            [color.id],
+          )
+        ).rowCount,
+        0,
+      );
+    });
+
+    it("swaps two names in one save", async () => {
+      await add("A");
+      const [a, b] = (await add("B")).body;
+      const res = await save([
+        { id: a.id, name: "B", type: "text" },
+        { id: b.id, name: "A", type: "text" },
+      ]);
+      assert.equal(res.status, 200);
+      assert.deepEqual(
+        res.body.map((x: Body) => x.name),
+        ["B", "A"],
+      );
+    });
+
+    it("refuses bad lists whole, changing nothing", async () => {
+      const [a] = (await add("A")).body;
+      const foreign = (
+        await db.pool.query(
+          "select id::int from attributes order by id limit 1",
+        )
+      ).rows[0].id;
+      for (const [list, status, error] of [
+        [[{ name: "", type: "text" }], 400, "invalid"],
+        [[{ name: "X", type: "date" }], 400, "invalid"],
+        [[{ id: "1", name: "X", type: "text" }], 400, "invalid"],
+        ["nope", 400, "invalid"],
+        [
+          [
+            { id: a.id, name: "X", type: "text" },
+            { id: a.id, name: "Y", type: "text" },
+          ],
+          400,
+          "invalid",
+        ],
+        [Array(11).fill({ name: "X", type: "text" }), 400, "invalid"],
+        [[{ id: foreign, name: "X", type: "text" }], 404, "not_found"],
+        [
+          [
+            { id: a.id, name: "Same", type: "text" },
+            { name: " same ", type: "list" },
+          ],
+          409,
+          "attribute_exists",
+        ],
+      ] as const) {
+        const res = await save(list);
+        assert.equal(res.status, status, JSON.stringify(list));
+        assert.equal(res.body.error, error, JSON.stringify(list));
+      }
+      const now = await request("GET", A, ann);
+      assert.deepEqual(
+        now.body.map((x: Body) => x.name),
+        ["A"],
+      );
+    });
+
+    it("an unchanged list keeps an approved game approved; a change sends it to pending", async () => {
+      const [a] = (await add("A")).body;
+      await db.pool.query("update games set status = 'approved'");
+      await save([{ id: a.id, name: "A", type: "text" }]);
+      assert.equal(await statusOf(), "approved");
+      await save([{ id: a.id, name: "A", type: "number" }]);
+      assert.equal(await statusOf(), "pending");
+    });
+
+    it("is owner/admin only", async () => {
+      const bob = await login("bob@example.test");
+      await db.pool.query("update games set status = 'approved'");
+      assert.equal(
+        (await request("PUT", A, undefined, { attributes: [] })).status,
+        401,
+      );
+      assert.equal((await save([], bob)).status, 403);
+    });
   });
 
   it("removing an attribute hard-deletes its values", async () => {

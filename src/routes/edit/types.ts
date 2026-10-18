@@ -2,7 +2,7 @@
 export interface Attribute {
   id: number;
   name: string;
-  type: "text" | "list";
+  type: "text" | "list" | "number";
 }
 
 export interface Entry {

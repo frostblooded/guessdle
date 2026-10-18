@@ -333,6 +333,7 @@ export type PartyRefusal =
   | "duplicate"
   | "party_ended"
   | "not_enough_entries"
+  | "game_paused"
   | "server_error";
 
 const ACTIONS = new Set(["give-up", "start-round", "end-round", "end-party"]);
@@ -406,6 +407,8 @@ export const REFUSAL_TEXT: Record<PartyRefusal, string> = {
   duplicate: "You already guessed that one.",
   party_ended: "This party has ended.",
   not_enough_entries: `This game needs at least ${MIN_ENTRIES} entries before a round can start.`,
+  game_paused:
+    "This game is paused while some of its entries are missing values.",
   server_error: "The server hit an unexpected problem. Try again in a moment.",
 };
 

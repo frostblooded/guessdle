@@ -55,6 +55,8 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       description: game.description,
       cover: game.coverUrl,
       attributes: roster.attributes,
+      // Some entries miss values: nobody can play until they are filled in
+      paused: roster.incomplete > 0,
       entries: roster.entries.map(({ id, name, photo }) => ({
         id,
         name,
