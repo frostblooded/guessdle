@@ -4,6 +4,7 @@ import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
 import { correctnessClass } from "../../game/correctness.ts";
 import {
+  clockTime,
   ordinal,
   progressLabel,
   type FinishedRound,
@@ -138,7 +139,7 @@ export function Podium({ view }: { view: PartyView }) {
 const nameOf = (view: PartyView, id: number): string =>
   view.players.find((p) => p.id === id)?.nickname ?? "Removed player";
 
-// One finished round: its answer, then each player's place, points and guesses
+// One finished round: its answer, then each player's place, points, guesses and solve time
 function Round({ view, round }: { view: PartyView; round: FinishedRound }) {
   return (
     <Card className="party-round mb-4 p-4 sm:p-5">
@@ -172,7 +173,7 @@ function Round({ view, round }: { view: PartyView; round: FinishedRound }) {
               </span>
               <span className="party-player-detail col-start-2 text-sm text-muted-foreground">
                 {result.solved
-                  ? `${result.guesses} ${result.guesses === 1 ? "guess" : "guesses"}`
+                  ? `${result.guesses} ${result.guesses === 1 ? "guess" : "guesses"} in ${clockTime(result.timeMs!)}`
                   : result.gaveUp
                     ? "Gave up"
                     : "Did not solve"}

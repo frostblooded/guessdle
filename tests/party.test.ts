@@ -4,6 +4,7 @@ import { Correctness } from "../src/game/correctness.ts";
 import type { Entry } from "../src/game/game.ts";
 import {
   cleanNickname,
+  clockTime,
   drawAnswer,
   everyoneDone,
   normalizeCode,
@@ -334,6 +335,12 @@ describe("text", () => {
       "101st",
       "111th",
     ]);
+  });
+  it("writes solve times as a clock", () => {
+    assert.deepEqual(
+      [0, 999, 7_400, 83_000, 600_000, 3_723_000].map(clockTime),
+      ["0:00", "0:00", "0:07", "1:23", "10:00", "1:02:03"],
+    );
   });
   it("labels progress", () => {
     const p = { playerId: 1, guesses: 1, solved: false, gaveUp: false };
