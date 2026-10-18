@@ -2,6 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router";
+import { ReviewButtons } from "../../components/review-buttons.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import {
@@ -11,6 +12,7 @@ import {
   TableRow,
 } from "../../components/ui/table.tsx";
 import { getJson } from "../../lib/api.ts";
+import { useDelayed } from "../../lib/use-delayed.ts";
 import { api } from "../../manage-client.ts";
 
 interface QueueItem {
@@ -35,12 +37,15 @@ export function QueuePanel({ active }: { active: boolean }) {
   });
   const [failed, setFailed] = useState(false);
   const games = queue.data?.games ?? [];
+  const slow = useDelayed(queue.isPending);
   const message = queue.isError
     ? LOAD_FAILED
     : failed
       ? ACT_FAILED
       : queue.isPending
-        ? "Loading the queue…"
+        ? slow
+          ? "Loading the queue…"
+          : null
         : games.length === 0
           ? "No games are waiting."
           : null;
@@ -98,28 +103,15 @@ export function QueuePanel({ active }: { active: boolean }) {
                 </TableCell>
                 <TableCell>
                   <span className="flex justify-end gap-2">
-                    <Button
-                      className="queue-approve"
-                      size="sm"
-                      onClick={() => void act("POST", `${slug}/approve`)}
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      className="queue-reject"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const reason = prompt(
-                          `Why is "${game.name}" rejected?`,
-                        )?.trim();
-                        if (reason) {
-                          void act("POST", `${slug}/reject`, { reason });
-                        }
+                    <ReviewButtons
+                      slug={game.slug}
+                      name={game.name}
+                      onDone={async () => {
+                        setFailed(false);
+                        await queue.refetch();
                       }}
-                    >
-                      Reject
-                    </Button>
+                      onFail={() => setFailed(true)}
+                    />
                     <Button
                       className="queue-delete"
                       variant="destructive"

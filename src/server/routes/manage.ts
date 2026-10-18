@@ -1,5 +1,5 @@
 // Creating a game and editing its details (spec #66): owner and admin only.
-import type { LoadedGame } from "../access.ts";
+import { canApprove, type LoadedGame } from "../access.ts";
 import express from "express";
 import type { Express, Request, Response } from "express";
 import { slugBase, slugError } from "../../game/slug.ts";
@@ -76,7 +76,8 @@ export function manageRoutes(
       }
     };
 
-  const detailsOf = ({ game, roster }: LoadedGame) => ({
+  // `canApprove`: the editor shows an admin Approve and Reject on a pending game
+  const detailsOf = ({ game, roster }: LoadedGame, user: SessionUser) => ({
     slug: game.slug,
     name: game.name,
     description: game.description,
@@ -85,6 +86,7 @@ export function manageRoutes(
     rejectReason: game.rejectReason,
     skipPeriod: game.skipPeriod,
     entryCount: roster.entries.length,
+    canApprove: canApprove(game, user),
   });
 
   app.post("/api/games", writes, json, async (req, res) => {
@@ -129,8 +131,8 @@ export function manageRoutes(
 
   app.get(
     "/api/games/:slug/details",
-    manageRoute(async (loaded, _user, _req, res) => {
-      res.json(detailsOf(loaded));
+    manageRoute(async (loaded, user, _req, res) => {
+      res.json(detailsOf(loaded, user));
     }),
   );
 
@@ -274,7 +276,7 @@ export function manageRoutes(
 
   // Submit and unpublish: one guarded status move
   const flowRoute = (move: Move) =>
-    manageRoute(async ({ game }, _user, req, res) => {
+    manageRoute(async ({ game }, user, req, res) => {
       const out = await lifecycle.move(game, move);
       if (out !== "ok") {
         fail(res, out);
@@ -282,7 +284,7 @@ export function manageRoutes(
       }
       const fresh = await loadGame(ctx, req, res);
       if (fresh) {
-        res.json(detailsOf(fresh));
+        res.json(detailsOf(fresh, user));
       }
     });
   app.post("/api/games/:slug/submit", writes, json, flowRoute("submit"));
@@ -343,7 +345,7 @@ export function manageRoutes(
       await refs.release([replaced]);
       const fresh = await loadGame(ctx, req, res);
       if (fresh) {
-        res.json(detailsOf(fresh));
+        res.json(detailsOf(fresh, user));
       }
     }),
   );

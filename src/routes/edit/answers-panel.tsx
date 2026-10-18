@@ -10,6 +10,7 @@ import {
   TableHead,
   TableRow,
 } from "../../components/ui/table.tsx";
+import { useDelayed } from "../../lib/use-delayed.ts";
 import { api, errorText } from "../../manage-client.ts";
 
 interface AnswerDay {
@@ -62,6 +63,9 @@ export function AnswersPanel({
   active: boolean;
 }) {
   const [message, setMessage] = useState<string | null>(null);
+  // The first load of the days; its notice waits in case the days arrive at once
+  const [loading, setLoading] = useState(false);
+  const slow = useDelayed(loading);
   const [entries, setEntries] = useState<{ id: number; name: string }[]>([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -109,10 +113,12 @@ export function AnswersPanel({
         setMessage("Add entries first: answers are drawn from them.");
         return;
       }
-      setMessage("Loading days…");
+      setMessage(null);
+      setLoading(true);
       // One call finds today, a second adds the days before it as the Answer History
       const out = await api<AnswerList>("GET", `${base}/answers`);
       if (out?.status !== 200) {
+        setLoading(false);
         setMessage(errorText(out));
         return;
       }
@@ -121,6 +127,7 @@ export function AnswersPanel({
         "GET",
         `${base}/answers?from=${historyStart(first.today)}&to=${first.to}`,
       );
+      setLoading(false);
       show(full?.status === 200 ? full.data : first);
     })();
   }, [active, base]);
@@ -157,9 +164,9 @@ export function AnswersPanel({
         id="ans-message"
         variant="warn"
         role="status"
-        hidden={message === null}
+        hidden={message === null && !slow}
       >
-        {message}
+        {message ?? (slow ? "Loading days…" : null)}
       </Alert>
       <div id="ans-body" className="space-y-5" hidden={entries.length === 0}>
         <form

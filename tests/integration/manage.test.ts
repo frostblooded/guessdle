@@ -221,6 +221,13 @@ describe("creating and editing a game", () => {
       assert.equal((await patch(root, { name: "By admin" })).status, 200);
     });
 
+    it("tells only an admin on a pending game it can approve", async () => {
+      assert.equal((await details(root)).body.canApprove, false);
+      await setStatus("ann-game", "pending");
+      assert.equal((await details(ann)).body.canApprove, false);
+      assert.equal((await details(root)).body.canApprove, true);
+    });
+
     it("an ownerless game is editable by admins only", async () => {
       assert.equal((await details(ann, "petdle")).status, 403);
       assert.equal((await patch(ann, { name: "Hi" }, "petdle")).status, 403);
