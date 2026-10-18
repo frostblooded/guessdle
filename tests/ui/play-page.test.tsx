@@ -57,7 +57,12 @@ function fakeServer(game?: Response) {
           today: 5,
           startDate: "2026-10-13",
           attributes: [{ name: "Color", type: "text" }],
-          entries: ENTRIES.map(({ id, name, photo }) => ({ id, name, photo })),
+          entries: ENTRIES.map(({ id, name, photo, color }) => ({
+            id,
+            name,
+            photo,
+            values: [color],
+          })),
         })
       );
     }
@@ -448,5 +453,90 @@ describe("PlayPage on a past day", () => {
     await screen.findByText(/No guesses yet/);
     assert.equal(document.querySelector("#game-lede"), null);
     assert.ok(screen.getByRole("button", { name: "Reset" }));
+  });
+});
+
+describe("PlayPage selection mode", () => {
+  const listNames = (): string[] =>
+    screen
+      .getAllByRole("button", { name: /^Guess / })
+      .map((b) => b.getAttribute("aria-label")!.slice("Guess ".length));
+
+  it("the guess box asks for a guess", async () => {
+    vi.stubGlobal("fetch", fakeServer());
+    renderPlay();
+    await screen.findByText(/No guesses yet/);
+    assert.equal(input().placeholder, "Enter your guess here");
+  });
+
+  it("lists every entry with its values in place of the board, and a tap guesses it", async () => {
+    vi.stubGlobal("fetch", fakeServer());
+    renderPlay();
+    await screen.findByText(/No guesses yet/);
+    await userEvent.click(screen.getByRole("button", { name: "Select" }));
+    assert.equal(screen.queryByRole("combobox", { name: "Name" }), null);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Select next guess" }),
+    );
+    assert.equal(screen.queryByText(/No guesses yet/), null);
+    assert.deepEqual(listNames(), ["Abby", "Bela", "Dido"]);
+    assert.ok(
+      screen
+        .getByRole("button", { name: "Guess Bela" })
+        .textContent!.includes("Black"),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Guess Bela" }));
+    // The list closes on the board with the new row
+    await waitFor(() => assert.equal(guessRows().length, 1));
+    assert.equal(document.querySelector("#select-list"), null);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Select next guess" }),
+    );
+    assert.deepEqual(listNames(), ["Abby", "Dido"]);
+  });
+
+  it("filters by name and sorts by a tapped column", async () => {
+    vi.stubGlobal("fetch", fakeServer());
+    renderPlay();
+    await screen.findByText(/No guesses yet/);
+    await userEvent.click(screen.getByRole("button", { name: "Select" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Select next guess" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Sort by Color" }),
+    );
+    assert.deepEqual(listNames(), ["Bela", "Abby", "Dido"]);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Sort by Color" }),
+    );
+    assert.deepEqual(listNames(), ["Abby", "Dido", "Bela"]);
+    await userEvent.type(
+      screen.getByRole("textbox", { name: "Filter by name" }),
+      "D",
+    );
+    assert.deepEqual(listNames(), ["Dido"]);
+    // Back to the board without guessing
+    await userEvent.click(
+      screen.getByRole("button", { name: "Back to my guesses" }),
+    );
+    await screen.findByText(/No guesses yet/);
+  });
+
+  it("remembers the mode for the next visit", async () => {
+    vi.stubGlobal("fetch", fakeServer());
+    renderPlay();
+    await screen.findByText(/No guesses yet/);
+    await userEvent.click(screen.getByRole("button", { name: "Select" }));
+    cleanup();
+    renderPlay();
+    await screen.findByText(/No guesses yet/);
+    assert.ok(screen.getByRole("button", { name: "Select next guess" }));
+    assert.equal(
+      screen
+        .getByRole("button", { name: "Select" })
+        .getAttribute("aria-pressed"),
+      "true",
+    );
   });
 });
