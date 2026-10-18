@@ -1,7 +1,7 @@
 // Every failure code the server sends: its HTTP status and the text the browser shows.
 // One table so a new code cannot reach one side without the other.
 
-import { MIN_ENTRIES } from "./limits.ts";
+import { MAX_OPEN_PARTIES, MIN_ENTRIES } from "./limits.ts";
 
 const failure = (status: number, text: string) => ({ status, text });
 
@@ -34,6 +34,20 @@ export const FAILURES = {
   self_deletion: failure(409, "You cannot delete your own account here."),
   last_admin: failure(409, "At least one admin must remain."),
   self_demotion: failure(409, "You cannot remove your own admin rights."),
+  party_not_found: failure(
+    404,
+    "There is no party with this code. Check the code and try again.",
+  ),
+  party_ended: failure(409, "This party has ended."),
+  nickname_taken: failure(
+    409,
+    "Someone in this party already has that nickname. Pick another one.",
+  ),
+  party_full: failure(409, "This party is full."),
+  too_many_parties: failure(
+    409,
+    `You already have ${MAX_OPEN_PARTIES} parties open. End one before starting another.`,
+  ),
   too_large: failure(413, "That image is over 5 MB."),
   unsupported: failure(415, "Use a JPEG, PNG or WebP image."),
   corrupt: failure(422, "That image could not be read."),

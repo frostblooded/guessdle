@@ -212,7 +212,12 @@ export function AnswersPanel({
           </thead>
           <tbody id="ans-days">
             {days.map((day) => (
-              <TableRow key={day.date} data-date={day.date}>
+              // Every row the same height, the last included (issue #83)
+              <TableRow
+                key={day.date}
+                data-date={day.date}
+                className="last:border-b"
+              >
                 <TableCell className="font-mono whitespace-nowrap">
                   {day.date}
                 </TableCell>
@@ -220,7 +225,8 @@ export function AnswersPanel({
                   {day.missing ? `MISSING (${day.entryId})` : day.name}
                 </TableCell>
                 <TableCell>
-                  <span className="flex flex-wrap gap-1">
+                  {/* Pills and action stay on one line, so rows stay even on phones (the table scrolls) */}
+                  <span className="flex gap-1 whitespace-nowrap">
                     {day.today && <Tag tag="today" />}
                     <Tag
                       tag={
@@ -229,9 +235,9 @@ export function AnswersPanel({
                     />
                   </span>
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right whitespace-nowrap">
                   {day.locked ? (
-                    <span className="text-xs text-muted-foreground">
+                    <span className="action-locked inline-flex h-8 items-center text-xs text-muted-foreground">
                       locked
                     </span>
                   ) : (

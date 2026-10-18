@@ -1,5 +1,6 @@
 // The editor's Entries tab: list, add, change and delete entries with photo and values.
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCrop } from "../../components/crop-dialog.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button, buttonVariants } from "../../components/ui/button.tsx";
 import { Input, Label, Textarea } from "../../components/ui/input.tsx";
@@ -51,6 +52,7 @@ export function EntriesPanel({
   // The attributes the form was built for; the ref lets the refresh compare without re-running
   const [formAttributes, setFormAttributes] = useState(initial.attributes);
   const built = useRef(initial.attributes);
+  const { crop, dialog } = useCrop(setError);
 
   useEffect(() => {
     if (!active) {
@@ -122,10 +124,14 @@ export function EntriesPanel({
       return;
     }
     setError("");
+    const cropped = await crop(file, "photo");
+    if (!cropped) {
+      return;
+    }
     const up = await api<{ url?: string }>(
       "POST",
       "/api/uploads?kind=photo",
-      file,
+      cropped,
     );
     const url = up?.status === 200 ? up.data.url : undefined;
     if (url) {
@@ -137,6 +143,7 @@ export function EntriesPanel({
 
   return (
     <div className="space-y-5">
+      {dialog}
       <p className="lede text-sm text-muted-foreground">
         Each entry is a row on the board. A game needs at least {MIN_ENTRIES}{" "}
         entries before anyone can play it.

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import { decide, type Need } from "../src/server/access.ts";
+import { canApprove, decide, type Need } from "../src/server/access.ts";
 import type { GameRow, Roster } from "../src/server/games.ts";
 import type { SessionUser } from "../src/server/auth.ts";
 
@@ -49,5 +49,22 @@ describe("decide", () => {
     assert.equal(decide(undefined, VIEWERS.owner, "edit"), "not_found");
     assert.equal(decide(undefined, VIEWERS.owner, "admin"), "forbidden");
     assert.equal(decide(undefined, VIEWERS.admin, "admin"), "not_found");
+  });
+});
+
+describe("canApprove", () => {
+  it("is only for an admin, only on a pending game", () => {
+    const pending = found("pending", 2).game;
+    assert.equal(canApprove(pending, VIEWERS.admin), true);
+    for (const who of ["anon", "stranger", "owner"] as const) {
+      assert.equal(canApprove(pending, VIEWERS[who]), false, who);
+    }
+    for (const status of ["draft", "approved", "rejected"]) {
+      assert.equal(
+        canApprove(found(status, 2).game, VIEWERS.admin),
+        false,
+        status,
+      );
+    }
   });
 });

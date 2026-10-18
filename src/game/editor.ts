@@ -13,7 +13,10 @@ export interface Details {
   entryCount: number;
 }
 
-export function statusNotice(d: Details): string {
+// Shared by the editor and the Play page, which knows only these fields
+export function statusNotice(
+  d: Pick<Details, "status" | "rejectReason" | "entryCount">,
+): string {
   const missing = Math.max(0, MIN_ENTRIES - d.entryCount);
   const needs =
     missing > 0

@@ -3,15 +3,16 @@ import { randomBytes } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
+import {
+  type ImageKind,
+  MAX_UPLOAD_BYTES,
+  UPLOAD_SHAPES,
+} from "../game/crop.ts";
 
-export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
-const MAX_SIDE = { photo: 800, cover: 1200 };
+export { type ImageKind, isImageKind, MAX_UPLOAD_BYTES } from "../game/crop.ts";
+
 // Decompression-bomb guard; sharp's default is 268 MP
 const MAX_PIXELS = 50_000_000;
-
-export type ImageKind = keyof typeof MAX_SIDE;
-export const isImageKind = (value: unknown): value is ImageKind =>
-  value === "photo" || value === "cover";
 
 export class ImageError extends Error {
   readonly code: "unsupported" | "too_large" | "corrupt";
@@ -44,7 +45,7 @@ export async function processImage(
   try {
     return await sharp(input, { limitInputPixels: MAX_PIXELS })
       .rotate()
-      .resize(MAX_SIDE[kind], MAX_SIDE[kind], {
+      .resize(UPLOAD_SHAPES[kind].maxSide, UPLOAD_SHAPES[kind].maxSide, {
         fit: "inside",
         withoutEnlargement: true,
       })
