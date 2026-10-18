@@ -105,26 +105,27 @@ export function EntriesPanel({
     })();
   }, [active, base]);
 
-  // Runs a call that answers with the entry list; false when it was refused
+  // Runs a call that answers with the entry list; a saved form clears before the page refreshes,
+  // so nothing typed meanwhile is lost
   const run = async (
     method: "POST" | "PATCH" | "DELETE",
     path: string,
     body?: unknown,
-  ): Promise<boolean> => {
+  ): Promise<void> => {
     setError("");
     const out = await api<Entry[]>(method, path, body);
     if (out?.status !== 200) {
       setError(errorText(out as Reply | null));
-      return false;
+      return;
     }
     setEntries(out.data);
     setDraft((d) =>
-      d.editing && !out.data.some((e) => e.id === d.editing?.id)
+      body !== undefined ||
+      (d.editing && !out.data.some((e) => e.id === d.editing?.id))
         ? draftOf(null)
         : d,
     );
     await onChange();
-    return true;
   };
 
   const submit = async (event: FormEvent): Promise<void> => {
@@ -150,12 +151,9 @@ export function EntriesPanel({
             }),
           }
         : { name: draft.name, photo: draft.photo, values };
-    const ok = draft.editing
-      ? await run("PATCH", `${base}/entries/${draft.editing.id}`, body)
-      : await run("POST", `${base}/entries`, body);
-    if (ok) {
-      setDraft(draftOf(null));
-    }
+    await (draft.editing
+      ? run("PATCH", `${base}/entries/${draft.editing.id}`, body)
+      : run("POST", `${base}/entries`, body));
   };
 
   // Crops and uploads the file; its URL, or null after a cancel or a failure
