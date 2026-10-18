@@ -18,7 +18,7 @@ declare module "@tarekraafat/autocomplete.js" {
     selector: string;
     placeHolder?: string;
     data: {
-      src: string[] | (() => string[]);
+      src: string[];
       filter?: (list: AutoCompleteItem[]) => AutoCompleteItem[];
     };
     resultsList?: {

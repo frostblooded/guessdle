@@ -14,7 +14,10 @@ async function phone(browser: Browser, baseURL: string): Promise<Page> {
   return context.newPage();
 }
 
-// Opens a party on Petdle from the Play page; returns its code
+// The original game, which the suite always has
+const SLUG = "petdle";
+
+// Opens a party on it from the Play page; returns its code
 async function hostParty(
   page: Page,
   nickname: string = "Ana",
@@ -22,7 +25,7 @@ async function hostParty(
   await page.request.post("/api/test/login", { data: { email: newEmail() } });
   await page.goto("/g/petdle");
   await page.locator("#party-host-link").click();
-  await expect(page).toHaveURL(/\/party\?host=petdle$/);
+  await expect(page).toHaveURL(new RegExp(`/party\\?host=${SLUG}$`));
   await expect(page.locator("#host-form")).toBeVisible();
   await page.locator("#host-nickname").fill(nickname);
   await page.locator("#host-button").click();
@@ -49,7 +52,9 @@ test("a signed-out visitor is sent to sign in before hosting", async ({
 }) => {
   await page.goto("/g/petdle");
   await page.locator("#party-host-link").click();
-  await expect(page).toHaveURL(/\/login\?next=%2Fparty%3Fhost%3Dpetdle$/);
+  await expect(page).toHaveURL(
+    new RegExp(`/login\\?next=%2Fparty%3Fhost%3D${SLUG}$`),
+  );
 });
 
 test("a host and a phone play a round, then the party ends on a podium", async ({
@@ -164,7 +169,10 @@ test("the party page fits a 320px phone", async ({
   const code = await hostParty(page);
   await page.locator("#start-round").click();
   const small = await (
-    await browser.newContext({ baseURL: baseURL!, viewport: { width: 320, height: 568 } })
+    await browser.newContext({
+      baseURL: baseURL!,
+      viewport: { width: 320, height: 568 },
+    })
   ).newPage();
   await small.goto(`/party/${code}`);
   await small.locator("#join-nickname").fill("Narrow");
