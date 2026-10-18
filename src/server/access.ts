@@ -17,8 +17,25 @@ export interface LoadedGame {
   user: SessionUser | null;
 }
 
+// Whether the game has enough active entries to draw a Daily Answer or a Round from
+const hasEnoughEntries = (game: GameRow, roster: Roster): boolean =>
+  roster.entries.length >= minEntriesOf(game.kind);
+
 export const isPlayable = (game: GameRow, roster: Roster): boolean =>
-  game.status !== "draft" && roster.entries.length >= minEntriesOf(game.kind);
+  game.status !== "draft" && hasEnoughEntries(game, roster);
+
+// Why nobody can play the game for now, whoever may see it: too few active entries, or Paused
+// (an active entry missing a value). Play, opening a Party, starting a Round and submitting for
+// approval all ask this one rule. Null when it plays.
+export const playBlocker = (
+  game: GameRow,
+  roster: Roster,
+): "not_enough_entries" | "game_paused" | null =>
+  !hasEnoughEntries(game, roster)
+    ? "not_enough_entries"
+    : roster.incomplete > 0
+      ? "game_paused"
+      : null;
 
 // Open to everyone: playable, and its owner is not banned
 export const isPublic = (game: GameRow, roster: Roster): boolean =>

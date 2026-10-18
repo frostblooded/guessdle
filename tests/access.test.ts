@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import { canApprove, decide, type Need } from "../src/server/access.ts";
+import {
+  canApprove,
+  decide,
+  playBlocker,
+  type Need,
+} from "../src/server/access.ts";
 import type { GameRow, Roster } from "../src/server/games.ts";
 import type { SessionUser } from "../src/server/auth.ts";
 
@@ -85,5 +90,24 @@ describe("canApprove", () => {
         status,
       );
     }
+  });
+});
+
+describe("playBlocker", () => {
+  const of = (kind: string, entries: number, incomplete = 0) =>
+    playBlocker(
+      { kind, status: "approved" } as GameRow,
+      { entries: new Array(entries).fill({}), incomplete } as unknown as Roster,
+    );
+  it("a classic game needs two active entries, a Blur game one", () => {
+    assert.equal(of("classic", 1), "not_enough_entries");
+    assert.equal(of("classic", 2), null);
+    assert.equal(of("blur", 0), "not_enough_entries");
+    assert.equal(of("blur", 1), null);
+  });
+  it("an entry missing a value pauses the game; too few entries is said first", () => {
+    assert.equal(of("classic", 3, 1), "game_paused");
+    assert.equal(of("blur", 1, 1), "game_paused");
+    assert.equal(of("classic", 1, 1), "not_enough_entries");
   });
 });

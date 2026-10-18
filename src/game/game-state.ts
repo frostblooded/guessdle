@@ -1,4 +1,5 @@
 import { dateToString } from "./date.ts";
+import type { DayProgress } from "./days.ts";
 
 // Game State: what the browser remembers about today.
 
@@ -128,6 +129,39 @@ function readJson(storage: StateStorage, key: string): unknown {
   }
 }
 
+// What a board's stored Game State says was played, without writing anything: the Past days
+// list reads every day this way. Today's board (`expires`) reads as unplayed once its last
+// played date is not today, as createGameState would clear it.
+export function readProgress(
+  rawStorage: StateStorage,
+  now: () => Date,
+  expires: boolean,
+): DayProgress {
+  const storage: StateStorage = tolerantStorage(rawStorage);
+  if (
+    expires &&
+    readJson(storage, LOCAL_LAST_PLAYED_STRING) !== dateToString(now())
+  ) {
+    return { won: false, gaveUp: false, guesses: 0 };
+  }
+  return {
+    won: readJson(storage, LOCAL_STORAGE_VICTORY_STRING) === true,
+    gaveUp: readJson(storage, LOCAL_STORAGE_GAVE_UP_STRING) === true,
+    guesses: usedGuessesIn(storage).length,
+  };
+}
+
+// The stored entry ids; anything else reads as none
+function usedGuessesIn(storage: StateStorage): number[] {
+  const value: unknown = readJson(storage, LOCAL_STORAGE_USED_GUESSES_STRING);
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item: unknown): item is number =>
+    Number.isInteger(item),
+  );
+}
+
 // Clears guesses and victory unless last played is today (a missing or invalid
 // last played counts as another day), then marks today as played. A past day's
 // state (`expires` false) is kept for good.
@@ -137,16 +171,7 @@ export function createGameState(
   expires: boolean = true,
 ): GameState {
   const storage: StateStorage = tolerantStorage(rawStorage);
-  const getUsedGuesses = (): number[] => {
-    const value: unknown = readJson(storage, LOCAL_STORAGE_USED_GUESSES_STRING);
-    if (!Array.isArray(value)) {
-      return [];
-    }
-
-    return value.filter((item: unknown): item is number =>
-      Number.isInteger(item),
-    );
-  };
+  const getUsedGuesses = (): number[] => usedGuessesIn(storage);
 
   const today: string = dateToString(now());
   if (expires && readJson(storage, LOCAL_LAST_PLAYED_STRING) !== today) {

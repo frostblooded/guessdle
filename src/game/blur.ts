@@ -13,6 +13,15 @@ export const isGameKind = (value: unknown): value is GameKind =>
 export const minEntriesOf = (kind: GameKind): number =>
   kind === "blur" ? 1 : MIN_ENTRIES;
 
+// Whether `guesses` (skips included) used up a Blur game's tries without the answer. `tries` is
+// absent for a classic game, whose guesses are unlimited. Solo play, Past days and party rounds
+// all lose by this one rule.
+export const outOfTries = (
+  tries: number | null | undefined,
+  guesses: number,
+  won: boolean,
+): boolean => tries !== null && tries !== undefined && !won && guesses >= tries;
+
 // The grid is GRID x GRID squares, numbered 0..CELLS-1 row by row from the top left
 export const GRID = 3;
 export const CELLS = GRID * GRID;

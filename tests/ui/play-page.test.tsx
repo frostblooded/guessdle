@@ -5,6 +5,8 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, it, vi } from "vitest";
 import { FAILURES, UNREACHABLE } from "../../src/game/failures.ts";
+import { dateToString } from "../../src/game/date.ts";
+import { RATE_LIMITED } from "../../src/game/play.ts";
 import { PlayPage } from "../../src/routes/play/play-page.tsx";
 
 // A tiny game: answer Dido; Color is the one attribute
@@ -287,7 +289,68 @@ describe("PlayPage", () => {
   });
 });
 
+describe("PlayPage signed in", () => {
+  it("a give-up after the day ended on another device shows the finished board", async () => {
+    let over = false;
+    const anon = fakeServer();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit): Promise<Response> => {
+        if (url === "/api/me") {
+          return json(200, {
+            user: { name: "A", email: "a@x.test", admin: false },
+          });
+        }
+        if (url === "/api/games/pets/state") {
+          return json(200, {
+            day: 5,
+            ids: [],
+            rows: [],
+            victory: false,
+            gaveUp: over,
+            ...(over && { answer: "Dido" }),
+          });
+        }
+        if (url === "/api/games/pets/state/give-up") {
+          // Another device gave up meanwhile
+          over = true;
+          return json(409, { error: "finished" });
+        }
+        return anon(url, init);
+      }),
+    );
+    renderPlay();
+    await screen.findByText(/No guesses yet/);
+    await userEvent.click(screen.getByRole("button", { name: "Give up" }));
+    await screen.findByText("Better luck tomorrow");
+    assert.equal(
+      document.querySelector("#give-up-answer-name")!.textContent,
+      "Dido",
+    );
+  });
+});
+
 describe("PlayPage load failures", () => {
+  it("a rate-limited load says the same as a rate-limited guess", async () => {
+    localStorage.setItem("game:pets:usedGuesses", "[1]");
+    localStorage.setItem("game:pets:day", "1");
+    localStorage.setItem(
+      "game:pets:lastPlayed",
+      JSON.stringify(dateToString(new Date())),
+    );
+    const server = fakeServer();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) =>
+        url === "/api/games/pets/grade"
+          ? json(429, { error: "rate_limited" })
+          : server(url, init),
+      ),
+    );
+    renderPlay();
+    await screen.findByText(RATE_LIMITED);
+  });
+
   it("blames the connection only when the server cannot be reached", async () => {
     vi.stubGlobal(
       "fetch",

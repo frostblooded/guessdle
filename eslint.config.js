@@ -10,6 +10,9 @@ export default tseslint.config(
       "node_modules/",
       "test-results/",
       ".claude/worktrees/",
+      // Third-party Claude Code hooks, kept as upstream ships them.
+      ".claude/caveman/",
+      ".claude/ponytail/",
       "storybook-static/",
     ],
   },

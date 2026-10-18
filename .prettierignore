@@ -8,3 +8,6 @@ package-lock.json
 howto
 storybook-static
 .claude/skills
+# Third-party Claude Code hooks, kept as upstream ships them.
+.claude/caveman
+.claude/ponytail

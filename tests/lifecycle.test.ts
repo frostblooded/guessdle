@@ -88,8 +88,16 @@ function fake(status: GameStatus, entryCount: number = 2) {
     if (sql.includes("returning slug")) {
       return { rows: [{ slug: "pets", name: "Pets" }], rowCount: 1 };
     }
-    if (sql.includes("count(*)")) {
-      return { rows: [{ n: entryCount }], rowCount: 1 };
+    // loadRoster's entries, each complete (the game has no attributes)
+    if (sql.includes("from entries where game_id")) {
+      const rows = Array.from({ length: entryCount }, (_, i) => ({
+        id: i + 1,
+        name: `E${i + 1}`,
+        photo: "",
+        deleted: false,
+        blurOrder: null,
+      }));
+      return { rows, rowCount: rows.length };
     }
     if (sql.includes("from users where admin")) {
       return {
