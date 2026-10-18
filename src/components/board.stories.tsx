@@ -8,14 +8,16 @@ import { BoardRow, GuessRow, TitleTile } from "./board.tsx";
 
 const { Correct, PartiallyCorrect, Incorrect } = Correctness;
 
-// A row as the API grades it: photo, name, then Colors and Owners
+// A row as the API grades it: name, the Photo image column, then Colors and Owners
 const row = (
   photo: string,
+  name: [string, Correctness],
   ...cells: [GradedAttribute["value"], Correctness][]
 ): GradedAttribute[] => [
-  { key: "photo", value: photo, correctness: Correct },
+  { key: "name", value: name[0], correctness: name[1] },
+  { key: "Photo", value: photo, correctness: name[1], image: true },
   ...cells.map(([value, correctness], i) => ({
-    key: ["name", "colors", "owners"][i]!,
+    key: ["colors", "owners"][i]!,
     value,
     correctness,
   })),
@@ -42,12 +44,12 @@ const ROWS = [
   ),
 ];
 
-const TITLES = ["Photo", "Name", "Colors", "Owners"];
+const TITLES = ["Name", "Photo", "Colors", "Owners"];
 
 function Board({ rows }: { rows: GradedAttribute[][] }) {
   return (
     <div className="flex max-w-3xl flex-col gap-2">
-      <BoardRow columns={TITLES.length}>
+      <BoardRow images={TITLES.map((title) => title === "Photo")}>
         {TITLES.map((title) => (
           <TitleTile key={title}>{title}</TitleTile>
         ))}

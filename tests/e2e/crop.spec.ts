@@ -29,7 +29,8 @@ const wide = (): Promise<Buffer> =>
     .png()
     .toBuffer();
 
-// Signs in, makes a game and opens its editor; counts the uploads the page sends
+// Signs in, makes a game with a Photo Image attribute and opens its editor; counts the uploads
+// the page sends
 async function openEditor(page: Page): Promise<{ uploads: () => number }> {
   await page.request.post("/api/test/login", {
     data: { email: `crop-${unique()}@example.test` },
@@ -38,6 +39,9 @@ async function openEditor(page: Page): Promise<{ uploads: () => number }> {
     data: { name: `Crop ${unique()}` },
   });
   const { slug } = (await created.json()) as { slug: string };
+  await page.request.post(`/api/games/${slug}/attributes`, {
+    data: { name: "Photo", type: "image" },
+  });
   let sent = 0;
   page.on("request", (r) => {
     if (r.url().includes("/api/uploads")) {
@@ -52,7 +56,7 @@ async function openEditor(page: Page): Promise<{ uploads: () => number }> {
 const pickPhoto = async (page: Page, buffer: Buffer): Promise<void> => {
   await page.locator("#tab-entries").click();
   await page
-    .locator("#entry-photo")
+    .locator("#entry-fields input[type=file]")
     .setInputFiles({ name: "pet.png", mimeType: "image/png", buffer });
 };
 
@@ -71,8 +75,8 @@ test("confirming uploads the photo cropped square from the middle", async ({
   await expect(page.locator("#crop-dialog")).toBeVisible();
   await page.locator("#crop-confirm").click();
   await expect(page.locator("#crop-dialog")).toHaveCount(0);
-  await expect(page.locator("#entry-photo-preview")).toBeVisible();
-  const meta = await (await stored(page, "#entry-photo-preview")).metadata();
+  await expect(page.locator(".entry-image-preview")).toBeVisible();
+  const meta = await (await stored(page, ".entry-image-preview")).metadata();
   expect([meta.width, meta.height]).toEqual([300, 300]);
 });
 
@@ -89,8 +93,8 @@ test("moving and zooming the frame changes what is uploaded", async ({
   await page.mouse.move(box.x - 600, box.y + box.height / 2, { steps: 10 });
   await page.mouse.up();
   await page.locator("#crop-confirm").click();
-  await expect(page.locator("#entry-photo-preview")).toBeVisible();
-  const image = await stored(page, "#entry-photo-preview");
+  await expect(page.locator(".entry-image-preview")).toBeVisible();
+  const image = await stored(page, ".entry-image-preview");
   const { width, height } = await image.metadata();
   expect(width).toBe(height);
   expect(width).toBeLessThan(300);
@@ -108,7 +112,7 @@ test("cancelling the crop uploads nothing", async ({ page }) => {
   await pickPhoto(page, await wide());
   await page.locator("#crop-cancel").click();
   await expect(page.locator("#crop-dialog")).toHaveCount(0);
-  await expect(page.locator("#entry-photo-preview")).toBeHidden();
+  await expect(page.locator(".entry-image-preview")).toBeHidden();
   await expect(page.locator("#entry-error")).toHaveText("");
   expect(uploads()).toBe(0);
 });

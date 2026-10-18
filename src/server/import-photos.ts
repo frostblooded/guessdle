@@ -1,4 +1,5 @@
-// One-off (#71): runs the repo's photos/*.jpg through the upload pipeline and points Petdle's entries at the results.
+// One-off (#71): runs the repo's photos/*.jpg through the upload pipeline and points Petdle's Image
+// values at the results.
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type pg from "pg";
@@ -27,19 +28,27 @@ async function store(
   return url;
 }
 
-// Entries still on /photos/<slug>.jpg are converted; entries already moved are skipped, so reruns are safe.
+// Image values still on /photos/<slug>.jpg are converted; values already moved are skipped, so reruns are safe.
 // `missing` lists slugs with no file in photosDir (left untouched).
 export async function importPhotos(
   pool: pg.Pool,
   options: ImportOptions,
 ): Promise<{ imported: number; missing: string[] }> {
-  const { rows } = await pool.query<{ id: number; photo_url: string }>(
-    "select e.id, e.photo_url from entries e join games g on g.id = e.game_id where g.slug = 'petdle' and e.photo_url like '/photos/%' order by e.id",
+  const { rows } = await pool.query<{
+    id: number;
+    attributeId: number;
+    url: string;
+  }>(
+    `select v.entry_id as id, v.attribute_id as "attributeId", v.value as url
+     from entry_values v join attributes a on a.id = v.attribute_id
+     join games g on g.id = a.game_id
+     where g.slug = 'petdle' and a.type = 'image' and v.value like '/photos/%'
+     order by v.entry_id, a.position`,
   );
   let imported = 0;
   const missing: string[] = [];
   for (const row of rows) {
-    const file = row.photo_url.slice("/photos/".length);
+    const file = row.url.slice("/photos/".length);
     try {
       const url = await store(
         pool,
@@ -47,10 +56,10 @@ export async function importPhotos(
         join(options.photosDir, file),
         "photo",
       );
-      await pool.query("update entries set photo_url = $1 where id = $2", [
-        url,
-        row.id,
-      ]);
+      await pool.query(
+        "update entry_values set value = $1 where entry_id = $2 and attribute_id = $3",
+        [url, row.id, row.attributeId],
+      );
       imported++;
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== "ENOENT") {

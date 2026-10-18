@@ -1,12 +1,12 @@
-// The editor's Entries tab: list, add, change and delete entries with photo and values (a Blur
-// game's image and square order, a Sequence game's photos).
+// The editor's Entries tab: list, add, change and delete entries with their values (a Blur
+// entry: its image and square order; a Sequence entry: its photos).
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useCrop } from "../../components/crop-dialog.tsx";
 import { CELLS, type GameKind } from "../../game/blur.ts";
 import type { ImageKind } from "../../game/crop.ts";
 import { FAILURES } from "../../game/failures.ts";
 import { Alert } from "../../components/ui/alert.tsx";
-import { Button, buttonVariants } from "../../components/ui/button.tsx";
+import { Button } from "../../components/ui/button.tsx";
 import { Input, Label, Textarea } from "../../components/ui/input.tsx";
 import {
   MAX_ENTRY_NAME,
@@ -15,18 +15,14 @@ import {
 } from "../../game/limits.ts";
 import { api, errorText, type Reply } from "../../manage-client.ts";
 import { cn } from "../../lib/utils.ts";
-import {
-  IMAGE_TYPES,
-  isIncomplete,
-  thumbOf,
-  type Attribute,
-  type Entry,
-} from "./types.ts";
+import { isIncomplete, thumbOf, type Attribute, type Entry } from "./types.ts";
+import { ImagePicker, ImageValue } from "./image-value.tsx";
 import { BlurOrderEditor } from "./blur-order-editor.tsx";
 import { EntriesLede } from "./entries-lede.tsx";
 import { ShotsEditor } from "./shots-editor.tsx";
 
-// What the form holds: the entry being edited (null: adding), its name, photo URL and values
+// What the form holds: the entry being edited (null: adding), its name, Blur image URL and
+// values (an Image value is its URL)
 interface Draft {
   editing: Entry | null;
   name: string;
@@ -105,27 +101,28 @@ export function EntriesPanel({
     })();
   }, [active, base]);
 
-  // Runs a call that answers with the entry list; a saved form clears before the page refreshes,
-  // so nothing typed meanwhile is lost
+  // Runs a call that answers with the entry list; false when it was refused. `clear` empties
+  // the form with the new list, before the page refresh, so nothing typed after it is lost.
   const run = async (
     method: "POST" | "PATCH" | "DELETE",
     path: string,
     body?: unknown,
-  ): Promise<void> => {
+    clear = false,
+  ): Promise<boolean> => {
     setError("");
     const out = await api<Entry[]>(method, path, body);
     if (out?.status !== 200) {
       setError(errorText(out as Reply | null));
-      return;
+      return false;
     }
     setEntries(out.data);
     setDraft((d) =>
-      body !== undefined ||
-      (d.editing && !out.data.some((e) => e.id === d.editing?.id))
+      clear || (d.editing && !out.data.some((e) => e.id === d.editing?.id))
         ? draftOf(null)
         : d,
     );
     await onChange();
+    return true;
   };
 
   const submit = async (event: FormEvent): Promise<void> => {
@@ -150,10 +147,10 @@ export function EntriesPanel({
               blurOrder: draft.blurOrder,
             }),
           }
-        : { name: draft.name, photo: draft.photo, values };
+        : { name: draft.name, values };
     await (draft.editing
-      ? run("PATCH", `${base}/entries/${draft.editing.id}`, body)
-      : run("POST", `${base}/entries`, body));
+      ? run("PATCH", `${base}/entries/${draft.editing.id}`, body, true)
+      : run("POST", `${base}/entries`, body, true));
   };
 
   // Crops and uploads the file; its URL, or null after a cancel or a failure
@@ -178,12 +175,16 @@ export function EntriesPanel({
     return url ?? null;
   };
 
-  const upload = async (input: HTMLInputElement): Promise<void> => {
+  // Uploads the chosen picture, then hands its URL to `done`
+  const upload = async (
+    input: HTMLInputElement,
+    done: (url: string) => void,
+  ): Promise<void> => {
     const file = input.files?.[0];
     input.value = "";
     const url = file && (await uploadFile(file, "photo"));
     if (url) {
-      setDraft((d) => ({ ...d, photo: url }));
+      done(url);
     }
   };
 
@@ -200,13 +201,13 @@ export function EntriesPanel({
             key={entry.id}
             className="attr-row flex items-center gap-3 px-3 py-2"
           >
-            {thumbOf(entry) ? (
+            {thumbOf(entry, formAttributes) ? (
               <img
                 className={cn(
                   "entry-thumb h-10 shrink-0 rounded-md object-cover",
                   sequence ? "aspect-video" : "w-10",
                 )}
-                src={thumbOf(entry)}
+                src={thumbOf(entry, formAttributes)}
                 alt=""
               />
             ) : (
@@ -288,55 +289,31 @@ export function EntriesPanel({
             onChange={(shots) => setDraft((d) => ({ ...d, shots }))}
           />
         )}
-        <div className="space-y-2" hidden={sequence}>
-          <p className="text-sm font-medium">{blur ? "Image" : "Photo"}</p>
-          {blur && !draft.photo && (
-            <p className="text-sm text-muted-foreground">
-              Players see this image split into nine squares, all blurred but
-              one, and the whole image once the day is over.
-            </p>
-          )}
-          {blur && draft.photo && (
-            <BlurOrderEditor
-              src={draft.photo}
-              order={draft.blurOrder}
-              onChange={(blurOrder) => setDraft((d) => ({ ...d, blurOrder }))}
-            />
-          )}
-          {!blur && draft.photo && (
-            <img
-              id="entry-photo-preview"
-              className="cover-preview size-24 rounded-lg object-cover"
-              src={draft.photo}
-              alt=""
-            />
-          )}
-          <div className="flex flex-wrap gap-2">
-            <input
-              type="file"
-              id="entry-photo"
-              accept={IMAGE_TYPES}
-              className="sr-only"
-              onChange={(event) => void upload(event.target)}
-            />
-            <label
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-              htmlFor="entry-photo"
-            >
-              {blur ? "Choose image" : "Choose photo"}
-            </label>
-            {!blur && (
-              <Button
-                id="entry-photo-remove"
-                variant="ghost"
-                size="sm"
-                onClick={() => setDraft((d) => ({ ...d, photo: "" }))}
-              >
-                Remove photo
-              </Button>
+        {blur && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Image</p>
+            {draft.photo ? (
+              <BlurOrderEditor
+                src={draft.photo}
+                order={draft.blurOrder}
+                onChange={(blurOrder) => setDraft((d) => ({ ...d, blurOrder }))}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Players see this image split into nine squares, all blurred but
+                one, and the whole image once the day is over.
+              </p>
             )}
+            <ImagePicker
+              id="entry-photo"
+              onPick={(input) =>
+                void upload(input, (url) =>
+                  setDraft((d) => ({ ...d, photo: url })),
+                )
+              }
+            />
           </div>
-        </div>
+        )}
         <div id="entry-fields" className="space-y-4 empty:hidden">
           {formAttributes.map((attr) => {
             const id = `entry-attr-${attr.id}`;
@@ -348,14 +325,24 @@ export function EntriesPanel({
               }));
             return (
               <div key={attr.id} className="space-y-2">
-                <Label htmlFor={id}>
-                  {attr.type === "list"
-                    ? `${attr.name} (one per line)`
-                    : attr.type === "number"
-                      ? `${attr.name} (number)`
-                      : attr.name}
-                </Label>
-                {attr.type === "list" ? (
+                {attr.type === "image" ? (
+                  <ImageValue
+                    id={id}
+                    name={attr.name}
+                    src={value}
+                    onPick={(input) => void upload(input, set)}
+                    onRemove={() => set("")}
+                  />
+                ) : (
+                  <Label htmlFor={id}>
+                    {attr.type === "list"
+                      ? `${attr.name} (one per line)`
+                      : attr.type === "number"
+                        ? `${attr.name} (number)`
+                        : attr.name}
+                  </Label>
+                )}
+                {attr.type === "image" ? null : attr.type === "list" ? (
                   <Textarea
                     id={id}
                     required

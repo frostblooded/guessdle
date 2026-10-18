@@ -19,7 +19,8 @@
     "dev": "vite",
     "icons": "node scripts/build-icons.mjs",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build -o storybook-static"
+    "build-storybook": "storybook build -o storybook-static",
+    "prepare": "git config core.hooksPath .githooks || exit 0"
   },
   "engines": {
     "node": ">=24"

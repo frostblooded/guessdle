@@ -1,11 +1,11 @@
 // The guesses under Play's guess box, newest first: a classic game's graded rows under its column
 // titles, or a Blur or Sequence game's names.
-import { BoardRow, GuessRow, TitleTile } from "../../components/board.tsx";
+import { GuessRow, TitleRow } from "../../components/board.tsx";
 import { EmptyState } from "../../components/page.tsx";
 import { BlurGuesses, BlurView } from "../../components/blur-view.tsx";
 import { SequenceView } from "../../components/sequence-view.tsx";
 import type { GameKind } from "../../game/blur.ts";
-import type { GradedAttribute } from "../../game/game.ts";
+import type { BoardColumn, GradedAttribute } from "../../game/game.ts";
 
 // What a Blur or Sequence game shows of the answer: the image with n squares clear (`blur`), or
 // photo n (`shot`). `board` refetches it on a fresh board, `day` names a past day.
@@ -49,27 +49,15 @@ export function PlayResults({
   empty,
 }: {
   rows: readonly GradedAttribute[][];
-  // A classic game's column titles; null for a Blur or Sequence game
-  titles: readonly string[] | null;
+  // A classic game's columns; null for a Blur or Sequence game
+  titles: readonly BoardColumn[] | null;
   loading: boolean;
   loadingText: string;
   empty: boolean;
 }) {
   return (
     <div className="results flex flex-col gap-2 sm:gap-2.5">
-      {titles && (
-        <BoardRow
-          id="guess-results-titles-row"
-          columns={titles.length}
-          aria-hidden="true"
-        >
-          {titles.map((title, i) => (
-            <TitleTile key={i} className="guess-result-title">
-              {title}
-            </TitleTile>
-          ))}
-        </BoardRow>
-      )}
+      {titles && <TitleRow columns={titles} />}
       {loading && <EmptyState id="loading-state">{loadingText}</EmptyState>}
       {empty && (
         <EmptyState id="empty-state">

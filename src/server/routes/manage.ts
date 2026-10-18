@@ -16,17 +16,18 @@ import { requestUser, type SessionUser } from "../auth.ts";
 import type { AttributeType } from "../../game/game.ts";
 import { deleteEntry, listEntries, saveEntry } from "../entries.ts";
 import {
-  createGame,
   editAttributes,
   listAttributes,
-  listOwned,
-  loadRoster,
-  patchKind,
   saveAttributes,
-  skipOf,
-  updateGame,
   type AttributeDraft,
   type AttributeEdit,
+} from "../attributes.ts";
+import {
+  createGame,
+  listOwned,
+  patchKind,
+  skipOf,
+  updateGame,
   type GameRow,
 } from "../games.ts";
 import { rateLimit, type RateLimit } from "../rate-limit.ts";
@@ -152,7 +153,9 @@ export function manageRoutes(
 
   const attrBase = "/api/games/:slug/attributes";
   const typeOf = (v: unknown): AttributeType | undefined =>
-    v === "text" || v === "list" || v === "number" ? v : undefined;
+    v === "text" || v === "list" || v === "number" || v === "image"
+      ? v
+      : undefined;
   const nameOf = (v: unknown): string | undefined =>
     nameIn(v, MAX_ATTRIBUTE_NAME);
   const idOf = (req: Request): number => {
@@ -244,17 +247,8 @@ export function manageRoutes(
   );
 
   // A Sequence game's schedule follows which entries may be the answer (ADR 0020)
-  const reschedule = async (game: GameRow): Promise<void> => {
-    if (game.kind === "sequence") {
-      await rescheduleFuture(
-        pool,
-        game,
-        (await loadRoster(pool, game)).answerIds,
-        todayIn(now(), ctx.timeZone),
-        ctx.random,
-      );
-    }
-  };
+  const reschedule = (game: GameRow): Promise<void> =>
+    rescheduleFuture(pool, game, todayIn(now(), ctx.timeZone), ctx.random);
 
   const entryBase = "/api/games/:slug/entries";
   // Creates (no :id) or changes an entry, then answers with the entry list
@@ -266,24 +260,30 @@ export function manageRoutes(
         ? undefined
         : (await listEntries(pool, game)).find((e) => e.id === id);
     const input = parseEntryInput(bodyOf(req));
-    if (
-      !input ||
-      (id === undefined && !input.name) ||
-      (input.photo !== undefined &&
-        !(await refs.mayAttach(
-          input.photo,
-          current?.photo ?? "",
-          user.id,
-          game.ownerId,
-        ))) ||
-      (input.shots !== undefined &&
-        !(await refs.mayAttachAll(
-          input.shots,
-          current?.shots ?? [],
-          user.id,
-          game.ownerId,
-        )))
-    ) {
+    // Every picture sent, the photo, each Image value and each Sequence shot, with what it replaces
+    const images = (await listAttributes(pool, game))
+      .filter(
+        (a) => a.type === "image" && String(a.id) in (input?.values ?? {}),
+      )
+      .map((a) => ({
+        url: input!.values![String(a.id)]![0] ?? "",
+        current: current?.values[String(a.id)]?.[0] ?? "",
+      }));
+    if (input?.photo !== undefined) {
+      images.push({ url: input.photo, current: current?.photo ?? "" });
+    }
+    for (const url of input?.shots ?? []) {
+      images.push({ url, current: current?.shots?.includes(url) ? url : "" });
+    }
+    const allowed = async (): Promise<boolean> => {
+      for (const { url, current } of images) {
+        if (!(await refs.mayAttach(url, current, user.id, game.ownerId))) {
+          return false;
+        }
+      }
+      return true;
+    };
+    if (!input || (id === undefined && !input.name) || !(await allowed())) {
       fail(res, "invalid");
       return;
     }

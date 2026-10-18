@@ -1,11 +1,13 @@
 // Entry editing (spec #66): add, change and soft-delete the entries of one game.
 import type pg from "pg";
 import { parseNumberValue } from "../game/number.ts";
-import { listAttributes, type GameRow } from "./games.ts";
+import { listAttributes } from "./attributes.ts";
+import type { GameRow } from "./games.ts";
 
 export interface EntryRow {
   id: number;
   name: string;
+  // Blur games only: the entry's image (a classic entry's pictures are Image values)
   photo: string;
   // Attribute id to its items (Text has at most one; empty means no value)
   values: Record<string, string[]>;
@@ -50,12 +52,13 @@ export interface EntryInput {
   shots?: string[];
 }
 
-// Creates the entry (`id` undefined) or changes it. Every attribute needs a value once saved,
-// from the input or already stored; Number values are stored as parseNumberValue gives them.
-// A Blur game's entry instead needs its photo and a complete square order, sent or stored. A
-// Sequence entry needs only its name: one missing photos just cannot be the answer.
+// Creates the entry (`id` undefined) or changes it. Every attribute but Image needs a value once
+// saved, from the input or already stored; Number values are stored as parseNumberValue gives
+// them, an Image value is one upload URL. A Blur game's entry instead needs its photo and a
+// complete square order, sent or stored; only a Blur entry has a photo. A Sequence entry needs
+// only its name: one missing photos just cannot be the answer.
 // Runs in the caller's game transaction (lifecycle.edit), which applies the status rule.
-// `replaced` are the files the caller should release.
+// `replaced` lists the files the edit stopped using, for the caller to release.
 export async function saveEntry(
   tx: pg.PoolClient,
   game: GameRow,
@@ -118,8 +121,11 @@ export async function saveEntry(
   );
   const filled = (attrId: string): boolean =>
     attrId in values ? values[attrId]!.length > 0 : stored.has(attrId);
-  if (!attrs.every((a) => filled(String(a.id)))) {
+  if (!attrs.every((a) => a.type === "image" || filled(String(a.id)))) {
     return "missing_values";
+  }
+  if (game.kind !== "blur" && input.photo !== undefined) {
+    return "invalid";
   }
   if (game.kind === "blur") {
     const order = input.blurOrder ?? current?.blurOrder ?? null;
@@ -153,6 +159,17 @@ export async function saveEntry(
       input.blurOrder,
     ]);
   }
+  const images = attrs
+    .filter((a) => a.type === "image" && String(a.id) in values)
+    .map((a) => a.id);
+  const replaced = (
+    await tx.query<{ value: string }>(
+      `select value from entry_values where entry_id = $1 and attribute_id = any($2::bigint[])`,
+      [entryId, images],
+    )
+  ).rows
+    .map((r) => r.value)
+    .filter((url) => !Object.values(values).some((v) => v.includes(url)));
   for (const [attrId, items] of Object.entries(values)) {
     await tx.query(
       "delete from entry_values where entry_id = $1 and attribute_id = $2",
@@ -168,12 +185,15 @@ export async function saveEntry(
   const after = new Set([photo, ...shots]);
   return {
     id: entryId,
-    replaced: before.filter((url) => url !== "" && !after.has(url)),
+    replaced: [
+      ...replaced,
+      ...before.filter((url) => url !== "" && !after.has(url)),
+    ],
   };
 }
 
 // Soft delete: the entry leaves autocomplete and draws, past guesses and history still resolve.
-// Its photo stays: history still shows it and the nightly sweep counts it as referenced.
+// Its pictures stay: history still shows them and the nightly sweep counts it as referenced.
 export async function deleteEntry(
   q: Pick<pg.Pool, "query">,
   game: GameRow,

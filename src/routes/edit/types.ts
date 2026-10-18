@@ -5,7 +5,7 @@ import { hasAllShots } from "../../game/sequence.ts";
 export interface Attribute {
   id: number;
   name: string;
-  type: "text" | "list" | "number";
+  type: "text" | "list" | "number" | "image";
 }
 
 export interface Entry {
@@ -33,8 +33,21 @@ export const isIncomplete = (
     ? !hasAllShots(entry.shots ?? [], tries)
     : kind === "blur"
       ? !entry.photo || !entry.blurOrder
-      : attributes.some((attr) => !entry.values[String(attr.id)]?.length);
+      : attributes.some(
+          (attr) =>
+            attr.type !== "image" && !entry.values[String(attr.id)]?.length,
+        );
 
-// The entry's picture in the editor list: its photo, or a Sequence entry's first photo
-export const thumbOf = (entry: Entry): string =>
-  entry.shots?.find((shot) => shot !== "") ?? entry.photo;
+// The entry's picture in the editor list: a Blur entry's image, a Sequence entry's first photo,
+// a classic entry's first Image value
+export const thumbOf = (
+  entry: Entry,
+  attributes: readonly Attribute[],
+): string =>
+  entry.shots?.find((shot) => shot !== "") ??
+  (entry.photo ||
+    (attributes
+      .filter((attr) => attr.type === "image")
+      .map((attr) => entry.values[String(attr.id)]?.[0])
+      .find(Boolean) ??
+      ""));

@@ -30,7 +30,7 @@ export function EntriesLede({
         <>
           Each entry is a row on the board. A game needs at least {MIN_ENTRIES}{" "}
           entries before anyone can play it, and every entry needs a value for
-          every attribute.
+          every attribute except pictures, which may stay empty.
         </>
       )}
     </p>

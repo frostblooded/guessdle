@@ -1,7 +1,7 @@
 // Stored Daily Answers: one row per calendar date in the server time zone.
 import type pg from "pg";
 import type { GameRow } from "./games.ts";
-import { skipOf } from "./games.ts";
+import { loadRoster, skipOf } from "./games.ts";
 import { dateOfDay } from "../game/date.ts";
 
 const LOCK_KEY = 5_150_002; // arbitrary; serialises answer generation per game across API replicas
@@ -396,15 +396,19 @@ export function redrawFuture(
 
 // After a Sequence game's entries or photo count changed (ADR 0020): overrides after `today`
 // whose entry can no longer be the answer are cleared, and every generated day after `today` is
-// re-drawn over `ids`, so a newly complete entry comes up next. Today and the past stay.
-export function rescheduleFuture(
+// re-drawn over the entries that may be the answer, so a newly complete entry comes up next.
+// Today and the past stay. Other kinds keep their schedule.
+export async function rescheduleFuture(
   pool: pg.Pool,
   game: GameRow,
-  ids: readonly number[],
   today: string,
   random: () => number,
 ): Promise<void> {
-  return locked(pool, game, async (client) => {
+  if (game.kind !== "sequence") {
+    return;
+  }
+  const ids = (await loadRoster(pool, game)).answerIds;
+  await locked(pool, game, async (client) => {
     await client.query(
       `update daily_answers set source = 'generated'
        where game_id = $1 and day > $2 and source = 'override' and not (entry_id = any($3::bigint[]))`,

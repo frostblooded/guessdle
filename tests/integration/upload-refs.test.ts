@@ -60,12 +60,30 @@ describe("upload references", () => {
     ),
     (await findGame(db.pool, slug))!
   );
-  const entry = (slug: string, photo: string, deleted = false) =>
-    db.pool.query(
+  // An entry using `photo` as its photo (as a Blur entry does), or with `image` as an Image value
+  const entry = async (
+    slug: string,
+    photo: string,
+    deleted = false,
+    image = false,
+  ): Promise<void> => {
+    const { rows } = await db.pool.query<{ id: number }>(
       `insert into entries (game_id, name, photo_url, deleted_at)
-       select id, $2, $2, case when $3 then now() end from games where slug = $1`,
-      [slug, photo, deleted],
+       select id, $2, $3, case when $4 then now() end from games where slug = $1
+       returning id::int`,
+      [slug, photo, image ? "" : photo, deleted],
     );
+    if (image) {
+      await db.pool.query(
+        `with a as (
+           insert into attributes (game_id, name, type, position)
+           select id, $2, 'image', 0 from games where slug = $1 returning id)
+         insert into entry_values (entry_id, attribute_id, position, value)
+         select $3, a.id, 0, $2 from a`,
+        [slug, photo, rows[0]!.id],
+      );
+    }
+  };
   const left = async (): Promise<string[]> => (await readdir(dir)).sort();
   const rows = async (): Promise<number> =>
     (await db.pool.query("select 1 from uploads")).rowCount!;
@@ -97,7 +115,8 @@ describe("upload references", () => {
     const owner = await user("o@x.test");
     const admin = await user("adm@x.test");
     const shared = await file(owner);
-    // g1 and g2 both use `shared`; each also has a private cover and photo
+    // g1 and g2 both use `shared`; each also has a private cover and picture (g1's as Image
+    // values, g2's as photos)
     const [c1, p1, c2, p2] = [
       await file(owner),
       await file(owner),
@@ -106,8 +125,8 @@ describe("upload references", () => {
     ];
     const g1 = await game("one", owner, c1);
     await game("two", owner, c2);
-    await entry("one", shared);
-    await entry("one", p1);
+    await entry("one", shared, false, true);
+    await entry("one", p1, false, true);
     await entry("two", shared);
     await entry("two", p2, true);
 

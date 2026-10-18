@@ -14,7 +14,9 @@ import ati from "../../howto/ati.jpg";
 import cookie from "../../howto/cookie.jpg";
 import eddie from "../../howto/eddie.jpg";
 
-const TITLES = ["Photo", "Name", "Colors", "Owners"];
+const TITLES = ["Name", "Photo", "Colors", "Owners"];
+// The example game's Photo is an Image column, right after Name
+const IMAGES = TITLES.map((title) => title === "Photo");
 
 type Example = [photo: string, name: string, ...cells: [string, string][]];
 
@@ -72,8 +74,8 @@ const STEPS: { title: string; text: ReactNode; example: Example | null }[] = [
     ],
   },
   {
-    title: "5. Photo is a hint",
-    text: "The photo never changes color. Use it to remember who is who. A new pet appears every day. Guess Ati and the whole row turns green: you win!",
+    title: "5. Pictures are a hint",
+    text: "Picture columns never change color. Use it to remember who is who. A new pet appears every day. Guess Ati and the whole row turns green: you win!",
     example: [
       ati,
       "Ati",
@@ -89,7 +91,7 @@ function ExampleRows({ example }: { example: Example | null }) {
   return (
     <div className="mt-4 space-y-1.5">
       <BoardRow
-        columns={4}
+        images={IMAGES}
         className="help-example help-head"
         aria-hidden="true"
       >
@@ -98,20 +100,20 @@ function ExampleRows({ example }: { example: Example | null }) {
         ))}
       </BoardRow>
       {example ? (
-        <BoardRow columns={4} className="help-example">
-          <PhotoTile src={photo!} alt={name!} />
-          {cells.map(([grade, text]) => (
+        <BoardRow images={IMAGES} className="help-example">
+          {cells.map(([grade, text], i) => [
             <GradeTile key={text} grade={grade}>
               {text}
-            </GradeTile>
-          ))}
+            </GradeTile>,
+            i === 0 && <PhotoTile key="photo" src={photo!} alt={name!} />,
+          ])}
         </BoardRow>
       ) : (
         <BoardRow
-          columns={4}
+          images={IMAGES}
           className="help-example"
           role="img"
-          aria-label="The secret pet: photo, name, colors and owners are all hidden"
+          aria-label="The secret pet: name, photo, colors and owners are all hidden"
         >
           {TITLES.map((title) => (
             <div
