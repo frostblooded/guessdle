@@ -58,6 +58,7 @@ ADR 0016. Pure rules in `src/game/party.ts` (codes, nicknames, ranking, Placemen
 - Rate limits: nginx and `src/server/rate-limit.ts`. `/api/test/login` exists only with `NODE_ENV=test`.
 - Migrations: `db/migrations/*.sql`, applied at startup.
 - Deploy, env keys, backups: `docs/deploy.md`.
+- Site icon: `icons/favicon.svg` is the source (four result tiles, the last a `?`). `npm run icons` (`scripts/build-icons.mjs`, Playwright) renders `favicon.ico` (16/32/48) and `icons/apple-touch-icon.png`; commit all three. `index.html` links them, so Vite hashes them into `dist/assets/`; the root `favicon.ico` is also served for browsers that ask for it directly.
 
 ## Tests
 
