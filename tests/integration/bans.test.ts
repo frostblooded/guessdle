@@ -100,7 +100,7 @@ describe("admin bans", () => {
     await rm(uploadsDir, { recursive: true, force: true });
   });
   beforeEach(async () => {
-    // Petdle survives the user wipe (owner rows cascade to games)
+    // The seeded game survives the user wipe (owner rows cascade to games)
     await db.pool.query("update games set owner_id = null");
     await db.pool.query("delete from game_results");
     await db.pool.query("delete from users");
@@ -108,7 +108,7 @@ describe("admin bans", () => {
     ann = await login("ann@x.test");
     sam = await login("sam@x.test");
     annId = await idOf("ann@x.test");
-    // Ann owns Petdle, an approved playable game
+    // Ann owns the seeded game, approved and playable
     await db.pool.query("update games set owner_id = $1 where slug = $2", [
       annId,
       GAME,
