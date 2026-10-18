@@ -58,7 +58,7 @@ export function GuessBox({
       <Input
         {...getInputProps({
           disabled,
-          placeholder: "Guess a name...",
+          placeholder: "Enter your guess here",
           autoComplete: "off",
           autoCapitalize: "off",
           spellCheck: false,

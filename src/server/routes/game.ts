@@ -46,7 +46,8 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
   });
 
   // What a player needs to render the game: its attributes and active entries. A Blur game's
-  // entries go without photos: those are its answers (ADR 0019).
+  // entries go without photos: those are its answers (ADR 0019). A classic game's carry their values
+  // for the selection list.
   app.get(base, async (req, res) => {
     res.set("Cache-Control", "no-store");
     const loaded = await loadGame(ctx, req, res);
@@ -72,11 +73,11 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       attributes: roster.attributes,
       // Some entries miss values: nobody can play until they are filled in
       paused: roster.incomplete > 0,
-      entries: roster.entries.map(({ id, name, photo }) => ({
-        id,
-        name,
-        photo: game.kind === "blur" ? "" : photo,
-      })),
+      entries: roster.entries.map(({ id, name, photo, values }) =>
+        game.kind === "blur"
+          ? { id, name, photo: "" }
+          : { id, name, photo, values },
+      ),
     });
   });
 

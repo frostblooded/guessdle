@@ -16,11 +16,13 @@ export interface GameAttribute {
   type: AttributeType;
 }
 
-// What the client knows of an entry: enough to autocomplete and show a photo
+// What the client knows of an entry: enough to autocomplete and show a photo, and a classic
+// game sends its values too for the selection list
 export interface EntryRef {
   id: number;
   name: string;
   photo: string;
+  values?: AttributeValue[];
 }
 
 // An entry with its values, one per game attribute in attribute order (Text and

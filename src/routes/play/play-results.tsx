@@ -48,8 +48,8 @@ export function PlayResults({
       {empty && (
         <EmptyState id="empty-state">
           {titles
-            ? "No guesses yet. Start typing a name above, then pick one."
-            : "No guesses yet. Look at the picture, then type a name above."}
+            ? "No guesses yet. Guess any name above to start."
+            : "No guesses yet. Look at the picture, then guess a name above."}
         </EmptyState>
       )}
       {titles ? (

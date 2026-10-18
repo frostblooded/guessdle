@@ -11,7 +11,12 @@ const TILE_COLORS: Record<string, string> = {
   incorrect: "bg-incorrect",
 };
 
-// A grid row: the photo column, then one equal column per name and attribute
+// The board grid: the photo column, then one equal column per name and attribute
+export const boardColumns = (columns: number): CSSProperties => ({
+  gridTemplateColumns: `var(--photo) repeat(${columns - 1}, minmax(0, 1fr))`,
+});
+
+// A grid row of the board
 export function BoardRow({
   columns,
   className,
@@ -24,10 +29,7 @@ export function BoardRow({
         "row grid gap-1.5 [--photo:3rem] sm:gap-2 sm:[--photo:4.5rem]",
         className,
       )}
-      style={{
-        gridTemplateColumns: `var(--photo) repeat(${columns - 1}, minmax(0, 1fr))`,
-        ...style,
-      }}
+      style={{ ...boardColumns(columns), ...style }}
       {...props}
     />
   );

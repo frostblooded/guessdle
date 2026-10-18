@@ -23,7 +23,7 @@ import type { Play } from "../../game/play.ts";
 import type { GameKind } from "../../game/blur.ts";
 import { browserFetch, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
-import { GuessBox } from "./guess-box.tsx";
+import { GuessPanel, useGuessMode } from "./guess-panel.tsx";
 import {
   GameNotFound,
   NoSuchDay,
@@ -34,6 +34,7 @@ import { boardUrl, PlayResults } from "./play-results.tsx";
 import { PlayActions, PlayStatus, type StatusView } from "./play-status.tsx";
 import { ResetDialog } from "./reset-dialog.tsx";
 import { ResultBanner, resultOf, type Result } from "./result-banner.tsx";
+import { SelectList } from "./select-list.tsx";
 import { StatsDialog } from "./stats-dialog.tsx";
 import { useVictoryStats } from "./use-victory-stats.ts";
 
@@ -101,6 +102,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const submitting = useRef(false);
   const opener = useRef<HTMLButtonElement | null>(null);
   const victory = useVictoryStats(slug, play);
+  const modes = useGuessMode();
 
   const playable = typeof game === "object" ? game : null;
   // Why the game could not be loaded
@@ -201,6 +203,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
       return;
     }
     setGuess("");
+    modes.setSelecting(false);
     if (res.kind === "duplicate") {
       return;
     }
@@ -273,9 +276,8 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const used = new Set(rows.map((row) => nameCell(row).value));
   const blur = playable?.kind === "blur" ? (playable.blurTries ?? 1) : null;
   const wrong = rows.filter((row) => !isAnswerRow(row)).length;
-  const names = roster
-    .map((entry) => entry.name)
-    .filter((name) => !used.has(name));
+  const unguessed = roster.filter((entry) => !used.has(entry.name));
+  const names = unguessed.map((entry) => entry.name);
   const titles = [
     "Photo",
     "Name",
@@ -352,26 +354,16 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
           />
         )}
         <Card className="play-card mb-6 gap-3 p-4 sm:p-5">
-          <div
-            id="new-guess-row"
-            className="guess-row flex gap-2"
-            hidden={finished}
-          >
-            <GuessBox
+          <div className="flex flex-col gap-3" hidden={finished}>
+            <GuessPanel
+              modes={modes}
               names={names}
               value={guess}
               onChange={setGuess}
               onSubmit={(name) => void submit(name)}
               disabled={cannotPlay}
+              guessDisabled={cannotPlay || loading}
             />
-            <Button
-              id="submit-new-guess-button"
-              className="h-11 px-5 font-bold uppercase"
-              disabled={cannotPlay || loading}
-              onClick={() => void submit(guess)}
-            >
-              Guess
-            </Button>
           </div>
           <div
             className="game-actions flex flex-wrap justify-center gap-2"
@@ -411,13 +403,25 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
           onConfirm={() => void reset()}
           opener={opener}
         />
-        <PlayResults
-          rows={rows}
-          titles={blur === null ? titles : null}
-          loading={isPending || loading}
-          loadingText={past ? "Loading the game…" : "Loading today's game…"}
-          empty={ready && rows.length === 0}
-        />
+        {modes.selecting && !finished && !cannotPlay ? (
+          <SelectList
+            entries={unguessed.map((entry) => ({
+              ...entry,
+              values: entry.values ?? [],
+            }))}
+            attributes={blur === null ? (playable?.attributes ?? []) : []}
+            photos={blur === null}
+            onPick={(name) => void submit(name)}
+          />
+        ) : (
+          <PlayResults
+            rows={rows}
+            titles={blur === null ? titles : null}
+            loading={isPending || loading}
+            loadingText={past ? "Loading the game…" : "Loading today's game…"}
+            empty={ready && rows.length === 0}
+          />
+        )}
       </section>
     </>
   );
