@@ -34,7 +34,10 @@ export async function api<T = Record<string, unknown>>(
 export const signInThen = (path: string): void =>
   location.replace(`/login?next=${encodeURIComponent(path)}`);
 
-export const errorText = (reply: Reply | null): string =>
+export const errorText = (reply: Reply<unknown> | null): string =>
   reply === null
     ? "Could not reach the server. Check your connection and try again."
-    : failureText(reply.data["error"], reply.status);
+    : failureText(
+        (reply.data as Record<string, unknown> | null)?.["error"],
+        reply.status,
+      );

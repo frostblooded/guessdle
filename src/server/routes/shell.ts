@@ -1,4 +1,4 @@
-// The game page shell (/g/<slug>) with the game's link-preview meta injected.
+// The app shell (index.html) served at /g/<slug> with the game's link-preview meta injected.
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Express, Request } from "express";
@@ -53,8 +53,9 @@ export function shellRoutes(
       tags.push("<title>Game not found - Guessdle</title>");
       tags.push(meta("name", "robots", "noindex"));
     }
-    const html = (await readFile(join(shellDir, "game.html"), "utf8")).replace(
-      "<title>Guessdle</title>",
+    // The game's own title and description replace the site-wide ones
+    const html = (await readFile(join(shellDir, "index.html"), "utf8")).replace(
+      /<title>Guessdle<\/title>\s*<meta\s+name="description"[^>]*>/,
       () => tags.join("\n    "),
     );
     res
