@@ -1,6 +1,7 @@
 // Draws a party view: the scoreboard, the podium and the finished rounds.
 import { correctnessClass } from "./game/correctness.ts";
 import {
+  clockTime,
   ordinal,
   progressLabel,
   type FinishedRound,
@@ -86,7 +87,7 @@ export function renderPodium(view: PartyView): HTMLElement[] {
     });
 }
 
-// One finished round: its answer, then each player's place, points and guesses
+// One finished round: its answer, then each player's place, points, guesses and solve time
 function renderRound(view: PartyView, round: FinishedRound): HTMLElement {
   const card = el("article", "card party-round");
   const head = el("div", "party-round-head");
@@ -107,7 +108,7 @@ function renderRound(view: PartyView, round: FinishedRound): HTMLElement {
     const row = el("li", "party-result");
     const place = result.place === null ? "–" : ordinal(result.place);
     const outcome = result.solved
-      ? `${result.guesses} ${result.guesses === 1 ? "guess" : "guesses"}`
+      ? `${result.guesses} ${result.guesses === 1 ? "guess" : "guesses"} in ${clockTime(result.timeMs!)}`
       : result.gaveUp
         ? "Gave up"
         : "Did not solve";

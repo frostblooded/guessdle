@@ -378,6 +378,18 @@ export function ordinal(n: number): string {
   return `${n}${suffix}`;
 }
 
+// A solve time as a clock: 0:07, 1:23, 1:02:03
+export function clockTime(ms: number): string {
+  const total = Math.floor(ms / 1000);
+  const [h, m, sec] = [
+    Math.floor(total / 3600),
+    Math.floor(total / 60) % 60,
+    total % 60,
+  ];
+  const pad = (n: number): string => String(n).padStart(2, "0");
+  return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
+}
+
 // How a player is doing in the live round, as the scoreboard says it
 export function progressLabel(p: Omit<Progress, "timeMs">): string {
   const count = `${p.guesses} ${p.guesses === 1 ? "guess" : "guesses"}`;
