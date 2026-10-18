@@ -4,7 +4,7 @@ import { normalizeCode } from "../../game/party.ts";
 import { CodeForm, HostForm } from "./party-forms.tsx";
 import { PartyRoom } from "./party-room.tsx";
 
-export function PartyPage() {
+function PartyScreen() {
   const { code: raw } = useParams();
   const [params] = useSearchParams();
   const host = params.get("host");
@@ -17,4 +17,13 @@ export function PartyPage() {
     );
   }
   return host === null ? <CodeForm /> : <HostForm slug={host} />;
+}
+
+// A phone-first page: kept narrow on wide screens
+export function PartyPage() {
+  return (
+    <div className="mx-auto max-w-3xl">
+      <PartyScreen />
+    </div>
+  );
 }
