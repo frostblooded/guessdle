@@ -18,8 +18,14 @@
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
     "types": ["vite/client"],
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    ".storybook/*.ts",
+    ".storybook/*.tsx"
+  ],
   "exclude": ["src/server"]
 }

@@ -6,3 +6,4 @@ tests/playwright-report
 tests/fixtures
 package-lock.json
 howto
+storybook-static
