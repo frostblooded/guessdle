@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "../../components/ui/table.tsx";
 import { getJson } from "../../lib/api.ts";
+import { useDelayed } from "../../lib/use-delayed.ts";
 import { api } from "../../manage-client.ts";
 
 interface QueueItem {
@@ -35,12 +36,15 @@ export function QueuePanel({ active }: { active: boolean }) {
   });
   const [failed, setFailed] = useState(false);
   const games = queue.data?.games ?? [];
+  const slow = useDelayed(queue.isPending);
   const message = queue.isError
     ? LOAD_FAILED
     : failed
       ? ACT_FAILED
       : queue.isPending
-        ? "Loading the queue…"
+        ? slow
+          ? "Loading the queue…"
+          : null
         : games.length === 0
           ? "No games are waiting."
           : null;
