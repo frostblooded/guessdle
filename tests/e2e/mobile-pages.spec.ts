@@ -63,3 +63,23 @@ test("the gallery, Create, My games and the editor fit a 320px phone", async ({
   await onScreen(page.locator("#mine > *").first());
   await noSidewaysScroll(page);
 });
+
+test("Settings fits a 320px phone and keeps a switch turned off", async ({
+  page,
+}) => {
+  await page.request.post("/api/test/login", {
+    data: { email: `settings-${unique()}@example.test` },
+  });
+  await page.goto("/");
+  await page.locator("#user-menu-button").click();
+  await page.locator("#settings-link").click();
+  await expect(page).toHaveURL(/\/settings$/);
+  const review = page.locator("#mail-review");
+  await onScreen(page.locator("#mail-all"), review);
+  await noSidewaysScroll(page);
+  await expect(review).toHaveAttribute("aria-checked", "true");
+  await review.click();
+  await expect(review).toHaveAttribute("aria-checked", "false");
+  await page.reload();
+  await expect(review).toHaveAttribute("aria-checked", "false");
+});
