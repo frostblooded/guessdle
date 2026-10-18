@@ -5,11 +5,16 @@ import { BoardRow, GuessRow, TitleTile } from "../../components/board.tsx";
 import { BlurGuesses, BlurView } from "../../components/blur-view.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
-import { findEntryId, isAnswerRow, nameCell } from "../../game/game.ts";
-import type { HintKind } from "../../game/free-hint.ts";
+import {
+  findEntryId,
+  guessedNames,
+  isAnswerRow,
+  SKIP,
+} from "../../game/game.ts";
 import type { LiveRound, PartyView } from "../../game/party.ts";
+import { GuessForm } from "../play/guess-form.tsx";
+import type { HintKind } from "../../game/free-hint.ts";
 import { FreeHintCard } from "../play/free-hint.tsx";
-import { GuessBox } from "../play/guess-box.tsx";
 import { AnswerDescription } from "../play/result-banner.tsx";
 
 type Board = NonNullable<LiveRound["yours"]>;
@@ -35,7 +40,7 @@ export function PartyRound({
   const [guess, setGuess] = useState("");
   const entries = view.game.entries;
   const done = mine.solved || mine.gaveUp || mine.lost;
-  const used = new Set(mine.rows.map((row) => nameCell(row).value));
+  const used = guessedNames(mine.rows);
   const blur = view.game.kind === "blur" ? (view.game.blurTries ?? 1) : null;
   const newestFirst = [...mine.rows].reverse();
   const names = entries.map((e) => e.name).filter((name) => !used.has(name));
@@ -106,22 +111,13 @@ export function PartyRound({
       )}
       {!done && (
         <Card id="guess-card" className="play-card mb-6 gap-3 p-4 sm:p-5">
-          <div id="new-guess-row" className="guess-row flex gap-2">
-            <GuessBox
-              names={names}
-              value={guess}
-              onChange={setGuess}
-              onSubmit={submit}
-              disabled={false}
-            />
-            <Button
-              id="submit-new-guess-button"
-              className="h-11"
-              onClick={() => submit(guess)}
-            >
-              Guess
-            </Button>
-          </div>
+          <GuessForm
+            names={names}
+            value={guess}
+            onChange={setGuess}
+            onSubmit={submit}
+            onSkip={blur === null ? undefined : () => onGuess(SKIP)}
+          />
           <div className="game-actions flex justify-end">
             <Button
               id="give-up-button"

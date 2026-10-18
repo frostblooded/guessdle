@@ -14,6 +14,8 @@ import {
 import {
   gradeGuess,
   nameCell,
+  SKIP,
+  skippedRow,
   type Entry,
   type EntryRef,
   type GameAttribute,
@@ -294,7 +296,14 @@ export function partyView(input: ViewInput): PartyView {
     round.guesses
       .filter((g) => g.playerId === playerId)
       .map((g) =>
-        gradeGuess(attributes, entry(round.answerId), entry(g.entryId), kind),
+        g.entryId === SKIP && kind === "blur"
+          ? skippedRow()
+          : gradeGuess(
+              attributes,
+              entry(round.answerId),
+              entry(g.entryId),
+              kind,
+            ),
       );
   const latest = rounds.at(-1);
   const me = players.find((p) => p.id === viewer);

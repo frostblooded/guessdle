@@ -17,6 +17,21 @@ const base: Details = {
 };
 
 describe("statusNotice", () => {
+  it("asks a Blur game for one entry only", () => {
+    assert.match(
+      statusNotice({ ...base, kind: "blur", entryCount: 0 }),
+      /needs 1 more entry/,
+    );
+    assert.doesNotMatch(
+      statusNotice({ ...base, kind: "blur", entryCount: 1 }),
+      /more entr/,
+    );
+    assert.match(
+      statusNotice({ ...base, entryCount: 1 }),
+      /needs 1 more entry/,
+    );
+  });
+
   it("says nothing for an approved game", () => {
     assert.equal(statusNotice({ ...base, status: "approved" }), "");
     assert.equal(

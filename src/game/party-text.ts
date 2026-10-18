@@ -43,7 +43,7 @@ export const REFUSAL_TEXT: Record<PartyRefusal, string> = {
   finished: "You are done with this round. Wait for the next one.",
   duplicate: "You already guessed that one.",
   party_ended: "This party has ended.",
-  not_enough_entries: `This game needs at least ${MIN_ENTRIES} entries before a round can start.`,
+  not_enough_entries: `This game needs at least ${MIN_ENTRIES} entries (one for a Blur game) before a round can start.`,
   game_paused:
     "This game is paused while some of its entries are missing values.",
   no_hint: "No free hint is available right now.",

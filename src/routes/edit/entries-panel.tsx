@@ -181,14 +181,19 @@ export function EntriesPanel({
     <div className="space-y-5">
       {dialog}
       <p className="lede text-sm text-muted-foreground">
-        {blur
-          ? "Each entry is one possible answer."
-          : "Each entry is a row on the board."}{" "}
-        A game needs at least {MIN_ENTRIES} entries before anyone can play it,
-        and every entry needs{" "}
-        {blur
-          ? "an image and the order its nine squares clear in."
-          : "a value for every attribute."}
+        {blur ? (
+          <>
+            Each entry is one possible answer. A Blur game plays with a single
+            entry, and every entry needs an image and the order its nine squares
+            clear in.
+          </>
+        ) : (
+          <>
+            Each entry is a row on the board. A game needs at least{" "}
+            {MIN_ENTRIES} entries before anyone can play it, and every entry
+            needs a value for every attribute.
+          </>
+        )}
       </p>
       <ul
         id="entry-list"

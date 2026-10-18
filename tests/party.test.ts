@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { Correctness } from "../src/game/correctness.ts";
-import type { Entry } from "../src/game/game.ts";
+import { SKIP, type Entry } from "../src/game/game.ts";
 import {
   cleanNickname,
   drawAnswer,
@@ -374,6 +374,20 @@ describe("Blur game rounds", () => {
         [2, 2, false],
         [1, 0, true],
       ],
+    );
+  });
+
+  it("counts a skip as a try, shown as a skipped row", () => {
+    const live = round({
+      endedAt: null,
+      tries: 2,
+      guesses: [g(1, SKIP, 1100), g(1, 3, 1200)],
+    });
+    const ana = view([live], 1).round!.yours!;
+    assert.equal(ana.lost, true);
+    assert.deepEqual(
+      ana.rows.map((row) => row[0]!.key),
+      ["skip", "name"],
     );
   });
 

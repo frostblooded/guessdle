@@ -11,22 +11,22 @@ import { Card } from "../../components/ui/card.tsx";
 import { FAILURES, failureText, UNREACHABLE } from "../../game/failures.ts";
 import {
   findEntryId,
+  guessedNames,
+  SKIP,
   isAnswerRow,
-  nameCell,
   type EntryRef,
   type GameAttribute,
   type GradedAttribute,
 } from "../../game/game.ts";
-import { MIN_ENTRIES } from "../../game/limits.ts";
 import { openPlay } from "../../game/open-play.ts";
 import type { Play } from "../../game/play.ts";
-import type { GameKind } from "../../game/blur.ts";
+import { minEntriesOf, type GameKind } from "../../game/blur.ts";
 import { browserFetch, gameKey, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { FreeHintCard } from "./free-hint.tsx";
 import { useFreeHint } from "./use-free-hint.ts";
 import { noticeOf, RATE_LIMITED } from "./notice.ts";
-import { GuessBox } from "./guess-box.tsx";
+import { GuessForm } from "./guess-form.tsx";
 import {
   GameNotFound,
   NoSuchDay,
@@ -106,7 +106,8 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const gameFailure =
     typeof game === "string" && game !== "missing" ? game : null;
   const roster = playable?.entries ?? [];
-  const tooSmall = playable !== null && roster.length < MIN_ENTRIES;
+  const tooSmall =
+    playable !== null && roster.length < minEntriesOf(playable.kind);
   // Not playable for now: too few entries, or paused
   const closed = tooSmall || playable?.paused === true;
   // A past day the game has; today's and later Day Numbers are handled below
@@ -184,7 +185,14 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
 
   async function submit(name: string): Promise<void> {
     const id = findEntryId(roster, name);
-    if (id === null || submitting.current || !play.current) {
+    if (id !== null) {
+      await submitId(id);
+    }
+  }
+
+  // Sends a guess by entry id, or SKIP
+  async function submitId(id: number): Promise<void> {
+    if (submitting.current || !play.current) {
       return;
     }
     submitting.current = true;
@@ -192,11 +200,13 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
       submitting.current = false;
     });
     setNotice(noticeOf(res));
-    // The typed guess stays when the server could not grade it, to retry
+    // The typed guess stays when the server could not grade it, to retry, and on a skip
     if (res.kind !== "accepted" && res.kind !== "duplicate") {
       return;
     }
-    setGuess("");
+    if (id !== SKIP) {
+      setGuess("");
+    }
     if (res.kind === "duplicate") {
       return;
     }
@@ -260,7 +270,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const loading = !cannotPlay && !ready;
   const finished = result !== null;
   // Each row names its guess; those names leave the suggestions
-  const used = new Set(rows.map((row) => nameCell(row).value));
+  const used = guessedNames(rows);
   const blur = playable?.kind === "blur" ? (playable.blurTries ?? 1) : null;
   const wrong = rows.filter((row) => !isAnswerRow(row)).length;
   const names = roster
@@ -342,27 +352,16 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
           />
         )}
         <Card className="play-card mb-6 gap-3 p-4 sm:p-5">
-          <div
-            id="new-guess-row"
-            className="guess-row flex gap-2"
+          <GuessForm
+            names={names}
+            value={guess}
+            onChange={setGuess}
+            onSubmit={(name) => void submit(name)}
+            onSkip={blur === null ? undefined : () => void submitId(SKIP)}
+            disabled={cannotPlay}
+            busy={loading}
             hidden={finished}
-          >
-            <GuessBox
-              names={names}
-              value={guess}
-              onChange={setGuess}
-              onSubmit={(name) => void submit(name)}
-              disabled={cannotPlay}
-            />
-            <Button
-              id="submit-new-guess-button"
-              className="h-11 px-5 font-bold uppercase"
-              disabled={cannotPlay || loading}
-              onClick={() => void submit(guess)}
-            >
-              Guess
-            </Button>
-          </div>
+          />
           <div
             className="game-actions flex flex-wrap justify-center gap-2"
             hidden={!finished}
