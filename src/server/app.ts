@@ -16,6 +16,7 @@ import { createPartyHub, type PartyHub } from "./party-hub.ts";
 import { shellRoutes } from "./routes/shell.ts";
 import { uploadRoutes } from "./routes/uploads.ts";
 import { blurRoutes } from "./routes/blur.ts";
+import { playlistRoutes } from "./routes/playlists.ts";
 import { tutorialRoutes } from "./routes/tutorial.ts";
 
 export interface AppDeps {
@@ -110,6 +111,7 @@ export function createApp({
   answersRoutes(app, ctx);
   partyRoutes(app, ctx, hub);
   blurRoutes(app, ctx, uploadsDir);
+  playlistRoutes(app, ctx, writeLimit);
   tutorialRoutes(app, ctx);
   shellRoutes(app, ctx, shellDir);
 
