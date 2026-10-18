@@ -13,6 +13,9 @@ export interface SessionUser {
   name: string;
   email: string;
   admin: boolean;
+  // Banned by an admin: still signs in and plays, but cannot create or change games
+  banned: boolean;
+  banReason: string;
 }
 
 export function adminEmailsFromEnv(value: string | undefined): string[] {
@@ -33,7 +36,7 @@ export async function upsertUser(
   const { rows } = await pool.query<SessionUser>(
     `insert into users (email, name, admin) values (lower($1), $2, $3)
      on conflict (lower(email)) do update set admin = users.admin or excluded.admin
-     returning id::int, name, email, admin`,
+     returning id::int, name, email, admin, banned_at is not null as banned, ban_reason as "banReason"`,
     [email, name, makeAdmin],
   );
   return rows[0]!;
@@ -72,7 +75,8 @@ export async function userForSession(
        update sessions set expires_at = $2 where token_hash = $1 and expires_at > $3 returning user_id
      )
      update users u set last_seen = $3 from s where u.id = s.user_id
-     returning u.id::int, u.name, u.email, u.admin`,
+     returning u.id::int, u.name, u.email, u.admin, u.banned_at is not null as banned,
+       u.ban_reason as "banReason"`,
     [hash(token), new Date(now.getTime() + SESSION_DAYS * DAY_MS), now],
   );
   return rows[0] ?? null;

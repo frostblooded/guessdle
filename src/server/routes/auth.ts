@@ -42,6 +42,8 @@ export function authRoutes(
         name: user.name,
         email: user.email,
         admin: user.admin,
+        // The banner on every page
+        ...(user.banned && { banned: true, banReason: user.banReason }),
         // The Admin link's badge
         ...(user.admin && { pending: await pendingCount(pool) }),
       },

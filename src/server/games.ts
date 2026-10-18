@@ -34,7 +34,13 @@ export interface GameRow {
   kind: GameKind;
   // Blur games: the number of tries
   blurTries: number;
+  // Its owner is banned: hidden from all but the owner and admins
+  ownerBanned: boolean;
 }
+
+// SQL: the game `g`'s owner is banned
+export const OWNER_BANNED =
+  "exists (select 1 from users o where o.id = g.owner_id and o.banned_at is not null)";
 
 // A game plays with at least this many active entries
 
@@ -50,8 +56,9 @@ const gameWhere = async (
     `select id::int, slug, name, description, cover_url as "coverUrl",
        owner_id::int as "ownerId", status, reject_reason as "rejectReason",
        to_char(start_date, 'YYYY-MM-DD') as "startDate",
-       skip_period as "skipPeriod", kind, blur_tries as "blurTries"
-     from games where ${where} = $1`,
+       skip_period as "skipPeriod", kind, blur_tries as "blurTries",
+       ${OWNER_BANNED} as "ownerBanned"
+     from games g where ${where} = $1`,
     [value],
   );
   return rows[0] ?? null;
@@ -172,7 +179,7 @@ export async function listGallery(q: Q): Promise<GalleryCard[]> {
        ) else '{}'::text[] end as photos,
        count(e.id)::int as "entryCount", g.kind
      from games g join entries e on e.game_id = g.id and e.deleted_at is null
-     where g.status = 'approved' and not ${HAS_MISSING_VALUES}
+     where g.status = 'approved' and not ${HAS_MISSING_VALUES} and not ${OWNER_BANNED}
      group by g.id having count(e.id) >= case when g.kind = 'blur' then 1 else $1 end
      order by g.slug = 'petdle' desc, g.created_at desc, g.id desc`,
     [MIN_ENTRIES, MAX_TILES],

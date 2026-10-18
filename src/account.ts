@@ -7,6 +7,9 @@ export interface AccountUser {
   admin: boolean;
   // Games waiting for review; sent to admins only
   pending?: number;
+  // Sent only to a banned player, with the reason the admin gave
+  banned?: true;
+  banReason?: string;
 }
 
 // null when signed out, or when the server cannot be reached (shown as signed out)

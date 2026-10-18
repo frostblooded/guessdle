@@ -26,6 +26,10 @@ export const FAILURES = {
   reserved: failure(400, "That address is reserved. Pick another one."),
   unauthorized: failure(401, "Your session ended. Sign in again."),
   forbidden: failure(403, "You cannot change this game."),
+  banned: failure(
+    403,
+    "Your account is banned, so you cannot create or change games. You can still play.",
+  ),
   quota_exceeded: failure(403, "You have used all your upload space."),
   not_found: failure(404, "This game no longer exists."),
   no_such_day: failure(
@@ -58,6 +62,15 @@ export const FAILURES = {
   self_deletion: failure(409, "You cannot delete your own account here."),
   last_admin: failure(409, "At least one admin must remain."),
   self_demotion: failure(409, "You cannot remove your own admin rights."),
+  self_ban: failure(409, "You cannot ban yourself."),
+  admin_ban: failure(
+    409,
+    "Admins cannot be banned. Remove their admin rights first.",
+  ),
+  promote_banned: failure(
+    409,
+    "A banned player cannot be made an admin. Unban them first.",
+  ),
   party_not_found: failure(
     404,
     "There is no party with this code. Check the code and try again.",

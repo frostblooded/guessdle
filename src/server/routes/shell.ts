@@ -2,7 +2,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Express, Request } from "express";
-import { isPlayable, resolveGame } from "../access.ts";
+import { isPublic, resolveGame } from "../access.ts";
 import { paramOf, type AppContext } from "./context.ts";
 
 const escapeHtml = (text: string): string =>
@@ -46,7 +46,7 @@ export function shellRoutes(
           meta("property", "og:image", new URL(game.coverUrl, origin).href),
         );
       }
-      if (game.status !== "approved" || !isPlayable(game, roster)) {
+      if (game.status !== "approved" || !isPublic(game, roster)) {
         tags.push(meta("name", "robots", "noindex"));
       }
     } else {
