@@ -4,6 +4,8 @@ import { call, failureOf, type Fetch } from "./game/transport.ts";
 export interface AccountUser {
   name: string;
   email: string;
+  // The public profile name; null until the player picks one
+  username: string | null;
   admin: boolean;
   // Games waiting for review; sent to admins only
   pending?: number;

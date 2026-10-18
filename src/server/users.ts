@@ -14,6 +14,10 @@ export interface AdminUser {
 
 const LOCK_KEY = 48_002;
 
+// SQL true when the owner of the game aliased `g` is banned
+export const OWNER_BANNED =
+  "exists (select 1 from users o where o.id = g.owner_id and o.banned_at is not null)";
+
 export async function listUsers(pool: pg.Pool): Promise<AdminUser[]> {
   const { rows } = await pool.query<AdminUser>(
     `select id::int, name, email, last_seen as "lastSeen", admin,

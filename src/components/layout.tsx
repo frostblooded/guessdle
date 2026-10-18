@@ -133,9 +133,9 @@ function BanNotice() {
   }
   return (
     <Alert id="ban-notice" variant="error" role="status" className="mb-6">
-      Your account is banned, so your games are hidden from other players and
-      you cannot create or change games. You can still play. Reason:{" "}
-      {user.banReason}
+      Your account is banned, so your games and playlists are hidden from other
+      players and you cannot create or change games or playlists. You can still
+      play. Reason: {user.banReason}
     </Alert>
   );
 }

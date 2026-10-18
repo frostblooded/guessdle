@@ -61,8 +61,17 @@ An Owner's or Admin's choice of Daily Answer for today or a future day, replacin
 **Admin**:
 A signed-in user with the admin flag. Admins get an Admin link in the account menu and use the admin page (`/admin`): the approval queue, all Games, users (promote or demote, never oneself or the last Admin) and backups. They can also edit any Game. Emails in `ADMIN_EMAILS` become Admins on login.
 
+**Ban**:
+An Admin's block on a player, set with a reason from the Users tab and lifted by Unban, which restores everything. A banned player still signs in and plays, sees the reason in a banner on every page, and keeps seeing their own Games and Playlists, but cannot create or change any. Everyone else (Admins aside) sees neither, and their wins leave other players' stats. Admins cannot be banned, and a banned player cannot be promoted.
+
 **Day Number**:
 Whole calendar days since the game's start date. The start date itself is day 0. Each Day Number maps to exactly one Daily Answer.
+
+**Username**:
+A signed-in player's one public name, picked once (lowercase letters, digits, underscores). Their **Profile** at `/u/<username>` shows their Playlists and their gallery Games. The account's `name` is its email and is never shown publicly.
+
+**Playlist**:
+A player's named, ordered list of Games, public (anyone with the link, and on their Profile) or private (only them). Only Games the gallery shows can be added, and a Game that leaves the gallery drops out of view until it returns.
 
 **Party**:
 A live competition on one Game, opened by a signed-in **Host**, that friends join from their phones with a 4-letter code (ADR 0016). It runs any number of **Rounds** and ends when the Host ends it or after 12 idle hours; its results stay at its link for 30 days.

@@ -1,7 +1,14 @@
 // Every failure code the server sends: its HTTP status and the text the browser shows.
 // One table so a new code cannot reach one side without the other.
 
-import { MAX_OPEN_PARTIES, MIN_ENTRIES } from "./limits.ts";
+import {
+  MAX_OPEN_PARTIES,
+  MAX_PLAYLIST_GAMES,
+  MAX_PLAYLISTS,
+  MAX_USERNAME,
+  MIN_ENTRIES,
+  MIN_USERNAME,
+} from "./limits.ts";
 
 const failure = (status: number, text: string) => ({ status, text });
 
@@ -28,7 +35,7 @@ export const FAILURES = {
   forbidden: failure(403, "You cannot change this game."),
   banned: failure(
     403,
-    "Your account is banned, so you cannot create or change games. You can still play.",
+    "Your account is banned, so you cannot create or change games or playlists. You can still play.",
   ),
   quota_exceeded: failure(403, "You have used all your upload space."),
   not_found: failure(404, "This game no longer exists."),
@@ -84,6 +91,35 @@ export const FAILURES = {
   too_many_parties: failure(
     409,
     `You already have ${MAX_OPEN_PARTIES} parties open. End one before starting another.`,
+  ),
+  invalid_username: failure(
+    400,
+    `A username is ${MIN_USERNAME} to ${MAX_USERNAME} lowercase letters, digits or underscores.`,
+  ),
+  username_taken: failure(
+    409,
+    "Someone already has that username. Pick another one.",
+  ),
+  username_set: failure(409, "You already picked a username."),
+  username_required: failure(
+    409,
+    "Pick a username first: your playlists show on your profile under it.",
+  ),
+  playlist_not_found: failure(
+    404,
+    "This playlist does not exist, or its owner made it private.",
+  ),
+  too_many_playlists: failure(
+    409,
+    `You already have ${MAX_PLAYLISTS} playlists. Delete one before making another.`,
+  ),
+  playlist_full: failure(
+    409,
+    `This playlist already holds ${MAX_PLAYLIST_GAMES} games. Remove one before adding another.`,
+  ),
+  game_not_listed: failure(
+    409,
+    "Only games shown in the gallery can go in a playlist.",
   ),
   too_large: failure(413, "That image is over 5 MB."),
   unsupported: failure(415, "Use a JPEG, PNG or WebP image."),

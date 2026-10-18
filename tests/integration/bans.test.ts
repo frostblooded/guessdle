@@ -232,6 +232,49 @@ describe("admin bans", () => {
     assert.equal((await win()).body.players, 2);
   });
 
+  it("hides the banned player's playlists and stops them changing any", async () => {
+    await send("PUT", "/api/me/username", ann, { username: "ann" });
+    const made = await send("POST", "/api/playlists", ann, {
+      name: "Faves",
+      public: true,
+    });
+    assert.equal(made.status, 201);
+    const list = `/api/playlists/${made.body.id}`;
+    // Sam's own public playlist holds Ann's game; it drops out while she is banned
+    await send("PUT", "/api/me/username", sam, { username: "sam" });
+    const sams = (
+      await send("POST", "/api/playlists", sam, { name: "Mix", public: true })
+    ).body.id as number;
+    await send("PUT", `/api/playlists/${sams}/games/${GAME}`, sam, {});
+    const samGames = async (): Promise<number> =>
+      (await send("GET", `/api/playlists/${sams}`, null)).body.games.length;
+    assert.equal(await samGames(), 1);
+
+    await ban(boss, annId, "Spam");
+    assert.equal((await send("GET", list, null)).status, 404);
+    assert.equal((await send("GET", list, sam)).status, 404);
+    assert.equal((await send("GET", list, ann)).status, 200);
+    assert.equal((await send("GET", list, boss)).status, 200);
+    const profile = async (viewer: string): Promise<number> =>
+      (await send("GET", "/api/users/ann", viewer)).body.playlists.length;
+    assert.equal(await profile(sam), 0);
+    assert.equal(await profile(boss), 1);
+    assert.equal(await profile(ann), 1);
+    assert.equal(await samGames(), 0);
+    assert.deepEqual(
+      (await send("PATCH", list, ann, { name: "Renamed" })).body,
+      { error: "banned" },
+    );
+    assert.deepEqual(
+      (await send("POST", "/api/playlists", ann, { name: "Another" })).body,
+      { error: "banned" },
+    );
+
+    await unban(boss, annId);
+    assert.equal((await send("GET", list, sam)).status, 200);
+    assert.equal(await samGames(), 1);
+  });
+
   it("unban restores everything as it was", async () => {
     await ban(boss, annId, "Rude names");
     assert.equal((await unban(sam, annId)).status, 403);
