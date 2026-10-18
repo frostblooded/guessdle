@@ -19,10 +19,14 @@ export interface GameView {
   lost?: true;
   // The answer's name: present once the day is over (victory, give-up or lost)
   answer?: string;
-  // Blur and Sequence games, once the day is over: the answer's whole image (a Sequence game's
-  // first photo)
+  // Blur games, once the day is over: the answer's whole image
   answerPhoto?: string;
 }
+
+// An id a player may guess: an active entry, or in a Blur or Sequence game SKIP
+const isGuessId = (game: GameRow, roster: Roster, id: unknown): boolean =>
+  (id === SKIP && isImageGame(game.kind)) ||
+  roster.entries.some((e) => e.id === id);
 
 // A Blur or Sequence game's tries, null for a classic game with unlimited guesses
 export const triesOf = (game: GameRow): number | null =>
@@ -73,7 +77,7 @@ export interface GameContext {
   userId: number;
   date: string;
   day: number;
-  // An archive day (not today): playable, but its wins stay out of the daily stats
+  // An archive day (not today), played from the Past days list
   past: boolean;
 }
 
@@ -82,11 +86,10 @@ export async function view(
   q: Q,
   { game, roster, answer, userId, date, day }: GameContext,
 ): Promise<GameView> {
-  // Skips read back as SKIP, in order among the guesses
   const guesses = await q.query<{ entry_id: number }>(
-    `select entry_id::int, seq from user_guesses where user_id = $1 and game_id = $2 and day = $3
-     union all select ${SKIP}, seq from user_skips where user_id = $1 and game_id = $2 and day = $3
-     order by seq`,
+    // A skip is stored with no entry (migration 011)
+    `select coalesce(entry_id, ${SKIP})::int as entry_id from user_guesses
+     where user_id = $1 and game_id = $2 and day = $3 order by seq`,
     [userId, game.id, date],
   );
   const gaveUp =
@@ -160,26 +163,15 @@ export async function addGuess(
   current: GameView,
   id: unknown,
 ): Promise<Refusal | null> {
-  const skip = id === SKIP && triesOf(game) !== null;
-  if (
-    typeof id !== "number" ||
-    !(skip || roster.entries.some((e) => e.id === id))
-  ) {
+  if (typeof id !== "number" || !isGuessId(game, roster, id)) {
     return "invalid";
   }
   if (finished(current)) {
     return "finished";
   }
-  if (skip) {
-    await q.query(
-      "insert into user_skips (user_id, game_id, day) values ($1, $2, $3)",
-      [userId, game.id, date],
-    );
-    return null;
-  }
   const { rowCount } = await q.query(
     "insert into user_guesses (user_id, game_id, day, entry_id) values ($1, $2, $3, $4) on conflict do nothing",
-    [userId, game.id, date, id],
+    [userId, game.id, date, id === SKIP ? null : id],
   );
   return rowCount === 1 ? null : "duplicate";
 }
@@ -208,15 +200,10 @@ export async function mergeLocal(
   body: Record<string, unknown>,
 ): Promise<Refusal | null> {
   const { ids, gaveUp } = body;
-  const tries = triesOf(game);
   if (
     !Array.isArray(ids) ||
-    ids.length > (tries ?? roster.entries.length) ||
-    !ids.every(
-      (id) =>
-        (id === SKIP && tries !== null) ||
-        roster.entries.some((e) => e.id === id),
-    ) ||
+    ids.length > (triesOf(game) ?? roster.entries.length) ||
+    !ids.every((id) => isGuessId(game, roster, id)) ||
     (gaveUp !== undefined && typeof gaveUp !== "boolean")
   ) {
     return "invalid";
@@ -227,7 +214,7 @@ export async function mergeLocal(
   if (current.ids.length > 0 || current.gaveUp) {
     return "has_progress";
   }
-  // Keep first occurrences (every skip) in order, stop after the answer
+  // Keep first occurrences (and every skip) in order, stop after the answer
   const keep = (ids as number[]).filter(
     (id, i) => id === SKIP || ids.indexOf(id) === i,
   );
@@ -238,10 +225,8 @@ export async function mergeLocal(
   );
   for (const id of adopted) {
     await q.query(
-      id === SKIP
-        ? "insert into user_skips (user_id, game_id, day) values ($1, $2, $3)"
-        : "insert into user_guesses (user_id, game_id, day, entry_id) values ($1, $2, $3, $4)",
-      id === SKIP ? [userId, game.id, date] : [userId, game.id, date, id],
+      "insert into user_guesses (user_id, game_id, day, entry_id) values ($1, $2, $3, $4)",
+      [userId, game.id, date, id === SKIP ? null : id],
     );
   }
   if (gaveUp === true && end === -1 && !isLost(game, adopted, false)) {
@@ -258,7 +243,7 @@ export async function resetGame(
   { game, userId, date }: GameContext,
 ): Promise<Refusal | null> {
   // Any time, even with no rows: deleting nothing is fine
-  for (const table of ["user_guesses", "user_skips", "user_give_ups"]) {
+  for (const table of ["user_guesses", "user_give_ups"]) {
     await q.query(
       `delete from ${table} where user_id = $1 and game_id = $2 and day = $3`,
       [userId, game.id, date],

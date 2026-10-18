@@ -55,8 +55,8 @@ describe("limits shared with the pages", () => {
   });
   it("says the entry minimum in the editor copy from the shared limit", () => {
     assert.match(
-      text("src/routes/edit/entries-panel.tsx"),
-      /at least \{MIN_ENTRIES\}(\{" "\})?\s+entries/,
+      text("src/routes/edit/entries-lede.tsx"),
+      /at least(\{" "\})?\s+\{MIN_ENTRIES\}(\{" "\})?\s+entries/,
     );
   });
 });

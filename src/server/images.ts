@@ -75,10 +75,29 @@ export const fileOf = (dir: string, url: string): string | null => {
 const BLUR_STRENGTH = 0.06;
 const BLUR_CACHE = 200;
 
+// Memoizes an image render by key, keeping the latest `limit` results
+function lru(
+  limit: number,
+): (
+  key: string,
+  render: () => Promise<Buffer | null>,
+) => Promise<Buffer | null> {
+  const cache = new Map<string, Promise<Buffer | null>>();
+  return (key, render) => {
+    const hit = cache.get(key) ?? render();
+    cache.delete(key);
+    cache.set(key, hit);
+    if (cache.size > limit) {
+      cache.delete(cache.keys().next().value!);
+    }
+    return hit;
+  };
+}
+
 // Renders a Blur game's board (ADR 0019): the stored upload blurred all over, with the first
 // `shown` squares of `order` pasted back clear. Keeps the latest boards in memory.
 export function blurRenderer(dir: string) {
-  const cache = new Map<string, Promise<Buffer | null>>();
+  const cached = lru(BLUR_CACHE);
   const render = async (
     url: string,
     cells: readonly number[],
@@ -108,14 +127,30 @@ export function blurRenderer(dir: string) {
       return null;
     }
   };
-  return (url: string, cells: readonly number[]): Promise<Buffer | null> => {
-    const key = `${url}:${cells.join(",")}`;
-    const hit = cache.get(key) ?? render(url, cells);
-    cache.delete(key);
-    cache.set(key, hit);
-    if (cache.size > BLUR_CACHE) {
-      cache.delete(cache.keys().next().value!);
-    }
-    return hit;
-  };
+  return (url: string, cells: readonly number[]): Promise<Buffer | null> =>
+    cached(`${url}:${cells.join(",")}`, () => render(url, cells));
+}
+
+// A gallery banner tile's side, and how hard it is blurred: enough that no answer shows
+const TILE_SIDE = 240;
+const TILE_BLUR = 18;
+
+// Renders a stored upload as a small, heavily blurred square for a Blur game's gallery banner
+export function tileRenderer(dir: string) {
+  const cached = lru(BLUR_CACHE);
+  return (url: string): Promise<Buffer | null> =>
+    cached(url, async () => {
+      const file = fileOf(dir, url);
+      try {
+        return file
+          ? await sharp(file)
+              .resize(TILE_SIDE, TILE_SIDE, { fit: "cover" })
+              .blur(TILE_BLUR)
+              .webp()
+              .toBuffer()
+          : null;
+      } catch {
+        return null;
+      }
+    });
 }

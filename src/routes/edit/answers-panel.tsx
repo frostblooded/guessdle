@@ -28,8 +28,8 @@ interface AnswerList {
   from: string;
   to: string;
   days: AnswerDay[];
-  // The entries an Override may name (a Sequence game's with every photo)
-  answerIds: number[];
+  // The entries an Override may name (a Sequence game's with every photo); all when absent
+  answerIds?: number[];
 }
 
 const HISTORY_DAYS = 7;
@@ -72,8 +72,10 @@ export function AnswersPanel({
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [days, setDays] = useState<AnswerDay[]>([]);
-  const [answerIds, setAnswerIds] = useState<number[]>([]);
-  const choices = entries.filter((entry) => answerIds.includes(entry.id));
+  const [answerIds, setAnswerIds] = useState<number[] | null>(null);
+  const choices = entries.filter(
+    (entry) => answerIds === null || answerIds.includes(entry.id),
+  );
   const [editing, setEditing] = useState<AnswerDay | null>(null);
   const [pick, setPick] = useState("");
 
@@ -92,7 +94,7 @@ export function AnswersPanel({
     setFrom(data.from);
     setTo(data.to);
     setDays(data.days);
-    setAnswerIds(data.answerIds);
+    setAnswerIds(data.answerIds ?? null);
     setEditing(null);
   };
   // Saving or clearing re-draws later days, so reload the same range afterwards

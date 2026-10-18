@@ -20,7 +20,7 @@ const json = (status: number, body: unknown): Response =>
 
 const row = (id: number) => [
   {
-    key: "name",
+    key: id === 0 ? "skip" : "name",
     value: id === 0 ? "Skipped" : ENTRIES.find((e) => e.id === id)!.name,
     correctness: id === 2 ? 2 : 0,
   },
@@ -98,7 +98,9 @@ describe("PlayPage, Sequence game", () => {
       "Photo 1 of 3 · 3 tries left",
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "Skip" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Skip this guess" }),
+    );
     await screen.findByText("Skipped");
     assert.match(current().src, /\/shot\/2\?/);
     assert.equal(shotButton(2).disabled, false);
@@ -111,7 +113,7 @@ describe("PlayPage, Sequence game", () => {
 
   it("a skip on the last try ends the day and reveals the answer", async () => {
     renderPlay();
-    const skip = await screen.findByRole("button", { name: "Skip" });
+    const skip = await screen.findByRole("button", { name: "Skip this guess" });
     await waitFor(() => assert.equal(skip.hasAttribute("disabled"), false));
     for (let i = 0; i < 3; i++) {
       await userEvent.click(skip);

@@ -90,7 +90,7 @@ export interface Play {
   // Graded rows of the guesses stored for today, oldest first; the reason if the
   // server could not grade them (the stored guesses stay)
   load(): Promise<Loaded | LoadFailure>;
-  // Takes an entry id, or SKIP in a Blur or Sequence game
+  // Takes an entry id, or SKIP (Blur and Sequence games)
   submit(id: number): Promise<SubmitResult>;
   // Reveals the answer and finishes the game
   giveUp(): Promise<GiveUpResult>;
@@ -197,7 +197,6 @@ export function createPlay({
       if (finished) {
         return { kind: "finished" };
       }
-      // The server refuses a skip in a classic game
       if (
         id !== SKIP &&
         !roster.some((entry: EntryRef): boolean => entry.id === id)

@@ -72,11 +72,11 @@ test("a Sequence game is made in the editor and played photo by photo, with a sk
         .evaluate((img: HTMLImageElement) => img.naturalWidth),
     )
     .toBeGreaterThan(0);
-  await page.locator("#skip-button").click();
+  await page.locator("#skip-guess-button").click();
   await expect(page.locator("#sequence-tries")).toHaveText(
     "Photo 2 of 2 · 1 try left",
   );
-  await expect(page.locator(".guess-result-cell.incorrect")).toHaveText([
+  await expect(page.locator(".guess-result-cell.skipped")).toHaveText([
     "Skipped",
   ]);
   await page.locator('[data-shot="1"]').click();
@@ -118,7 +118,7 @@ test("a Sequence game's Play page fits a phone", async ({ page }) => {
   }
   await page.goto(`/g/${slug}`);
   await expect(page.locator("#sequence-view")).toBeVisible();
-  await expect(page.locator("#skip-button")).toBeVisible();
+  await expect(page.locator("#skip-guess-button")).toBeVisible();
   const width = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(width).toBeLessThanOrEqual(375);
 });

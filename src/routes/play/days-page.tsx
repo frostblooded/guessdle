@@ -12,7 +12,7 @@ import {
   gameStorage,
   pastDayStorage,
 } from "../../game/game-state.ts";
-import { useMe } from "../../lib/api.ts";
+import { gameKey, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { DayList } from "./day-list.tsx";
 import { GameNotFound } from "./past-day.tsx";
@@ -60,7 +60,7 @@ export function DaysPage() {
   const { slug = "" } = useParams();
   const me = useMe();
   const game = useQuery({
-    queryKey: ["game", slug],
+    queryKey: gameKey(slug),
     queryFn: () => loadGame(slug),
     staleTime: Infinity,
   });

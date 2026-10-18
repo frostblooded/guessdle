@@ -2,7 +2,6 @@
 // one at a time; each wrong guess or skip unlocks the next. Pure, so the server, the editor and
 // Play share it.
 
-
 // An entry may be an answer once every one of the game's `count` photos is uploaded; until then
 // players can still guess it
 export const hasAllShots = (shots: readonly string[], count: number): boolean =>

@@ -85,7 +85,7 @@ describe("gradeIds with skips", () => {
     assert.equal(out.kind, "graded");
     if (out.kind === "graded") {
       assert.deepEqual(out.rows[0], [
-        { key: "name", value: "Skipped", correctness: Correctness.Incorrect },
+        { key: "skip", value: "Skipped", correctness: Correctness.Incorrect },
       ]);
       assert.equal(out.rows.length, 4);
       assert.equal(out.victory, true);

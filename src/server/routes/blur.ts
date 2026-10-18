@@ -1,13 +1,14 @@
 // What a Blur or Sequence game shows of the answer before the day or round is over: a Blur
 // board (ADR 0019), the answer's image with only some squares clear, or a Sequence photo
-// (ADR 0020), one of those unlocked so far. Both are sent from the stored upload, so the
-// image's own URL stays secret.
+// (ADR 0020), one of those unlocked so far; also a Blur game's gallery banner tiles. All are
+// sent from the stored uploads, so their URLs stay secret.
 import { readFile } from "node:fs/promises";
 import type { Express, Request, Response } from "express";
 import type { GameKind } from "../../game/blur.ts";
 import type { Entry } from "../../game/game.ts";
 import { normalizeCode } from "../../game/party.ts";
-import { blurRenderer, fileOf } from "../images.ts";
+import { MAX_TILES } from "../../game/banner.ts";
+import { blurRenderer, fileOf, tileRenderer } from "../images.ts";
 import { findParty, loadData } from "../parties.ts";
 import type { GameRow } from "../games.ts";
 import {
@@ -32,6 +33,7 @@ export function blurRoutes(
   uploadsDir: string,
 ): void {
   const render = blurRenderer(uploadsDir);
+  const tile = tileRenderer(uploadsDir);
   // How many squares are clear, or which photo, 1-9 from the URL, or 0
   const shownOf = (req: Request): number => {
     const raw = String(paramOf(req, "n"));
@@ -120,4 +122,30 @@ export function blurRoutes(
   // Photo n of the sequence
   app.get("/api/games/:slug/shot/:n", dayRoute("sequence", shot));
   app.get("/api/parties/:code/shot/:round/:n", roundRoute("sequence", shot));
+
+  // Tile n of the gallery banner: the nth entry photo, by entry id, heavily blurred. Not a
+  // secret, so browsers may keep it a while.
+  app.get("/api/games/:slug/tile/:n", async (req, res) => {
+    const loaded = await loadGame(ctx, req, res);
+    if (!loaded) {
+      return;
+    }
+    const n = Number(paramOf(req, "n"));
+    const photo = loaded.roster.entries
+      .map((entry) => entry.photo)
+      .filter((p) => p !== "")[n];
+    const image =
+      loaded.game.kind === "blur" &&
+      Number.isInteger(n) &&
+      n < MAX_TILES &&
+      photo
+        ? await tile(photo)
+        : null;
+    if (!image) {
+      fail(res, "not_found");
+      return;
+    }
+    res.set("Cache-Control", "public, max-age=300");
+    res.type("image/webp").send(image);
+  });
 }

@@ -72,7 +72,9 @@ function CropDialog({ job }: { job: Job }) {
           document.querySelector<HTMLElement>("#crop-confirm")?.focus();
         }}
       >
-        <AlertDialogTitle id="crop-title">Crop the {LABELS[job.kind]}</AlertDialogTitle>
+        <AlertDialogTitle id="crop-title">
+          Crop the {LABELS[job.kind]}
+        </AlertDialogTitle>
         <AlertDialogDescription>
           Drag the frame to move it; zoom to pick how much shows.
         </AlertDialogDescription>

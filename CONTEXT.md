@@ -14,10 +14,13 @@ An Admin's sign-off that lets a Game appear in the front-page gallery. Unapprove
 The signed-in user who created a Game. Owners and Admins edit the Game, set its Overrides, submit, unpublish and delete it. Deleting a user deletes their Games.
 
 **Kind**:
-A Game is **Classic** (guessed by comparing Attributes) or **Blur** (guessed from a blurred image). Chosen when the Game is created; it never changes.
+A Game is **Classic** (guessed by comparing Attributes), **Blur** (guessed from a blurred image) or **Sequence** (guessed from a series of photos shown one at a time). Chosen when the Game is created; it never changes.
 
 **Square Order**:
 The order a Blur Game Entry's nine image squares clear in, picked by the Owner. Only the first square is clear at first; each wrong Guess clears the next. The Game sets the tries (1 to 9): a wrong Guess on the last one loses the day.
+
+**Shots**:
+A Sequence Game Entry's photos, in the order players see them; the Game sets how many (1 to 9, 6 at first). The first shows at the start and each wrong Guess or skip shows the next. An Entry missing some can be guessed but is never a Daily Answer.
 
 **Draft**:
 A Game's first status. Only its Owner and Admins can see it (everyone else gets a 404) until it is submitted. Statuses: draft, pending, approved, rejected.
@@ -53,7 +56,7 @@ How well one attribute of a guess matches the Daily Answer: correct, partially c
 What is remembered about today: the Guesses made (as Entry ids), whether the player gave up, and the day last played. Anonymous players keep it in the browser (`localStorage`). Signed-in players keep it on the server, so it follows them across devices. Victory is never stored: it is derived from the Guesses and the current Daily Answer. It resets on a new calendar day, or when the player resets at any time once they have made a Guess (the Daily Answer stays the same). On first login, leftover browser guesses are merged into the account only if the account has no progress that day; otherwise the server state wins.
 
 **Past Day**:
-An earlier day of a Game (Day Number 0 up to yesterday), played from the Past days list at `/g/<slug>/day/<n>` against that day's stored Daily Answer. Each Past Day keeps its own Game State, which never expires: signed in on the server, anonymous in the browser. A finished Past Day is a read-only record (no reset). Wins on a Past Day never count toward daily stats; only today's do. Browser guesses of a Past Day are never merged into the account.
+An earlier day of a Game (Day Number 0 up to yesterday), played from the Past days list at `/g/<slug>/day/<n>` against that day's stored Daily Answer. Each Past Day keeps its own Game State, which never expires: signed in on the server, anonymous in the browser. A finished Past Day can be reset like today. The first win on a Past Day counts in that day's stats, as if played on the day (decided 2026-10-18); later wins after a reset change nothing. Browser guesses of a Past Day are never merged into the account.
 
 **Override**:
 An Owner's or Admin's choice of Daily Answer for today or a future day, replacing the generated one. Past days cannot be overridden. Setting or clearing an Override re-draws every later generated day; overridden days are never re-drawn.

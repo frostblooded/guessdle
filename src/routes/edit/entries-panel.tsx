@@ -12,7 +12,6 @@ import {
   MAX_ENTRY_NAME,
   MAX_LIST_ITEMS,
   MAX_VALUE_LENGTH,
-  MIN_ENTRIES,
 } from "../../game/limits.ts";
 import { api, errorText, type Reply } from "../../manage-client.ts";
 import { cn } from "../../lib/utils.ts";
@@ -24,6 +23,7 @@ import {
   type Entry,
 } from "./types.ts";
 import { BlurOrderEditor } from "./blur-order-editor.tsx";
+import { EntriesLede } from "./entries-lede.tsx";
 import { ShotsEditor } from "./shots-editor.tsx";
 
 // What the form holds: the entry being edited (null: adding), its name, photo URL and values
@@ -192,25 +192,7 @@ export function EntriesPanel({
   return (
     <div className="space-y-5">
       {dialog}
-      {sequence ? (
-        <p className="lede text-sm text-muted-foreground">
-          Each entry is one possible answer, shown to players as {tries} photos,
-          one at a time. An entry missing photos can still be guessed but is
-          never a day's answer. A game needs at least {MIN_ENTRIES} entries
-          before anyone can play it.
-        </p>
-      ) : (
-        <p className="lede text-sm text-muted-foreground">
-          {blur
-            ? "Each entry is one possible answer."
-            : "Each entry is a row on the board."}{" "}
-          A game needs at least {MIN_ENTRIES} entries before anyone can play it,
-          and every entry needs{" "}
-          {blur
-            ? "an image and the order its nine squares clear in."
-            : "a value for every attribute."}
-        </p>
-      )}
+      <EntriesLede kind={kind} tries={tries} />
       <ul
         id="entry-list"
         className="attr-list divide-y rounded-lg border empty:hidden"

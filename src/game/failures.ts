@@ -34,11 +34,11 @@ export const FAILURES = {
   ),
   too_few_entries: failure(
     409,
-    `Add at least ${MIN_ENTRIES} entries before submitting.`,
+    `Add at least ${MIN_ENTRIES} entries (one for a Blur game) before submitting.`,
   ),
   not_enough_entries: failure(
     409,
-    `This game cannot be played yet: it needs at least ${MIN_ENTRIES} entries to pick a daily answer. Use the Edit link to add entries.`,
+    `This game cannot be played yet: it needs at least ${MIN_ENTRIES} entries (one for a Blur game) to pick a daily answer. Use the Edit link to add entries.`,
   ),
   incomplete_entries: failure(
     409,

@@ -173,3 +173,72 @@ test("an admin whose Approve lost a race sees why", async ({
   await expect(admin.locator("#approve-error")).toContainText("status changed");
   await expect(admin.locator("#status-notice")).toContainText("Pending");
 });
+
+test("Play shows the status an edit just moved, after going there from the editor", async ({
+  browser,
+  baseURL,
+}) => {
+  const id = unique();
+  const owner = await signedIn(browser, baseURL!, `owner-${id}@example.test`);
+  const admin = await signedIn(
+    browser,
+    baseURL!,
+    `admin-${id}@example.test`,
+    true,
+  );
+  const { slug } = (await (
+    await owner.request.post("/api/games", { data: { name: `Edit ${id}` } })
+  ).json()) as { slug: string };
+  for (const entry of ["One", "Two"]) {
+    await owner.request.post(`/api/games/${slug}/entries`, {
+      data: { name: entry },
+    });
+  }
+  await owner.request.post(`/api/games/${slug}/submit`, { data: {} });
+  await admin.request.post(`/api/admin/games/${slug}/approve`, { data: {} });
+
+  // Approved: no notice. Then to the editor and back by the page's own links, no reload.
+  await open(owner, slug);
+  await expect(owner.locator("#status-notice")).toBeHidden();
+  await owner.locator("#edit-link").click();
+  await owner.locator("#edit-name").fill(`Renamed ${id}`);
+  await owner.locator("#save-button").click();
+  await expect(owner.locator("#edit-saved")).toBeVisible();
+  // A details edit sends an approved game back to pending
+  await expect(owner.locator("#status-notice")).toContainText("Pending");
+  await owner.locator("#view-link").click();
+  await expect(owner.locator("#loading-state")).toBeHidden();
+  await expect(owner.locator("#status-notice")).toContainText("Pending");
+});
+
+test("Play keeps an approval made on it after a trip to the editor", async ({
+  browser,
+  baseURL,
+}) => {
+  const id = unique();
+  const admin = await signedIn(
+    browser,
+    baseURL!,
+    `admin-keep-${id}@example.test`,
+    true,
+  );
+  const { slug } = (await (
+    await admin.request.post("/api/games", { data: { name: `Keep ${id}` } })
+  ).json()) as { slug: string };
+  for (const entry of ["One", "Two"]) {
+    await admin.request.post(`/api/games/${slug}/entries`, {
+      data: { name: entry },
+    });
+  }
+  await admin.request.post(`/api/games/${slug}/submit`, { data: {} });
+
+  await open(admin, slug);
+  await admin.locator("#approve-button").click();
+  await expect(admin.locator("#status-notice")).toBeHidden();
+  await admin.locator("#edit-link").click();
+  await expect(admin.locator("#unpublish-button")).toBeVisible();
+  await admin.goBack();
+  await expect(admin.locator("#loading-state")).toBeHidden();
+  await expect(admin.locator("#status-notice")).toBeHidden();
+  await expect(admin.locator("#approve-button")).toBeHidden();
+});

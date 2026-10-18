@@ -1,6 +1,10 @@
 // Admin "All games" tab: every game of any status, searchable, with Delete, and Approve and Reject
 // on pending games.
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
@@ -15,7 +19,7 @@ import {
   TableHead,
   TableRow,
 } from "../../components/ui/table.tsx";
-import { getJson } from "../../lib/api.ts";
+import { forgetGame, getJson } from "../../lib/api.ts";
 import { useDelayed } from "../../lib/use-delayed.ts";
 import { api } from "../../manage-client.ts";
 
@@ -37,6 +41,7 @@ const REVIEW_FAILED =
   "The review action did not go through. Another admin may have handled this game already, or the server may be failing. Reload the list to see its current state.";
 
 export function GamesPanel({ active }: { active: boolean }) {
+  const client = useQueryClient();
   const [search, setSearch] = useState("");
   // What the list shows: the search box, 250 ms after the last keystroke
   const [query, setQuery] = useState("");
@@ -179,6 +184,7 @@ export function GamesPanel({ active }: { active: boolean }) {
                       name={game.name}
                       onDone={async () => {
                         setFailed(null);
+                        forgetGame(client, game.slug);
                         await list.refetch();
                       }}
                       onFail={() => setFailed(REVIEW_FAILED)}
