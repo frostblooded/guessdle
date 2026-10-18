@@ -7,19 +7,50 @@ import { AccountArea } from "./account-area.tsx";
 import { ThemeButton } from "./theme-button.tsx";
 import { Button } from "./ui/button.tsx";
 
-function PawMark() {
+// The site icon's tiles (icons/favicon.svg) in shades of the theme colour
+function TilesMark() {
   return (
-    <svg
-      className="brand-mark size-7 rounded-lg bg-primary p-1 text-primary-foreground"
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      aria-hidden="true"
-    >
-      <circle cx="5" cy="11" r="2.2" />
-      <circle cx="9.5" cy="6" r="2.2" />
-      <circle cx="14.5" cy="6" r="2.2" />
-      <circle cx="19" cy="11" r="2.2" />
-      <path d="M12 11c-3 0-6 3-6 6 0 2 1.5 3 3.2 3 1.2 0 1.8-.5 2.8-.5s1.6.5 2.8.5c1.7 0 3.2-1 3.2-3 0-3-3-6-6-6z" />
+    <svg className="brand-mark size-7" viewBox="0 0 64 64" aria-hidden="true">
+      <rect
+        className="fill-primary"
+        x="1"
+        y="1"
+        width="29"
+        height="29"
+        rx="5"
+      />
+      <rect
+        className="fill-primary/70"
+        x="34"
+        y="1"
+        width="29"
+        height="29"
+        rx="5"
+      />
+      <rect
+        className="fill-primary/45"
+        x="1"
+        y="34"
+        width="29"
+        height="29"
+        rx="5"
+      />
+      <rect
+        className="fill-primary"
+        x="34"
+        y="34"
+        width="29"
+        height="29"
+        rx="5"
+      />
+      <path
+        className="stroke-primary-foreground"
+        d="M44.4 45.6a4.3 4.3 0 1 1 6.6 3.6c-1.5 1-2.5 1.8-2.5 3.4v.3"
+        fill="none"
+        strokeWidth="3.8"
+        strokeLinecap="round"
+      />
+      <circle className="fill-primary-foreground" cx="48.5" cy="57.6" r="2.2" />
     </svg>
   );
 }
@@ -51,7 +82,7 @@ function Header() {
           className="brand flex items-center gap-2 text-lg font-bold tracking-tight text-foreground no-underline"
           to="/"
         >
-          <PawMark />
+          <TilesMark />
           <span className="uppercase tracking-wider">Guessdle</span>
         </Link>
         <nav
