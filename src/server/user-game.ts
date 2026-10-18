@@ -11,7 +11,7 @@ import type { GameRow, Roster } from "./games.ts";
 
 export interface GameView {
   day: number;
-  // The answer's revision: a changed one means the day started over (migration 013)
+  // The answer's revision: a changed one means the day started over (migration 015)
   revision: number;
   ids: number[];
   rows: GradedAttribute[][];

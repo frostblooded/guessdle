@@ -196,7 +196,7 @@ async function redrawFrom(
 
 export interface DayAnswer {
   entryId: number;
-  // Bumped each time the answer changed after the day was stored (migration 013)
+  // Bumped each time the answer changed after the day was stored (migration 015)
   revision: number;
 }
 
