@@ -21,7 +21,7 @@ import { MIN_ENTRIES } from "../../game/limits.ts";
 import { openPlay } from "../../game/open-play.ts";
 import type { Play } from "../../game/play.ts";
 import type { GameKind } from "../../game/blur.ts";
-import { browserFetch, useMe } from "../../lib/api.ts";
+import { browserFetch, gameKey, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { GuessPanel, useGuessMode } from "./guess-panel.tsx";
 import {
@@ -81,7 +81,7 @@ export const RATE_LIMITED =
 // `day`: a past day's Day Number from the address, or null for today
 function Game({ slug, day }: { slug: string; day: number | null }) {
   const { data: game, isPending } = useQuery({
-    queryKey: ["game", slug],
+    queryKey: gameKey(slug),
     queryFn: () => loadGame(slug),
     staleTime: Infinity,
   });
@@ -101,7 +101,6 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const started = useRef(false);
   const submitting = useRef(false);
   const opener = useRef<HTMLButtonElement | null>(null);
-  const victory = useVictoryStats(slug, play);
   const modes = useGuessMode();
 
   const playable = typeof game === "object" ? game : null;
@@ -115,8 +114,8 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   // A past day the game has; today's and later Day Numbers are handled below
   const past = playable !== null && day !== null && day < playable.today;
   const pastDay = past ? day : undefined;
-  // A finished past day is a read-only record (no Reset)
-  const resettable = !past;
+  // A past day's first win counts in that day's stats, like today's
+  const victory = useVictoryStats(slug, play, pastDay);
 
   useTitle(
     game === "missing"
@@ -207,13 +206,12 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
     if (res.kind === "duplicate") {
       return;
     }
-    // A past day's win stays out of the daily stats
-    if (rows.length === 0 && !past) {
+    if (rows.length === 0) {
       victory.startClock();
     }
     if (res.answer !== undefined && (res.isAnswer || res.lost)) {
       setResult(resultOf(res.isAnswer ? "victory" : "lost", res));
-      if (res.isAnswer && !past) {
+      if (res.isAnswer) {
         void victory.show();
       }
     }
@@ -317,7 +315,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
               id="reset-guesses-button"
               variant="outline"
               size="sm"
-              hidden={finished || !resettable}
+              hidden={finished}
               disabled={cannotPlay || rows.length === 0}
               onClick={askReset}
             >
@@ -367,7 +365,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
           </div>
           <div
             className="game-actions flex flex-wrap justify-center gap-2"
-            hidden={!finished || !resettable}
+            hidden={!finished}
           >
             <Button
               id="stats-button"
@@ -379,16 +377,17 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
             </Button>
             <Button
               id="reset-button"
-              hidden={!finished || !resettable}
+              hidden={!finished}
               disabled={cannotPlay}
               onClick={askReset}
             >
-              Reset today&apos;s game
+              {past ? "Reset this game" : "Reset today's game"}
             </Button>
           </div>
         </Card>
-        {result?.kind === "victory" && !past && (
+        {result?.kind === "victory" && (
           <StatsDialog
+            past={past}
             open={victory.open}
             onOpenChange={victory.setOpen}
             answer={result.answer}
@@ -402,6 +401,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
           onOpenChange={setConfirming}
           onConfirm={() => void reset()}
           opener={opener}
+          past={past}
         />
         {modes.selecting && !finished && !cannotPlay ? (
           <SelectList

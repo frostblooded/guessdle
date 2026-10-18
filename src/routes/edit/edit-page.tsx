@@ -1,4 +1,5 @@
 // /g/:slug/edit: the game editor, with Details, Attributes, Entries and Answers tabs.
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router";
 import { EmptyState, MessageCard, PageHead } from "../../components/page.tsx";
@@ -16,6 +17,7 @@ import {
 import type { Details } from "../../game/editor.ts";
 import { MAX_DESCRIPTION, MAX_NAME } from "../../game/limits.ts";
 import { api, errorText } from "../../manage-client.ts";
+import { forgetGame } from "../../lib/api.ts";
 import { useSignedIn } from "../../lib/use-signed-in.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { AnswersPanel } from "./answers-panel.tsx";
@@ -363,7 +365,11 @@ function EditGame({ slug }: { slug: string }) {
   const user = useSignedIn(location.pathname);
   const [loaded, setLoaded] = useState<Loaded>({ kind: "loading" });
   const started = useRef(false);
+  const client = useQueryClient();
   useTitle("Edit game - Guessdle", true);
+
+  // Edits here can move the game's status and roster, so Play must not show its old copy after
+  useEffect(() => () => forgetGame(client, slug), [client, slug]);
 
   useEffect(() => {
     if (!user || started.current) {

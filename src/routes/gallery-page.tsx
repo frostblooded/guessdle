@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { Link } from "react-router";
+import { GameKindLabel } from "../components/game-kind.tsx";
 import { EmptyState, PageHead } from "../components/page.tsx";
 import { Alert } from "../components/ui/alert.tsx";
 import { Badge } from "../components/ui/badge.tsx";
 import { buttonVariants } from "../components/ui/button.tsx";
+import type { GameKind } from "../game/blur.ts";
 import { bannerOf, type Banner } from "../game/banner.ts";
 import { cn } from "../lib/utils.ts";
 import { useTitle } from "../lib/use-title.ts";
@@ -16,7 +18,7 @@ interface GameCard {
   cover: string;
   photos: string[];
   entryCount: number;
-  kind: "classic" | "blur";
+  kind: GameKind;
 }
 
 async function fetchGames(): Promise<GameCard[]> {
@@ -99,15 +101,16 @@ function Card({ card, featured }: { card: GameCard; featured: boolean }) {
           <h2 className="flex flex-wrap items-center gap-2 text-xl font-bold tracking-wide uppercase">
             {card.name}
             {featured && <Badge variant="default">Original</Badge>}
-            {card.kind === "blur" && <Badge variant="secondary">Blur</Badge>}
           </h2>
           {card.description && (
             <p className="line-clamp-3 text-sm text-muted-foreground">
               {card.description}
             </p>
           )}
-          <p className="fine-print mt-auto text-xs font-medium text-muted-foreground">
-            {card.entryCount} entries
+          <p className="fine-print mt-auto flex flex-wrap items-center gap-x-1.5 text-xs font-medium text-muted-foreground">
+            <GameKindLabel kind={card.kind} />
+            <span aria-hidden="true">·</span>
+            <span>{card.entryCount} entries</span>
           </p>
         </div>
       </Link>
