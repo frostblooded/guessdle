@@ -39,6 +39,8 @@ import { useVictoryStats } from "./use-victory-stats.ts";
 type PlayableGame = {
   name: string;
   canEdit: boolean;
+  // Some entries miss values, so the game cannot be played for now
+  paused: boolean;
   attributes: GameAttribute[];
   entries: EntryRef[];
 } & StatusView;
@@ -96,6 +98,8 @@ function Game({ slug }: { slug: string }) {
   const playable = typeof game === "object" && game !== null ? game : null;
   const roster = playable?.entries ?? [];
   const tooSmall = playable !== null && roster.length < MIN_ENTRIES;
+  // Not playable for now: too few entries, or paused
+  const closed = tooSmall || playable?.paused === true;
 
   useTitle(
     game === "missing"
@@ -113,7 +117,7 @@ function Game({ slug }: { slug: string }) {
   // Once the game and who is signed in are known: pick where the game lives, then load it.
   // The ref keeps StrictMode's second effect run from merging twice.
   useEffect(() => {
-    if (!playable || tooSmall || me.isPending || started.current) {
+    if (!playable || closed || me.isPending || started.current) {
       return;
     }
     started.current = true;
@@ -154,7 +158,7 @@ function Game({ slug }: { slug: string }) {
       }
       setReady(true);
     })();
-  }, [playable, tooSmall, me.isPending, me.data, slug]);
+  }, [playable, closed, me.isPending, me.data, slug]);
 
   async function submit(name: string): Promise<void> {
     const id = findEntryId(roster, name);
@@ -236,13 +240,15 @@ function Game({ slug }: { slug: string }) {
   }
 
   // The game cannot be played on this page view: the reason shows as the notice
-  const cannotPlay = game === null || tooSmall || blocked;
+  const cannotPlay = game === null || closed || blocked;
   const shownNotice =
     game === null
       ? GAME_FAILED
       : tooSmall
         ? `${FAILURES.not_enough_entries.text} It has ${roster.length} now.`
-        : notice;
+        : closed
+          ? FAILURES.game_paused.text
+          : notice;
   const loading = !cannotPlay && !ready;
   const finished = result !== null;
   // Each row names its guess in the second cell; those names leave the suggestions
@@ -287,7 +293,7 @@ function Game({ slug }: { slug: string }) {
             </Button>
             <PlayActions
               slug={slug}
-              canHost={playable !== null && !tooSmall}
+              canHost={playable !== null && !closed}
               canEdit={playable?.canEdit === true}
             />
           </>

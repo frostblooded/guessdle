@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import { statusNotice, type Details } from "../src/game/editor.ts";
+import { erasedBy, statusNotice, type Details } from "../src/game/editor.ts";
 
 const base: Details = {
   slug: "pets",
@@ -11,6 +11,7 @@ const base: Details = {
   rejectReason: "",
   skipPeriod: null,
   entryCount: 5,
+  incompleteCount: 0,
 };
 
 describe("statusNotice", () => {
@@ -22,6 +23,17 @@ describe("statusNotice", () => {
     );
   });
 
+  it("says a game with incomplete entries is paused, approved or not", () => {
+    assert.match(
+      statusNotice({ ...base, status: "approved", incompleteCount: 1 }),
+      /^Paused: 1 entry is missing values/,
+    );
+    assert.match(
+      statusNotice({ ...base, incompleteCount: 3 }),
+      /^Draft.* Paused: 3 entries are missing values/,
+    );
+  });
+
   it("explains every other status", () => {
     assert.match(statusNotice(base), /^Draft/);
     assert.match(statusNotice({ ...base, status: "pending" }), /^Pending/);
@@ -29,5 +41,28 @@ describe("statusNotice", () => {
       statusNotice({ ...base, status: "rejected", rejectReason: "Too vague" }),
       /^Rejected: Too vague/,
     );
+  });
+});
+
+describe("erasedBy", () => {
+  const saved = [
+    { id: 1, name: "Colors", type: "list" },
+    { id: 2, name: "Height", type: "text" },
+    { id: 3, name: "Owner", type: "text" },
+  ];
+
+  it("names removed attributes and changed types, not renames or new ones", () => {
+    assert.deepEqual(
+      erasedBy(saved, [
+        { id: 1, type: "list" },
+        { id: 2, type: "number" },
+        { type: "number" },
+      ]),
+      ["Height", "Owner"],
+    );
+  });
+
+  it("is empty when nothing is lost", () => {
+    assert.deepEqual(erasedBy(saved, saved), []);
   });
 });

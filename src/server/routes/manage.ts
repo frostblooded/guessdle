@@ -16,8 +16,10 @@ import {
   listAttributes,
   listOwned,
   patchKind,
+  saveAttributes,
   skipOf,
   updateGame,
+  type AttributeDraft,
   type AttributeEdit,
 } from "../games.ts";
 import { rateLimit, type RateLimit } from "../rate-limit.ts";
@@ -86,6 +88,7 @@ export function manageRoutes(
     rejectReason: game.rejectReason,
     skipPeriod: game.skipPeriod,
     entryCount: roster.entries.length,
+    incompleteCount: roster.incomplete,
     canApprove: canApprove(game, user),
   });
 
@@ -138,15 +141,33 @@ export function manageRoutes(
 
   const attrBase = "/api/games/:slug/attributes";
   const typeOf = (v: unknown): AttributeType | undefined =>
-    v === "text" || v === "list" ? v : undefined;
+    v === "text" || v === "list" || v === "number" ? v : undefined;
   const nameOf = (v: unknown): string | undefined =>
     nameIn(v, MAX_ATTRIBUTE_NAME);
   const idOf = (req: Request): number => {
     const raw = String(req.params["id"]);
     return /^\d{1,15}$/.test(raw) ? Number(raw) : -1;
   };
-  // Applies the edit `build` reads from the request, then answers with the attributes
-  const attributeRoute = (build: (req: Request) => AttributeEdit | undefined) =>
+  // The editor's Save: the whole list, each item {id?, name, type}; undefined when malformed
+  const draftsOf = (v: unknown): AttributeDraft[] | undefined => {
+    if (!Array.isArray(v)) {
+      return undefined;
+    }
+    const drafts = v.map((item: unknown): AttributeDraft | undefined => {
+      const { id, name, type } = (item ?? {}) as Record<string, unknown>;
+      const [n, t] = [nameOf(name), typeOf(type)];
+      const okId = id === undefined || (Number.isInteger(id) && Number(id) > 0);
+      return n && t && okId
+        ? { id: id as number | undefined, name: n, type: t }
+        : undefined;
+    });
+    return drafts.every((d) => d !== undefined) ? drafts : undefined;
+  };
+  // Applies the edit `build` reads from the request (one change, or the whole list), then
+  // answers with the attributes
+  const attributeRoute = (
+    build: (req: Request) => AttributeEdit | AttributeDraft[] | undefined,
+  ) =>
     manageRoute(async ({ game }, _user, req, res) => {
       const edit = build(req);
       if (!edit) {
@@ -156,7 +177,10 @@ export function manageRoutes(
       const out = await lifecycle.edit(
         game,
         "attributes",
-        (tx) => editAttributes(tx, game, edit),
+        (tx) =>
+          Array.isArray(edit)
+            ? saveAttributes(tx, game, edit)
+            : editAttributes(tx, game, edit),
         (r) => r === "ok",
       );
       if (out !== "ok" && out !== "noop") {
@@ -181,6 +205,12 @@ export function manageRoutes(
       const [n, t] = [nameOf(name), typeOf(type)];
       return n && t ? { add: { name: n, type: t } } : undefined;
     }),
+  );
+  app.put(
+    attrBase,
+    writes,
+    json,
+    attributeRoute((req) => draftsOf(bodyOf(req)["attributes"])),
   );
   app.patch(
     `${attrBase}/:id`,

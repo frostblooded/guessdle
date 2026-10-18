@@ -4,9 +4,11 @@ import {
   type AttributeValue,
   Correctness,
   gradeCorrectness,
+  gradeNumber,
+  type Hint,
 } from "./correctness.ts";
 
-export type AttributeType = "text" | "list";
+export type AttributeType = "text" | "list" | "number";
 
 export interface GameAttribute {
   name: string;
@@ -20,8 +22,8 @@ export interface EntryRef {
   photo: string;
 }
 
-// An entry with its values, one per game attribute in attribute order (Text as
-// a string, List as an array)
+// An entry with its values, one per game attribute in attribute order (Text and
+// Number as a string, List as an array)
 export interface Entry extends EntryRef {
   values: AttributeValue[];
 }
@@ -32,7 +34,13 @@ export interface GradedAttribute {
   key: string;
   value: AttributeValue;
   correctness: Correctness;
+  // Number columns only, on a wrong guess
+  hint?: Hint;
 }
+
+// Every attribute has a value: an entry missing one pauses its game
+export const hasAllValues = (values: readonly AttributeValue[]): boolean =>
+  values.every((value: AttributeValue): boolean => value.length > 0);
 
 export function isAnswerRow(row: GradedAttribute[]): boolean {
   return row.every(
@@ -62,7 +70,14 @@ export function gradeGuess(
       (attribute: GameAttribute, i: number): GradedAttribute => ({
         key: attribute.name,
         value: guess.values[i]!,
-        correctness: gradeCorrectness(guess.values[i]!, answer.values[i]!),
+        ...(attribute.type === "number"
+          ? gradeNumber(guess.values[i] as string, answer.values[i] as string)
+          : {
+              correctness: gradeCorrectness(
+                guess.values[i]!,
+                answer.values[i]!,
+              ),
+            }),
       }),
     ),
   ];

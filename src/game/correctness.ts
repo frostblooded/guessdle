@@ -36,6 +36,28 @@ export function gradeCorrectness(
   return Correctness.Incorrect;
 }
 
+// Where the Daily Answer's number lies from a wrong guess
+export type Hint = "higher" | "lower";
+
+// Number: correct on the same value (so 2.50 matches 2.5); otherwise incorrect, with whether
+// the answer is higher or lower. A blank on either side is graded like Text and gets no hint.
+export function gradeNumber(
+  guess: string,
+  answer: string,
+): { correctness: Correctness; hint?: Hint } {
+  if (guess === "" || answer === "") {
+    return { correctness: gradeCorrectness(guess, answer) };
+  }
+  const [g, a] = [Number(guess), Number(answer)];
+  if (g === a) {
+    return { correctness: Correctness.Correct };
+  }
+  return {
+    correctness: Correctness.Incorrect,
+    hint: a > g ? "higher" : "lower",
+  };
+}
+
 function arraysHaveCommonElement(array1: string[], array2: string[]): boolean {
   for (const el1 of array1) {
     for (const el2 of array2) {

@@ -46,8 +46,20 @@ describe("game entries", () => {
     return res.headers.get("set-cookie")!.split(";")[0]!;
   };
   const E = "/api/games/ann-game/entries";
-  const add = (body: unknown, cookie: string | undefined = ann) =>
-    request("POST", E, cookie, body);
+  // Every attribute needs a value: a named entry gets these unless the body sets its own
+  const add = (body: Body, cookie: string | undefined = ann) =>
+    request(
+      "POST",
+      E,
+      cookie,
+      body.name !== undefined &&
+        (body.values === undefined || typeof body.values === "object")
+        ? {
+            ...body,
+            values: { [colorId]: ["Red"], [originId]: "Spain", ...body.values },
+          }
+        : body,
+    );
   const one = async (name: string): Promise<Body> =>
     (await request("GET", E, ann)).body.find((e: Body) => e.name === name);
   const status = async (): Promise<string> =>
@@ -116,14 +128,53 @@ describe("game entries", () => {
       [colorId]: ["Red", "Blue"],
       [originId]: ["Spain"],
     });
-    // A patch touches only what it names; an empty list clears the value
+    // A patch touches only what it names
     const patched = await request("PATCH", `${E}/${rex.id}`, ann, {
-      values: { [colorId]: [] },
+      values: { [colorId]: ["Green"] },
     });
     assert.equal(patched.status, 200);
-    assert.deepEqual((await one("Rex")).values, { [originId]: ["Spain"] });
     await request("PATCH", `${E}/${rex.id}`, ann, { name: "Rexy" });
-    assert.deepEqual((await one("Rexy")).values, { [originId]: ["Spain"] });
+    assert.deepEqual((await one("Rexy")).values, {
+      [colorId]: ["Green"],
+      [originId]: ["Spain"],
+    });
+  });
+
+  it("refuses an entry missing a value, new or edited", async () => {
+    const missing = await request("POST", E, ann, {
+      name: "Rex",
+      values: { [colorId]: ["Red"] },
+    });
+    assert.equal(missing.status, 400);
+    assert.equal(missing.body.error, "missing_values");
+    const blank = await add({ name: "Rex", values: { [originId]: " " } });
+    assert.equal(blank.body.error, "missing_values");
+    await add({ name: "Rex" });
+    const rex = await one("Rex");
+    const cleared = await request("PATCH", `${E}/${rex.id}`, ann, {
+      values: { [colorId]: [] },
+    });
+    assert.equal(cleared.body.error, "missing_values");
+    assert.deepEqual((await one("Rex")).values, rex.values);
+  });
+
+  it("stores Number values as numbers and refuses anything else", async () => {
+    const [, , size] = (
+      await request("POST", "/api/games/ann-game/attributes", ann, {
+        name: "Size",
+        type: "number",
+      })
+    ).body;
+    const ok = await add({ name: "Rex", values: { [size.id]: " 2,5 " } });
+    assert.equal(ok.status, 200);
+    assert.deepEqual((await one("Rex")).values[size.id], ["2.5"]);
+    for (const bad of ["big", "1e3", "12 cm"]) {
+      const res = await add({ name: "Fido", values: { [size.id]: bad } });
+      assert.equal(res.status, 400, bad);
+      assert.equal(res.body.error, "not_a_number", bad);
+    }
+    const two = await add({ name: "Fido", values: { [size.id]: ["1", "2"] } });
+    assert.equal(two.body.error, "invalid");
   });
 
   it("rejects bad input and name clashes", async () => {
@@ -282,8 +333,66 @@ describe("game entries", () => {
   });
 
   it("removing an attribute drops its values from the entry list", async () => {
-    await add({ name: "A", values: { [originId]: "Spain" } });
+    await add({ name: "A" });
     await request("DELETE", `/api/games/ann-game/attributes/${originId}`, ann);
-    assert.deepEqual((await one("A")).values, {});
+    assert.deepEqual((await one("A")).values, { [colorId]: ["Red"] });
+  });
+
+  it("a new attribute pauses the game until every entry has a value", async () => {
+    await add({ name: "A" });
+    await add({ name: "B" });
+    await db.pool.query("update games set status = 'approved'");
+    const game = async () => (await request("GET", "/api/games/ann-game")).body;
+    const gallery = async (): Promise<string[]> =>
+      (await request("GET", "/api/games")).body.map((g: Body) => g.slug);
+    assert.equal((await game()).paused, false);
+    assert.ok((await gallery()).includes("ann-game"));
+
+    const [, , size] = (
+      await request("POST", "/api/games/ann-game/attributes", ann, {
+        name: "Size",
+        type: "number",
+      })
+    ).body;
+    await db.pool.query("update games set status = 'approved'");
+    assert.equal((await game()).paused, true);
+    assert.ok(!(await gallery()).includes("ann-game"));
+    const grade = await request("POST", "/api/games/ann-game/grade", ann, {
+      ids: [],
+    });
+    assert.equal(grade.status, 409);
+    assert.equal(grade.body.error, "game_paused");
+    const details = await request("GET", "/api/games/ann-game/details", ann);
+    assert.equal(details.body.incompleteCount, 2);
+
+    for (const name of ["A", "B"]) {
+      await request("PATCH", `${E}/${(await one(name)).id}`, ann, {
+        values: { [size.id]: "3" },
+      });
+    }
+    await db.pool.query("update games set status = 'approved'");
+    assert.equal((await game()).paused, false);
+    assert.equal(
+      (
+        await request("POST", "/api/games/ann-game/grade", ann, {
+          ids: [],
+        })
+      ).status,
+      200,
+    );
+    assert.ok((await gallery()).includes("ann-game"));
+  });
+
+  it("submit is refused while an entry is missing a value", async () => {
+    await add({ name: "A" });
+    await add({ name: "B" });
+    await request("POST", "/api/games/ann-game/attributes", ann, {
+      name: "Size",
+      type: "number",
+    });
+    const res = await request("POST", "/api/games/ann-game/submit", ann, {});
+    assert.equal(res.status, 409);
+    assert.equal(res.body.error, "incomplete_entries");
+    assert.equal(await status(), "draft");
   });
 });

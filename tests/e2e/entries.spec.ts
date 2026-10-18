@@ -73,7 +73,14 @@ test("the Entries tab adds, edits and deletes entries and counts what is missing
   await expect(page.locator("#entry-error")).toContainText(
     "already has that name",
   );
+  // Every attribute needs a value
   await page.locator("#entry-name").fill("Fido");
+  await page.getByRole("button", { name: "Add entry" }).click();
+  await expect(page.locator("#entry-error")).toContainText(
+    "Fill in every attribute",
+  );
+  await expect(page.locator("#entry-list li")).toHaveCount(1);
+  await page.getByLabel("Color (one per line)").fill("Brown");
   await page.getByRole("button", { name: "Add entry" }).click();
   await expect(page.locator("#entry-list li")).toHaveCount(2);
   await expect(page.locator("#status-notice")).not.toContainText("needs");

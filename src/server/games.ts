@@ -1,12 +1,13 @@
 // Game, attribute and entry data: the one seam between routes and the tables.
-import {
-  MAX_ATTRIBUTES,
-  MAX_VALUE_LENGTH,
-  MIN_ENTRIES,
-} from "../game/limits.ts";
+import { MAX_ATTRIBUTES, MIN_ENTRIES } from "../game/limits.ts";
 import type pg from "pg";
 import type { AttributeValue } from "../game/correctness.ts";
-import type { AttributeType, Entry, GameAttribute } from "../game/game.ts";
+import {
+  hasAllValues,
+  type AttributeType,
+  type Entry,
+  type GameAttribute,
+} from "../game/game.ts";
 import { MAX_TILES } from "../game/banner.ts";
 import { slugError } from "../game/slug.ts";
 import type { EditKind } from "./lifecycle.ts";
@@ -65,7 +66,16 @@ export interface Roster {
   entries: Entry[];
   // Every entry including soft-deleted ones, so past guesses still resolve
   all: Entry[];
+  // Active entries missing a value: while any are, the game is paused
+  incomplete: number;
 }
+
+// SQL true when the game aliased `g` has an active entry missing a value (no value rows for an
+// attribute; blanks are never stored). Such a game is paused.
+export const HAS_MISSING_VALUES = `exists (
+  select 1 from entries e join attributes a on a.game_id = e.game_id
+  where e.game_id = g.id and e.deleted_at is null and not exists (
+    select 1 from entry_values v where v.entry_id = e.id and v.attribute_id = a.id))`;
 
 // A game's attributes and entries with their values
 export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
@@ -112,10 +122,12 @@ export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
     photo,
     values: attributes.rows.map((attr) => cell(id, attr)),
   }));
+  const active = all.filter((_, i) => !entries.rows[i]!.deleted);
   return {
     attributes: attributes.rows.map(({ name, type }) => ({ name, type })),
-    entries: all.filter((_, i) => !entries.rows[i]!.deleted),
+    entries: active,
     all,
+    incomplete: active.filter((entry) => !hasAllValues(entry.values)).length,
   };
 }
 
@@ -129,7 +141,8 @@ export interface GalleryCard {
   entryCount: number;
 }
 
-// Approved games with at least MIN_ENTRIES active entries: the original first, then newest first
+// Approved games with at least MIN_ENTRIES active entries and none missing a value: the original
+// first, then newest first
 export async function listGallery(q: Q): Promise<GalleryCard[]> {
   const { rows } = await q.query<GalleryCard>(
     `select g.slug, g.name, g.description, g.cover_url as cover,
@@ -140,7 +153,7 @@ export async function listGallery(q: Q): Promise<GalleryCard[]> {
        ) else '{}'::text[] end as photos,
        count(e.id)::int as "entryCount"
      from games g join entries e on e.game_id = g.id and e.deleted_at is null
-     where g.status = 'approved'
+     where g.status = 'approved' and not ${HAS_MISSING_VALUES}
      group by g.id having count(e.id) >= $1
      order by g.slug = 'petdle' desc, g.created_at desc, g.id desc`,
     [MIN_ENTRIES, MAX_TILES],
@@ -250,6 +263,66 @@ export async function listAttributes(
   return rows;
 }
 
+// The whole attribute list as the editor's Save sends it: kept ones by id, new ones without
+export interface AttributeDraft {
+  id?: number | undefined;
+  name: string;
+  type: AttributeType;
+}
+
+// Replaces a game's attributes with `drafts`, in that order: missing ids are removed, a changed
+// type erases that attribute's values, new ones are added. All or nothing, in the caller's game
+// transaction (lifecycle.edit). "noop" when nothing changed.
+export async function saveAttributes(
+  client: Q,
+  game: GameRow,
+  drafts: readonly AttributeDraft[],
+): Promise<"ok" | "noop" | "invalid" | "attribute_exists" | "not_found"> {
+  const attrs = await listAttributes(client, game);
+  const ids = drafts.flatMap((d) => (d.id === undefined ? [] : [d.id]));
+  const names = drafts.map((d) => d.name.toLowerCase());
+  if (drafts.length > MAX_ATTRIBUTES || new Set(ids).size !== ids.length) {
+    return "invalid";
+  }
+  if (ids.some((id) => !attrs.some((a) => a.id === id))) {
+    return "not_found";
+  }
+  if (new Set(names).size !== names.length) {
+    return "attribute_exists";
+  }
+  const unchanged =
+    drafts.length === attrs.length &&
+    drafts.every(
+      (d, i) =>
+        d.id === attrs[i]!.id &&
+        d.name === attrs[i]!.name &&
+        d.type === attrs[i]!.type,
+    );
+  if (unchanged) {
+    return "noop";
+  }
+  const removed = attrs.filter((a) => !ids.includes(a.id)).map((a) => a.id);
+  const retyped = attrs
+    .filter((a) => drafts.some((d) => d.id === a.id && d.type !== a.type))
+    .map((a) => a.id);
+  await client.query("delete from attributes where id = any($1::bigint[])", [
+    removed,
+  ]);
+  await client.query(
+    "delete from entry_values where attribute_id = any($1::bigint[])",
+    [retyped],
+  );
+  for (const [position, d] of drafts.entries()) {
+    await client.query(
+      d.id === undefined
+        ? "insert into attributes (game_id, name, type, position) values ($1, $2, $3, $4)"
+        : "update attributes set name = $2, type = $3, position = $4 where id = $1",
+      [d.id ?? game.id, d.name, d.type, position],
+    );
+  }
+  return "ok";
+}
+
 export type AttributeEdit =
   | { add: { name: string; type: AttributeType } }
   | {
@@ -261,9 +334,9 @@ export type AttributeEdit =
     }
   | { remove: number };
 
-// Adds, renames, retypes or removes an attribute. Removing hard-deletes its values; Text to
-// List keeps the value as a one-item list, List to Text joins the items with ", ". A real
-// change is "ok" (the lifecycle then resets the status), a rename to the same name is "noop".
+// Adds, renames, retypes or removes an attribute. Removing or retyping hard-deletes its values,
+// which pauses the game until every entry is filled in again. A real change is "ok" (the
+// lifecycle then resets the status), a rename to the same name is "noop".
 // Runs in the caller's game transaction (lifecycle.edit).
 export async function editAttributes(
   client: Q,
@@ -301,18 +374,10 @@ export async function editAttributes(
         return "attribute_exists";
       }
       changed = name !== attr.name || type !== attr.type;
-      if (type === "text" && attr.type === "list") {
-        await client.query(
-          `update entry_values v set value = j.joined
-             from (select entry_id, left(string_agg(value, ', ' order by position), $2) as joined
-                   from entry_values where attribute_id = $1 group by entry_id) j
-             where v.attribute_id = $1 and v.entry_id = j.entry_id and v.position = 0`,
-          [id, MAX_VALUE_LENGTH],
-        );
-        await client.query(
-          "delete from entry_values where attribute_id = $1 and position > 0",
-          [id],
-        );
+      if (type !== attr.type) {
+        await client.query("delete from entry_values where attribute_id = $1", [
+          id,
+        ]);
       }
       await client.query(
         "update attributes set name = $2, type = $3 where id = $1",

@@ -1,5 +1,6 @@
 // Entry editing (spec #66): add, change and soft-delete the entries of one game.
 import type pg from "pg";
+import { parseNumberValue } from "../game/number.ts";
 import { listAttributes, type GameRow } from "./games.ts";
 
 export interface EntryRow {
@@ -36,8 +37,10 @@ export interface EntryInput {
   values?: Record<string, string[]>;
 }
 
-// Creates the entry (`id` undefined) or changes it. Runs in the caller's game transaction
-// (lifecycle.edit), which applies the status rule. `replacedPhoto` is the file the caller should delete.
+// Creates the entry (`id` undefined) or changes it. Every attribute needs a value once saved,
+// from the input or already stored; Number values are stored as parseNumberValue gives them.
+// Runs in the caller's game transaction (lifecycle.edit), which applies the status rule.
+// `replacedPhoto` is the file the caller should delete.
 export async function saveEntry(
   tx: pg.PoolClient,
   game: GameRow,
@@ -48,6 +51,8 @@ export async function saveEntry(
   | "invalid"
   | "entry_exists"
   | "not_found"
+  | "missing_values"
+  | "not_a_number"
 > {
   const current = (
     await tx.query<{ name: string; photo: string }>(
@@ -70,11 +75,30 @@ export async function saveEntry(
     return "entry_exists";
   }
   const attrs = await listAttributes(tx, game);
+  const values: Record<string, string[]> = {};
   for (const [attrId, items] of Object.entries(input.values ?? {})) {
     const attr = attrs.find((a) => String(a.id) === attrId);
-    if (!attr || (attr.type === "text" && items.length > 1)) {
+    if (!attr || (attr.type !== "list" && items.length > 1)) {
       return "invalid";
     }
+    const parsed = attr.type === "number" ? items.map(parseNumberValue) : items;
+    if (parsed.some((v) => v === null)) {
+      return "not_a_number";
+    }
+    values[attrId] = parsed as string[];
+  }
+  const stored = new Set(
+    (
+      await tx.query<{ attribute_id: string }>(
+        "select distinct attribute_id::text from entry_values where entry_id = $1",
+        [id ?? 0],
+      )
+    ).rows.map((r) => r.attribute_id),
+  );
+  const filled = (attrId: string): boolean =>
+    attrId in values ? values[attrId]!.length > 0 : stored.has(attrId);
+  if (!attrs.every((a) => filled(String(a.id)))) {
+    return "missing_values";
   }
   let entryId = id;
   if (entryId === undefined) {
@@ -90,7 +114,7 @@ export async function saveEntry(
       [entryId, name, photo],
     );
   }
-  for (const [attrId, items] of Object.entries(input.values ?? {})) {
+  for (const [attrId, items] of Object.entries(values)) {
     await tx.query(
       "delete from entry_values where entry_id = $1 and attribute_id = $2",
       [entryId, attrId],

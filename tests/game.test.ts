@@ -5,6 +5,7 @@ import {
   findEntryId,
   gradeGuess,
   gradeIds,
+  hasAllValues,
   type Entry,
   type GameAttribute,
 } from "../src/game/game.ts";
@@ -77,6 +78,41 @@ describe("gradeGuess", () => {
       gradeGuess(ATTRIBUTES, first, twin)[0]!.correctness,
       Correctness.Incorrect,
     );
+  });
+});
+
+describe("gradeGuess: Number attributes", () => {
+  const attrs: GameAttribute[] = [{ name: "Age", type: "number" }];
+  const aged = (id: number, age: string): Entry => ({
+    id,
+    name: `E${id}`,
+    photo: "",
+    values: [age],
+  });
+
+  it("adds the hint only to a wrong number", () => {
+    const answer = aged(1, "7");
+    const wrong = gradeGuess(attrs, answer, aged(2, "3"))[2]!;
+    assert.equal(wrong.correctness, Correctness.Incorrect);
+    assert.equal(wrong.hint, "higher");
+    const right = gradeGuess(attrs, answer, aged(3, "7.0"))[2]!;
+    assert.equal(right.correctness, Correctness.Correct);
+    assert.equal("hint" in right, false);
+  });
+
+  it("leaves Text and List cells without a hint", () => {
+    for (const cell of gradeGuess(ATTRIBUTES, first, second)) {
+      assert.equal("hint" in cell, false, cell.key);
+    }
+  });
+});
+
+describe("hasAllValues", () => {
+  it("needs every Text, Number and List value filled", () => {
+    assert.equal(hasAllValues(["a", ["b"], "3"]), true);
+    assert.equal(hasAllValues(["a", [], "3"]), false);
+    assert.equal(hasAllValues(["", ["b"]]), false);
+    assert.equal(hasAllValues([]), true);
   });
 });
 

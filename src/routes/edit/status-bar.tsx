@@ -59,7 +59,9 @@ export function StatusBar({
         {canSubmit && (
           <Button
             id="submit-button"
-            disabled={details.entryCount < MIN_ENTRIES}
+            disabled={
+              details.entryCount < MIN_ENTRIES || details.incompleteCount > 0
+            }
             onClick={() => void flow("submit")}
           >
             Submit for approval

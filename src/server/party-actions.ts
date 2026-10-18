@@ -98,6 +98,9 @@ export async function act(
           if (active.length < MIN_ENTRIES) {
             return "not_enough_entries";
           }
+          if (data.roster.incomplete > 0) {
+            return "game_paused";
+          }
           await tx.query(
             `insert into party_rounds (party_id, number, answer_entry_id, started_at)
              values ($1, $2, $3, $4)`,

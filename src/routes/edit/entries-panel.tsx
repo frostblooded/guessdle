@@ -146,7 +146,8 @@ export function EntriesPanel({
       {dialog}
       <p className="lede text-sm text-muted-foreground">
         Each entry is a row on the board. A game needs at least {MIN_ENTRIES}{" "}
-        entries before anyone can play it.
+        entries before anyone can play it, and every entry needs a value for
+        every attribute.
       </p>
       <ul
         id="entry-list"
@@ -172,6 +173,13 @@ export function EntriesPanel({
             <span className="entry-name min-w-0 flex-1 truncate font-medium">
               {entry.name}
             </span>
+            {formAttributes.some(
+              (attr) => !entry.values[String(attr.id)]?.length,
+            ) && (
+              <span className="entry-missing shrink-0 text-sm font-medium text-error">
+                Missing values
+              </span>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -268,11 +276,14 @@ export function EntriesPanel({
                 <Label htmlFor={id}>
                   {attr.type === "list"
                     ? `${attr.name} (one per line)`
-                    : attr.name}
+                    : attr.type === "number"
+                      ? `${attr.name} (number)`
+                      : attr.name}
                 </Label>
                 {attr.type === "list" ? (
                   <Textarea
                     id={id}
+                    required
                     rows={3}
                     maxLength={MAX_VALUE_LENGTH * MAX_LIST_ITEMS}
                     value={value}
@@ -281,6 +292,8 @@ export function EntriesPanel({
                 ) : (
                   <Input
                     id={id}
+                    required
+                    inputMode={attr.type === "number" ? "decimal" : undefined}
                     maxLength={MAX_VALUE_LENGTH}
                     value={value.split("\n")[0]}
                     onChange={(event) => set(event.target.value)}
