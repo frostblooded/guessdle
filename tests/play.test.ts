@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
+import { FAILURES, UNREACHABLE } from "../src/game/failures.ts";
 import { beforeEach, describe, it } from "vitest";
 import { gradeIds } from "../src/game/game.ts";
 import type { StateStorage } from "../src/game/game-state.ts";
-import { createPlay } from "../src/game/play.ts";
+import { createPlay, type Loaded, type LoadFailure } from "../src/game/play.ts";
 import type { Fetch } from "../src/game/transport.ts";
 import { ATTRIBUTES, GUESS_DATA, SLUG } from "./roster-fixture.ts";
 
@@ -73,6 +74,15 @@ class FakeServer {
   };
 }
 
+// The loaded game, failing the test if the load was refused
+const loadedOf = async (play: {
+  load(): Promise<Loaded | LoadFailure>;
+}): Promise<Loaded> => {
+  const loaded = await play.load();
+  assert.ok(!("failure" in loaded), "load failed");
+  return loaded;
+};
+
 let storage: MemoryStorage;
 let server: FakeServer;
 const open = () =>
@@ -142,7 +152,10 @@ describe("submit", () => {
   it("stores nothing when the request fails", async () => {
     server.down = true;
     const play = open();
-    assert.deepEqual(await play.submit(one!.id), { kind: "error" });
+    assert.deepEqual(await play.submit(one!.id), {
+      kind: "error",
+      message: UNREACHABLE,
+    });
     assert.deepEqual(play.getUsedGuesses(), []);
     server.down = false;
     assert.equal((await play.submit(one!.id)).kind, "accepted");
@@ -154,7 +167,10 @@ describe("submit", () => {
       status: 500,
       json: async () => ({ error: "server_error" }),
     });
-    assert.deepEqual(await open().submit(one!.id), { kind: "error" });
+    assert.deepEqual(await open().submit(one!.id), {
+      kind: "error",
+      message: FAILURES.server_error.text,
+    });
   });
 
   it("reports a rate limit, JSON or nginx plain text, and keeps state", async () => {
@@ -200,7 +216,7 @@ describe("load", () => {
   it("regrades stored guesses, oldest first", async () => {
     await open().submit(one!.id);
     await open().submit(two!.id);
-    const loaded = await open().load();
+    const loaded = await loadedOf(open());
     assert.deepEqual(
       loaded?.rows.map((row) => row[1]!.value),
       [one!.name, two!.name],
@@ -211,7 +227,7 @@ describe("load", () => {
   it("shows the victory and the answer when a stored guess is right", async () => {
     await open().submit(one!.id);
     await open().submit(answer.id);
-    const loaded = await open().load();
+    const loaded = await loadedOf(open());
     assert.equal(loaded?.victory, true);
     assert.equal(loaded?.answer, answer.name);
   });
@@ -233,11 +249,11 @@ describe("load", () => {
     assert.deepEqual(play.getUsedGuesses(), []);
   });
 
-  it("keeps the stored guesses and returns null when the server is down", async () => {
+  it("keeps the stored guesses and reports the server as unreachable", async () => {
     await open().submit(one!.id);
     server.down = true;
     const play = open();
-    assert.equal(await play.load(), null);
+    assert.deepEqual(await play.load(), { failure: UNREACHABLE });
     assert.deepEqual(play.getUsedGuesses(), [one!.id]);
   });
 });
@@ -288,7 +304,10 @@ describe("giveUp", () => {
   it("changes nothing when the request fails", async () => {
     const play = open();
     server.down = true;
-    assert.deepEqual(await play.giveUp(), { kind: "error" });
+    assert.deepEqual(await play.giveUp(), {
+      kind: "error",
+      message: UNREACHABLE,
+    });
     assert.equal(storage.getItem("gaveUp"), null);
     server.down = false;
     assert.equal((await play.submit(one!.id)).kind, "accepted");
@@ -300,7 +319,10 @@ describe("giveUp", () => {
       status: 500,
       json: async () => ({ error: "server_error" }),
     });
-    assert.deepEqual(await open().giveUp(), { kind: "error" });
+    assert.deepEqual(await open().giveUp(), {
+      kind: "error",
+      message: FAILURES.server_error.text,
+    });
   });
 
   it("starts over instead of revealing when the server is on a newer day", async () => {
@@ -320,7 +342,7 @@ describe("giveUp", () => {
     await first.submit(one!.id);
     await first.giveUp();
     const play = open();
-    const loaded = await play.load();
+    const loaded = await loadedOf(play);
     assert.equal(loaded?.gaveUp, true);
     assert.equal(loaded?.victory, false);
     assert.equal(loaded?.answer, answer.name);
@@ -330,7 +352,7 @@ describe("giveUp", () => {
 
   it("is restored on load even with no guesses", async () => {
     await open().giveUp();
-    const loaded = await open().load();
+    const loaded = await loadedOf(open());
     assert.deepEqual(
       [loaded?.gaveUp, loaded?.answer, loaded?.rows.length],
       [true, answer.name, 0],
@@ -359,10 +381,10 @@ describe("giveUp", () => {
     assert.equal((await next.submit(one!.id)).kind, "accepted");
   });
 
-  it("keeps the stored give-up and returns null on load when the server is down", async () => {
+  it("keeps the stored give-up and reports the server as unreachable on load", async () => {
     await open().giveUp();
     server.down = true;
-    assert.equal(await open().load(), null);
+    assert.deepEqual(await open().load(), { failure: UNREACHABLE });
     assert.equal(storage.getItem("gaveUp"), "true");
   });
 });
@@ -376,7 +398,7 @@ describe("reset", () => {
     assert.deepEqual(play.getUsedGuesses(), []);
     assert.equal(storage.getItem("day"), null);
     assert.equal((await play.submit(answer.id)).kind, "accepted");
-    assert.equal((await open().load())?.rows.length, 1);
+    assert.equal((await loadedOf(open())).rows.length, 1);
   });
 
   it("after a give-up clears the finished state and allows replay", async () => {
@@ -458,7 +480,7 @@ describe("a past day", () => {
 
   it("keeps its guesses on later calendar days", async () => {
     await openPast(MONDAY).submit(one!.id);
-    const loaded = await openPast(TUESDAY).load();
+    const loaded = await loadedOf(openPast(TUESDAY));
     assert.equal(loaded?.rows.length, 1);
   });
 

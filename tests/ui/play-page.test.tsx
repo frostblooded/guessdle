@@ -4,6 +4,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, it, vi } from "vitest";
+import { FAILURES, UNREACHABLE } from "../../src/game/failures.ts";
 import { PlayPage } from "../../src/routes/play/play-page.tsx";
 
 // A tiny game: answer Dido; Color is the one attribute
@@ -269,9 +270,9 @@ describe("PlayPage", () => {
   });
 
   it("a game that cannot load disables every control", async () => {
-    vi.stubGlobal("fetch", fakeServer(json(500, {})));
+    vi.stubGlobal("fetch", fakeServer(json(500, { error: "server_error" })));
     renderPlay();
-    await screen.findByText(/Could not load the game/);
+    await screen.findByText(FAILURES.server_error.text);
     assert.equal(input().disabled, true);
     for (const name of ["Guess", "Reset", "Give up"]) {
       assert.equal(
@@ -280,6 +281,37 @@ describe("PlayPage", () => {
         name,
       );
     }
+  });
+});
+
+describe("PlayPage load failures", () => {
+  it("blames the connection only when the server cannot be reached", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url === "/api/me") {
+          return json(200, { user: null });
+        }
+        throw new TypeError("Failed to fetch");
+      }),
+    );
+    renderPlay();
+    await screen.findByText(UNREACHABLE);
+  });
+
+  it("names a refusal the server explains", async () => {
+    vi.stubGlobal("fetch", fakeServer(json(409, { error: "game_paused" })));
+    renderPlay();
+    await screen.findByText(FAILURES.game_paused.text);
+  });
+
+  it("does not blame the connection for a reply it cannot read", async () => {
+    vi.stubGlobal(
+      "fetch",
+      fakeServer(new Response("<html>Bad gateway</html>", { status: 502 })),
+    );
+    renderPlay();
+    await screen.findByText(/answered with a problem it did not explain/);
   });
 });
 

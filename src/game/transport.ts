@@ -1,4 +1,5 @@
 // The one fetch transport shared by anonymous play, signed-in play and merge.
+import { failureText, UNREACHABLE } from "./failures.ts";
 
 // The part of fetch that the game clients use
 export type Fetch = (
@@ -44,6 +45,14 @@ export async function call(
   } catch {
     return null;
   }
+}
+
+// What to tell the player about a reply that was not a success: the server's own reason, or that
+// it could not be reached at all
+export function failureMessage(res: Reply | null): string {
+  return res === null
+    ? UNREACHABLE
+    : failureText((res.data as { error?: unknown } | null)?.error, res.status);
 }
 
 export function failureOf(res: Reply | null): Failure | null {

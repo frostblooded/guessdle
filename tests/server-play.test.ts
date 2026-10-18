@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { FAILURES, UNREACHABLE } from "../src/game/failures.ts";
 import { beforeEach, describe, it } from "vitest";
 import { gradeIds } from "../src/game/game.ts";
 import { ATTRIBUTES, GUESS_DATA, SLUG } from "./roster-fixture.ts";
+import type { Loaded, LoadFailure } from "../src/game/play.ts";
 import { createServerPlay } from "../src/game/server-play.ts";
 import type { Fetch } from "../src/game/transport.ts";
 
@@ -51,7 +53,9 @@ class FakeServer {
       },
     });
     if (this.status !== null) {
-      return reply(this.status, { error: "rate_limited" });
+      return reply(this.status, {
+        error: this.status === 429 ? "rate_limited" : "server_error",
+      });
     }
     const finished = this.view().victory || this.gaveUp;
     if (url === `/api/games/${SLUG}/state`) {
@@ -82,6 +86,15 @@ class FakeServer {
   };
 }
 
+// The loaded game, failing the test if the load was refused
+const loadedOf = async (play: {
+  load(): Promise<Loaded | LoadFailure>;
+}): Promise<Loaded> => {
+  const loaded = await play.load();
+  assert.ok(!("failure" in loaded), "load failed");
+  return loaded;
+};
+
 let server: FakeServer;
 let newDays: number;
 const open = () =>
@@ -100,32 +113,67 @@ describe("load", () => {
   it("returns the stored game, and its ids feed getUsedGuesses", async () => {
     server.ids = [one!.id];
     const play = open();
-    const loaded = await play.load();
-    assert.equal(loaded?.rows.length, 1);
-    assert.equal(loaded?.victory, false);
+    const loaded = await loadedOf(play);
+    assert.equal(loaded.rows.length, 1);
+    assert.equal(loaded.victory, false);
     assert.deepEqual(play.getUsedGuesses(), [one!.id]);
   });
 
   it("carries the win and the answer", async () => {
     server.ids = [answer.id];
-    const loaded = await open().load();
-    assert.equal(loaded?.victory, true);
-    assert.equal(loaded?.answer, answer.name);
+    const loaded = await loadedOf(open());
+    assert.equal(loaded.victory, true);
+    assert.equal(loaded.answer, answer.name);
   });
 
   it("carries a give-up", async () => {
     server.gaveUp = true;
-    const loaded = await open().load();
-    assert.equal(loaded?.gaveUp, true);
-    assert.equal(loaded?.answer, answer.name);
+    const loaded = await loadedOf(open());
+    assert.equal(loaded.gaveUp, true);
+    assert.equal(loaded.answer, answer.name);
   });
 
-  it("is null when the server cannot be reached or errors", async () => {
+  it("says why when the server cannot be reached or refuses", async () => {
     server.down = true;
-    assert.equal(await open().load(), null);
+    assert.deepEqual(await open().load(), { failure: UNREACHABLE });
     server.down = false;
     server.status = 500;
-    assert.equal(await open().load(), null);
+    assert.deepEqual(await open().load(), {
+      failure: FAILURES.server_error.text,
+    });
+    server.status = 429;
+    assert.deepEqual(await open().load(), {
+      failure: FAILURES.rate_limited.text,
+    });
+  });
+});
+
+describe("load refusals", () => {
+  it.each([
+    [401, "unauthorized"],
+    [404, "not_found"],
+    [409, "game_paused"],
+    [409, "not_enough_entries"],
+  ] as const)("explains a %i %s reply", async (status, error) => {
+    server.fetch = async () => ({
+      ok: false,
+      status,
+      json: async () => ({ error }),
+    });
+    assert.deepEqual(await open().load(), {
+      failure: FAILURES[error].text,
+    });
+  });
+
+  it("does not blame the connection for an unknown error", async () => {
+    server.fetch = async () => ({
+      ok: false,
+      status: 500,
+      json: async () => ({}),
+    });
+    const loaded = await open().load();
+    assert.ok("failure" in loaded);
+    assert.match(loaded.failure, /did not explain/);
   });
 });
 
@@ -175,10 +223,16 @@ describe("submit", () => {
   it("is an error when the request fails, keeping state", async () => {
     const play = open();
     server.down = true;
-    assert.deepEqual(await play.submit(one!.id), { kind: "error" });
+    assert.deepEqual(await play.submit(one!.id), {
+      kind: "error",
+      message: UNREACHABLE,
+    });
     server.down = false;
     server.status = 500;
-    assert.deepEqual(await play.submit(one!.id), { kind: "error" });
+    assert.deepEqual(await play.submit(one!.id), {
+      kind: "error",
+      message: FAILURES.server_error.text,
+    });
     server.status = null;
     assert.equal((await play.submit(one!.id)).kind, "accepted");
   });
@@ -221,7 +275,10 @@ describe("give up", () => {
 
   it("is an error when the request fails", async () => {
     server.down = true;
-    assert.deepEqual(await open().giveUp(), { kind: "error" });
+    assert.deepEqual(await open().giveUp(), {
+      kind: "error",
+      message: UNREACHABLE,
+    });
   });
 
   it("is finished when another device already ended the game", async () => {

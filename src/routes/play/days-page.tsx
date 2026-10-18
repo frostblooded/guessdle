@@ -6,7 +6,7 @@ import { EmptyState, PageHead } from "../../components/page.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { buttonVariants } from "../../components/ui/button.tsx";
 import { localStatus, type DaysResponse } from "../../game/days.ts";
-import { failureText } from "../../game/failures.ts";
+import { failureText, UNREACHABLE } from "../../game/failures.ts";
 import {
   createGameState,
   gameStorage,
@@ -17,9 +17,6 @@ import { useTitle } from "../../lib/use-title.ts";
 import { DayList } from "./day-list.tsx";
 import { GameNotFound } from "./past-day.tsx";
 import { loadGame } from "./play-page.tsx";
-
-const LOAD_FAILED =
-  "Could not load the past days. Your connection may be down or the server may have a problem. Refresh the page; if it keeps failing, try again in a few minutes.";
 
 // The list, "missing" for no such game, or the text of why it could not be loaded
 async function loadDays(
@@ -35,7 +32,7 @@ async function loadDays(
       ? (data as DaysResponse)
       : failureText((data as { error?: unknown } | null)?.error, res.status);
   } catch {
-    return LOAD_FAILED;
+    return UNREACHABLE;
   }
 }
 

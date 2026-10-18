@@ -8,7 +8,7 @@ import { PageHead } from "../../components/page.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
-import { FAILURES } from "../../game/failures.ts";
+import { FAILURES, failureText, UNREACHABLE } from "../../game/failures.ts";
 import {
   findEntryId,
   isAnswerRow,
@@ -54,18 +54,21 @@ export type PlayableGame = {
   entries: EntryRef[];
 } & StatusView;
 
-// The game's attributes and entries, "missing" for no such game, or null when it could not be loaded
+// The game's attributes and entries, "missing" for no such game, or the text of why it could not be loaded
 export async function loadGame(
   slug: string,
-): Promise<PlayableGame | "missing" | null> {
+): Promise<PlayableGame | "missing" | string> {
   try {
     const res = await fetch(`/api/games/${encodeURIComponent(slug)}`);
     if (res.status === 404) {
       return "missing";
     }
-    return res.ok ? ((await res.json()) as PlayableGame) : null;
+    const data = (await res.json().catch(() => null)) as unknown;
+    return res.ok
+      ? (data as PlayableGame)
+      : failureText((data as { error?: unknown } | null)?.error, res.status);
   } catch {
-    return null;
+    return UNREACHABLE;
   }
 }
 
@@ -73,14 +76,6 @@ const now = (): Date => new Date();
 
 export const RATE_LIMITED =
   "Too many requests in a short time. Wait a minute, then try again.";
-const GUESS_FAILED =
-  "Your guess could not be checked because the server did not answer. It is still in the box: press Enter to try again.";
-const GIVE_UP_FAILED =
-  "Could not reveal the answer because the server did not answer. Try again in a moment.";
-const GAME_FAILED =
-  "Could not load the game. Your connection may be down or the server may have a problem. Refresh the page; if it keeps failing, try again in a few minutes.";
-const STATE_FAILED =
-  "Could not load your game. Your connection may be down or the server may have a problem. Refresh the page; if it keeps failing, try again in a few minutes.";
 
 // `day`: a past day's Day Number from the address, or null for today
 function Game({ slug, day }: { slug: string; day: number | null }) {
@@ -107,7 +102,10 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const opener = useRef<HTMLButtonElement | null>(null);
   const victory = useVictoryStats(slug, play);
 
-  const playable = typeof game === "object" && game !== null ? game : null;
+  const playable = typeof game === "object" ? game : null;
+  // Why the game could not be loaded
+  const gameFailure =
+    typeof game === "string" && game !== "missing" ? game : null;
   const roster = playable?.entries ?? [];
   const tooSmall = playable !== null && roster.length < MIN_ENTRIES;
   // Not playable for now: too few entries, or paused
@@ -161,9 +159,9 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
       }
       play.current = current;
       const loaded = await current.load();
-      if (loaded === null) {
+      if ("failure" in loaded) {
         setBlocked(true);
-        setNotice(STATE_FAILED);
+        setNotice(loaded.failure);
         return;
       }
       setRows([...loaded.rows].reverse());
@@ -195,7 +193,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
       res.kind === "rate_limited"
         ? RATE_LIMITED
         : res.kind === "error"
-          ? GUESS_FAILED
+          ? res.message
           : null,
     );
     // The typed guess stays when the server could not grade it, to retry
@@ -228,7 +226,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
       res.kind === "rate_limited"
         ? RATE_LIMITED
         : res.kind === "error"
-          ? GIVE_UP_FAILED
+          ? res.message
           : null,
     );
     if (res.kind === "gaveUp") {
@@ -260,10 +258,10 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   }
 
   // The game cannot be played on this page view: the reason shows as the notice
-  const cannotPlay = game === null || closed || blocked;
+  const cannotPlay = gameFailure !== null || closed || blocked;
   const shownNotice =
-    game === null
-      ? GAME_FAILED
+    gameFailure !== null
+      ? gameFailure
       : tooSmall
         ? `${FAILURES.not_enough_entries.text} It has ${roster.length} now.`
         : closed

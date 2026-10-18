@@ -112,7 +112,7 @@ test("a failed game load is reported, not silent", async ({ page }) => {
   await page.route("**/api/games/petdle/grade", (route) => route.abort());
   await page.reload();
   await expect(page.locator("#notice")).toContainText(
-    "Could not load your game",
+    "Could not reach the server",
   );
   await expectPlayDisabled(page);
 });
@@ -123,7 +123,7 @@ test("when the game itself cannot load, nothing on the board can be used", async
   await page.route("**/api/games/petdle", (route) => route.abort());
   await page.goto("/g/petdle");
   await expect(page.locator("#notice")).toContainText(
-    "Could not load the game",
+    "Could not reach the server",
   );
   await expectPlayDisabled(page);
 });

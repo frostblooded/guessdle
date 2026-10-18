@@ -1,11 +1,12 @@
 // Anonymous play: the browser keeps pet ids, the server grades them.
+import { FAILURES } from "./failures.ts";
 import { isAnswerRow, type EntryRef, type GradedAttribute } from "./game.ts";
 import {
   createGameState,
   type GameState,
   type StateStorage,
 } from "./game-state.ts";
-import { call, failureOf, type Failure, type Fetch } from "./transport.ts";
+import { call, failureMessage, type Fetch } from "./transport.ts";
 
 // What a finished day reveals: the answer's name, and a Blur game's whole image
 export interface Reveal {
@@ -43,10 +44,23 @@ export const revealIn = (res: Reveal): Reveal => ({
   ...(res.answerPhoto !== undefined && { answerPhoto: res.answerPhoto }),
 });
 
+// Why today's game could not be loaded, as the text for the player
+export interface LoadFailure {
+  failure: string;
+}
+
+// A POST the server did not accept: too many requests, or the text of why not
+type Refused = { kind: "rate_limited" } | { kind: "error"; message: string };
+
+// The player's text for a refused POST
+export const refusalText = (refused: Refused): string =>
+  refused.kind === "error" ? refused.message : FAILURES.rate_limited.text;
+
 export type SubmitResult =
   | { kind: "invalid" }
   | { kind: "duplicate" }
-  | { kind: "error" }
+  // `message` says why: unreachable, or the server's reason
+  | { kind: "error"; message: string }
   // Too many requests (API JSON or nginx plain text); nothing changed, retry later
   | { kind: "rate_limited" }
   // The game is over (won or gave up); reset to play again
@@ -62,15 +76,15 @@ export type SubmitResult =
 export type GiveUpResult =
   | { kind: "gaveUp"; answer: string; answerPhoto?: string }
   | { kind: "finished" }
-  | { kind: "error" }
+  | { kind: "error"; message: string }
   | { kind: "rate_limited" }
   // The server is on a newer day: the game started over and nothing was revealed
   | { kind: "newday" };
 
 export interface Play {
-  // Graded rows of the guesses stored for today, oldest first; null if the
-  // server could not be reached (the stored guesses stay)
-  load(): Promise<Loaded | null>;
+  // Graded rows of the guesses stored for today, oldest first; the reason if the
+  // server could not grade them (the stored guesses stay)
+  load(): Promise<Loaded | LoadFailure>;
   // Takes an entry id
   submit(id: number): Promise<SubmitResult>;
   // Reveals the answer and finishes the game
@@ -114,9 +128,14 @@ export function createPlay({
   const giveUpUrl: string = `${base}/give-up${query}`;
 
   // The parsed body of a successful POST, or why there is none
-  async function post<T>(url: string, body: unknown): Promise<T | Failure> {
+  async function post<T>(url: string, body: unknown): Promise<T | Refused> {
     const res = await call(fetch, url, body);
-    return failureOf(res) ?? (res!.ok ? (res!.data as T) : "error");
+    if (res?.status === 429) {
+      return { kind: "rate_limited" };
+    }
+    return res?.ok
+      ? (res.data as T)
+      : { kind: "error", message: failureMessage(res) };
   }
 
   // True if the response is from a newer day than the stored game, which is
@@ -133,14 +152,14 @@ export function createPlay({
   }
 
   const play: Play = {
-    async load(): Promise<Loaded | null> {
+    async load(): Promise<Loaded | LoadFailure> {
       const ids: number[] = state.getUsedGuesses();
       const gaveUp: boolean = state.getGaveUp();
       const loaded: Loaded = { rows: [], victory: false };
       if (ids.length > 0) {
         const res = await post<GradeResponse>(gradeUrl, { ids });
-        if (typeof res === "string") {
-          return null;
+        if ("kind" in res) {
+          return { failure: refusalText(res) };
         }
         if (isNewDay(res.day)) {
           return { rows: [], victory: false };
@@ -155,8 +174,8 @@ export function createPlay({
       }
       if (gaveUp) {
         const res = await post<GiveUpResponse>(giveUpUrl, {});
-        if (typeof res === "string") {
-          return null;
+        if ("kind" in res) {
+          return { failure: refusalText(res) };
         }
         if (isNewDay(res.day)) {
           return { rows: [], victory: false };
@@ -183,8 +202,8 @@ export function createPlay({
       const res = await post<GradeResponse>(gradeUrl, {
         ids: [...used, id],
       });
-      if (typeof res === "string") {
-        return { kind: res };
+      if ("kind" in res) {
+        return res;
       }
       if (isNewDay(res.day)) {
         return play.submit(id);
@@ -211,8 +230,8 @@ export function createPlay({
         return { kind: "finished" };
       }
       const res = await post<GiveUpResponse>(giveUpUrl, {});
-      if (typeof res === "string") {
-        return { kind: res };
+      if ("kind" in res) {
+        return res;
       }
       if (isNewDay(res.day)) {
         return { kind: "newday" };

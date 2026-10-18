@@ -3,12 +3,13 @@ import { isAnswerRow, type GradedAttribute } from "./game.ts";
 import {
   revealIn,
   type GiveUpResult,
+  type LoadFailure,
   type Loaded,
   type Play,
   type Reveal,
   type SubmitResult,
 } from "./play.ts";
-import { call, failureOf, type Fetch } from "./transport.ts";
+import { call, failureMessage, type Fetch } from "./transport.ts";
 
 // The server's view of today's game
 interface GameResponse extends Reveal {
@@ -54,10 +55,10 @@ export function createServerPlay({
     (data as { error?: string } | null)?.error;
 
   const play: Play = {
-    async load(): Promise<Loaded | null> {
+    async load(): Promise<Loaded | LoadFailure> {
       const res = await call(fetch, `${base}${query}`);
       if (res?.status !== 200) {
-        return null;
+        return { failure: failureMessage(res) };
       }
       const game = res.data as GameResponse;
       adopt(game);
@@ -75,12 +76,11 @@ export function createServerPlay({
         return { kind: "finished" };
       }
       const res = await call(fetch, `${base}/guess${query}`, { id });
-      const failure = failureOf(res);
-      if (failure !== null) {
-        return { kind: failure };
+      if (res?.status === 429) {
+        return { kind: "rate_limited" };
       }
-      if (res!.status === 200) {
-        const game = res!.data as GameResponse;
+      if (res?.status === 200) {
+        const game = res.data as GameResponse;
         adopt(game);
         const row = game.rows[game.rows.length - 1]!;
         return {
@@ -91,7 +91,7 @@ export function createServerPlay({
           ...revealIn(game),
         };
       }
-      const error = errorOf(res!.data);
+      const error = errorOf(res?.data);
       if (error === "finished") {
         finished = true;
         return { kind: "finished" };
@@ -99,7 +99,7 @@ export function createServerPlay({
       if (error === "duplicate" || error === "invalid") {
         return { kind: error };
       }
-      return { kind: "error" };
+      return { kind: "error", message: failureMessage(res) };
     },
 
     async giveUp(): Promise<GiveUpResult> {
@@ -107,20 +107,19 @@ export function createServerPlay({
         return { kind: "finished" };
       }
       const res = await call(fetch, `${base}/give-up${query}`, {});
-      const failure = failureOf(res);
-      if (failure !== null) {
-        return { kind: failure };
+      if (res?.status === 429) {
+        return { kind: "rate_limited" };
       }
-      if (res!.status === 200) {
-        const game = res!.data as GameResponse;
+      if (res?.status === 200) {
+        const game = res.data as GameResponse;
         adopt(game);
         return { kind: "gaveUp", answer: game.answer!, ...revealIn(game) };
       }
-      if (errorOf(res!.data) === "finished") {
+      if (errorOf(res?.data) === "finished") {
         finished = true;
         return { kind: "finished" };
       }
-      return { kind: "error" };
+      return { kind: "error", message: failureMessage(res) };
     },
 
     async reset(): Promise<boolean> {
