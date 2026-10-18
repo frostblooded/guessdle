@@ -52,7 +52,7 @@ export function guessRowElement(row: GradedAttribute[]): HTMLDivElement {
 
 // Autocomplete on #new-guess-input over the roster's names, leaving out what was already guessed
 export function attachGuessInput(
-  roster: () => EntryRef[],
+  roster: EntryRef[],
   usedIds: () => number[],
 ): autoComplete {
   const input = document.querySelector<HTMLInputElement>("#new-guess-input")!;
@@ -60,11 +60,11 @@ export function attachGuessInput(
     selector: "#new-guess-input",
     placeHolder: "Guess a name...",
     data: {
-      src: () => roster().map((item: EntryRef): string => item.name),
+      src: roster.map((item: EntryRef): string => item.name),
       filter: (list: AutoCompleteItem[]): AutoCompleteItem[] => {
         const used: number[] = usedIds();
         return list.filter((item: AutoCompleteItem): boolean => {
-          const id: number | null = findEntryId(roster(), item.value);
+          const id: number | null = findEntryId(roster, item.value);
           return id === null || !used.includes(id);
         });
       },
@@ -95,7 +95,7 @@ export function attachGuessInput(
   });
   input.addEventListener("open", (): void => {
     // Hack to fix a bug on mobile where if you click on the autocomplete list item, the autocomplete list opens again immediately
-    if (roster().some((item: EntryRef): boolean => item.name === input.value)) {
+    if (roster.some((item: EntryRef): boolean => item.name === input.value)) {
       complete.close();
     }
   });

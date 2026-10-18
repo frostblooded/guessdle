@@ -393,10 +393,8 @@ export const REFUSAL_TEXT: Record<PartyRefusal, string> = {
   finished: "You are done with this round. Wait for the next one.",
   duplicate: "You already guessed that one.",
   party_ended: "This party has ended.",
-  not_enough_entries:
-    `This game needs at least ${MIN_ENTRIES} entries before a round can start.`,
-  server_error:
-    "The server hit an unexpected problem. Try again in a moment.",
+  not_enough_entries: `This game needs at least ${MIN_ENTRIES} entries before a round can start.`,
+  server_error: "The server hit an unexpected problem. Try again in a moment.",
 };
 
 // The socket close code for a player the host removed

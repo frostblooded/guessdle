@@ -108,10 +108,7 @@ window.onload = async function (): Promise<void> {
     fetch: browserFetch,
     onNewDay: clearBoard,
   });
-  autoCompleteJs = attachGuessInput(
-    () => roster,
-    () => play.getUsedGuesses(),
-  );
+  autoCompleteJs = attachGuessInput(roster, () => play.getUsedGuesses());
 
   initButtons();
   initNewGuessSubmit();

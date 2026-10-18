@@ -6,7 +6,6 @@ import {
   type ServerMessage,
 } from "./game/party.ts";
 
-
 export interface PartySocket {
   send(msg: ClientMessage): boolean;
   // Reconnects at once, e.g. with a new token after joining

@@ -73,9 +73,8 @@ let handler = serveStatic;
 let sockets = null;
 if (process.env.DATABASE_URL) {
   const { connect } = await import("../src/server/main.ts");
-  const { attachPartySockets, createApp } = await import(
-    "../src/server/app.ts"
-  );
+  const { attachPartySockets, createApp } =
+    await import("../src/server/app.ts");
   const { adminEmailsFromEnv } = await import("../src/server/auth.ts");
   const { mailConfigFromEnv } = await import("../src/server/mailer.ts");
   const { rateLimitFromEnv } = await import("../src/server/rate-limit.ts");

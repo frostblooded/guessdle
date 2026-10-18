@@ -340,7 +340,7 @@ function renderBoard(view: PartyView): void {
   $("#round-title").textContent = `Round ${round.number}`;
   if (complete === null) {
     showColumnTitles(view.game.attributes);
-    complete = attachGuessInput(entries, () =>
+    complete = attachGuessInput(entries(), () =>
       (current?.round?.yours?.rows ?? []).map(
         (row) => findEntryId(entries(), String(row[1]!.value)) ?? -1,
       ),
