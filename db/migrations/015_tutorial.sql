@@ -1,13 +1,14 @@
--- How to play's practice game (spec: the tutorial thread, 2026-10-18): a frozen copy of Petdle's
--- active pets as they were when this migration ran. The tutorial reads only this copy, so later
--- edits to Petdle never change it. One row; its photo URLs keep their files alive (upload-refs.ts).
+-- How to play's practice game: a frozen copy of the pet game's active entries as they were when
+-- this migration ran. The tutorial reads only this copy, so later edits to the game never change
+-- it. One row; the pictures it names keep their files alive (upload-refs.ts).
 create table tutorial (
   id smallint primary key default 1 check (id = 1),
   -- [{name, type}] in column order
   attributes jsonb not null,
-  -- [{id, name, photo, values}], values one per attribute (List as an array, others a string)
+  -- [{id, name, photo, values}]: values one per attribute (List as an array, others a string,
+  -- Image the upload URL); photo is the first Image value, blank when none
   entries jsonb not null,
-  -- The practice game's secret pet: Ati, else the first pet
+  -- The practice game's secret: Ati, else the first entry
   answer_id integer not null,
   created_at timestamptz not null default now()
 );
@@ -20,12 +21,12 @@ attrs as (
   from attributes a join game g on g.id = a.game_id
 ),
 pets as (
-  select e.id, e.name, e.photo_url
+  select e.id, e.name
   from entries e join game g on g.id = e.game_id
   where e.deleted_at is null
 ),
 cells as (
-  select p.id as entry_id, a.n,
+  select p.id as entry_id, a.n, a.type,
     case when a.type = 'list' then
       coalesce((select jsonb_agg(v.value order by v.position) from entry_values v
                 where v.entry_id = p.id and v.attribute_id = a.id), '[]'::jsonb)
@@ -43,7 +44,9 @@ select
   (select jsonb_agg(jsonb_build_object(
       'id', p.id,
       'name', p.name,
-      'photo', p.photo_url,
+      'photo', coalesce((select c.value #>> '{}' from cells c
+                         where c.entry_id = p.id and c.type = 'image' and c.value <> '""'::jsonb
+                         order by c.n limit 1), ''),
       'values', coalesce((select jsonb_agg(c.value order by c.n) from cells c where c.entry_id = p.id),
         '[]'::jsonb)
     ) order by lower(p.name), p.id) from pets p),
@@ -51,6 +54,11 @@ select
     (select id from pets order by lower(name), id limit 1))
 where exists (select 1 from pets);
 
--- The photo URLs the tutorial uses, for upload reference checks
+-- Every picture URL the tutorial shows, for upload reference checks
 create view tutorial_photos as
-select e ->> 'photo' as url from tutorial, jsonb_array_elements(entries) e;
+select v.value #>> '{}' as url
+from tutorial t,
+  jsonb_array_elements(t.attributes) with ordinality a (attr, n),
+  jsonb_array_elements(t.entries) e (entry),
+  jsonb_array_elements(e.entry -> 'values') with ordinality v (value, m)
+where a.n = v.m and a.attr ->> 'type' = 'image';

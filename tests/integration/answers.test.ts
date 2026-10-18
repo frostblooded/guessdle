@@ -274,12 +274,12 @@ describe("stored daily answers and anonymous grading", () => {
       assert.equal(body.victory, false);
       assert.deepEqual(Object.keys(body).sort(), ["day", "rows", "victory"]);
       assert.deepEqual(
-        body.rows!.map((row) => row[1]!.value),
+        body.rows!.map((row) => row[0]!.value),
         wrong.map(petName),
       );
       assert.deepEqual(
         body.rows![0]!.map((cell) => cell.key),
-        ["photo", "name", "Colors", "Owners"],
+        ["name", "Photo", "Colors", "Owners"],
       );
     });
 

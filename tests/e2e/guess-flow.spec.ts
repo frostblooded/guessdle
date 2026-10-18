@@ -718,3 +718,28 @@ test.describe("day rollover in an open tab", () => {
     await expect(resetButton(page)).toBeHidden();
   });
 });
+
+test("selection mode: pick a guess from the list, and the mode is remembered", async ({
+  page,
+}) => {
+  await page.locator("#guess-mode-select").click();
+  await expect(input(page)).toBeHidden();
+  await page.locator("#select-guess-button").click();
+  const list = page.locator("#select-list");
+  await expect(list.locator(".select-option")).toHaveCount(names.length);
+  await list.locator("#select-filter").fill(wrongName);
+  await list
+    .getByRole("button", { name: `Guess ${wrongName}`, exact: true })
+    .click();
+  await expect(list).toBeHidden();
+  await expect(rows(page)).toHaveCount(1);
+  await expect(rows(page).first()).toContainText(wrongName);
+
+  await page.reload();
+  await expect(page.locator("#guess-mode-select")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.locator("#select-guess-button").click();
+  await expect(list.locator(".select-option")).toHaveCount(names.length - 1);
+});

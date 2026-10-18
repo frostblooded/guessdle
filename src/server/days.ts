@@ -1,9 +1,10 @@
 // The Past days list: every day from the game's start to today, with the
 // signed-in player's progress on each.
 import type pg from "pg";
-import { statusOf, type DayItem } from "../game/days.ts";
+import { statusOf, type DayItem, type DayProgress } from "../game/days.ts";
 import { dateOfDay } from "./answers.ts";
 import type { GameRow } from "./games.ts";
+import { triesOf } from "./play-day.ts";
 
 type Q = Pick<pg.Pool, "query">;
 
@@ -15,10 +16,7 @@ export async function listDays(
   today: number,
   userId: number | null,
 ): Promise<DayItem[]> {
-  const played = new Map<
-    string,
-    { won: boolean; gaveUp: boolean; guesses: number }
-  >();
+  const played = new Map<string, DayProgress>();
   if (userId !== null) {
     const guesses = await q.query<{
       date: string;
@@ -57,6 +55,7 @@ export async function listDays(
       date,
       status: statusOf(
         played.get(date) ?? { won: false, gaveUp: false, guesses: 0 },
+        triesOf(game),
       ),
     });
   }

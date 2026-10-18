@@ -8,22 +8,28 @@ import { PageHead } from "../../components/page.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
-import { FAILURES, failureText, UNREACHABLE } from "../../game/failures.ts";
+import { FAILURES } from "../../game/failures.ts";
 import {
+  boardColumns,
   findEntryId,
   guessedNames,
   SKIP,
   isAnswerRow,
-  type EntryRef,
-  type GameAttribute,
   type GradedAttribute,
 } from "../../game/game.ts";
 import { openPlay } from "../../game/open-play.ts";
-import type { Play } from "../../game/play.ts";
-import { minEntriesOf, type GameKind } from "../../game/blur.ts";
+import {
+  RATE_LIMITED,
+  refusalText,
+  type GiveUpResult,
+  type Loaded,
+  type Play,
+  type SubmitResult,
+} from "../../game/play.ts";
+import { minEntriesOf } from "../../game/blur.ts";
 import { browserFetch, gameKey, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
-import { GuessForm } from "./guess-form.tsx";
+import { GuessForm, useGuessMode } from "./guess-form.tsx";
 import {
   GameNotFound,
   NoSuchDay,
@@ -31,51 +37,29 @@ import {
   PastDaysLink,
 } from "./past-day.tsx";
 import { boardUrl, PlayResults } from "./play-results.tsx";
-import { PlayActions, PlayStatus, type StatusView } from "./play-status.tsx";
+import { loadGame } from "./load-game.ts";
+import { PlayActions, PlayStatus } from "./play-status.tsx";
 import { ResetDialog } from "./reset-dialog.tsx";
 import { ResultBanner, resultOf, type Result } from "./result-banner.tsx";
+import { SelectList } from "./select-list.tsx";
 import { StatsDialog } from "./stats-dialog.tsx";
 import { useVictoryStats } from "./use-victory-stats.ts";
 
-export type PlayableGame = {
-  name: string;
-  // Today's Day Number; past days are 0 up to it
-  today: number;
-  // Day 0's date, "YYYY-MM-DD"
-  startDate: string;
-  canEdit: boolean;
-  // Some entries miss values, so the game cannot be played for now
-  paused: boolean;
-  kind: GameKind;
-  // Blur games: tries per day
-  blurTries?: number;
-  attributes: GameAttribute[];
-  // A Blur game's entries come without photos
-  entries: EntryRef[];
-} & StatusView;
-
-// The game's attributes and entries, "missing" for no such game, or the text of why it could not be loaded
-export async function loadGame(
-  slug: string,
-): Promise<PlayableGame | "missing" | string> {
-  try {
-    const res = await fetch(`/api/games/${encodeURIComponent(slug)}`);
-    if (res.status === 404) {
-      return "missing";
-    }
-    const data = (await res.json().catch(() => null)) as unknown;
-    return res.ok
-      ? (data as PlayableGame)
-      : failureText((data as { error?: unknown } | null)?.error, res.status);
-  } catch {
-    return UNREACHABLE;
-  }
-}
-
 const now = (): Date => new Date();
 
-export const RATE_LIMITED =
-  "Too many requests in a short time. Wait a minute, then try again.";
+// The banner for a loaded board, null while the day is still being played
+const finishedResult = (loaded: Loaded): Result =>
+  loaded.answer !== undefined &&
+  (loaded.victory || loaded.gaveUp || loaded.lost)
+    ? resultOf(
+        loaded.victory ? "victory" : loaded.lost ? "lost" : "give-up",
+        loaded,
+      )
+    : null;
+
+// The notice a guess or give-up leaves: why it was refused, or none
+const noticeOf = (res: SubmitResult | GiveUpResult): string | null =>
+  res.kind === "rate_limited" || res.kind === "error" ? refusalText(res) : null;
 
 // `day`: a past day's Day Number from the address, or null for today
 function Game({ slug, day }: { slug: string; day: number | null }) {
@@ -100,6 +84,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const started = useRef(false);
   const submitting = useRef(false);
   const opener = useRef<HTMLButtonElement | null>(null);
+  const modes = useGuessMode();
 
   const playable = typeof game === "object" ? game : null;
   // Why the game could not be loaded
@@ -130,6 +115,20 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
     setBoard((n) => n + 1);
   };
 
+  // Loads the board as stored and shows it: on open, and when a guess or give-up finds the day
+  // already over (finished on another device)
+  async function showBoard(current: Play): Promise<void> {
+    const loaded = await current.load();
+    if ("failure" in loaded) {
+      setBlocked(true);
+      setNotice(loaded.failure);
+      return;
+    }
+    setRows([...loaded.rows].reverse());
+    setResult(finishedResult(loaded));
+    setReady(true);
+  }
+
   // Once the game and who is signed in are known: pick where the game lives, then load it.
   // The ref keeps StrictMode's second effect run from merging twice.
   useEffect(() => {
@@ -158,25 +157,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
         setNotice(RATE_LIMITED);
       }
       play.current = current;
-      const loaded = await current.load();
-      if ("failure" in loaded) {
-        setBlocked(true);
-        setNotice(loaded.failure);
-        return;
-      }
-      setRows([...loaded.rows].reverse());
-      if (
-        loaded.answer !== undefined &&
-        (loaded.victory || loaded.gaveUp || loaded.lost)
-      ) {
-        setResult(
-          resultOf(
-            loaded.victory ? "victory" : loaded.lost ? "lost" : "give-up",
-            loaded,
-          ),
-        );
-      }
-      setReady(true);
+      await showBoard(current);
     })();
   }, [playable, closed, me.isPending, me.data, slug, day, pastDay]);
 
@@ -196,13 +177,11 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
     const res = await play.current.submit(id).finally(() => {
       submitting.current = false;
     });
-    setNotice(
-      res.kind === "rate_limited"
-        ? RATE_LIMITED
-        : res.kind === "error"
-          ? res.message
-          : null,
-    );
+    setNotice(noticeOf(res));
+    if (res.kind === "finished") {
+      await showBoard(play.current);
+      return;
+    }
     // The typed guess stays when the server could not grade it, to retry, and on a skip
     if (res.kind !== "accepted" && res.kind !== "duplicate") {
       return;
@@ -210,6 +189,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
     if (id !== SKIP) {
       setGuess("");
     }
+    modes.setSelecting(false);
     if (res.kind === "duplicate") {
       return;
     }
@@ -230,15 +210,11 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
     if (!res) {
       return;
     }
-    setNotice(
-      res.kind === "rate_limited"
-        ? RATE_LIMITED
-        : res.kind === "error"
-          ? res.message
-          : null,
-    );
+    setNotice(noticeOf(res));
     if (res.kind === "gaveUp") {
       setResult(resultOf("give-up", res));
+    } else if (res.kind === "finished" && play.current) {
+      await showBoard(play.current);
     }
   }
 
@@ -281,14 +257,9 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const used = guessedNames(rows);
   const blur = playable?.kind === "blur" ? (playable.blurTries ?? 1) : null;
   const wrong = rows.filter((row) => !isAnswerRow(row)).length;
-  const names = roster
-    .map((entry) => entry.name)
-    .filter((name) => !used.has(name));
-  const titles = [
-    "Photo",
-    "Name",
-    ...(playable?.attributes.map((a) => a.name) ?? []),
-  ];
+  const unguessed = roster.filter((entry) => !used.has(entry.name));
+  const names = unguessed.map((entry) => entry.name);
+  const titles = boardColumns(playable?.attributes ?? []);
 
   return (
     <>
@@ -362,6 +333,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
         )}
         <Card className="play-card mb-6 gap-3 p-4 sm:p-5">
           <GuessForm
+            modes={modes}
             names={names}
             value={guess}
             onChange={setGuess}
@@ -411,13 +383,21 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
           opener={opener}
           past={past}
         />
-        <PlayResults
-          rows={rows}
-          titles={blur === null ? titles : null}
-          loading={isPending || loading}
-          loadingText={past ? "Loading the game…" : "Loading today's game…"}
-          empty={ready && rows.length === 0}
-        />
+        {modes.selecting && !finished && !cannotPlay ? (
+          <SelectList
+            entries={unguessed}
+            attributes={blur === null ? (playable?.attributes ?? []) : null}
+            onPick={(name) => void submit(name)}
+          />
+        ) : (
+          <PlayResults
+            rows={rows}
+            titles={blur === null ? titles : null}
+            loading={isPending || loading}
+            loadingText={past ? "Loading the game…" : "Loading today's game…"}
+            empty={ready && rows.length === 0}
+          />
+        )}
       </section>
     </>
   );

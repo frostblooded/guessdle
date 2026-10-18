@@ -3,7 +3,11 @@ import { FAILURES, UNREACHABLE } from "../src/game/failures.ts";
 import { beforeEach, describe, it } from "vitest";
 import { gradeIds } from "../src/game/game.ts";
 import { ATTRIBUTES, GUESS_DATA, SLUG } from "./roster-fixture.ts";
-import type { Loaded, LoadFailure } from "../src/game/play.ts";
+import {
+  RATE_LIMITED,
+  type Loaded,
+  type LoadFailure,
+} from "../src/game/play.ts";
 import { createServerPlay } from "../src/game/server-play.ts";
 import type { Fetch } from "../src/game/transport.ts";
 
@@ -143,7 +147,7 @@ describe("load", () => {
     });
     server.status = 429;
     assert.deepEqual(await open().load(), {
-      failure: FAILURES.rate_limited.text,
+      failure: RATE_LIMITED,
     });
   });
 });
@@ -187,7 +191,7 @@ describe("submit", () => {
     assert.deepEqual(play.getUsedGuesses(), [one!.id]);
     if (result.kind === "accepted") {
       assert.equal(result.isAnswer, false);
-      assert.equal(result.row[1]!.value, one!.name);
+      assert.equal(result.row[0]!.value, one!.name);
     }
   });
 

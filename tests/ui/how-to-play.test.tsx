@@ -9,6 +9,7 @@ import { HowToPlayPage } from "../../src/routes/how-to-play-page.tsx";
 
 const TUTORIAL: Tutorial = {
   attributes: [
+    { name: "Photo", type: "image" },
     { name: "Colors", type: "list" },
     { name: "Owners", type: "list" },
   ],
@@ -17,30 +18,32 @@ const TUTORIAL: Tutorial = {
       id: 1,
       name: "Ati",
       photo: "/u/1.webp",
-      values: [["Black", "Orange", "White"], ["Niki"]],
+      values: ["/u/1.webp", ["Black", "Orange", "White"], ["Niki"]],
     },
     {
       id: 2,
       name: "Bela",
       photo: "/u/2.webp",
-      values: [["Black", "Grey", "White"], ["Beti"]],
+      values: ["/u/2.webp", ["Black", "Grey", "White"], ["Beti"]],
     },
     {
       id: 3,
       name: "Cookie",
       photo: "/u/3.webp",
-      values: [["Black", "Orange", "White"], ["Niki"]],
+      values: ["/u/3.webp", ["Black", "Orange", "White"], ["Niki"]],
     },
     {
       id: 4,
       name: "Eddie",
       photo: "/u/4.webp",
-      values: [
-        ["Orange", "White"],
-        ["Stefi", "Yasen"],
-      ],
+      values: ["/u/4.webp", ["Orange", "White"], ["Stefi", "Yasen"]],
     },
-    { id: 5, name: "Kimi", photo: "/u/5.webp", values: [["Black"], ["Niki"]] },
+    {
+      id: 5,
+      name: "Kimi",
+      photo: "/u/5.webp",
+      values: ["/u/5.webp", ["Black"], ["Niki"]],
+    },
   ],
   answerId: 1,
 };

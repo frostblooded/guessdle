@@ -1,18 +1,20 @@
 // The viewer's own board in a live party round: the guess box, their graded rows (a Blur game's
 // image and guessed names) and, once they solved it, gave up or ran out of tries, the answer.
 import { useState } from "react";
-import { BoardRow, GuessRow, TitleTile } from "../../components/board.tsx";
+import { GuessRow, TitleRow } from "../../components/board.tsx";
 import { BlurGuesses, BlurView } from "../../components/blur-view.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
 import {
+  boardColumns,
   findEntryId,
   guessedNames,
   isAnswerRow,
   SKIP,
 } from "../../game/game.ts";
 import type { LiveRound, PartyView } from "../../game/party.ts";
-import { GuessForm } from "../play/guess-form.tsx";
+import { GuessForm, useGuessMode } from "../play/guess-form.tsx";
+import { SelectList } from "../play/select-list.tsx";
 
 type Board = NonNullable<LiveRound["yours"]>;
 
@@ -33,13 +35,17 @@ export function PartyRound({
   onNotice: (text: string | null) => void;
 }) {
   const [guess, setGuess] = useState("");
-  const entries = view.game.entries;
+  const modes = useGuessMode();
   const done = mine.solved || mine.gaveUp || mine.lost;
+  // Selection mode's list, in place of the board
+  const listing = modes.selecting && !done;
+  const entries = view.game.entries;
   const used = guessedNames(mine.rows);
   const blur = view.game.kind === "blur" ? (view.game.blurTries ?? 1) : null;
   const newestFirst = [...mine.rows].reverse();
-  const names = entries.map((e) => e.name).filter((name) => !used.has(name));
-  const titles = ["Photo", "Name", ...view.game.attributes.map((a) => a.name)];
+  const unguessed = entries.filter((e) => !used.has(e.name));
+  const names = unguessed.map((e) => e.name);
+  const titles = boardColumns(view.game.attributes);
 
   const submit = (name: string): void => {
     const id = findEntryId(entries, name);
@@ -50,6 +56,7 @@ export function PartyRound({
     if (onGuess(id)) {
       onNotice(null);
       setGuess("");
+      modes.setSelecting(false);
     }
   };
 
@@ -104,6 +111,7 @@ export function PartyRound({
       {!done && (
         <Card id="guess-card" className="play-card mb-6 gap-3 p-4 sm:p-5">
           <GuessForm
+            modes={modes}
             names={names}
             value={guess}
             onChange={setGuess}
@@ -122,20 +130,17 @@ export function PartyRound({
           </div>
         </Card>
       )}
-      {blur !== null && <BlurGuesses rows={newestFirst} />}
-      {blur === null && mine.rows.length > 0 && (
+      {listing && (
+        <SelectList
+          entries={unguessed}
+          attributes={blur === null ? view.game.attributes : null}
+          onPick={submit}
+        />
+      )}
+      {!listing && blur !== null && <BlurGuesses rows={newestFirst} />}
+      {!listing && blur === null && mine.rows.length > 0 && (
         <div id="board" className="results flex flex-col gap-2 sm:gap-2.5">
-          <BoardRow
-            id="guess-results-titles-row"
-            columns={titles.length}
-            aria-hidden="true"
-          >
-            {titles.map((title, i) => (
-              <TitleTile key={i} className="guess-result-title">
-                {title}
-              </TitleTile>
-            ))}
-          </BoardRow>
+          <TitleRow columns={titles} />
           <div id="guess-results-container" className="flex flex-col gap-2">
             {newestFirst.map((row, i) => (
               <GuessRow key={mine.rows.length - i} row={row} />

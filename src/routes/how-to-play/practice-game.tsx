@@ -6,7 +6,12 @@ import { BoardRow, GuessRow, TitleTile } from "../../components/board.tsx";
 import { Button, buttonVariants } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
 import { correctnessClass } from "../../game/correctness.ts";
-import { gradeGuess, type Entry } from "../../game/game.ts";
+import {
+  boardColumns,
+  gradeGuess,
+  type BoardColumn,
+  type Entry,
+} from "../../game/game.ts";
 import {
   explainRow,
   stillFitting,
@@ -30,27 +35,28 @@ const SWATCH: Record<string, string> = {
 };
 
 function Board({
-  titles,
+  columns,
   rows,
 }: {
-  titles: readonly string[];
+  columns: readonly BoardColumn[];
   rows: ReturnType<typeof gradeGuess>[];
 }) {
+  const images = columns.map((column) => column.image);
   return (
     <div className="practice-board flex flex-col gap-1.5 sm:gap-2">
-      <BoardRow columns={titles.length} aria-hidden="true">
-        {titles.map((title) => (
+      <BoardRow images={images} aria-hidden="true">
+        {columns.map(({ title }) => (
           <TitleTile key={title}>{title}</TitleTile>
         ))}
       </BoardRow>
       {rows.length === 0 ? (
         <BoardRow
-          columns={titles.length}
+          images={images}
           className="practice-secret"
           role="img"
           aria-label="The secret pet: every column is hidden"
         >
-          {titles.map((title) => (
+          {columns.map(({ title }) => (
             <div
               key={title}
               className="cell flex min-h-12 items-center justify-center rounded-lg border-2 border-dashed text-lg font-bold text-muted-foreground sm:min-h-16"
@@ -116,7 +122,7 @@ function StepCard({
 export function PracticeGame({ tutorial }: { tutorial: Tutorial }) {
   const { attributes, entries, answerId } = tutorial;
   const answer = entries.find((e) => e.id === answerId) ?? entries[0]!;
-  const titles = ["Photo", "Name", ...attributes.map((a) => a.name)];
+  const columns = boardColumns(attributes);
   const [step, setStep] = useState<Step>("secret");
   const [guesses, setGuesses] = useState<Entry[]>([]);
   const rows = useMemo(
@@ -135,7 +141,9 @@ export function PracticeGame({ tutorial }: { tutorial: Tutorial }) {
   const clues = last && (
     <Clues
       lines={explainRow(attributes, last)}
-      grades={last.slice(1).map((cell) => correctnessClass(cell.correctness))}
+      grades={last
+        .filter((cell) => !cell.image)
+        .map((cell) => correctnessClass(cell.correctness))}
     />
   );
 
@@ -158,7 +166,7 @@ export function PracticeGame({ tutorial }: { tutorial: Tutorial }) {
             Every day the game picks one secret pet. Nobody knows which one, not
             even you. Your goal is to find it, using as few guesses as you can.
           </p>
-          <Board titles={titles} rows={rows} />
+          <Board columns={columns} rows={rows} />
           <Button size="lg" onClick={() => setStep("first")}>
             Next
           </Button>
@@ -188,7 +196,7 @@ export function PracticeGame({ tutorial }: { tutorial: Tutorial }) {
             secret pet: <b>green</b> is the same, <b>orange</b> is partly the
             same, <b>red</b> is different.
           </p>
-          <Board titles={titles} rows={rows} />
+          <Board columns={columns} rows={rows} />
           {clues}
           <Button size="lg" onClick={() => setStep("narrow")}>
             Next guess
@@ -207,7 +215,7 @@ export function PracticeGame({ tutorial }: { tutorial: Tutorial }) {
                 : `${fitting.size} pets still fit.`}
             </b>
           </p>
-          <Board titles={titles} rows={rows} />
+          <Board columns={columns} rows={rows} />
           {rows.length > 1 && clues}
           <PetPicker
             entries={entries}
@@ -226,7 +234,7 @@ export function PracticeGame({ tutorial }: { tutorial: Tutorial }) {
               ? "First try: lucky you!"
               : `You got it in ${rows.length} guesses.`}
           </p>
-          <Board titles={titles} rows={rows} />
+          <Board columns={columns} rows={rows} />
           <ul className="list-disc space-y-1.5 pl-5 text-muted-foreground">
             <li>Real games pick a new secret every day.</li>
             <li>
@@ -234,7 +242,8 @@ export function PracticeGame({ tutorial }: { tutorial: Tutorial }) {
               you did here.
             </li>
             <li>
-              New to this? Turn on <b>selection mode</b> on a game&apos;s page
+              New to this? On a game&apos;s page, switch from <b>Type</b> to{" "}
+              <b>Select</b>
               to pick from a list of every answer instead of typing names.
             </li>
           </ul>

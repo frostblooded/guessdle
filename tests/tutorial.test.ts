@@ -8,6 +8,7 @@ import {
 import { explainRow, stillFitting } from "../src/game/tutorial.ts";
 
 const ATTRIBUTES: GameAttribute[] = [
+  { name: "Photo", type: "image" },
   { name: "Colors", type: "list" },
   { name: "Owner", type: "text" },
   { name: "Age", type: "number" },
@@ -22,7 +23,7 @@ const pet = (
   id,
   name,
   photo: `/p/${id}.webp`,
-  values: [colors, owner, age],
+  values: [`/p/${id}.webp`, colors, owner, age],
 });
 
 const ATI = pet(1, "Ati", ["Black", "Orange", "White"], "Niki", "5");
@@ -33,7 +34,7 @@ const ROSTER = [ATI, COOKIE, EDDIE, BELA];
 const row = (guess: Entry) => gradeGuess(ATTRIBUTES, ATI, guess);
 
 describe("explainRow", () => {
-  it("says what each color means for a wrong guess, skipping the photo", () => {
+  it("says what each color means for a wrong guess, skipping the picture", () => {
     assert.deepEqual(explainRow(ATTRIBUTES, row(EDDIE)), [
       "Name is red: Eddie is not the secret pet.",
       "Colors is orange: the secret pet has some of Orange, White, but not exactly these.",

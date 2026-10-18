@@ -1,9 +1,12 @@
 // The game status lifecycle (spec #66): which edits send a game back to pending, the guarded
-// moves (submit, unpublish, approve, reject) and the admin email on entering pending.
+// moves (submit, unpublish, approve, reject), the admin email on entering pending and the
+// owner's approval emails (owner-mail.ts).
 import type pg from "pg";
-import { minEntriesOf } from "../game/blur.ts";
-import { HAS_MISSING_VALUES, type GameRow, type GameStatus } from "./games.ts";
+import { playBlocker } from "./access.ts";
+import { loadRoster, type GameRow, type GameStatus } from "./games.ts";
+import type { OwnerMailKind } from "../mail-settings.ts";
 import type { MailConfig } from "./mailer.ts";
+import { mailOwner, type OwnerNotice } from "./owner-mail.ts";
 import { withGameLock } from "./tx.ts";
 
 type Q = Pick<pg.Pool, "query">;
@@ -44,6 +47,24 @@ export const moveTarget = (
 ): GameStatus | undefined =>
   MOVES[move].from.includes(status) ? MOVES[move].to : undefined;
 
+// The owner email a status change sends: an admin's verdict, or an edit that took an
+// approved game out of the gallery. Submitting and unpublishing are the owner's own doing.
+export function ownerMailFor(
+  move: Move | "edit",
+  before: GameStatus,
+  after: GameStatus,
+): OwnerMailKind | undefined {
+  if (move === "approve" && after === "approved") {
+    return "approved";
+  }
+  if (move === "reject" && after === "rejected") {
+    return "rejected";
+  }
+  return move === "edit" && before === "approved" && after === "pending"
+    ? "review"
+    : undefined;
+}
+
 export const enteredPending = (
   before: GameStatus,
   after: GameStatus,
@@ -71,31 +92,53 @@ async function mailAdminsPending(
 
 export type MoveResult =
   "ok" | "invalid_state" | "too_few_entries" | "incomplete_entries";
+// What to mail once the transaction commits
+interface Mails {
+  admins: { slug: string; name: string } | undefined;
+  owner: OwnerNotice | undefined;
+}
+const NO_MAILS: Mails = { admins: undefined, owner: undefined };
 interface Settled {
   result: MoveResult;
-  row: { slug: string; name: string } | undefined;
+  mails: Mails;
 }
 
-// Every status change goes through here, so none can forget the admin email.
+// Every status change goes through here, so none can forget the admin or owner email.
 export function gameLifecycle(pool: pg.Pool, mail?: MailConfig) {
-  // Runs under the game lock; sets the new status and returns the row to mail about, if any
+  // Runs under the game lock; sets the new status and returns what to mail about
   const settle = async (
     tx: pg.PoolClient,
     game: GameRow,
+    move: Move | "edit",
     before: GameStatus,
     after: GameStatus,
     reason: string | null = null,
-  ) => {
-    const { rows } = await tx.query<{ slug: string; name: string }>(
+  ): Promise<Mails> => {
+    const { rows } = await tx.query<{
+      slug: string;
+      name: string;
+      reason: string;
+    }>(
       `update games set status = $2, reject_reason = coalesce($3, reject_reason), updated_at = now()
-       where id = $1 returning slug, name`,
+       where id = $1 returning slug, name, reject_reason as reason`,
       [game.id, after, reason],
     );
-    return enteredPending(before, after) ? rows[0] : undefined;
+    const row = rows[0];
+    const kind = ownerMailFor(move, before, after);
+    return {
+      admins: row && enteredPending(before, after) ? row : undefined,
+      owner: row && kind ? { kind, gameId: game.id, ...row } : undefined,
+    };
   };
-  const mailIf = async (row: { slug: string; name: string } | undefined) => {
-    if (row && mail) {
-      await mailAdminsPending(pool, mail, row);
+  const mailIf = async ({ admins, owner }: Mails) => {
+    if (!mail) {
+      return;
+    }
+    if (admins) {
+      await mailAdminsPending(pool, mail, admins);
+    }
+    if (owner) {
+      await mailOwner(pool, mail, owner);
     }
   };
 
@@ -108,18 +151,24 @@ export function gameLifecycle(pool: pg.Pool, mail?: MailConfig) {
       work: (tx: pg.PoolClient) => Promise<T>,
       isEdit: (result: T) => boolean = () => true,
     ): Promise<T> {
-      const { result, row } = await withGameLock(
+      const { result, mails } = await withGameLock(
         pool,
         game.id,
         async (tx, before) => {
           const result = await work(tx);
-          const row = isEdit(result)
-            ? await settle(tx, game, before, statusAfterEdit(before, kind))
-            : undefined;
-          return { result, row };
+          const mails = isEdit(result)
+            ? await settle(
+                tx,
+                game,
+                "edit",
+                before,
+                statusAfterEdit(before, kind),
+              )
+            : NO_MAILS;
+          return { result, mails };
         },
       );
-      await mailIf(row);
+      await mailIf(mails);
       return result;
     },
 
@@ -128,42 +177,40 @@ export function gameLifecycle(pool: pg.Pool, mail?: MailConfig) {
       move: Move,
       reason: string = "",
     ): Promise<MoveResult> {
-      const { result, row } = await withGameLock(
+      const { result, mails } = await withGameLock(
         pool,
         game.id,
         async (tx, before): Promise<Settled> => {
           const after = moveTarget(move, before);
           if (!after) {
-            return { result: "invalid_state", row: undefined };
+            return { result: "invalid_state", mails: NO_MAILS };
           }
           if (move === "submit") {
-            const { rows } = await tx.query<{ n: number }>(
-              "select count(*)::int as n from entries where game_id = $1 and deleted_at is null",
-              [game.id],
-            );
-            if (rows[0]!.n < minEntriesOf(game.kind)) {
-              return { result: "too_few_entries", row: undefined };
-            }
-            const missing = await tx.query(
-              `select 1 from games g where g.id = $1 and ${HAS_MISSING_VALUES}`,
-              [game.id],
-            );
-            if (missing.rowCount) {
-              return { result: "incomplete_entries", row: undefined };
+            // The roster as of the lock, so a concurrent edit cannot slip past
+            const blocker = playBlocker(game, await loadRoster(tx, game));
+            if (blocker) {
+              return {
+                result:
+                  blocker === "not_enough_entries"
+                    ? "too_few_entries"
+                    : "incomplete_entries",
+                mails: NO_MAILS,
+              };
             }
           }
           // Submit keeps the last rejection reason; the others set it (cleared unless rejecting)
-          const row = await settle(
+          const mails = await settle(
             tx,
             game,
+            move,
             before,
             after,
             move === "submit" ? null : reason,
           );
-          return { result: "ok", row };
+          return { result: "ok", mails };
         },
       );
-      await mailIf(row);
+      await mailIf(mails);
       return result;
     },
   };

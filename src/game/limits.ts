@@ -6,7 +6,8 @@ export const MAX_DESCRIPTION = 500;
 export const MIN_SLUG = 3;
 export const MAX_SLUG = 40;
 export const MAX_ENTRY_NAME = 60;
-export const MAX_ATTRIBUTES = 10;
+// 10, plus room for the Photo column every classic game had built in before Image attributes
+export const MAX_ATTRIBUTES = 11;
 export const MAX_ATTRIBUTE_NAME = 40;
 // One value, and how many a List attribute may hold
 export const MAX_VALUE_LENGTH = 200;

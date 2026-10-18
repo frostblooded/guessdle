@@ -43,6 +43,7 @@ describe("the tutorial's frozen pet game copy", () => {
     const { status, body } = await tutorial();
     assert.equal(status, 200);
     assert.deepEqual(body.attributes, [
+      { name: "Photo", type: "image" },
       { name: "Colors", type: "list" },
       { name: "Owners", type: "list" },
     ]);
@@ -59,17 +60,16 @@ describe("the tutorial's frozen pet game copy", () => {
         id: pid("ati"),
         name: "Ati",
         photo: "/photos/ati.jpg",
-        values: [["Black", "Orange", "White"], ["Niki"]],
+        values: ["/photos/ati.jpg", ["Black", "Orange", "White"], ["Niki"]],
       },
     );
   });
 
   it("does not change when the pet game's entries change", async () => {
     const before = await tutorial();
-    await db.pool.query(
-      "update entries set name = 'Atilla', photo_url = '/uploads/x.webp' where id = $1",
-      [pid("ati")],
-    );
+    await db.pool.query("update entries set name = 'Atilla' where id = $1", [
+      pid("ati"),
+    ]);
     await db.pool.query("delete from entry_values where entry_id = $1", [
       pid("bela"),
     ]);
@@ -91,7 +91,7 @@ describe("the tutorial's frozen pet game copy", () => {
       const old = new Date(Date.now() - 3 * 24 * 3600 * 1000);
       await utimes(join(dir, name), old, old);
       await db.pool.query(
-        `update tutorial set entries = jsonb_set(entries, '{0,photo}', to_jsonb($1::text))`,
+        `update tutorial set entries = jsonb_set(entries, '{0,values,0}', to_jsonb($1::text))`,
         [photo],
       );
       const refs = uploadRefs(db.pool, dir);

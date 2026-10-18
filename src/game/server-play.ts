@@ -1,6 +1,7 @@
 // Signed-in play: guesses, give-up and reset live on the server (/api/game).
 import { isAnswerRow, type GradedAttribute } from "./game.ts";
 import {
+  RATE_LIMITED,
   revealIn,
   type GiveUpResult,
   type LoadFailure,
@@ -57,6 +58,9 @@ export function createServerPlay({
   const play: Play = {
     async load(): Promise<Loaded | LoadFailure> {
       const res = await call(fetch, `${base}${query}`);
+      if (res?.status === 429) {
+        return { failure: RATE_LIMITED };
+      }
       if (res?.status !== 200) {
         return { failure: failureMessage(res) };
       }
