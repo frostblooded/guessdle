@@ -175,7 +175,8 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
     }
   });
 
-  // Records the player's first win today and answers with today's stats. Signed-in
+  // Records the player's first win of the day (today, or a past day named by ?day=N) and
+  // answers with that day's stats. Signed-in
   // players are known by their session and their stored guesses; anonymous ones by
   // the browser's token and the ids they send, which must end with the answer.
   app.post(
@@ -189,7 +190,12 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         return;
       }
       const { game, roster } = loaded;
-      const { date, day } = todayOf(ctx, game);
+      const played = dayOf(ctx, req, game);
+      if (!played) {
+        failWith(res, "no_such_day");
+        return;
+      }
+      const { date, day, past } = played;
       const body = bodyOf(req);
       const player = user
         ? `user:${user.id}`
@@ -214,7 +220,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
               userId: user.id,
               date,
               day,
-              past: false,
+              past,
             })
           ).ids
         : (ids as number[]);

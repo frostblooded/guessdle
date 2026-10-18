@@ -163,4 +163,61 @@ describe("victory stats", () => {
     );
     assert.match(rows[0]!.player, /^user:\d+$/);
   });
+
+  describe("a past day", () => {
+    // 2026-10-15, Day Number 426: the backfill stores "ati"
+    const PAST_ANSWER = pid("ati");
+
+    it("records its first win in that day's stats, apart from today's", async () => {
+      const { status, body } = await post(`${G}/result?day=426`, {
+        ids: [ANSWER, PAST_ANSWER],
+        seconds: 30,
+        player: TOKEN_A,
+      });
+      assert.equal(status, 200);
+      assert.equal(body.day, 426);
+      assert.deepEqual(body.you, { guesses: 2, seconds: 30 });
+      const replay = await post(`${G}/result?day=426`, {
+        ids: [PAST_ANSWER],
+        seconds: 5,
+        player: TOKEN_A,
+      });
+      assert.deepEqual(replay.body.you, { guesses: 2, seconds: 30 });
+      const today = await post(`${G}/result`, {
+        ids: [ANSWER],
+        seconds: 9,
+        player: TOKEN_B,
+      });
+      assert.equal(today.body.players, 1);
+    });
+
+    it("grades against the past day's answer, not today's", async () => {
+      const { status } = await post(`${G}/result?day=426`, {
+        ids: [ANSWER],
+        player: TOKEN_A,
+      });
+      assert.equal(status, 409);
+    });
+
+    it("uses a signed-in player's guesses stored for that day", async () => {
+      const cookie = await login("a@x.test");
+      await post(`${G}/state/guess?day=426`, { id: PAST_ANSWER }, cookie);
+      const { status, body } = await post(
+        `${G}/result?day=426`,
+        { seconds: 7 },
+        cookie,
+      );
+      assert.equal(status, 200);
+      assert.deepEqual(body.you, { guesses: 1, seconds: 7 });
+    });
+
+    it("refuses a day after today", async () => {
+      const { status, body } = await post(`${G}/result?day=428`, {
+        ids: [ANSWER],
+        player: TOKEN_A,
+      });
+      assert.equal(status, 404);
+      assert.equal(body.error, "no_such_day");
+    });
+  });
 });

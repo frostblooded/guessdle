@@ -1,6 +1,6 @@
-// The victory popup's state: the solve clock, and today's stats fetched when it opens.
+// The victory popup's state: the solve clock, and the day's stats fetched when it opens.
 import { useState, type RefObject } from "react";
-import { gameStorage } from "../../game/game-state.ts";
+import { gameStorage, pastDayStorage } from "../../game/game-state.ts";
 import type { Play } from "../../game/play.ts";
 import { fetchStats, playerToken, type DayStats } from "../../game/stats.ts";
 import { browserFetch } from "../../lib/api.ts";
@@ -19,10 +19,17 @@ export interface VictoryStats {
   show(): Promise<void>;
 }
 
+// `day`: a past day's Day Number; today when absent
 export function useVictoryStats(
   slug: string,
   play: RefObject<Play | null>,
+  day?: number,
 ): VictoryStats {
+  // The clock lives with the board it times
+  const board = (): ReturnType<typeof gameStorage> =>
+    day === undefined
+      ? gameStorage(localStorage, slug)
+      : pastDayStorage(localStorage, slug, day);
   const [open, setOpen] = useState(false);
   const [stats, setStats] = useState<DayStats | null>(null);
   const [failed, setFailed] = useState(false);
@@ -30,9 +37,7 @@ export function useVictoryStats(
   // Whole seconds since the first guess, or null when this browser did not see it
   const seconds = (): number | null => {
     try {
-      const started = Number(
-        gameStorage(localStorage, slug).getItem(FIRST_GUESS_KEY),
-      );
+      const started = Number(board().getItem(FIRST_GUESS_KEY));
       return started > 0
         ? Math.max(0, Math.round((Date.now() - started) / 1000))
         : null;
@@ -48,10 +53,7 @@ export function useVictoryStats(
     failed,
     startClock(): void {
       try {
-        gameStorage(localStorage, slug).setItem(
-          FIRST_GUESS_KEY,
-          String(Date.now()),
-        );
+        board().setItem(FIRST_GUESS_KEY, String(Date.now()));
       } catch {
         // Blocked storage: the time stays unknown
       }
@@ -59,11 +61,16 @@ export function useVictoryStats(
     async show(): Promise<void> {
       setOpen(true);
       setFailed(false);
-      const fresh = await fetchStats(browserFetch, slug, {
-        ids: play.current?.getUsedGuesses() ?? [],
-        seconds: seconds(),
-        player: playerToken(localStorage),
-      });
+      const fresh = await fetchStats(
+        browserFetch,
+        slug,
+        {
+          ids: play.current?.getUsedGuesses() ?? [],
+          seconds: seconds(),
+          player: playerToken(localStorage),
+        },
+        day,
+      );
       if (fresh) {
         setStats(fresh);
       } else {

@@ -85,6 +85,25 @@ test("every asset a page links is served from dist/assets", async ({
   }
 });
 
+test("the shell links the site icons with image types", async ({ request }) => {
+  const html = await (await request.get("/")).text();
+  const icons = [
+    ["icon", /favicon-[^"]+\.ico/, "image/x-icon"],
+    ["icon", /favicon-[^"]+\.svg/, "image/svg+xml"],
+    ["apple-touch-icon", /apple-touch-icon-[^"]+\.png/, "image/png"],
+  ] as const;
+  for (const [rel, file, type] of icons) {
+    const link = new RegExp(
+      `<link rel="${rel}"[^>]*href="(/dist/assets/${file.source})"`,
+    );
+    const href = html.match(link)?.[1];
+    expect(href, file.source).toBeDefined();
+    const response = await request.get(href!);
+    expect(response.status(), href).toBe(200);
+    expect(response.headers()["content-type"]).toContain(type);
+  }
+});
+
 for (const path of NOT_SERVED) {
   test(`${path} is a 404 with the app shell`, async ({ request }) => {
     const response = await request.get(path);

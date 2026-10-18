@@ -73,7 +73,7 @@ export interface GameContext {
   userId: number;
   date: string;
   day: number;
-  // An archive day (not today): playable, but its wins stay out of the daily stats
+  // An archive day (not today), played from the Past days list
   past: boolean;
 }
 
