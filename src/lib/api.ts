@@ -1,5 +1,9 @@
 // Shared fetch for the React app, and the signed-in user as a TanStack Query.
-import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import {
+  useQuery,
+  type QueryClient,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 import { fetchUser, type AccountUser } from "../account.ts";
 import type { Fetch } from "../game/transport.ts";
 import { api } from "../manage-client.ts";
@@ -24,3 +28,11 @@ export async function getJson<T>(path: string): Promise<T> {
   }
   return out.data;
 }
+
+// Play's and Past days' copy of GET /api/games/:slug, kept for the whole visit
+export const gameKey = (slug: string) => ["game", slug] as const;
+
+// Drops that copy after the game changed elsewhere (the editor, an admin list), so the next
+// visit to Play loads its status afresh
+export const forgetGame = (client: QueryClient, slug: string): void =>
+  client.removeQueries({ queryKey: gameKey(slug), exact: true });

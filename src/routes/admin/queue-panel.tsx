@@ -1,5 +1,5 @@
 // Admin Approval queue tab: pending games oldest first, each with a play link, Approve, Reject and Delete.
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router";
 import { ReviewButtons } from "../../components/review-buttons.tsx";
@@ -11,7 +11,7 @@ import {
   TableHead,
   TableRow,
 } from "../../components/ui/table.tsx";
-import { getJson } from "../../lib/api.ts";
+import { forgetGame, getJson } from "../../lib/api.ts";
 import { useDelayed } from "../../lib/use-delayed.ts";
 import { api } from "../../manage-client.ts";
 
@@ -29,6 +29,7 @@ const ACT_FAILED =
   "The review action did not go through. Another admin may have handled this game already, or the server may be failing. Reload the queue to see its current state.";
 
 export function QueuePanel({ active }: { active: boolean }) {
+  const client = useQueryClient();
   // Refetched each time the tab opens (stale at once)
   const queue = useQuery({
     queryKey: ["admin", "queue"],
@@ -108,6 +109,7 @@ export function QueuePanel({ active }: { active: boolean }) {
                       name={game.name}
                       onDone={async () => {
                         setFailed(false);
+                        forgetGame(client, game.slug);
                         await queue.refetch();
                       }}
                       onFail={() => setFailed(true)}
