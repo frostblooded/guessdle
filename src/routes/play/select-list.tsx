@@ -103,16 +103,8 @@ export function SelectList({
           className="sticky top-0 z-10 grid gap-1 bg-card p-1 [--photo:2.5rem] sm:[--photo:3rem]"
           style={grid}
         >
-          {photos && (
-            <div
-              className={cn(
-                cellBase,
-                "min-h-0 bg-tile py-2 font-semibold text-white",
-              )}
-            >
-              Photo
-            </div>
-          )}
+          {/* The photo column has no title: "Photo" does not fit its width on a phone */}
+          {photos && <span aria-hidden="true" />}
           <SortTitle label="Name" column={-1} sort={sort} onSort={onSort} />
           {attributes.map((attribute, i) => (
             <SortTitle
