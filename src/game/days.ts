@@ -1,8 +1,9 @@
 // Past days: the list a player picks an archive day from (GET /api/games/:slug/days).
+import { outOfTries } from "./blur.ts";
 
 // How far the player got on a day; "unplayed" also for anonymous players, whose
 // progress lives in the browser
-export type DayStatus = "won" | "gave-up" | "playing" | "unplayed";
+export type DayStatus = "won" | "gave-up" | "lost" | "playing" | "unplayed";
 
 export interface DayItem {
   day: number;
@@ -13,36 +14,36 @@ export interface DayItem {
 
 export interface DaysResponse {
   today: number;
+  // Blur games: tries per day, so the browser can tell a lost day; null for a classic game
+  tries: number | null;
   // Newest first, today included
   days: DayItem[];
 }
 
-// A day's status from what was played on it: a win beats a give-up beats guesses
-export function statusOf(played: {
+// What was played on a day
+export interface DayProgress {
   won: boolean;
   gaveUp: boolean;
+  // Skips included
   guesses: number;
-}): DayStatus {
+}
+
+// A day's status from what was played on it: a win beats a give-up beats used-up tries
+// (Blur games; `tries` null for a classic game) beats guesses
+export function statusOf(
+  played: DayProgress,
+  tries: number | null = null,
+): DayStatus {
   if (played.won) {
     return "won";
   }
   if (played.gaveUp) {
     return "gave-up";
   }
+  if (outOfTries(tries, played.guesses, false)) {
+    return "lost";
+  }
   return played.guesses > 0 ? "playing" : "unplayed";
-}
-
-// An anonymous player's status on a day, from the browser's Game State
-export function localStatus(state: {
-  getWon(): boolean;
-  getGaveUp(): boolean;
-  getUsedGuesses(): number[];
-}): DayStatus {
-  return statusOf({
-    won: state.getWon(),
-    gaveUp: state.getGaveUp(),
-    guesses: state.getUsedGuesses().length,
-  });
 }
 
 // "Sat 17 Oct 2026" for a "YYYY-MM-DD" date, read as a calendar day (no time zone shift)
