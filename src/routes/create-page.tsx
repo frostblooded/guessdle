@@ -9,7 +9,7 @@ import { slugify } from "../game/slug.ts";
 import { api, errorText } from "../manage-client.ts";
 import { useSignedIn } from "../lib/use-signed-in.ts";
 import { useTitle } from "../lib/use-title.ts";
-import type { GameKind } from "../game/zoom.ts";
+import type { GameKind } from "../game/blur.ts";
 
 const KINDS: { kind: GameKind; title: string; text: string }[] = [
   {
@@ -18,9 +18,9 @@ const KINDS: { kind: GameKind; title: string; text: string }[] = [
     text: "Players guess by comparing attributes, like colors or owners.",
   },
   {
-    kind: "zoom",
-    title: "Zoom",
-    text: "Players guess from zoomed-in parts of an image, one try per part.",
+    kind: "blur",
+    title: "Blur",
+    text: "Players guess from an image split into nine blurred squares that clear one by one.",
   },
 ];
 

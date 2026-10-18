@@ -1,5 +1,5 @@
 import { MIN_ENTRIES } from "./limits.ts";
-import type { GameKind } from "./zoom.ts";
+import type { GameKind } from "./blur.ts";
 
 // Editor wording that depends on a game's status (pure, so it is unit tested).
 
@@ -12,8 +12,8 @@ export interface Details {
   rejectReason: string;
   skipPeriod: number | null;
   kind: GameKind;
-  // Zoom games: parts per entry, also the number of tries
-  zoomParts: number;
+  // Blur games: the number of tries
+  blurTries: number;
   entryCount: number;
   // Active entries missing a value; while any are, the game is paused
   incompleteCount: number;

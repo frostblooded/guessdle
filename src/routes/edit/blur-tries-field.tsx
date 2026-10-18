@@ -1,8 +1,8 @@
-// A Zoom game's part count on the Details tab: parts per entry, which is also the number of tries.
+// A Blur game's number of tries on the Details tab. Each wrong guess clears one more square.
 import { Label, NativeSelect } from "../../components/ui/input.tsx";
-import { MAX_ZOOM_PARTS } from "../../game/limits.ts";
+import { MAX_BLUR_TRIES } from "../../game/limits.ts";
 
-export function ZoomPartsField({
+export function BlurTriesField({
   value,
   onChange,
 }: {
@@ -11,15 +11,15 @@ export function ZoomPartsField({
 }) {
   return (
     <div className="space-y-2">
-      <Label htmlFor="edit-zoom-parts">
-        Zoomed parts per entry (one try each)
+      <Label htmlFor="edit-blur-tries">
+        Tries (each wrong guess clears one more square)
       </Label>
       <NativeSelect
-        id="edit-zoom-parts"
+        id="edit-blur-tries"
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
       >
-        {Array.from({ length: MAX_ZOOM_PARTS }, (_, i) => (
+        {Array.from({ length: MAX_BLUR_TRIES }, (_, i) => (
           <option key={i} value={i + 1}>
             {i + 1}
           </option>

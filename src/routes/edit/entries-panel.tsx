@@ -1,9 +1,8 @@
 // The editor's Entries tab: list, add, change and delete entries with photo and values.
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useCrop } from "../../components/crop-dialog.tsx";
-import { CropError, ZOOM_MAX_SIDE } from "../../game/crop.ts";
-import type { ZoomPart } from "../../game/zoom.ts";
-import { shrinkImage } from "../../image-cropper.ts";
+import { CELLS } from "../../game/blur.ts";
+import { FAILURES } from "../../game/failures.ts";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button, buttonVariants } from "../../components/ui/button.tsx";
 import { Input, Label, Textarea } from "../../components/ui/input.tsx";
@@ -15,7 +14,7 @@ import {
 } from "../../game/limits.ts";
 import { api, errorText, type Reply } from "../../manage-client.ts";
 import { IMAGE_TYPES, type Attribute, type Entry } from "./types.ts";
-import { ZoomPartsEditor } from "./zoom-parts-editor.tsx";
+import { BlurOrderEditor } from "./blur-order-editor.tsx";
 
 // What the form holds: the entry being edited (null: adding), its name, photo URL and values
 interface Draft {
@@ -23,15 +22,15 @@ interface Draft {
   name: string;
   photo: string;
   values: Record<string, string>;
-  // Zoom games: the photo's parts, closest first
-  parts: ZoomPart[];
+  // Blur games: the squares picked so far, in the order they clear
+  blurOrder: number[];
 }
 
 const draftOf = (entry: Entry | null): Draft => ({
   editing: entry,
   name: entry?.name ?? "",
   photo: entry?.photo ?? "",
-  parts: entry?.parts ?? [],
+  blurOrder: entry?.blurOrder ?? [],
   values: Object.fromEntries(
     Object.entries(entry?.values ?? {}).map(([id, items]) => [
       id,
@@ -44,12 +43,12 @@ export function EntriesPanel({
   base,
   initial,
   active,
-  zoomParts,
+  blur = false,
   onChange,
 }: {
   base: string;
-  // A Zoom game's part count; undefined for a classic game
-  zoomParts?: number | undefined;
+  // A Blur game: entries have an image and a square order instead of values
+  blur?: boolean;
   initial: { attributes: Attribute[]; entries: Entry[] };
   // The tab is open: refresh the lists, since attributes may have changed
   active: boolean;
@@ -118,10 +117,19 @@ export function EntriesPanel({
         (draft.values[String(attr.id)] ?? "").split("\n"),
       ]),
     );
-    const body =
-      zoomParts === undefined
-        ? { name: draft.name, photo: draft.photo, values }
-        : { name: draft.name, photo: draft.photo, parts: draft.parts };
+    if (blur && draft.photo && draft.blurOrder.length !== CELLS) {
+      setError(FAILURES.missing_order.text);
+      return;
+    }
+    const body = blur
+      ? {
+          name: draft.name,
+          photo: draft.photo,
+          ...(draft.blurOrder.length === CELLS && {
+            blurOrder: draft.blurOrder,
+          }),
+        }
+      : { name: draft.name, photo: draft.photo, values };
     const ok = draft.editing
       ? await run("PATCH", `${base}/entries/${draft.editing.id}`, body)
       : await run("POST", `${base}/entries`, body);
@@ -137,55 +145,40 @@ export function EntriesPanel({
       return;
     }
     setError("");
-    const zoom = zoomParts !== undefined;
-    const ready = zoom ? await shrink(file) : await crop(file, "photo");
-    if (!ready) {
+    const cropped = await crop(file, "photo");
+    if (!cropped) {
       return;
     }
     const up = await api<{ url?: string }>(
       "POST",
-      `/api/uploads?kind=${zoom ? "zoom" : "photo"}`,
-      ready,
+      "/api/uploads?kind=photo",
+      cropped,
     );
     const url = up?.status === 200 ? up.data.url : undefined;
     if (url) {
-      // A new image starts from the default parts
-      setDraft((d) => ({ ...d, photo: url, parts: [] }));
+      setDraft((d) => ({ ...d, photo: url }));
     } else {
       setError(errorText(up));
     }
   };
 
-  // A Zoom game's photo goes up whole, only shrunk to the stored size
-  const shrink = async (file: Blob): Promise<Blob | null> => {
-    try {
-      return await shrinkImage(file, ZOOM_MAX_SIDE);
-    } catch (e) {
-      if (e instanceof CropError) {
-        setError(e.message);
-        return null;
-      }
-      throw e;
-    }
-  };
-
   const incomplete = (entry: Entry): boolean =>
-    zoomParts === undefined
-      ? formAttributes.some((attr) => !entry.values[String(attr.id)]?.length)
-      : !entry.photo || (entry.parts?.length ?? 0) !== zoomParts;
+    blur
+      ? !entry.photo || !entry.blurOrder
+      : formAttributes.some((attr) => !entry.values[String(attr.id)]?.length);
 
   return (
     <div className="space-y-5">
       {dialog}
       <p className="lede text-sm text-muted-foreground">
-        {zoomParts === undefined
-          ? "Each entry is a row on the board."
-          : "Each entry is one possible answer."}{" "}
+        {blur
+          ? "Each entry is one possible answer."
+          : "Each entry is a row on the board."}{" "}
         A game needs at least {MIN_ENTRIES} entries before anyone can play it,
         and every entry needs{" "}
-        {zoomParts === undefined
-          ? "a value for every attribute."
-          : `an image with ${zoomParts} zoomed ${zoomParts === 1 ? "part" : "parts"} on it.`}
+        {blur
+          ? "an image and the order its nine squares clear in."
+          : "a value for every attribute."}
       </p>
       <ul
         id="entry-list"
@@ -213,7 +206,7 @@ export function EntriesPanel({
             </span>
             {incomplete(entry) && (
               <span className="entry-missing shrink-0 text-sm font-medium text-error">
-                {zoomParts === undefined ? "Missing values" : "Missing parts"}
+                {blur ? "Missing image or order" : "Missing values"}
               </span>
             )}
             <Button
@@ -265,25 +258,21 @@ export function EntriesPanel({
           />
         </div>
         <div className="space-y-2">
-          <p className="text-sm font-medium">
-            {zoomParts === undefined ? "Photo" : "Image"}
-          </p>
-          {zoomParts !== undefined && !draft.photo && (
+          <p className="text-sm font-medium">{blur ? "Image" : "Photo"}</p>
+          {blur && !draft.photo && (
             <p className="text-sm text-muted-foreground">
-              Pick a sharp, large image. Players only see the zoomed parts you
-              place on it, and the whole image once the day is over.
+              Players see this image split into nine squares, all blurred but
+              one, and the whole image once the day is over.
             </p>
           )}
-          {zoomParts !== undefined && draft.photo && (
-            <ZoomPartsEditor
-              key={draft.photo}
+          {blur && draft.photo && (
+            <BlurOrderEditor
               src={draft.photo}
-              parts={draft.parts}
-              count={zoomParts}
-              onChange={(parts) => setDraft((d) => ({ ...d, parts }))}
+              order={draft.blurOrder}
+              onChange={(blurOrder) => setDraft((d) => ({ ...d, blurOrder }))}
             />
           )}
-          {zoomParts === undefined && draft.photo && (
+          {!blur && draft.photo && (
             <img
               id="entry-photo-preview"
               className="cover-preview size-24 rounded-lg object-cover"
@@ -303,9 +292,9 @@ export function EntriesPanel({
               className={buttonVariants({ variant: "outline", size: "sm" })}
               htmlFor="entry-photo"
             >
-              {zoomParts === undefined ? "Choose photo" : "Choose image"}
+              {blur ? "Choose image" : "Choose photo"}
             </label>
-            {zoomParts === undefined && (
+            {!blur && (
               <Button
                 id="entry-photo-remove"
                 variant="ghost"

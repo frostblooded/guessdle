@@ -1,11 +1,11 @@
-// The result card above the guesses after a win, a give-up or (Zoom games) running out of tries.
+// The result card above the guesses after a win, a give-up or (Blur games) running out of tries.
 import type { EntryRef } from "../../game/game.ts";
 import type { Reveal } from "../../game/play.ts";
 
 export type Result = {
   kind: "victory" | "give-up" | "lost";
   answer: string;
-  // A Zoom game's answer image, which its roster does not carry
+  // A Blur game's answer image, which its roster does not carry
   photo?: string | undefined;
 } | null;
 

@@ -1,8 +1,8 @@
-// The viewer's own board in a live party round: the guess box, their graded rows (a Zoom game's
-// parts and guessed names) and, once they solved it, gave up or ran out of tries, the answer.
+// The viewer's own board in a live party round: the guess box, their graded rows (a Blur game's
+// image and guessed names) and, once they solved it, gave up or ran out of tries, the answer.
 import { useState } from "react";
 import { BoardRow, GuessRow, TitleTile } from "../../components/board.tsx";
-import { ZoomGuesses, ZoomView } from "../../components/zoom-view.tsx";
+import { BlurGuesses, BlurView } from "../../components/blur-view.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
 import { findEntryId, isAnswerRow, nameCell } from "../../game/game.ts";
@@ -31,7 +31,7 @@ export function PartyRound({
   const entries = view.game.entries;
   const done = mine.solved || mine.gaveUp || mine.lost;
   const used = new Set(mine.rows.map((row) => nameCell(row).value));
-  const zoom = view.game.kind === "zoom" ? (view.game.zoomParts ?? 1) : null;
+  const blur = view.game.kind === "blur" ? (view.game.blurTries ?? 1) : null;
   const newestFirst = [...mine.rows].reverse();
   const names = entries.map((e) => e.name).filter((name) => !used.has(name));
   const titles = ["Photo", "Name", ...view.game.attributes.map((a) => a.name)];
@@ -85,12 +85,12 @@ export function PartyRound({
           </div>
         )}
       </div>
-      {zoom !== null && (
-        <ZoomView
-          partUrl={(n) =>
-            `/api/parties/${encodeURIComponent(view.code)}/zoom/${round.number}/${n}`
+      {blur !== null && (
+        <BlurView
+          boardUrl={(n) =>
+            `/api/parties/${encodeURIComponent(view.code)}/blur/${round.number}/${n}`
           }
-          tries={zoom}
+          tries={blur}
           wrong={mine.rows.filter((row) => !isAnswerRow(row)).length}
           finished={done}
           reveal={done ? mine.answer?.photo : undefined}
@@ -126,8 +126,8 @@ export function PartyRound({
           </div>
         </Card>
       )}
-      {zoom !== null && <ZoomGuesses rows={newestFirst} />}
-      {zoom === null && mine.rows.length > 0 && (
+      {blur !== null && <BlurGuesses rows={newestFirst} />}
+      {blur === null && mine.rows.length > 0 && (
         <div id="board" className="results flex flex-col gap-2 sm:gap-2.5">
           <BoardRow
             id="guess-results-titles-row"

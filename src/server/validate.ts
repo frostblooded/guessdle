@@ -7,7 +7,7 @@ import {
   MAX_NAME,
   MAX_VALUE_LENGTH,
 } from "../game/limits.ts";
-import { isPartCount, parsePartList } from "../game/zoom.ts";
+import { isBlurOrder, isTryCount } from "../game/blur.ts";
 import type { GamePatch } from "./games.ts";
 import type { EntryInput } from "./entries.ts";
 
@@ -18,20 +18,20 @@ export const nameIn = (v: unknown, max: number): string | undefined =>
     : undefined;
 
 // The game fields of a PATCH body; undefined when any is malformed. `maxSkip` is the largest
-// skip period the roster allows; `zoom` whether the game is a Zoom game, the only kind with a
-// part count. A coverUrl is only shape-checked here.
+// skip period the roster allows; `blur` whether the game is a Blur game, the only kind with a
+// try count. A coverUrl is only shape-checked here.
 export function parseGamePatch(
   body: Record<string, unknown>,
   maxSkip: number,
-  zoom: boolean = false,
+  blur: boolean = false,
 ): GamePatch | undefined {
-  const { name, description, skipPeriod, coverUrl, zoomParts } = body;
+  const { name, description, skipPeriod, coverUrl, blurTries } = body;
   const patch: GamePatch = {};
-  if (zoomParts !== undefined) {
-    if (!zoom || !isPartCount(zoomParts)) {
+  if (blurTries !== undefined) {
+    if (!blur || !isTryCount(blurTries)) {
       return undefined;
     }
-    patch.zoomParts = zoomParts;
+    patch.blurTries = blurTries;
   }
   if (name !== undefined) {
     const title = nameIn(name, MAX_NAME);
@@ -76,14 +76,13 @@ export function parseGamePatch(
 export function parseEntryInput(
   body: Record<string, unknown>,
 ): EntryInput | undefined {
-  const { name, photo, values, parts } = body;
+  const { name, photo, values, blurOrder } = body;
   const out: EntryInput = {};
-  if (parts !== undefined) {
-    const list = parsePartList(parts);
-    if (!list) {
+  if (blurOrder !== undefined) {
+    if (!isBlurOrder(blurOrder)) {
       return undefined;
     }
-    out.parts = list;
+    out.blurOrder = blurOrder;
   }
   if (name !== undefined) {
     const title = nameIn(name, MAX_ENTRY_NAME);

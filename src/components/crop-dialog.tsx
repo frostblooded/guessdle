@@ -3,7 +3,7 @@
 // whose text goes to `onError`; the page renders the returned `dialog`.
 import { Minus, Plus } from "lucide-react";
 import { useCallback, useRef, useState, type ReactNode } from "react";
-import { CropError, type CropKind } from "../game/crop.ts";
+import { CropError, type ImageKind } from "../game/crop.ts";
 import {
   loadImage,
   mountCropper,
@@ -20,7 +20,7 @@ import {
 import { Button } from "./ui/button.tsx";
 
 interface Job {
-  kind: CropKind;
+  kind: ImageKind;
   image: HTMLImageElement;
   // The cropped file, null for a cancel, or the CropError the crop threw
   done(out: Blob | null | CropError): void;
@@ -110,11 +110,11 @@ function CropDialog({ job }: { job: Job }) {
 }
 
 export function useCrop(onError: (text: string) => void): {
-  crop: (file: Blob, kind: CropKind) => Promise<Blob | null>;
+  crop: (file: Blob, kind: ImageKind) => Promise<Blob | null>;
   dialog: ReactNode;
 } {
   const [job, setJob] = useState<Job | null>(null);
-  const crop = async (file: Blob, kind: CropKind): Promise<Blob | null> => {
+  const crop = async (file: Blob, kind: ImageKind): Promise<Blob | null> => {
     let image: HTMLImageElement;
     try {
       image = await loadImage(file);

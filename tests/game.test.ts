@@ -164,9 +164,9 @@ describe("gradeIds", () => {
   });
 });
 
-describe("gradeIds: Zoom games", () => {
+describe("gradeIds: Blur games", () => {
   it("grades the name only, so no photo reaches the player", () => {
-    const out = gradeIds(ATTRIBUTES, ROSTER, first, [2, 1], "zoom");
+    const out = gradeIds(ATTRIBUTES, ROSTER, first, [2, 1], "blur");
     assert.deepEqual(out, {
       kind: "graded",
       rows: [

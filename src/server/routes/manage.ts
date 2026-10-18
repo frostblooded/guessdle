@@ -22,9 +22,8 @@ import {
   type AttributeDraft,
   type AttributeEdit,
 } from "../games.ts";
-import { imageSizeOf } from "../images.ts";
 import { rateLimit, type RateLimit } from "../rate-limit.ts";
-import { isGameKind } from "../../game/zoom.ts";
+import { isGameKind } from "../../game/blur.ts";
 import { uploadRefs } from "../upload-refs.ts";
 import {
   bodyOf,
@@ -50,7 +49,6 @@ export function manageRoutes(
   const writes = rateLimit(pool, now, limit);
   const lifecycle = gameLifecycle(pool, ctx.mail);
   const refs = uploadRefs(pool, uploadsDir);
-  const sizeOf = imageSizeOf(uploadsDir);
 
   const needUser = async (
     req: Request,
@@ -91,7 +89,7 @@ export function manageRoutes(
     rejectReason: game.rejectReason,
     skipPeriod: game.skipPeriod,
     kind: game.kind,
-    zoomParts: game.zoomParts,
+    blurTries: game.blurTries,
     entryCount: roster.entries.length,
     incompleteCount: roster.incomplete,
     canApprove: canApprove(game, user),
@@ -176,8 +174,8 @@ export function manageRoutes(
   ) =>
     manageRoute(async ({ game }, _user, req, res) => {
       const edit = build(req);
-      // A Zoom game has no attributes
-      if (!edit || game.kind === "zoom") {
+      // A Blur game has no attributes
+      if (!edit || game.kind === "blur") {
         fail(res, "invalid");
         return;
       }
@@ -265,7 +263,7 @@ export function manageRoutes(
     const out = await lifecycle.edit(
       game,
       "entries",
-      (tx) => saveEntry(tx, game, id, input, sizeOf),
+      (tx) => saveEntry(tx, game, id, input),
       (r) => typeof r !== "string",
     );
     if (typeof out === "string") {
@@ -350,7 +348,7 @@ export function manageRoutes(
       const patch = parseGamePatch(
         body,
         Math.max(0, roster.entries.length - 1),
-        game.kind === "zoom",
+        game.kind === "blur",
       );
       if (
         !patch ||

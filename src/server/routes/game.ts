@@ -45,7 +45,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
     res.json(await listGallery(pool));
   });
 
-  // What a player needs to render the game: its attributes and active entries. A Zoom game's
+  // What a player needs to render the game: its attributes and active entries. A Blur game's
   // entries go without photos: those are its answers (ADR 0019).
   app.get(base, async (req, res) => {
     res.set("Cache-Control", "no-store");
@@ -65,7 +65,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       description: game.description,
       cover: game.coverUrl,
       kind: game.kind,
-      ...(game.kind === "zoom" && { zoomParts: game.zoomParts }),
+      ...(game.kind === "blur" && { blurTries: game.blurTries }),
       // Today's Day Number: past days are 0 up to it
       today: todayOf(ctx, game).day,
       startDate: game.startDate,
@@ -75,7 +75,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       entries: roster.entries.map(({ id, name, photo }) => ({
         id,
         name,
-        photo: game.kind === "zoom" ? "" : photo,
+        photo: game.kind === "blur" ? "" : photo,
       })),
     });
   });
@@ -102,7 +102,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
   });
 
   // Stateless grading for anonymous players. The answer is revealed only to a
-  // batch containing the right guess, or one using up a Zoom game's tries.
+  // batch containing the right guess, or one using up a Blur game's tries.
   app.post(
     `${base}/grade`,
     express.json({ limit: "10kb" }),

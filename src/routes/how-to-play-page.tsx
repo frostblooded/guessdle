@@ -146,14 +146,13 @@ export function HowToPlayPage() {
           </li>
         ))}
       </ol>
-      <Card id="help-zoom" className="mt-4 p-5 sm:p-6">
-        <h2 className="mb-2 text-lg font-semibold">Zoom games</h2>
+      <Card id="help-blur" className="mt-4 p-5 sm:p-6">
+        <h2 className="mb-2 text-lg font-semibold">Blur games</h2>
         <p className="text-muted-foreground">
-          Some games show a picture instead of a table. You start with a close
-          zoom on part of the secret answer&apos;s image. Every wrong guess
-          shows the next, wider part, and you have one try per part: miss on the
-          last one and the day is over. Tap the small pictures to look at the
-          parts again.
+          Some games show a picture instead of a table. The secret answer&apos;s
+          image is split into nine squares, and only one of them is clear at
+          first. Every wrong guess clears one more. The game says how many tries
+          you have: miss on the last one and the day is over.
         </p>
       </Card>
       <p className="cta mt-8 text-center">

@@ -3,8 +3,12 @@ import { randomBytes } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
-import { type ImageKind, MAX_UPLOAD_BYTES, maxSideOf } from "../game/crop.ts";
-import type { ImageSize, ZoomPart } from "../game/zoom.ts";
+import {
+  type ImageKind,
+  MAX_UPLOAD_BYTES,
+  UPLOAD_SHAPES,
+} from "../game/crop.ts";
+import { cellRect } from "../game/blur.ts";
 
 export { type ImageKind, isImageKind, MAX_UPLOAD_BYTES } from "../game/crop.ts";
 
@@ -42,7 +46,7 @@ export async function processImage(
   try {
     return await sharp(input, { limitInputPixels: MAX_PIXELS })
       .rotate()
-      .resize(maxSideOf(kind), maxSideOf(kind), {
+      .resize(UPLOAD_SHAPES[kind].maxSide, UPLOAD_SHAPES[kind].maxSide, {
         fit: "inside",
         withoutEnlargement: true,
       })
@@ -67,47 +71,49 @@ const fileOf = (dir: string, url: string): string | null => {
   return name === undefined ? null : join(dir, name);
 };
 
-// The pixel size of a stored upload, null when there is no such readable file
-export const imageSizeOf =
-  (dir: string) =>
-  async (url: string): Promise<ImageSize | null> => {
-    const file = fileOf(dir, url);
-    try {
-      const { width, height } = file ? await sharp(file).metadata() : {};
-      return width && height ? { width, height } : null;
-    } catch {
-      return null;
-    }
-  };
+// How hard the blurred squares are smudged, as a share of the image's side
+const BLUR_STRENGTH = 0.06;
+const BLUR_CACHE = 200;
 
-// The side of a zoomed part as Play shows it: small parts are enlarged to it
-export const PART_SIDE = 640;
-const PART_CACHE = 200;
-
-// Renders zoomed parts of stored uploads as WebP squares, keeping the latest ones in memory
-export function partRenderer(dir: string) {
+// Renders a Blur game's board (ADR 0019): the stored upload blurred all over, with the first
+// `shown` squares of `order` pasted back clear. Keeps the latest boards in memory.
+export function blurRenderer(dir: string) {
   const cache = new Map<string, Promise<Buffer | null>>();
-  const render = async (url: string, p: ZoomPart): Promise<Buffer | null> => {
+  const render = async (
+    url: string,
+    cells: readonly number[],
+  ): Promise<Buffer | null> => {
     const file = fileOf(dir, url);
     if (!file) {
       return null;
     }
     try {
-      return await sharp(file)
-        .extract({ left: p.x, top: p.y, width: p.size, height: p.size })
-        .resize(PART_SIDE, PART_SIDE, { fit: "fill" })
-        .webp()
-        .toBuffer();
+      const { width, height } = await sharp(file).metadata();
+      if (!width || !height) {
+        return null;
+      }
+      const clear = await Promise.all(
+        cells.map(async (cell) => {
+          const rect = cellRect(cell, width, height);
+          return {
+            input: await sharp(file).extract(rect).toBuffer(),
+            left: rect.left,
+            top: rect.top,
+          };
+        }),
+      );
+      const sigma = Math.max(1, Math.min(width, height) * BLUR_STRENGTH);
+      return await sharp(file).blur(sigma).composite(clear).webp().toBuffer();
     } catch {
       return null;
     }
   };
-  return (url: string, part: ZoomPart): Promise<Buffer | null> => {
-    const key = `${url}:${part.x}:${part.y}:${part.size}`;
-    const hit = cache.get(key) ?? render(url, part);
+  return (url: string, cells: readonly number[]): Promise<Buffer | null> => {
+    const key = `${url}:${cells.join(",")}`;
+    const hit = cache.get(key) ?? render(url, cells);
     cache.delete(key);
     cache.set(key, hit);
-    if (cache.size > PART_CACHE) {
+    if (cache.size > BLUR_CACHE) {
       cache.delete(cache.keys().next().value!);
     }
     return hit;

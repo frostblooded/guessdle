@@ -7,14 +7,14 @@ import {
 } from "./game-state.ts";
 import { call, failureOf, type Failure, type Fetch } from "./transport.ts";
 
-// What a finished day reveals: the answer's name, and a Zoom game's whole image
+// What a finished day reveals: the answer's name, and a Blur game's whole image
 export interface Reveal {
   answer?: string;
   answerPhoto?: string;
 }
 
 // POST /api/games/:slug/grade; `answer` (the entry's name) is present only once the day is
-// over (victory, or a Zoom game's tries used up: `lost`)
+// over (victory, or a Blur game's tries used up: `lost`)
 interface GradeResponse extends Reveal {
   day: number;
   rows: GradedAttribute[][];
@@ -33,7 +33,7 @@ export interface Loaded extends Reveal {
   rows: GradedAttribute[][];
   victory: boolean;
   gaveUp?: true;
-  // Zoom games: every try used without the answer
+  // Blur games: every try used without the answer
   lost?: true;
 }
 
@@ -55,7 +55,7 @@ export type SubmitResult =
       kind: "accepted";
       row: GradedAttribute[];
       isAnswer: boolean;
-      // Zoom games: this guess used the last try
+      // Blur games: this guess used the last try
       lost?: true;
     } & Reveal);
 

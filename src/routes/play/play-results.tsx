@@ -1,18 +1,19 @@
 // The guesses under Play's guess box, newest first: a classic game's graded rows under its column
-// titles, or a Zoom game's names.
+// titles, or a Blur game's names.
 import { BoardRow, GuessRow, TitleTile } from "../../components/board.tsx";
 import { EmptyState } from "../../components/page.tsx";
-import { ZoomGuesses } from "../../components/zoom-view.tsx";
+import { BlurGuesses } from "../../components/blur-view.tsx";
 import type { GradedAttribute } from "../../game/game.ts";
 
-// A Zoom game's part image; `board` refetches it on a fresh board, `day` names a past day
-export const partUrl = (
+// A Blur game's image with n squares clear; `board` refetches it on a fresh board, `day` names
+// a past day
+export const boardUrl = (
   slug: string,
   n: number,
   board: number,
   day: number | undefined,
 ): string =>
-  `/api/games/${encodeURIComponent(slug)}/zoom/${n}?b=${board}${day === undefined ? "" : `&day=${day}`}`;
+  `/api/games/${encodeURIComponent(slug)}/blur/${n}?b=${board}${day === undefined ? "" : `&day=${day}`}`;
 
 export function PlayResults({
   rows,
@@ -22,7 +23,7 @@ export function PlayResults({
   empty,
 }: {
   rows: readonly GradedAttribute[][];
-  // A classic game's column titles; null for a Zoom game
+  // A classic game's column titles; null for a Blur game
   titles: readonly string[] | null;
   loading: boolean;
   loadingText: string;
@@ -61,7 +62,7 @@ export function PlayResults({
           ))}
         </div>
       ) : (
-        <ZoomGuesses rows={rows} />
+        <BlurGuesses rows={rows} />
       )}
     </div>
   );

@@ -17,8 +17,8 @@ const NOW = new Date("2026-10-16T10:00:00Z");
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Body = any;
 
-// Zoom games (ADR 0019): entries with an uncropped image and square parts, one try per part
-describe("zoom games", () => {
+// Blur games (ADR 0019): entries with a square image and a square order, tries set per game
+describe("blur games", () => {
   let db: TestDb;
   let server: Server;
   let url: string;
@@ -49,46 +49,56 @@ describe("zoom games", () => {
     });
     return res.headers.get("set-cookie")!.split(";")[0]!;
   };
-  // A stored zoom image of w x h pixels
-  const upload = async (w: number, h: number): Promise<string> => {
-    const png = await sharp({
-      create: { width: w, height: h, channels: 3, background: "#369" },
+  // A stored square photo: its top-left square red, the rest blue
+  const upload = async (): Promise<string> => {
+    const red = await sharp({
+      create: { width: 100, height: 100, channels: 3, background: "#f00" },
     })
       .png()
       .toBuffer();
-    const res = await fetch(`${url}/api/uploads?kind=zoom`, {
+    const png = await sharp({
+      create: { width: 300, height: 300, channels: 3, background: "#00f" },
+    })
+      .composite([{ input: red, left: 0, top: 0 }])
+      .png()
+      .toBuffer();
+    const res = await fetch(`${url}/api/uploads?kind=photo`, {
       method: "POST",
       headers: { "Content-Type": "application/octet-stream", Cookie: ann },
       body: new Uint8Array(png),
     });
     return ((await res.json()) as { url: string }).url;
   };
-  const G = "/api/games/zoomy";
-  const parts = (n: number) =>
-    Array.from({ length: n }, (_, i) => ({
-      x: 10 * i,
-      y: 0,
-      size: 50 + i,
-    }));
-  const addEntry = async (name: string, count = 3): Promise<Body> =>
+  const G = "/api/games/blurry";
+  // The middle square first, then the rest row by row
+  const ORDER = [4, 0, 1, 2, 3, 5, 6, 7, 8];
+  const addEntry = async (name: string): Promise<Body> =>
     request("POST", `${G}/entries`, ann, {
       name,
-      photo: await upload(400, 300),
-      parts: parts(count),
+      photo: await upload(),
+      blurOrder: ORDER,
     });
   // Today's answer, read the way an owner can
   const answerName = async (): Promise<string> =>
     (
       await db.pool.query(
         `select e.name from daily_answers d join entries e on e.id = d.entry_id
-         join games g on g.id = d.game_id where g.slug = 'zoomy'`,
+         join games g on g.id = d.game_id where g.slug = 'blurry'`,
       )
     ).rows[0].name;
+  // The colour at a point of a board image
+  const pixel = async (image: Buffer, x: number, y: number) => {
+    const { data, info } = await sharp(image)
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const at = (y * info.width + x) * info.channels;
+    return [data[at]!, data[at + 1]!, data[at + 2]!];
+  };
 
   beforeAll(async () => {
     db = await startDb();
     await migrate(db.pool, MIGRATIONS_DIR);
-    dir = await mkdtemp(join(tmpdir(), "zoom-"));
+    dir = await mkdtemp(join(tmpdir(), "blur-"));
     server = await new Promise<Server>((resolve) => {
       const s = createApp({
         pool: db.pool,
@@ -112,30 +122,30 @@ describe("zoom games", () => {
     await db.pool.query("delete from games where slug <> 'petdle'");
     ann = await login("ann@example.test");
     await request("POST", "/api/games", ann, {
-      name: "Zoomy",
-      kind: "zoom",
+      name: "Blurry",
+      kind: "blur",
     });
-    await request("PATCH", G, ann, { zoomParts: 3 });
+    await request("PATCH", G, ann, { blurTries: 3 });
   });
 
-  it("creates a Zoom game with its part count, and refuses an unknown kind", async () => {
+  it("creates a Blur game with its tries, and refuses an unknown kind", async () => {
     const details = (await request("GET", `${G}/details`, ann)).body;
-    assert.equal(details.kind, "zoom");
-    assert.equal(details.zoomParts, 3);
+    assert.equal(details.kind, "blur");
+    assert.equal(details.blurTries, 3);
     assert.equal(
       (await request("POST", "/api/games", ann, { name: "X", kind: "quiz" }))
         .status,
       400,
     );
-    // A classic game has no part count
+    // A classic game has no try count
     await request("POST", "/api/games", ann, { name: "Classic" });
     assert.equal(
-      (await request("PATCH", "/api/games/classic", ann, { zoomParts: 2 }))
+      (await request("PATCH", "/api/games/classic", ann, { blurTries: 2 }))
         .status,
       400,
     );
     assert.equal(
-      (await request("PATCH", G, ann, { zoomParts: 7 })).status,
+      (await request("PATCH", G, ann, { blurTries: 10 })).status,
       400,
     );
   });
@@ -148,41 +158,46 @@ describe("zoom games", () => {
     assert.equal(res.status, 400);
   });
 
-  it("needs an image and every part inside it on each entry", async () => {
-    const photo = await upload(400, 300);
+  it("needs an image and a full square order on each entry", async () => {
+    const photo = await upload();
     const save = (body: Body) => request("POST", `${G}/entries`, ann, body);
-    assert.equal((await save({ name: "A" })).body.error, "missing_parts");
+    assert.equal((await save({ name: "A" })).body.error, "missing_order");
     assert.equal(
-      (await save({ name: "A", photo, parts: parts(2) })).body.error,
-      "missing_parts",
+      (await save({ name: "A", photo })).body.error,
+      "missing_order",
     );
-    // Off the image's right edge
     assert.equal(
-      (
-        await save({
-          name: "A",
-          photo,
-          parts: [...parts(2), { x: 380, y: 0, size: 40 }],
-        })
-      ).body.error,
+      (await save({ name: "A", blurOrder: ORDER })).body.error,
+      "missing_order",
+    );
+    assert.equal(
+      (await save({ name: "A", photo, blurOrder: [0, 1, 2] })).body.error,
       "invalid",
     );
-    const ok = await save({ name: "A", photo, parts: parts(3) });
+    const ok = await save({ name: "A", photo, blurOrder: ORDER });
     assert.equal(ok.status, 200);
-    assert.deepEqual(ok.body[0].parts, parts(3));
-    // A rename keeps the photo and its parts; a new photo needs new parts
+    assert.deepEqual(ok.body[0].blurOrder, ORDER);
+    // A rename or a new image keeps the order
     const id = ok.body[0].id;
     assert.equal(
       (await request("PATCH", `${G}/entries/${id}`, ann, { name: "B" })).status,
       200,
     );
+    const swapped = await request("PATCH", `${G}/entries/${id}`, ann, {
+      photo: await upload(),
+    });
+    assert.equal(swapped.status, 200);
+    assert.deepEqual(swapped.body[0].blurOrder, ORDER);
+    // A classic game takes no order
+    await request("POST", "/api/games", ann, { name: "Classic" });
     assert.equal(
       (
-        await request("PATCH", `${G}/entries/${id}`, ann, {
-          photo: await upload(400, 300),
+        await request("POST", "/api/games/classic/entries", ann, {
+          name: "C",
+          blurOrder: ORDER,
         })
-      ).body.error,
-      "missing_parts",
+      ).status,
+      400,
     );
   });
 
@@ -191,29 +206,40 @@ describe("zoom games", () => {
     await addEntry("Beta");
     await db.pool.query("update games set status = 'approved'");
     const game = (await request("GET", G)).body;
-    assert.equal(game.kind, "zoom");
-    assert.equal(game.zoomParts, 3);
+    assert.equal(game.kind, "blur");
+    assert.equal(game.blurTries, 3);
     assert.equal(game.paused, false);
     assert.ok(game.entries.every((e: Body) => e.photo === ""));
     const card = (await request("GET", "/api/games")).body.find(
-      (c: Body) => c.slug === "zoomy",
+      (c: Body) => c.slug === "blurry",
     );
     assert.deepEqual(card.photos, []);
-    assert.equal(card.kind, "zoom");
+    assert.equal(card.kind, "blur");
   });
 
-  it("serves today's answer's parts as images, and nothing past the last", async () => {
+  it("serves today's answer blurred but for the earned squares, up to the tries", async () => {
     await addEntry("Alpha");
     await addEntry("Beta");
     await db.pool.query("update games set status = 'approved'");
-    const part = await fetch(`${url}${G}/zoom/1`);
-    assert.equal(part.status, 200);
-    assert.equal(part.headers.get("content-type"), "image/webp");
-    assert.equal(part.headers.get("cache-control"), "no-store");
-    const meta = await sharp(Buffer.from(await part.arrayBuffer())).metadata();
-    assert.deepEqual([meta.width, meta.height], [640, 640]);
-    assert.equal((await fetch(`${url}${G}/zoom/4`)).status, 404);
-    assert.equal((await fetch(`${url}/api/games/petdle/zoom/1`)).status, 404);
+    const board = async (n: number): Promise<Buffer> => {
+      const res = await fetch(`${url}${G}/blur/${n}`);
+      assert.equal(res.status, 200);
+      assert.equal(res.headers.get("content-type"), "image/webp");
+      assert.equal(res.headers.get("cache-control"), "no-store");
+      return Buffer.from(await res.arrayBuffer());
+    };
+    const first = await board(1);
+    const meta = await sharp(first).metadata();
+    assert.deepEqual([meta.width, meta.height], [300, 300]);
+    // Square 0 (red) clears second: smudged into the blue next to it at first, clear after
+    const [r1, , b1] = await pixel(first, 95, 50);
+    assert.ok(b1! > 40 && r1! < 230, `blurred, got ${r1},${b1}`);
+    const [r2, g2, b2] = await pixel(await board(2), 95, 50);
+    assert.ok(r2! > 230 && g2! < 25 && b2! < 25, `clear, got ${r2},${b2}`);
+    // No more squares than tries
+    assert.equal((await fetch(`${url}${G}/blur/4`)).status, 404);
+    assert.equal((await fetch(`${url}${G}/blur/0`)).status, 404);
+    assert.equal((await fetch(`${url}/api/games/petdle/blur/1`)).status, 404);
   });
 
   it("grades by name only and ends the day after the last try", async () => {
@@ -283,22 +309,20 @@ describe("zoom games", () => {
     );
   });
 
-  it("pauses the game when the part count grows, and trims parts when it shrinks", async () => {
+  it("pauses the game while an entry has no order", async () => {
     await addEntry("Alpha");
     await addEntry("Beta");
-    await request("PATCH", G, ann, { zoomParts: 4 });
+    await db.pool.query(
+      "update entries set blur_order = null where name = 'Beta'",
+    );
     assert.equal(
       (await request("GET", `${G}/details`, ann)).body.incompleteCount,
-      2,
+      1,
     );
     assert.equal((await request("GET", G, ann)).body.paused, true);
-    await request("PATCH", G, ann, { zoomParts: 2 });
-    const entries = (await request("GET", `${G}/entries`, ann)).body;
-    assert.deepEqual(entries[0].parts, parts(2));
-    assert.equal((await request("GET", G, ann)).body.paused, false);
   });
 
-  it("gives a party round its parts and a try limit", async () => {
+  it("gives a party round its board and a try limit", async () => {
     await addEntry("Alpha");
     await addEntry("Beta");
     const host = await request("POST", `${G}/parties`, ann, {
@@ -306,12 +330,12 @@ describe("zoom games", () => {
     });
     assert.equal(host.status, 201);
     const view = (await request("GET", `/api/parties/${host.body.code}`)).body;
-    assert.equal(view.game.kind, "zoom");
-    assert.equal(view.game.zoomParts, 3);
+    assert.equal(view.game.kind, "blur");
+    assert.equal(view.game.blurTries, 3);
     assert.ok(view.game.entries.every((e: Body) => e.photo === ""));
     // No round yet
     assert.equal(
-      (await fetch(`${url}/api/parties/${host.body.code}/zoom/1/1`)).status,
+      (await fetch(`${url}/api/parties/${host.body.code}/blur/1/1`)).status,
       404,
     );
   });

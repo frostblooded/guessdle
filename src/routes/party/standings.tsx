@@ -190,7 +190,7 @@ function Round({ view, round }: { view: PartyView; round: FinishedRound }) {
                   >
                     {/* Skip a classic row's photo column: it repeats the name's grade */}
                     {grades
-                      .slice(view.game.kind === "zoom" ? 0 : 1)
+                      .slice(view.game.kind === "blur" ? 0 : 1)
                       .map((grade, j) => (
                         <span
                           key={j}

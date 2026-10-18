@@ -48,14 +48,14 @@ describe("parseGamePatch", () => {
   });
 });
 
-describe("parseGamePatch: Zoom games", () => {
-  it("takes a part count of 1 to 6 for a Zoom game only", () => {
-    assert.deepEqual(parseGamePatch({ zoomParts: 4 }, 3, true), {
-      zoomParts: 4,
+describe("parseGamePatch: Blur games", () => {
+  it("takes a try count of 1 to 9 for a Blur game only", () => {
+    assert.deepEqual(parseGamePatch({ blurTries: 4 }, 3, true), {
+      blurTries: 4,
     });
-    assert.equal(parseGamePatch({ zoomParts: 4 }, 3), undefined);
-    for (const zoomParts of [0, 7, 2.5, "3"]) {
-      assert.equal(parseGamePatch({ zoomParts }, 3, true), undefined);
+    assert.equal(parseGamePatch({ blurTries: 4 }, 3), undefined);
+    for (const blurTries of [0, 10, 2.5, "3"]) {
+      assert.equal(parseGamePatch({ blurTries }, 3, true), undefined);
     }
   });
 });
@@ -64,11 +64,12 @@ describe("parseEntryInput", () => {
   it("accepts an empty body", () => {
     assert.deepEqual(parseEntryInput({}), {});
   });
-  it("shape-checks zoomed parts", () => {
-    assert.deepEqual(parseEntryInput({ parts: [{ x: 1, y: 2, size: 20 }] }), {
-      parts: [{ x: 1, y: 2, size: 20 }],
+  it("takes a square order with every cell once", () => {
+    const order = [4, 0, 1, 2, 3, 5, 6, 7, 8];
+    assert.deepEqual(parseEntryInput({ blurOrder: order }), {
+      blurOrder: order,
     });
-    assert.equal(parseEntryInput({ parts: [{ x: 1 }] }), undefined);
+    assert.equal(parseEntryInput({ blurOrder: [0, 1] }), undefined);
   });
   it("trims the name and bounds it to 60", () => {
     assert.deepEqual(parseEntryInput({ name: " Rex " }), { name: "Rex" });

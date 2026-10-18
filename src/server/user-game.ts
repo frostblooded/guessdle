@@ -9,28 +9,28 @@ export interface GameView {
   rows: GradedAttribute[][];
   victory: boolean;
   gaveUp: boolean;
-  // Zoom games: every try was used without finding the answer
+  // Blur games: every try was used without finding the answer
   lost?: true;
   // The answer's name: present once the day is over (victory, give-up or lost)
   answer?: string;
-  // Zoom games, once the day is over: the answer's whole image
+  // Blur games, once the day is over: the answer's whole image
   answerPhoto?: string;
 }
 
-// A Zoom game's tries (one per part), null for a classic game with unlimited guesses
+// A Blur game's tries, null for a classic game with unlimited guesses
 export const triesOf = (game: GameRow): number | null =>
-  game.kind === "zoom" ? game.zoomParts : null;
+  game.kind === "blur" ? game.blurTries : null;
 
-// The answer as a finished day reveals it: its name, and a Zoom game's whole image
+// The answer as a finished day reveals it: its name, and a Blur game's whole image
 export const revealOf = (
   game: GameRow,
   answer: Entry,
 ): { answer: string; answerPhoto?: string } => ({
   answer: answer.name,
-  ...(game.kind === "zoom" && { answerPhoto: answer.photo }),
+  ...(game.kind === "blur" && { answerPhoto: answer.photo }),
 });
 
-// Whether `ids` used up a Zoom game's tries without the answer
+// Whether `ids` used up a Blur game's tries without the answer
 export const isLost = (
   game: GameRow,
   ids: readonly number[],

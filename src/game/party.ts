@@ -11,7 +11,7 @@ import {
   type GradedAttribute,
 } from "./game.ts";
 import { MAX_NICKNAME, MIN_ENTRIES } from "./limits.ts";
-import type { GameKind } from "./zoom.ts";
+import type { GameKind } from "./blur.ts";
 
 // No I or O, so a code read aloud or off a screen is never mistaken for 1 or 0
 export const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -61,7 +61,7 @@ export interface RoundData {
   // In the order they were made
   guesses: { playerId: number; entryId: number; at: number }[];
   giveUps: { playerId: number; at: number }[];
-  // Zoom games: guesses each player gets (ADR 0019); unlimited when absent
+  // Blur games: guesses each player gets (ADR 0019); unlimited when absent
   tries?: number;
 }
 
@@ -77,7 +77,7 @@ export interface Progress {
   guesses: number;
   solved: boolean;
   gaveUp: boolean;
-  // Zoom games: used every try without solving it
+  // Blur games: used every try without solving it
   lost: boolean;
   // From the round's start to the solving guess
   timeMs: number | null;
@@ -191,10 +191,10 @@ export interface PartyView {
     slug: string;
     name: string;
     kind: GameKind;
-    // Zoom games: parts per round, one try each
-    zoomParts?: number;
+    // Blur games: tries per round
+    blurTries?: number;
     attributes: GameAttribute[];
-    // A Zoom game's entries come without photos
+    // A Blur game's entries come without photos
     entries: EntryRef[];
   };
   ended: boolean;
@@ -232,7 +232,7 @@ export interface FinishedRound {
 
 export interface ViewInput {
   code: string;
-  game: { slug: string; name: string; kind?: GameKind; zoomParts?: number };
+  game: { slug: string; name: string; kind?: GameKind; blurTries?: number };
   attributes: readonly GameAttribute[];
   // Active entries (offered to guess) and every entry (so old guesses still resolve)
   entries: readonly Entry[];
@@ -311,7 +311,7 @@ export function partyView(input: ViewInput): PartyView {
       attributes: [...attributes],
       entries: input.entries.map((e) => ({
         ...ref(e),
-        photo: kind === "zoom" ? "" : e.photo,
+        photo: kind === "blur" ? "" : e.photo,
       })),
     },
     ended: input.ended,

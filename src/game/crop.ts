@@ -10,19 +10,9 @@ export const UPLOAD_SHAPES = {
   cover: { aspect: 16 / 7, maxSide: 1200 },
 } as const;
 
-// The kinds the browser crops first
-export type CropKind = keyof typeof UPLOAD_SHAPES;
-
-// A Zoom game's entry photo is kept uncropped and large, so close zooms stay sharp (ADR 0019)
-export const ZOOM_MAX_SIDE = 2000;
-
-export type ImageKind = CropKind | "zoom";
+export type ImageKind = keyof typeof UPLOAD_SHAPES;
 export const isImageKind = (value: unknown): value is ImageKind =>
-  value === "photo" || value === "cover" || value === "zoom";
-
-// The longest side the server stores for each kind
-export const maxSideOf = (kind: ImageKind): number =>
-  kind === "zoom" ? ZOOM_MAX_SIDE : UPLOAD_SHAPES[kind].maxSide;
+  value === "photo" || value === "cover";
 
 export interface Size {
   width: number;

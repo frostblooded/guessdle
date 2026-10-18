@@ -267,7 +267,7 @@ describe("partyView", () => {
   });
 });
 
-describe("Zoom game rounds", () => {
+describe("Blur game rounds", () => {
   const entry = (id: number, name: string): Entry => ({
     id,
     name,
@@ -278,7 +278,7 @@ describe("Zoom game rounds", () => {
   const view = (rounds: RoundData[], viewer: number | null) =>
     partyView({
       code: "KWZP",
-      game: { slug: "pics", name: "Pics", kind: "zoom", zoomParts: 2 },
+      game: { slug: "pics", name: "Pics", kind: "blur", blurTries: 2 },
       attributes: [],
       entries: all,
       all,
@@ -315,7 +315,7 @@ describe("Zoom game rounds", () => {
   it("sends no entry photos until a round is over", () => {
     const live = round({ endedAt: null, tries: 2 });
     const out = view([live], 1);
-    assert.equal(out.game.kind, "zoom");
+    assert.equal(out.game.kind, "blur");
     assert.ok(out.game.entries.every((e) => e.photo === ""));
     assert.equal(out.round!.yours!.answer, undefined);
   });

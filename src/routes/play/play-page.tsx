@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { Navigate, useParams } from "react-router";
-import { ZoomView } from "../../components/zoom-view.tsx";
+import { BlurView } from "../../components/blur-view.tsx";
 import { PageHead } from "../../components/page.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
@@ -20,7 +20,7 @@ import {
 import { MIN_ENTRIES } from "../../game/limits.ts";
 import { openPlay } from "../../game/open-play.ts";
 import type { Play } from "../../game/play.ts";
-import type { GameKind } from "../../game/zoom.ts";
+import type { GameKind } from "../../game/blur.ts";
 import { browserFetch, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { GuessBox } from "./guess-box.tsx";
@@ -30,7 +30,7 @@ import {
   PastDayLede,
   PastDaysLink,
 } from "./past-day.tsx";
-import { partUrl, PlayResults } from "./play-results.tsx";
+import { boardUrl, PlayResults } from "./play-results.tsx";
 import { PlayActions, PlayStatus, type StatusView } from "./play-status.tsx";
 import { ResetDialog } from "./reset-dialog.tsx";
 import { ResultBanner, resultOf, type Result } from "./result-banner.tsx";
@@ -47,10 +47,10 @@ export type PlayableGame = {
   // Some entries miss values, so the game cannot be played for now
   paused: boolean;
   kind: GameKind;
-  // Zoom games: parts per day, one try each
-  zoomParts?: number;
+  // Blur games: tries per day
+  blurTries?: number;
   attributes: GameAttribute[];
-  // A Zoom game's entries come without photos
+  // A Blur game's entries come without photos
   entries: EntryRef[];
 } & StatusView;
 
@@ -99,7 +99,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const [blocked, setBlocked] = useState(false);
   const [guess, setGuess] = useState("");
   const [confirming, setConfirming] = useState(false);
-  // Bumped on every fresh board, so a Zoom game's part images are fetched again
+  // Bumped on every fresh board, so a Blur game's board image is fetched again
   const [board, setBoard] = useState(0);
   const play = useRef<Play | null>(null);
   const started = useRef(false);
@@ -273,7 +273,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const finished = result !== null;
   // Each row names its guess; those names leave the suggestions
   const used = new Set(rows.map((row) => nameCell(row).value));
-  const zoom = playable?.kind === "zoom" ? (playable.zoomParts ?? 1) : null;
+  const blur = playable?.kind === "blur" ? (playable.blurTries ?? 1) : null;
   const wrong = rows.filter((row) => !isAnswerRow(row)).length;
   const names = roster
     .map((entry) => entry.name)
@@ -344,10 +344,10 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
         aria-label="Game board"
         aria-busy={isPending || loading ? true : undefined}
       >
-        {zoom !== null && ready && (
-          <ZoomView
-            partUrl={(n) => partUrl(slug, n, board, pastDay)}
-            tries={zoom}
+        {blur !== null && ready && (
+          <BlurView
+            boardUrl={(n) => boardUrl(slug, n, board, pastDay)}
+            tries={blur}
             wrong={wrong}
             finished={finished}
             reveal={result?.photo}
@@ -415,7 +415,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
         />
         <PlayResults
           rows={rows}
-          titles={zoom === null ? titles : null}
+          titles={blur === null ? titles : null}
           loading={isPending || loading}
           loadingText={past ? "Loading the game…" : "Loading today's game…"}
           empty={ready && rows.length === 0}

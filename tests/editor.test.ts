@@ -11,7 +11,7 @@ const base: Details = {
   rejectReason: "",
   skipPeriod: null,
   kind: "classic",
-  zoomParts: 5,
+  blurTries: 5,
   entryCount: 5,
   incompleteCount: 0,
 };

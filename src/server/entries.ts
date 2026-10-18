@@ -1,8 +1,7 @@
 // Entry editing (spec #66): add, change and soft-delete the entries of one game.
 import type pg from "pg";
 import { parseNumberValue } from "../game/number.ts";
-import { partsFit, type ImageSize, type ZoomPart } from "../game/zoom.ts";
-import { listAttributes, loadParts, type GameRow } from "./games.ts";
+import { listAttributes, type GameRow } from "./games.ts";
 
 export interface EntryRow {
   id: number;
@@ -10,8 +9,8 @@ export interface EntryRow {
   photo: string;
   // Attribute id to its items (Text has at most one; empty means no value)
   values: Record<string, string[]>;
-  // Zoom games only: the photo's zoomed parts, closest first
-  parts?: ZoomPart[];
+  // Blur games only: the order the grid's squares clear in, once picked
+  blurOrder?: number[] | null;
 }
 
 export async function listEntries(
@@ -23,19 +22,19 @@ export async function listEntries(
     name: string;
     photo: string;
     values: Record<string, string[]> | null;
+    blurOrder: number[] | null;
   }>(
-    `select e.id::int, e.name, e.photo_url as photo,
+    `select e.id::int, e.name, e.photo_url as photo, e.blur_order::int[] as "blurOrder",
        (select jsonb_object_agg(attribute_id, items) from (
           select attribute_id, jsonb_agg(value order by position) as items
           from entry_values where entry_id = e.id group by attribute_id) v) as values
      from entries e where e.game_id = $1 and e.deleted_at is null order by e.id`,
     [game.id],
   );
-  const parts = game.kind === "zoom" ? await loadParts(q, game) : null;
-  return rows.map((r) => ({
+  return rows.map(({ blurOrder, ...r }) => ({
     ...r,
     values: r.values ?? {},
-    ...(parts && { parts: parts.get(r.id) ?? [] }),
+    ...(game.kind === "blur" && { blurOrder }),
   }));
 }
 
@@ -43,16 +42,12 @@ export interface EntryInput {
   name?: string;
   photo?: string;
   values?: Record<string, string[]>;
-  parts?: ZoomPart[];
+  blurOrder?: number[];
 }
-
-// The pixel size of a stored upload, null when there is no such image
-export type ImageSizeOf = (url: string) => Promise<ImageSize | null>;
 
 // Creates the entry (`id` undefined) or changes it. Every attribute needs a value once saved,
 // from the input or already stored; Number values are stored as parseNumberValue gives them.
-// A Zoom game's entry instead needs its photo and exactly the game's count of parts inside it;
-// a new photo needs new parts.
+// A Blur game's entry instead needs its photo and a complete square order, sent or stored.
 // Runs in the caller's game transaction (lifecycle.edit), which applies the status rule.
 // `replacedPhoto` is the file the caller should delete.
 export async function saveEntry(
@@ -60,7 +55,6 @@ export async function saveEntry(
   game: GameRow,
   id: number | undefined,
   input: EntryInput,
-  sizeOf: ImageSizeOf = async () => null,
 ): Promise<
   | { id: number; replacedPhoto: string | null }
   | "invalid"
@@ -68,11 +62,15 @@ export async function saveEntry(
   | "not_found"
   | "missing_values"
   | "not_a_number"
-  | "missing_parts"
+  | "missing_order"
 > {
   const current = (
-    await tx.query<{ name: string; photo: string }>(
-      `select name, photo_url as photo from entries
+    await tx.query<{
+      name: string;
+      photo: string;
+      blurOrder: number[] | null;
+    }>(
+      `select name, photo_url as photo, blur_order::int[] as "blurOrder" from entries
        where id = $1 and game_id = $2 and deleted_at is null`,
       [id ?? 0, game.id],
     )
@@ -116,21 +114,12 @@ export async function saveEntry(
   if (!attrs.every((a) => filled(String(a.id)))) {
     return "missing_values";
   }
-  if (game.kind === "zoom") {
-    const kept = input.parts === undefined && photo === (current?.photo ?? "");
-    if (!kept) {
-      const parts = input.parts ?? [];
-      const size = photo === "" ? null : await sizeOf(photo);
-      if (!size || parts.length !== game.zoomParts) {
-        return "missing_parts";
-      }
-      if (!partsFit(parts, size)) {
-        return "invalid";
-      }
-    } else if (id === undefined) {
-      return "missing_parts";
+  if (game.kind === "blur") {
+    const order = input.blurOrder ?? current?.blurOrder ?? null;
+    if (photo === "" || order === null) {
+      return "missing_order";
     }
-  } else if (input.parts !== undefined) {
+  } else if (input.blurOrder !== undefined) {
     return "invalid";
   }
   let entryId = id;
@@ -147,21 +136,11 @@ export async function saveEntry(
       [entryId, name, photo],
     );
   }
-  if (input.parts !== undefined) {
-    await tx.query("delete from entry_zoom_parts where entry_id = $1", [
+  if (input.blurOrder !== undefined) {
+    await tx.query("update entries set blur_order = $2 where id = $1", [
       entryId,
+      input.blurOrder,
     ]);
-    await tx.query(
-      `insert into entry_zoom_parts (entry_id, position, x, y, size)
-       select $1, n - 1, x, y, s
-       from unnest($2::int[], $3::int[], $4::int[]) with ordinality as t (x, y, s, n)`,
-      [
-        entryId,
-        input.parts.map((p) => p.x),
-        input.parts.map((p) => p.y),
-        input.parts.map((p) => p.size),
-      ],
-    );
   }
   for (const [attrId, items] of Object.entries(values)) {
     await tx.query(

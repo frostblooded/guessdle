@@ -7,7 +7,7 @@ import {
   gradeNumber,
   type Hint,
 } from "./correctness.ts";
-import type { GameKind, ZoomPart } from "./zoom.ts";
+import type { GameKind } from "./blur.ts";
 
 export type AttributeType = "text" | "list" | "number";
 
@@ -27,12 +27,12 @@ export interface EntryRef {
 // Number as a string, List as an array)
 export interface Entry extends EntryRef {
   values: AttributeValue[];
-  // Zoom games only: the zoomed parts of the photo, closest first
-  parts?: ZoomPart[];
+  // Blur games only: the order the grid's squares clear in (cells 0-8), once picked
+  blurOrder?: number[];
 }
 
 // One column of a guessed entry, graded against the Daily Answer. Rows list the
-// photo, the name, then the game's Attributes: the table column order. A Zoom game's rows
+// photo, the name, then the game's Attributes: the table column order. A Blur game's rows
 // hold the name only, so no entry's image reaches the player before the day ends.
 export interface GradedAttribute {
   key: string;
@@ -68,7 +68,7 @@ export function gradeGuess(
     value: guess.name,
     correctness: gradeCorrectness(guess.name, answer.name),
   };
-  if (kind === "zoom") {
+  if (kind === "blur") {
     return [
       {
         ...name,
