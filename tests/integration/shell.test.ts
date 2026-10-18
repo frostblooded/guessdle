@@ -107,7 +107,9 @@ describe("game shell with link-preview meta", () => {
       /<meta property="og:image" content="http:\/\/127\.0\.0\.1:\d+\/uploads\/c\.webp" \/>/,
     );
     assert.doesNotMatch(html, /noindex/);
-    assert.match(html, /id="board"/);
+    assert.match(html, /id="root"/);
+    // The site-wide description gives way to the game's
+    assert.equal(html.match(/name="description"/g)?.length, 1);
   });
 
   it("omits og:image when the game has no cover", async () => {
