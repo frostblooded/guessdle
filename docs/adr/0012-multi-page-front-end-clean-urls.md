@@ -1,5 +1,7 @@
 # 0012: Multi-page front-end with clean URLs
 
+Status: superseded by ADR 0017 (React single-page app). The URLs, the `/admin` gate and the magic-link flow below still hold.
+
 The front-end was one page with the sign-in form, an admin dialog and a help dialog layered on the game. It is now a small site: real paths, no hash routing.
 
 | Path           | File               | Entry bundle               |
