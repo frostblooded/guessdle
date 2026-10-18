@@ -19,6 +19,7 @@ import {
   requestLoginLink,
 } from "../email-login.ts";
 import type { MailConfig } from "../mailer.ts";
+import { usernameOf } from "../playlists.ts";
 import { bodyOf, type AppContext } from "./context.ts";
 
 export interface AuthOptions {
@@ -41,6 +42,8 @@ export function authRoutes(
       user: user && {
         name: user.name,
         email: user.email,
+        // The public name on the profile and playlists; null until picked
+        username: await usernameOf(pool, user.id),
         admin: user.admin,
         // The Admin link's badge
         ...(user.admin && { pending: await pendingCount(pool) }),
