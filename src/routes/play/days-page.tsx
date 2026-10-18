@@ -2,7 +2,7 @@
 // from the server; an anonymous player's from the browser.
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
-import { EmptyState, MessageCard, PageHead } from "../../components/page.tsx";
+import { EmptyState, PageHead } from "../../components/page.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { buttonVariants } from "../../components/ui/button.tsx";
 import { localStatus, type DaysResponse } from "../../game/days.ts";
@@ -15,6 +15,7 @@ import {
 import { useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { DayList } from "./day-list.tsx";
+import { GameNotFound } from "./past-day.tsx";
 import { loadGame } from "./play-page.tsx";
 
 const LOAD_FAILED =
@@ -80,16 +81,7 @@ export function DaysPage() {
   );
 
   if (days.data === "missing" || game.data === "missing") {
-    return (
-      <>
-        <PageHead titleId="game-title" title="Game not found" />
-        <MessageCard id="not-found">
-          <Link className={buttonVariants()} to="/">
-            See all games
-          </Link>
-        </MessageCard>
-      </>
-    );
+    return <GameNotFound />;
   }
   const list =
     typeof days.data === "object"

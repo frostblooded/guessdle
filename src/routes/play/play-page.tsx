@@ -2,20 +2,11 @@
 // guesses in the browser, signed-in ones on the server.
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
-import { Link, Navigate, useParams } from "react-router";
+import { Navigate, useParams } from "react-router";
 import { BoardRow, GuessRow, TitleTile } from "../../components/board.tsx";
-import { EmptyState, MessageCard, PageHead } from "../../components/page.tsx";
+import { EmptyState, PageHead } from "../../components/page.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogTitle,
-} from "../../components/ui/alert-dialog.tsx";
-import { Button, buttonVariants } from "../../components/ui/button.tsx";
+import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
 import { FAILURES } from "../../game/failures.ts";
 import {
@@ -30,9 +21,17 @@ import type { Play } from "../../game/play.ts";
 import { browserFetch, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { GuessBox } from "./guess-box.tsx";
-import { NoSuchDay, PastDayLede, PastDaysLink } from "./past-day.tsx";
+import {
+  GameNotFound,
+  NoSuchDay,
+  PastDayLede,
+  PastDaysLink,
+} from "./past-day.tsx";
 import { PlayActions, PlayStatus, type StatusView } from "./play-status.tsx";
+import { ResetDialog } from "./reset-dialog.tsx";
 import { ResultBanner, type Result } from "./result-banner.tsx";
+import { StatsDialog } from "./stats-dialog.tsx";
+import { useVictoryStats } from "./use-victory-stats.ts";
 
 export type PlayableGame = {
   name: string;
@@ -96,6 +95,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const started = useRef(false);
   const submitting = useRef(false);
   const opener = useRef<HTMLButtonElement | null>(null);
+  const victory = useVictoryStats(slug, play);
 
   const playable = typeof game === "object" && game !== null ? game : null;
   const roster = playable?.entries ?? [];
@@ -190,8 +190,15 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
     if (res.kind === "duplicate") {
       return;
     }
+    // A past day's win stays out of the daily stats
+    if (rows.length === 0 && !past) {
+      victory.startClock();
+    }
     if (res.isAnswer && res.answer !== undefined) {
       setResult({ kind: "victory", answer: res.answer });
+      if (!past) {
+        void victory.show();
+      }
     }
     setRows((old) => [res.row, ...old]);
   }
@@ -225,20 +232,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   };
 
   if (game === "missing") {
-    return (
-      <>
-        <PageHead
-          titleId="game-title"
-          title="Game not found"
-          lede={<p id="game-lede">There is no game at this address.</p>}
-        />
-        <MessageCard id="not-found">
-          <Link className={buttonVariants()} to="/">
-            See all games
-          </Link>
-        </MessageCard>
-      </>
-    );
+    return <GameNotFound />;
   }
 
   if (playable && day !== null && !past) {
@@ -355,9 +349,17 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
             </Button>
           </div>
           <div
-            className="game-actions flex justify-center"
+            className="game-actions flex flex-wrap justify-center gap-2"
             hidden={!finished || !resettable}
           >
+            <Button
+              id="stats-button"
+              variant="outline"
+              hidden={result?.kind !== "victory"}
+              onClick={() => void victory.show()}
+            >
+              See stats
+            </Button>
             <Button
               id="reset-button"
               hidden={!finished || !resettable}
@@ -368,26 +370,22 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
             </Button>
           </div>
         </Card>
-        <AlertDialog open={confirming} onOpenChange={setConfirming}>
-          <AlertDialogContent
-            id="reset-dialog"
-            onCloseAutoFocus={(event) => {
-              event.preventDefault();
-              opener.current?.focus();
-            }}
-          >
-            <AlertDialogTitle>Reset today&apos;s guesses?</AlertDialogTitle>
-            <AlertDialogDescription>
-              The Daily Answer stays the same; you start with a fresh board.
-            </AlertDialogDescription>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction value="confirm" onClick={() => void reset()}>
-                Reset
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {result?.kind === "victory" && !past && (
+          <StatsDialog
+            open={victory.open}
+            onOpenChange={victory.setOpen}
+            answer={result.answer}
+            stats={victory.stats}
+            failed={victory.failed}
+            returnFocusId="stats-button"
+          />
+        )}
+        <ResetDialog
+          open={confirming}
+          onOpenChange={setConfirming}
+          onConfirm={() => void reset()}
+          opener={opener}
+        />
         <div className="results flex flex-col gap-2 sm:gap-2.5">
           <BoardRow
             id="guess-results-titles-row"

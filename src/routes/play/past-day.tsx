@@ -1,5 +1,5 @@
-// Play's pieces for past days: the head's Past days link, an archive day's lede, and the card
-// for a day the game does not have.
+// Play's pieces for past days: the head's Past days link, an archive day's lede, and the cards
+// for a day the game does not have and for an unknown game.
 import { Link } from "react-router";
 import { MessageCard, PageHead } from "../../components/page.tsx";
 import { buttonVariants } from "../../components/ui/button.tsx";
@@ -55,6 +55,24 @@ export function NoSuchDay({ slug, name }: { slug: string; name: string }) {
       />
       <MessageCard id="no-such-day">
         <PastDaysLink slug={slug} />
+      </MessageCard>
+    </>
+  );
+}
+
+// No game at this address (Play and the Past days list)
+export function GameNotFound() {
+  return (
+    <>
+      <PageHead
+        titleId="game-title"
+        title="Game not found"
+        lede={<p id="game-lede">There is no game at this address.</p>}
+      />
+      <MessageCard id="not-found">
+        <Link className={buttonVariants()} to="/">
+          See all games
+        </Link>
       </MessageCard>
     </>
   );

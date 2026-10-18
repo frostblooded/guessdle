@@ -46,3 +46,11 @@ export async function confirmReset(page: Page): Promise<void> {
   // The dialog closes before the reset itself finishes
   await expect(page.locator(".guess-result-row")).toHaveCount(0);
 }
+
+// Guesses the answer, then closes the victory stats popup that opens over the page
+export async function winGame(page: Page, answer: string): Promise<void> {
+  await submitGuess(page, answer);
+  await expect(page.locator("#stats-dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#stats-dialog")).toBeHidden();
+}
