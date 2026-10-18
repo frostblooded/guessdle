@@ -5,7 +5,10 @@ import {
   findEntryId,
   gradeGuess,
   gradeIds,
+  guessedNames,
   hasAllValues,
+  isSkipRow,
+  SKIP,
   type Entry,
   type GameAttribute,
 } from "../src/game/game.ts";
@@ -174,6 +177,31 @@ describe("gradeIds: Blur games", () => {
         [{ key: "name", value: "Ati", correctness: Correctness.Correct }],
       ],
       victory: true,
+    });
+  });
+});
+
+describe("gradeIds: skips", () => {
+  it("grades any number of skips as wrong rows in a Blur game", () => {
+    const out = gradeIds(ATTRIBUTES, ROSTER, first, [SKIP, 2, SKIP], "blur");
+    assert.equal(out.kind, "graded");
+    if (out.kind !== "graded") {
+      return;
+    }
+    assert.equal(out.victory, false);
+    assert.deepEqual(
+      out.rows.map((row) => isSkipRow(row)),
+      [true, false, true],
+    );
+    assert.deepEqual(out.rows[0], [
+      { key: "skip", value: "Skipped", correctness: Correctness.Incorrect },
+    ]);
+    // A skip names nobody, so it takes no name out of the suggestions
+    assert.deepEqual([...guessedNames(out.rows)], ["Bela"]);
+  });
+  it("refuses a skip in a classic game", () => {
+    assert.deepEqual(gradeIds(ATTRIBUTES, ROSTER, first, [SKIP]), {
+      kind: "invalid",
     });
   });
 });

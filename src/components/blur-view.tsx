@@ -2,7 +2,7 @@
 // square frame with only the earned squares clear, and the whole image once it is over.
 import { cn } from "../lib/utils.ts";
 import { Correctness } from "../game/correctness.ts";
-import { nameCell, type GradedAttribute } from "../game/game.ts";
+import { isSkipRow, nameCell, type GradedAttribute } from "../game/game.ts";
 import { blurProgress, CELLS } from "../game/blur.ts";
 
 export function BlurView({
@@ -48,7 +48,8 @@ export function BlurView({
   );
 }
 
-// A Blur game's guesses, newest first: names only, green for the answer, red otherwise
+// A Blur game's guesses, newest first: names only, green for the answer, red otherwise, grey
+// for a skip
 export function BlurGuesses({ rows }: { rows: readonly GradedAttribute[][] }) {
   return (
     <ol
@@ -64,7 +65,11 @@ export function BlurGuesses({ rows }: { rows: readonly GradedAttribute[][] }) {
             key={rows.length - i}
             className={cn(
               "guess-result-cell animate-in rounded-lg px-3 py-2.5 text-center font-bold text-white",
-              right ? "correct bg-correct" : "incorrect bg-incorrect",
+              right
+                ? "correct bg-correct"
+                : isSkipRow(row)
+                  ? "skipped border border-dashed bg-muted font-medium text-muted-foreground"
+                  : "incorrect bg-incorrect",
             )}
           >
             {String(cell.value)}

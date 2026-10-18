@@ -50,7 +50,7 @@ test("a Blur game is made in the editor and played square by square", async ({
 
   // No attributes; the tries are a Details field
   await expect(page.locator("#tab-attributes")).toHaveCount(0);
-  await page.locator("#edit-blur-tries").selectOption("2");
+  await page.locator("#edit-blur-tries").selectOption("3");
   await page.locator("#save-button").click();
   await expect(page.locator("#edit-saved")).toHaveText("Saved.");
 
@@ -87,7 +87,7 @@ test("a Blur game is made in the editor and played square by square", async ({
   await page.goto(`/g/${slug}`);
   await expect(page.locator("#blur-view")).toBeVisible();
   await expect(page.locator("#blur-tries")).toHaveText(
-    "1 of 9 squares clear · 2 tries left",
+    "1 of 9 squares clear · 3 tries left",
   );
   await expect
     .poll(() =>
@@ -99,11 +99,23 @@ test("a Blur game is made in the editor and played square by square", async ({
   await page.locator("#new-guess-input").fill(wrong[0]!);
   await page.locator("#submit-new-guess-button").click();
   await expect(page.locator("#blur-tries")).toHaveText(
-    "2 of 9 squares clear · 1 try left",
+    "2 of 9 squares clear · 2 tries left",
   );
   await expect(page.locator(".guess-result-cell.incorrect")).toHaveText([
     wrong[0]!,
   ]);
+
+  // A skip uses a try and clears the next square, and keeps what was typed
+  await page.locator("#new-guess-input").fill(wrong[1]!);
+  await page.keyboard.press("Escape");
+  await page.locator("#skip-guess-button").click();
+  await expect(page.locator("#blur-tries")).toHaveText(
+    "3 of 9 squares clear · 1 try left",
+  );
+  await expect(page.locator(".guess-result-cell.skipped")).toHaveText([
+    "Skipped",
+  ]);
+  await expect(page.locator("#new-guess-input")).toHaveValue(wrong[1]!);
 
   await page.locator("#new-guess-input").fill(wrong[1]!);
   await page.locator("#submit-new-guess-button").click();
@@ -114,6 +126,7 @@ test("a Blur game is made in the editor and played square by square", async ({
     /^\/uploads\//,
   );
   await expect(page.locator("#new-guess-row")).toBeHidden();
+  await expect(page.locator("#skip-guess-button")).toHaveCount(0);
 
   // A reload keeps the lost day
   await page.reload();
@@ -173,12 +186,17 @@ test("a party round on a Blur game shows the round's board", async ({
         .evaluate((img: HTMLImageElement) => img.naturalWidth),
     )
     .toBeGreaterThan(0);
+  // A skip clears the next square
+  await page.locator("#skip-guess-button").click();
+  await expect(page.locator("#blur-tries")).toHaveText(
+    "2 of 9 squares clear · 8 tries left",
+  );
   // Two entries: one guess or two finds it, and a lone player's round then ends
   await page.locator("#new-guess-input").fill("One");
   await page.locator("#submit-new-guess-button").click();
   const over = page.getByText("Round 1 is over");
   const second = page.locator("#blur-tries", {
-    hasText: "2 of 9 squares clear",
+    hasText: "3 of 9 squares clear",
   });
   await expect(over.or(second)).toBeVisible();
   if (!(await over.isVisible())) {

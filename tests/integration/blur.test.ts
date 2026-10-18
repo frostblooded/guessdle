@@ -319,6 +319,56 @@ describe("blur games", () => {
     assert.ok(won.answerPhoto);
   });
 
+  it("takes skips as tries, beyond the entry count, signed in or not", async () => {
+    const [only] = (await addEntry("Alpha")).body;
+    await db.pool.query("update games set status = 'approved'");
+    const grade = (ids: number[]) =>
+      request("POST", `${G}/grade`, undefined, { ids });
+    const one = (await grade([0])).body;
+    assert.deepEqual(one.rows, [
+      [{ key: "skip", value: "Skipped", correctness: 0 }],
+    ]);
+    const lost = (await grade([0, 0, 0])).body;
+    assert.equal(lost.lost, true);
+    assert.equal(lost.answer, "Alpha");
+    assert.equal((await grade([0, 0, 0, 0])).body.error, "invalid");
+    assert.equal((await grade([0, only.id])).body.victory, true);
+
+    const bob = await login("bob@example.test");
+    await request("GET", `${G}/state`, bob);
+    const skipped = (await request("POST", `${G}/state/guess`, bob, { id: 0 }))
+      .body;
+    assert.deepEqual(skipped.ids, [0]);
+    const again = (await request("POST", `${G}/state/guess`, bob, { id: 0 }))
+      .body;
+    assert.deepEqual(again.ids, [0, 0]);
+    const won = (
+      await request("POST", `${G}/state/guess`, bob, { id: only.id })
+    ).body;
+    assert.deepEqual(won.ids, [0, 0, only.id]);
+    assert.equal(won.victory, true);
+
+    // A local game with skips merges into a fresh account in order
+    const cy = await login("cy@example.test");
+    const merged = (
+      await request("POST", `${G}/state/merge`, cy, {
+        day: 0,
+        ids: [0, 0, only.id],
+      })
+    ).body;
+    assert.deepEqual(merged.ids, [0, 0, only.id]);
+
+    // A classic game takes no skip
+    assert.equal(
+      (
+        await request("POST", "/api/games/petdle/grade", undefined, {
+          ids: [0],
+        })
+      ).body.error,
+      "invalid",
+    );
+  });
+
   it("keeps a signed-in player to the tries", async () => {
     const entries = [];
     for (const name of ["Alpha", "Beta", "Gamma", "Delta"]) {
