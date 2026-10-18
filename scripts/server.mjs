@@ -16,7 +16,7 @@ const PAGES = new Set([
   "my-games",
 ]);
 const ALLOWED =
-  /^\/(index\.html|game\.html|login\.html|verify\.html|admin\.html|how-to-play\.html|create\.html|my-games\.html|edit\.html|favicon\.ico|(dist|howto|uploads)\/.+)$/;
+  /^\/(index\.html|game\.html|login\.html|verify\.html|admin\.html|how-to-play\.html|create\.html|my-games\.html|edit\.html|party\.html|favicon\.ico|(dist|howto|uploads)\/.+)$/;
 
 const TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -35,6 +35,8 @@ function pageFor(urlPath) {
   if (/^\/g\/[^/]+$/.test(urlPath)) return "game.html";
   // /g/<slug>/edit is the editor shell
   if (/^\/g\/[^/]+\/edit$/.test(urlPath)) return "edit.html";
+  // /party and /party/<CODE> are the party page (it reads the code from the path)
+  if (/^\/party(\/[A-Za-z]+)?$/.test(urlPath)) return "party.html";
   const name = urlPath.slice(1);
   return PAGES.has(name) ? `${name}.html` : null;
 }
@@ -68,9 +70,11 @@ async function serveStatic(req, res) {
 
 // With DATABASE_URL the Express API (src/server) runs in this process; the e2e suite leaves it unset.
 let handler = serveStatic;
+let sockets = null;
 if (process.env.DATABASE_URL) {
   const { connect } = await import("../src/server/main.ts");
-  const { createApp } = await import("../src/server/app.ts");
+  const { attachPartySockets, createApp } =
+    await import("../src/server/app.ts");
   const { adminEmailsFromEnv } = await import("../src/server/auth.ts");
   const { mailConfigFromEnv } = await import("../src/server/mailer.ts");
   const { rateLimitFromEnv } = await import("../src/server/rate-limit.ts");
@@ -87,5 +91,7 @@ if (process.env.DATABASE_URL) {
   });
   app.use(serveStatic);
   handler = app;
+  sockets = (server) => attachPartySockets(server, app);
 }
-createServer(handler).listen(PORT, "0.0.0.0");
+const server = createServer(handler).listen(PORT, "0.0.0.0");
+sockets?.(server);

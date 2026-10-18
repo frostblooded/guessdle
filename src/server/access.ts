@@ -23,6 +23,10 @@ export const isPlayable = (game: GameRow, roster: Roster): boolean =>
 export const canManage = (game: GameRow, user: SessionUser | null): boolean =>
   user !== null && (user.admin || game.ownerId === user.id);
 
+// An admin may approve a pending game right from its Play page (issue #88)
+export const canApprove = (game: GameRow, user: SessionUser | null): boolean =>
+  user?.admin === true && game.status === "pending";
+
 const adminDenial = (user: SessionUser | null): Denial | null =>
   user?.admin ? null : user ? "forbidden" : "unauthorized";
 

@@ -18,6 +18,7 @@ const PAGES: Record<string, string> = {
   "create.html": "create",
   "my-games.html": "my-games",
   "edit.html": "edit",
+  "party.html": "party",
 };
 
 describe("build output is wired through the pages and the deploy", () => {
@@ -132,6 +133,27 @@ describe("build output is wired through the pages and the deploy", () => {
       conf,
       /location ~ \^\/g\/\[\^\/\]\+\/edit\$ \{[^}]*try_files \/edit\.html =404;/,
     );
+  });
+
+  it("nginx serves /party and /party/<CODE> from the party page", () => {
+    const conf: string = read("deploy/nginx.conf");
+    assert.match(
+      conf,
+      /location ~ \^\/party\(\/\[A-Za-z\]\+\)\?\$ \{[^}]*try_files \/party\.html =404;/,
+    );
+  });
+
+  it("nginx upgrades party sockets to WebSockets", () => {
+    const conf: string = read("deploy/nginx.conf");
+    const block =
+      /location ~ \^\/api\/parties\/\[\^\/\]\+\/socket\$ \{([^}]*)\}/.exec(
+        conf,
+      );
+    assert.ok(block, "socket location");
+    assert.match(block[1]!, /proxy_http_version 1\.1;/);
+    assert.match(block[1]!, /proxy_set_header Upgrade \$http_upgrade;/);
+    assert.match(block[1]!, /proxy_set_header Connection "upgrade";/);
+    assert.match(block[1]!, /proxy_pass http:\/\/api:3000;/);
   });
 
   it("nginx revalidates by default and caches dist/ forever", () => {
