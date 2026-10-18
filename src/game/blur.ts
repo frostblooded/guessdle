@@ -3,10 +3,15 @@
 // owner picked. Pure, so the server, the editor and Play share it.
 import { MAX_BLUR_TRIES } from "./limits.ts";
 
-export type GameKind = "classic" | "blur";
+export type GameKind = "classic" | "blur" | "sequence";
 
 export const isGameKind = (value: unknown): value is GameKind =>
-  value === "classic" || value === "blur";
+  value === "classic" || value === "blur" || value === "sequence";
+
+// Blur and Sequence games: no attributes, graded on the name only, a fixed number of tries
+// (`blurTries`), and entry photos kept secret until the day is over
+export const isImageGame = (kind: GameKind): boolean =>
+  kind === "blur" || kind === "sequence";
 
 // The grid is GRID x GRID squares, numbered 0..CELLS-1 row by row from the top left
 export const GRID = 3;

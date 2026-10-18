@@ -1,4 +1,5 @@
 // A party view's scoreboard, the podium of an ended party and its finished rounds.
+import { isImageGame } from "../../game/blur.ts";
 import { Badge } from "../../components/ui/badge.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
@@ -190,7 +191,7 @@ function Round({ view, round }: { view: PartyView; round: FinishedRound }) {
                   >
                     {/* Skip a classic row's photo column: it repeats the name's grade */}
                     {grades
-                      .slice(view.game.kind === "blur" ? 0 : 1)
+                      .slice(isImageGame(view.game.kind) ? 0 : 1)
                       .map((grade, j) => (
                         <span
                           key={j}

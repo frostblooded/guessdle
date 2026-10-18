@@ -2,6 +2,7 @@
 import { randomBytes } from "node:crypto";
 import type pg from "pg";
 import { MAX_OPEN_PARTIES, MAX_PARTY_PLAYERS } from "../game/limits.ts";
+import { isImageGame } from "../game/blur.ts";
 import {
   partyView,
   randomCode,
@@ -243,7 +244,7 @@ export async function loadData(q: Q, party: PartyRow): Promise<PartyData> {
     players: players.rows,
     rounds: rounds.rows.map((r) => ({
       ...r,
-      ...(game.kind === "blur" && { tries: game.blurTries }),
+      ...(isImageGame(game.kind) && { tries: game.blurTries }),
       guesses: guesses.rows
         .filter((g) => g.roundId === r.id)
         .map(({ playerId, entryId, at }) => ({ playerId, entryId, at })),
@@ -277,7 +278,7 @@ export async function viewsOf(
           slug: game.slug,
           name: game.name,
           kind: game.kind,
-          ...(game.kind === "blur" && { blurTries: game.blurTries }),
+          ...(isImageGame(game.kind) && { blurTries: game.blurTries }),
         },
         attributes: roster.attributes,
         entries: roster.entries,

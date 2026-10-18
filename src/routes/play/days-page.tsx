@@ -16,7 +16,7 @@ import { useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { DayList } from "./day-list.tsx";
 import { GameNotFound } from "./past-day.tsx";
-import { loadGame } from "./play-page.tsx";
+import { loadGame } from "./load-game.ts";
 
 // The list, "missing" for no such game, or the text of why it could not be loaded
 async function loadDays(

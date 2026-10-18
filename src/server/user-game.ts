@@ -1,7 +1,13 @@
 // A signed-in player's Game State for one day, stored in Postgres.
 import type pg from "pg";
-import { gradeIds, type Entry, type GradedAttribute } from "../game/game.ts";
+import {
+  gradeIds,
+  SKIP,
+  type Entry,
+  type GradedAttribute,
+} from "../game/game.ts";
 import type { GameRow, Roster } from "./games.ts";
+import { isImageGame } from "../game/blur.ts";
 
 export interface GameView {
   day: number;
@@ -9,25 +15,29 @@ export interface GameView {
   rows: GradedAttribute[][];
   victory: boolean;
   gaveUp: boolean;
-  // Blur games: every try was used without finding the answer
+  // Blur and Sequence games: every try was used without finding the answer
   lost?: true;
   // The answer's name: present once the day is over (victory, give-up or lost)
   answer?: string;
-  // Blur games, once the day is over: the answer's whole image
+  // Blur and Sequence games, once the day is over: the answer's whole image (a Sequence game's
+  // first photo)
   answerPhoto?: string;
 }
 
-// A Blur game's tries, null for a classic game with unlimited guesses
+// A Blur or Sequence game's tries, null for a classic game with unlimited guesses
 export const triesOf = (game: GameRow): number | null =>
-  game.kind === "blur" ? game.blurTries : null;
+  isImageGame(game.kind) ? game.blurTries : null;
 
-// The answer as a finished day reveals it: its name, and a Blur game's whole image
+// The answer as a finished day reveals it: its name, and a Blur game's whole image or a
+// Sequence game's first photo
 export const revealOf = (
   game: GameRow,
   answer: Entry,
 ): { answer: string; answerPhoto?: string } => ({
   answer: answer.name,
   ...(game.kind === "blur" && { answerPhoto: answer.photo }),
+  ...(game.kind === "sequence" &&
+    answer.shots?.[0] && { answerPhoto: answer.shots[0] }),
 });
 
 // Whether `ids` used up a Blur game's tries without the answer
@@ -72,8 +82,11 @@ export async function view(
   q: Q,
   { game, roster, answer, userId, date, day }: GameContext,
 ): Promise<GameView> {
+  // Skips read back as SKIP, in order among the guesses
   const guesses = await q.query<{ entry_id: number }>(
-    "select entry_id::int from user_guesses where user_id = $1 and game_id = $2 and day = $3 order by seq",
+    `select entry_id::int, seq from user_guesses where user_id = $1 and game_id = $2 and day = $3
+     union all select ${SKIP}, seq from user_skips where user_id = $1 and game_id = $2 and day = $3
+     order by seq`,
     [userId, game.id, date],
   );
   const gaveUp =
@@ -147,11 +160,22 @@ export async function addGuess(
   current: GameView,
   id: unknown,
 ): Promise<Refusal | null> {
-  if (typeof id !== "number" || !roster.entries.some((e) => e.id === id)) {
+  const skip = id === SKIP && triesOf(game) !== null;
+  if (
+    typeof id !== "number" ||
+    !(skip || roster.entries.some((e) => e.id === id))
+  ) {
     return "invalid";
   }
   if (finished(current)) {
     return "finished";
+  }
+  if (skip) {
+    await q.query(
+      "insert into user_skips (user_id, game_id, day) values ($1, $2, $3)",
+      [userId, game.id, date],
+    );
+    return null;
   }
   const { rowCount } = await q.query(
     "insert into user_guesses (user_id, game_id, day, entry_id) values ($1, $2, $3, $4) on conflict do nothing",
@@ -184,10 +208,15 @@ export async function mergeLocal(
   body: Record<string, unknown>,
 ): Promise<Refusal | null> {
   const { ids, gaveUp } = body;
+  const tries = triesOf(game);
   if (
     !Array.isArray(ids) ||
-    ids.length > roster.entries.length ||
-    !ids.every((id) => roster.entries.some((e) => e.id === id)) ||
+    ids.length > (tries ?? roster.entries.length) ||
+    !ids.every(
+      (id) =>
+        (id === SKIP && tries !== null) ||
+        roster.entries.some((e) => e.id === id),
+    ) ||
     (gaveUp !== undefined && typeof gaveUp !== "boolean")
   ) {
     return "invalid";
@@ -198,8 +227,10 @@ export async function mergeLocal(
   if (current.ids.length > 0 || current.gaveUp) {
     return "has_progress";
   }
-  // Keep first occurrences in order, stop after the answer
-  const keep = [...new Set(ids as number[])];
+  // Keep first occurrences (every skip) in order, stop after the answer
+  const keep = (ids as number[]).filter(
+    (id, i) => id === SKIP || ids.indexOf(id) === i,
+  );
   const end = keep.indexOf(answer.id);
   const adopted = (end === -1 ? keep : keep.slice(0, end + 1)).slice(
     0,
@@ -207,8 +238,10 @@ export async function mergeLocal(
   );
   for (const id of adopted) {
     await q.query(
-      "insert into user_guesses (user_id, game_id, day, entry_id) values ($1, $2, $3, $4)",
-      [userId, game.id, date, id],
+      id === SKIP
+        ? "insert into user_skips (user_id, game_id, day) values ($1, $2, $3)"
+        : "insert into user_guesses (user_id, game_id, day, entry_id) values ($1, $2, $3, $4)",
+      id === SKIP ? [userId, game.id, date] : [userId, game.id, date, id],
     );
   }
   if (gaveUp === true && end === -1 && !isLost(game, adopted, false)) {
@@ -225,7 +258,7 @@ export async function resetGame(
   { game, userId, date }: GameContext,
 ): Promise<Refusal | null> {
   // Any time, even with no rows: deleting nothing is fine
-  for (const table of ["user_guesses", "user_give_ups"]) {
+  for (const table of ["user_guesses", "user_skips", "user_give_ups"]) {
     await q.query(
       `delete from ${table} where user_id = $1 and game_id = $2 and day = $3`,
       [userId, game.id, date],

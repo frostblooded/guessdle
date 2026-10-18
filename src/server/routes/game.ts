@@ -3,6 +3,7 @@ import express from "express";
 import type { Express, Request, Response } from "express";
 import type pg from "pg";
 import { gradeIds } from "../../game/game.ts";
+import { isImageGame } from "../../game/blur.ts";
 import type { DaysResponse } from "../../game/days.ts";
 import { listDays } from "../days.ts";
 import { isPlayerToken, MAX_SECONDS } from "../../game/stats.ts";
@@ -45,8 +46,8 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
     res.json(await listGallery(pool));
   });
 
-  // What a player needs to render the game: its attributes and active entries. A Blur game's
-  // entries go without photos: those are its answers (ADR 0019).
+  // What a player needs to render the game: its attributes and active entries. A Blur or
+  // Sequence game's entries go without photos: those are its answers (ADR 0019, 0020).
   app.get(base, async (req, res) => {
     res.set("Cache-Control", "no-store");
     const loaded = await loadGame(ctx, req, res);
@@ -65,7 +66,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       description: game.description,
       cover: game.coverUrl,
       kind: game.kind,
-      ...(game.kind === "blur" && { blurTries: game.blurTries }),
+      ...(isImageGame(game.kind) && { blurTries: game.blurTries }),
       // Today's Day Number: past days are 0 up to it
       today: todayOf(ctx, game).day,
       startDate: game.startDate,
@@ -75,7 +76,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       entries: roster.entries.map(({ id, name, photo }) => ({
         id,
         name,
-        photo: game.kind === "blur" ? "" : photo,
+        photo: isImageGame(game.kind) ? "" : photo,
       })),
     });
   });
@@ -122,7 +123,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         res.status(status).json({ error, day });
       };
       const ids = bodyOf(req)["ids"];
-      if (!isIdList(roster, ids) || ids.length > (triesOf(game) ?? Infinity)) {
+      if (!isIdList(roster, ids, triesOf(game))) {
         fail(400, "invalid");
         return;
       }
@@ -198,7 +199,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
           ? `anon:${body["player"]}`
           : null;
       const ids = body["ids"];
-      if (player === null || (!user && !isIdList(roster, ids))) {
+      if (player === null || (!user && !isIdList(roster, ids, triesOf(game)))) {
         res.status(400).json({ error: "invalid", day });
         return;
       }
@@ -219,7 +220,13 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
             })
           ).ids
         : (ids as number[]);
-      const graded = gradeIds(roster.attributes, roster.all, answer, won);
+      const graded = gradeIds(
+        roster.attributes,
+        roster.all,
+        answer,
+        won,
+        game.kind,
+      );
       if (graded.kind !== "graded" || won.at(-1) !== answer.id) {
         res.status(409).json({ error: "not_won", day });
         return;

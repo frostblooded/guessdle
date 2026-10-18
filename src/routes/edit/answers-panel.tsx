@@ -28,6 +28,8 @@ interface AnswerList {
   from: string;
   to: string;
   days: AnswerDay[];
+  // The entries an Override may name (a Sequence game's with every photo)
+  answerIds: number[];
 }
 
 const HISTORY_DAYS = 7;
@@ -70,6 +72,8 @@ export function AnswersPanel({
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [days, setDays] = useState<AnswerDay[]>([]);
+  const [answerIds, setAnswerIds] = useState<number[]>([]);
+  const choices = entries.filter((entry) => answerIds.includes(entry.id));
   const [editing, setEditing] = useState<AnswerDay | null>(null);
   const [pick, setPick] = useState("");
 
@@ -88,6 +92,7 @@ export function AnswersPanel({
     setFrom(data.from);
     setTo(data.to);
     setDays(data.days);
+    setAnswerIds(data.answerIds);
     setEditing(null);
   };
   // Saving or clearing re-draws later days, so reload the same range afterwards
@@ -134,7 +139,7 @@ export function AnswersPanel({
 
   const openEditor = (day: AnswerDay): void => {
     setEditing(day);
-    setPick(String(day.missing ? (entries[0]?.id ?? "") : day.entryId));
+    setPick(String(day.missing ? (choices[0]?.id ?? "") : day.entryId));
   };
 
   const apply = async (
@@ -271,7 +276,7 @@ export function AnswersPanel({
                 value={pick}
                 onChange={(event) => setPick(event.target.value)}
               >
-                {entries.map((entry) => (
+                {choices.map((entry) => (
                   <option key={entry.id} value={entry.id}>
                     {entry.name}
                   </option>

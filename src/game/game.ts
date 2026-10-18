@@ -7,7 +7,7 @@ import {
   gradeNumber,
   type Hint,
 } from "./correctness.ts";
-import type { GameKind } from "./blur.ts";
+import { isImageGame, type GameKind } from "./blur.ts";
 
 export type AttributeType = "text" | "list" | "number";
 
@@ -29,11 +29,13 @@ export interface Entry extends EntryRef {
   values: AttributeValue[];
   // Blur games only: the order the grid's squares clear in (cells 0-8), once picked
   blurOrder?: number[];
+  // Sequence games only: the photos in the order players see them, "" for a missing one
+  shots?: string[];
 }
 
 // One column of a guessed entry, graded against the Daily Answer. Rows list the
-// photo, the name, then the game's Attributes: the table column order. A Blur game's rows
-// hold the name only, so no entry's image reaches the player before the day ends.
+// photo, the name, then the game's Attributes: the table column order. A Blur or Sequence
+// game's rows hold the name only, so no entry's image reaches the player before the day ends.
 export interface GradedAttribute {
   key: string;
   value: AttributeValue;
@@ -68,7 +70,7 @@ export function gradeGuess(
     value: guess.name,
     correctness: gradeCorrectness(guess.name, answer.name),
   };
-  if (kind === "blur") {
+  if (isImageGame(kind)) {
     return [
       {
         ...name,
@@ -102,13 +104,22 @@ export function gradeGuess(
   ];
 }
 
+// A skip in a Blur or Sequence game: in a list of guessed ids it uses up a try like a wrong
+// guess, and may repeat
+export const SKIP = 0;
+
+// The row a skip shows in the guess list
+const skipRow = (): GradedAttribute[] => [
+  { key: "name", value: "Skipped", correctness: Correctness.Incorrect },
+];
+
 export type GradeIdsResult =
   | { kind: "invalid" }
   | { kind: "duplicate" }
   | { kind: "graded"; rows: GradedAttribute[][]; victory: boolean };
 
-// Grades guesses given by entry id, in order. Any unknown id makes the whole
-// batch invalid; otherwise any repeated id makes it a duplicate.
+// Grades guesses given by entry id, in order. Any unknown id (or a SKIP outside a Blur or
+// Sequence game) makes the whole batch invalid; otherwise any repeated id makes it a duplicate.
 export function gradeIds(
   attributes: readonly GameAttribute[],
   roster: readonly Entry[],
@@ -116,24 +127,25 @@ export function gradeIds(
   ids: readonly number[],
   kind: GameKind = "classic",
 ): GradeIdsResult {
-  const guesses: Entry[] = [];
+  const guesses: (Entry | null)[] = [];
   for (const id of ids) {
     const entry: Entry | undefined = roster.find(
       (item: Entry): boolean => item.id === id,
     );
-    if (!entry) {
+    if (!entry && !(id === SKIP && isImageGame(kind))) {
       return { kind: "invalid" };
     }
-    guesses.push(entry);
+    guesses.push(entry ?? null);
   }
-  if (new Set(ids).size !== ids.length) {
+  const named: readonly number[] = ids.filter((id) => id !== SKIP);
+  if (new Set(named).size !== named.length) {
     return { kind: "duplicate" };
   }
 
   return {
     kind: "graded",
-    rows: guesses.map((guess: Entry): GradedAttribute[] =>
-      gradeGuess(attributes, answer, guess, kind),
+    rows: guesses.map((guess: Entry | null): GradedAttribute[] =>
+      guess ? gradeGuess(attributes, answer, guess, kind) : skipRow(),
     ),
     victory: ids.includes(answer.id),
   };

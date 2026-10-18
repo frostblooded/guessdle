@@ -6,7 +6,12 @@ import { slugBase, slugError } from "../../game/slug.ts";
 import { gameLifecycle, type Move } from "../lifecycle.ts";
 import { MAX_ATTRIBUTE_NAME, MAX_NAME } from "../../game/limits.ts";
 import { nameIn, parseEntryInput, parseGamePatch } from "../validate.ts";
-import { redrawFuture, releaseEntry, todayIn } from "../answers.ts";
+import {
+  redrawFuture,
+  releaseEntry,
+  rescheduleFuture,
+  todayIn,
+} from "../answers.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
 import type { AttributeType } from "../../game/game.ts";
 import { deleteEntry, listEntries, saveEntry } from "../entries.ts";
@@ -15,15 +20,17 @@ import {
   editAttributes,
   listAttributes,
   listOwned,
+  loadRoster,
   patchKind,
   saveAttributes,
   skipOf,
   updateGame,
   type AttributeDraft,
   type AttributeEdit,
+  type GameRow,
 } from "../games.ts";
 import { rateLimit, type RateLimit } from "../rate-limit.ts";
-import { isGameKind } from "../../game/blur.ts";
+import { isGameKind, isImageGame } from "../../game/blur.ts";
 import { uploadRefs } from "../upload-refs.ts";
 import {
   bodyOf,
@@ -174,8 +181,8 @@ export function manageRoutes(
   ) =>
     manageRoute(async ({ game }, _user, req, res) => {
       const edit = build(req);
-      // A Blur game has no attributes
-      if (!edit || game.kind === "blur") {
+      // A Blur or Sequence game has no attributes
+      if (!edit || isImageGame(game.kind)) {
         fail(res, "invalid");
         return;
       }
@@ -236,6 +243,19 @@ export function manageRoutes(
     attributeRoute((req) => ({ remove: idOf(req) })),
   );
 
+  // A Sequence game's schedule follows which entries may be the answer (ADR 0020)
+  const reschedule = async (game: GameRow): Promise<void> => {
+    if (game.kind === "sequence") {
+      await rescheduleFuture(
+        pool,
+        game,
+        (await loadRoster(pool, game)).answerIds,
+        todayIn(now(), ctx.timeZone),
+        ctx.random,
+      );
+    }
+  };
+
   const entryBase = "/api/games/:slug/entries";
   // Creates (no :id) or changes an entry, then answers with the entry list
   const entryRoute = manageRoute(async ({ game }, user, req, res) => {
@@ -255,6 +275,13 @@ export function manageRoutes(
           current?.photo ?? "",
           user.id,
           game.ownerId,
+        ))) ||
+      (input.shots !== undefined &&
+        !(await refs.mayAttachAll(
+          input.shots,
+          current?.shots ?? [],
+          user.id,
+          game.ownerId,
         )))
     ) {
       fail(res, "invalid");
@@ -270,7 +297,8 @@ export function manageRoutes(
       fail(res, out);
       return;
     }
-    await refs.release([out.replacedPhoto]);
+    await refs.release(out.replaced);
+    await reschedule(game);
     res.json(await listEntries(pool, game));
   });
   app.get(
@@ -300,7 +328,7 @@ export function manageRoutes(
       await releaseEntry(
         pool,
         game,
-        roster.entries.map((e) => e.id).filter((e) => e !== id),
+        roster.answerIds.filter((e) => e !== id),
         todayIn(now(), ctx.timeZone),
         id,
         ctx.random,
@@ -348,7 +376,7 @@ export function manageRoutes(
       const patch = parseGamePatch(
         body,
         Math.max(0, roster.entries.length - 1),
-        game.kind === "blur",
+        isImageGame(game.kind),
       );
       if (
         !patch ||
@@ -369,7 +397,12 @@ export function manageRoutes(
         (tx) => updateGame(tx, game, patch),
       );
       const edited = { ...game, ...patch };
-      if (skipOf(edited) !== skipOf(game) && roster.entries.length > 0) {
+      if (
+        game.kind === "sequence" &&
+        (skipOf(edited) !== skipOf(game) || edited.blurTries !== game.blurTries)
+      ) {
+        await reschedule(edited);
+      } else if (skipOf(edited) !== skipOf(game) && roster.entries.length > 0) {
         await redrawFuture(
           pool,
           edited,

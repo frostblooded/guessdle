@@ -2,6 +2,7 @@
 // database check and stays with the caller.
 import {
   MAX_DESCRIPTION,
+  MAX_BLUR_TRIES,
   MAX_ENTRY_NAME,
   MAX_LIST_ITEMS,
   MAX_NAME,
@@ -18,8 +19,8 @@ export const nameIn = (v: unknown, max: number): string | undefined =>
     : undefined;
 
 // The game fields of a PATCH body; undefined when any is malformed. `maxSkip` is the largest
-// skip period the roster allows; `blur` whether the game is a Blur game, the only kind with a
-// try count. A coverUrl is only shape-checked here.
+// skip period the roster allows; `blur` whether the game is a Blur or Sequence game, the only
+// kinds with a try count. A coverUrl is only shape-checked here.
 export function parseGamePatch(
   body: Record<string, unknown>,
   maxSkip: number,
@@ -71,13 +72,23 @@ export function parseGamePatch(
   return patch;
 }
 
-// The entry fields in a request body; undefined when any is malformed. A photo is only
-// shape-checked here.
+// The entry fields in a request body; undefined when any is malformed. A photo or a Sequence
+// entry's shots are only shape-checked here.
 export function parseEntryInput(
   body: Record<string, unknown>,
 ): EntryInput | undefined {
-  const { name, photo, values, blurOrder } = body;
+  const { name, photo, values, blurOrder, shots } = body;
   const out: EntryInput = {};
+  if (shots !== undefined) {
+    if (
+      !Array.isArray(shots) ||
+      shots.length > MAX_BLUR_TRIES ||
+      !shots.every((shot) => typeof shot === "string")
+    ) {
+      return undefined;
+    }
+    out.shots = shots as string[];
+  }
   if (blurOrder !== undefined) {
     if (!isBlurOrder(blurOrder)) {
       return undefined;

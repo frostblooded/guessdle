@@ -38,12 +38,14 @@ export const fail = (res: Response, code: FailureCode): void => {
   res.status(FAILURES[code].status).json({ error: code });
 };
 
+// `tries`: a Blur or Sequence game's, whose skips may make the list longer than the roster
 export const isIdList = (
   { entries }: Roster,
   value: unknown,
+  tries: number | null = null,
 ): value is number[] =>
   Array.isArray(value) &&
-  value.length <= entries.length &&
+  value.length <= (tries ?? entries.length) &&
   value.every((id: unknown) => Number.isInteger(id));
 
 // Resolves `:slug` for what the viewer wants to do (access.ts) and sends the 404/401/403 itself.
@@ -133,7 +135,7 @@ export async function todaysAnswer(
   const answerId = await ensureAnswer(
     pool,
     game,
-    roster.entries.map((entry) => entry.id),
+    roster.answerIds,
     date,
     random,
   );

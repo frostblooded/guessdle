@@ -1,5 +1,5 @@
 // Upload references (spec #66): who may attach an uploaded file, and when a file is deleted.
-// A file lives while a game cover or an entry photo (soft-deleted ones too) uses it; callers state
+// A file lives while a game cover or an entry photo or Sequence shot (soft-deleted ones too) uses it; callers state
 // intent (attach, release, drop a game or user) and never unlink files themselves.
 import { readdir, stat, unlink } from "node:fs/promises";
 import { join } from "node:path";
@@ -23,7 +23,8 @@ export function uploadRefs(pool: pg.Pool, dir: string) {
   const isReferenced = async (url: string): Promise<boolean> =>
     (
       await pool.query(
-        "select 1 from games where cover_url = $1 union all select 1 from entries where photo_url = $1",
+        `select 1 from games where cover_url = $1
+         union all select 1 from entries where photo_url = $1 or $1 = any(shots)`,
         [url],
       )
     ).rowCount! > 0;
@@ -31,7 +32,8 @@ export function uploadRefs(pool: pg.Pool, dir: string) {
   // URLs still used by content (soft-deleted entries stay, they can be restored)
   const referencedUrls = async (): Promise<Set<string>> => {
     const { rows } = await pool.query<{ url: string }>(
-      "select cover_url as url from games union select photo_url from entries",
+      `select cover_url as url from games union select photo_url from entries
+       union select unnest(shots) from entries`,
     );
     return new Set(rows.map((r) => r.url));
   };
@@ -47,34 +49,55 @@ export function uploadRefs(pool: pg.Pool, dir: string) {
     }
   };
 
+  // A cover or photo may be cleared, kept, or a file stored for the acting user or the game's owner
+  const mayAttach = async (
+    url: string,
+    current: string,
+    actorId: number,
+    ownerId: number | null,
+  ): Promise<boolean> => {
+    const name = URL_RE.exec(url)?.[1];
+    return (
+      url === "" ||
+      url === current ||
+      (name !== undefined &&
+        (
+          await pool.query(
+            "select 1 from uploads where name = $1 and user_id = any($2)",
+            [name, [actorId, ownerId].filter((o) => o !== null)],
+          )
+        ).rowCount === 1)
+    );
+  };
+
   return {
     release,
+    mayAttach,
 
-    // A cover or photo may be cleared, kept, or a file stored for the acting user or the game's owner
-    async mayAttach(
-      url: string,
-      current: string,
+    // Every file in `urls` (a Sequence entry's shots) may be attached: kept from `current`, or
+    // as mayAttach allows
+    async mayAttachAll(
+      urls: readonly string[],
+      current: readonly string[],
       actorId: number,
       ownerId: number | null,
     ): Promise<boolean> {
-      const name = URL_RE.exec(url)?.[1];
-      return (
-        url === "" ||
-        url === current ||
-        (name !== undefined &&
-          (
-            await pool.query(
-              "select 1 from uploads where name = $1 and user_id = any($2)",
-              [name, [actorId, ownerId].filter((o) => o !== null)],
-            )
-          ).rowCount === 1)
-      );
+      for (const url of urls) {
+        if (
+          !current.includes(url) &&
+          !(await mayAttach(url, "", actorId, ownerId))
+        ) {
+          return false;
+        }
+      }
+      return true;
     },
 
     // Deletes the game (everything under it cascades), then releases its cover and photos
     async dropGame(game: GameRow): Promise<void> {
       const { rows } = await pool.query<{ url: string }>(
-        "select photo_url as url from entries where game_id = $1",
+        `select photo_url as url from entries where game_id = $1
+         union select unnest(shots) from entries where game_id = $1`,
         [game.id],
       );
       await pool.query("delete from games where id = $1", [game.id]);
@@ -87,7 +110,8 @@ export function uploadRefs(pool: pg.Pool, dir: string) {
       const { rows } = await pool.query<{ url: string }>(
         `select '/uploads/' || name as url from uploads where user_id = $1
          union select cover_url from games where owner_id = $1
-         union select e.photo_url from entries e join games g on g.id = e.game_id where g.owner_id = $1`,
+         union select e.photo_url from entries e join games g on g.id = e.game_id where g.owner_id = $1
+         union select unnest(e.shots) from entries e join games g on g.id = e.game_id where g.owner_id = $1`,
         [userId],
       );
       const { rowCount } = await pool.query("delete from users where id = $1", [

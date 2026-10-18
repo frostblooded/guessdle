@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { Link } from "react-router";
+import type { GameKind } from "../game/blur.ts";
 import { EmptyState, PageHead } from "../components/page.tsx";
 import { Alert } from "../components/ui/alert.tsx";
 import { Badge } from "../components/ui/badge.tsx";
@@ -16,7 +17,7 @@ interface GameCard {
   cover: string;
   photos: string[];
   entryCount: number;
-  kind: "classic" | "blur";
+  kind: GameKind;
 }
 
 async function fetchGames(): Promise<GameCard[]> {
@@ -100,6 +101,9 @@ function Card({ card, featured }: { card: GameCard; featured: boolean }) {
             {card.name}
             {featured && <Badge variant="default">Original</Badge>}
             {card.kind === "blur" && <Badge variant="secondary">Blur</Badge>}
+            {card.kind === "sequence" && (
+              <Badge variant="secondary">Sequence</Badge>
+            )}
           </h2>
           {card.description && (
             <p className="line-clamp-3 text-sm text-muted-foreground">

@@ -11,7 +11,7 @@ import {
   type GradedAttribute,
 } from "./game.ts";
 import { MAX_NICKNAME, MIN_ENTRIES } from "./limits.ts";
-import type { GameKind } from "./blur.ts";
+import { isImageGame, type GameKind } from "./blur.ts";
 
 // No I or O, so a code read aloud or off a screen is never mistaken for 1 or 0
 export const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -191,10 +191,10 @@ export interface PartyView {
     slug: string;
     name: string;
     kind: GameKind;
-    // Blur games: tries per round
+    // Blur and Sequence games: tries per round
     blurTries?: number;
     attributes: GameAttribute[];
-    // A Blur game's entries come without photos
+    // A Blur or Sequence game's entries come without photos
     entries: EntryRef[];
   };
   ended: boolean;
@@ -244,7 +244,12 @@ export interface ViewInput {
   viewer: number | null;
 }
 
-const ref = ({ id, name, photo }: Entry): EntryRef => ({ id, name, photo });
+// A Sequence entry shows its first photo once revealed
+const ref = ({ id, name, photo, shots }: Entry): EntryRef => ({
+  id,
+  name,
+  photo: photo || (shots?.[0] ?? ""),
+});
 
 export function partyView(input: ViewInput): PartyView {
   const { attributes, all, players, rounds, viewer } = input;
@@ -311,7 +316,7 @@ export function partyView(input: ViewInput): PartyView {
       attributes: [...attributes],
       entries: input.entries.map((e) => ({
         ...ref(e),
-        photo: kind === "blur" ? "" : e.photo,
+        photo: isImageGame(kind) ? "" : e.photo,
       })),
     },
     ended: input.ended,

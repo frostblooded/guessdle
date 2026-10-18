@@ -1,5 +1,10 @@
 // Game, attribute and entry data: the one seam between routes and the tables.
-import { MAX_ATTRIBUTES, MIN_ENTRIES } from "../game/limits.ts";
+import {
+  DEFAULT_SHOTS,
+  MAX_ATTRIBUTES,
+  MAX_BLUR_TRIES,
+  MIN_ENTRIES,
+} from "../game/limits.ts";
 import type pg from "pg";
 import type { AttributeValue } from "../game/correctness.ts";
 import {
@@ -11,6 +16,7 @@ import {
 import { MAX_TILES } from "../game/banner.ts";
 import { slugError } from "../game/slug.ts";
 import type { GameKind } from "../game/blur.ts";
+import { hasAllShots } from "../game/sequence.ts";
 import type { EditKind } from "./lifecycle.ts";
 
 type Q = Pick<pg.Pool, "query">;
@@ -32,7 +38,7 @@ export interface GameRow {
   startDate: string;
   skipPeriod: number | null;
   kind: GameKind;
-  // Blur games: the number of tries
+  // Blur and Sequence games: the number of tries (a Sequence game's photos per entry)
   blurTries: number;
 }
 
@@ -70,14 +76,22 @@ export interface Roster {
   entries: Entry[];
   // Every entry including soft-deleted ones, so past guesses still resolve
   all: Entry[];
-  // Active entries missing a value: while any are, the game is paused
+  // Active entries missing a value: while any are, the game is paused. A Sequence game counts
+  // its entries only while none of them may be the answer.
   incomplete: number;
+  // Active entries a day's answer is drawn from: all of them, but in a Sequence game only
+  // those with every photo
+  answerIds: number[];
 }
 
 // SQL true when the game aliased `g` has an active entry missing a value (no value rows for an
 // attribute; blanks are never stored), or, in a Blur game, missing its photo or its square
-// order. Such a game is paused.
-export const HAS_MISSING_VALUES = `(case when g.kind = 'blur' then exists (
+// order, or a Sequence game with no active entry that has every photo. Such a game is paused.
+export const HAS_MISSING_VALUES = `(case when g.kind = 'sequence' then not exists (
+  select 1 from entries e
+  where e.game_id = g.id and e.deleted_at is null and cardinality(e.shots) >= g.blur_tries
+    and not ('' = any(e.shots[1:g.blur_tries])))
+when g.kind = 'blur' then exists (
   select 1 from entries e
   where e.game_id = g.id and e.deleted_at is null and (e.photo_url = '' or e.blur_order is null))
 else exists (
@@ -85,11 +99,18 @@ else exists (
   where e.game_id = g.id and e.deleted_at is null and not exists (
     select 1 from entry_values v where v.entry_id = e.id and v.attribute_id = a.id)) end)`;
 
-// An entry that pauses its game: a value missing, or in a Blur game its photo or square order
+// An entry that pauses its game: a value missing, or in a Blur game its photo or square order.
+// A Sequence entry never does on its own: without every photo it just cannot be the answer.
 export const isIncomplete = (game: GameRow, entry: Entry): boolean =>
-  game.kind === "blur"
-    ? entry.photo === "" || entry.blurOrder === undefined
-    : !hasAllValues(entry.values);
+  game.kind === "sequence"
+    ? false
+    : game.kind === "blur"
+      ? entry.photo === "" || entry.blurOrder === undefined
+      : !hasAllValues(entry.values);
+
+// Whether the entry may be a day's answer (other kinds pause instead while one is incomplete)
+export const isAnswerable = (game: GameRow, entry: Entry): boolean =>
+  game.kind !== "sequence" || hasAllShots(entry.shots ?? [], game.blurTries);
 
 // A game's attributes and entries with their values
 export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
@@ -107,9 +128,10 @@ export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
     photo: string;
     deleted: boolean;
     blurOrder: number[] | null;
+    shots: string[];
   }>(
     `select id::int, name, photo_url as photo, deleted_at is not null as deleted,
-       blur_order::int[] as "blurOrder"
+       blur_order::int[] as "blurOrder", shots
      from entries where game_id = $1 order by id`,
     [game.id],
   );
@@ -132,19 +154,31 @@ export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
     const list = byCell.get(`${entryId}:${attr.id}`) ?? [];
     return (attr.type === "list" ? list : (list[0] ?? "")) as AttributeValue;
   };
-  const all = entries.rows.map(({ id, name, photo, blurOrder }): Entry => ({
-    id,
-    name,
-    photo,
-    values: attributes.rows.map((attr) => cell(id, attr)),
-    ...(game.kind === "blur" && blurOrder && { blurOrder }),
-  }));
+  const all = entries.rows.map(
+    ({ id, name, photo, blurOrder, shots }): Entry => ({
+      id,
+      name,
+      photo,
+      values: attributes.rows.map((attr) => cell(id, attr)),
+      ...(game.kind === "blur" && blurOrder && { blurOrder }),
+      ...(game.kind === "sequence" && { shots }),
+    }),
+  );
   const active = all.filter((_, i) => !entries.rows[i]!.deleted);
+  const answerIds = active
+    .filter((entry) => isAnswerable(game, entry))
+    .map((entry) => entry.id);
   return {
     attributes: attributes.rows.map(({ name, type }) => ({ name, type })),
     entries: active,
     all,
-    incomplete: active.filter((entry) => isIncomplete(game, entry)).length,
+    incomplete:
+      game.kind === "sequence"
+        ? answerIds.length === 0
+          ? active.length
+          : 0
+        : active.filter((entry) => isIncomplete(game, entry)).length,
+    answerIds,
   };
 }
 
@@ -154,7 +188,7 @@ export interface GalleryCard {
   description: string;
   cover: string;
   // Banner collage photos of active entries, by id; only for a classic game without a cover
-  // (a Blur game's photos are its answers)
+  // (a Blur or Sequence game's photos are its answers)
   photos: string[];
   entryCount: number;
   kind: GameKind;
@@ -213,9 +247,16 @@ export async function createGame(
   const insert = async (candidate: string): Promise<boolean> =>
     (
       await q.query(
-        `insert into games (slug, name, owner_id, start_date, kind) values ($1, $2, $3, $4, $5)
-         on conflict (slug) do nothing`,
-        [candidate, name, ownerId, startDate, kind],
+        `insert into games (slug, name, owner_id, start_date, kind, blur_tries)
+         values ($1, $2, $3, $4, $5, $6) on conflict (slug) do nothing`,
+        [
+          candidate,
+          name,
+          ownerId,
+          startDate,
+          kind,
+          kind === "sequence" ? DEFAULT_SHOTS : MAX_BLUR_TRIES,
+        ],
       )
     ).rowCount === 1;
   if ("typed" in slug) {
@@ -236,7 +277,7 @@ export interface GamePatch {
   description?: string;
   coverUrl?: string;
   skipPeriod?: number | null;
-  // Blur games only
+  // Blur and Sequence games only
   blurTries?: number;
 }
 

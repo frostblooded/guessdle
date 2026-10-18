@@ -94,8 +94,7 @@ export async function act(
           if (live) {
             return "round_live";
           }
-          const active = data.roster.entries.map((e) => e.id);
-          if (active.length < MIN_ENTRIES) {
+          if (data.roster.entries.length < MIN_ENTRIES) {
             return "not_enough_entries";
           }
           if (data.roster.incomplete > 0) {
@@ -108,7 +107,7 @@ export async function act(
               party.id,
               (latest?.number ?? 0) + 1,
               drawAnswer(
-                active,
+                data.roster.answerIds,
                 data.rounds.map((r) => r.answerId),
                 random,
               ),

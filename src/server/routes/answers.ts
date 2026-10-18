@@ -70,7 +70,7 @@ export function answersRoutes(app: Express, ctx: AppContext): void {
         res,
         today,
         todayN: dayNumber(today, loaded.game.startDate),
-        ids: loaded.roster.entries.map((entry) => entry.id),
+        ids: loaded.roster.answerIds,
       });
     };
 
@@ -104,6 +104,8 @@ export function answersRoutes(app: Express, ctx: AppContext): void {
         today,
         from,
         to: rawTo,
+        // The entries an Override may name: in a Sequence game only those with every photo
+        answerIds: ids,
         days: days.map((row) => {
           const entry = roster.all.find((e) => e.id === row.entryId);
           return {
@@ -137,7 +139,7 @@ export function answersRoutes(app: Express, ctx: AppContext): void {
       if (refusePastDay(res, date, today)) {
         return;
       }
-      await setOverride(pool, game, ids, date, entryId, random);
+      await setOverride(pool, game, ids, date, entryId, random, today);
       res.json({ ok: true });
     }),
   );

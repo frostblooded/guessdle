@@ -11,6 +11,8 @@ export interface EntryRow {
   values: Record<string, string[]>;
   // Blur games only: the order the grid's squares clear in, once picked
   blurOrder?: number[] | null;
+  // Sequence games only: the photos in order, "" for a slot not uploaded yet
+  shots?: string[];
 }
 
 export async function listEntries(
@@ -23,18 +25,20 @@ export async function listEntries(
     photo: string;
     values: Record<string, string[]> | null;
     blurOrder: number[] | null;
+    shots: string[];
   }>(
-    `select e.id::int, e.name, e.photo_url as photo, e.blur_order::int[] as "blurOrder",
+    `select e.id::int, e.name, e.photo_url as photo, e.blur_order::int[] as "blurOrder", e.shots,
        (select jsonb_object_agg(attribute_id, items) from (
           select attribute_id, jsonb_agg(value order by position) as items
           from entry_values where entry_id = e.id group by attribute_id) v) as values
      from entries e where e.game_id = $1 and e.deleted_at is null order by e.id`,
     [game.id],
   );
-  return rows.map(({ blurOrder, ...r }) => ({
+  return rows.map(({ blurOrder, shots, ...r }) => ({
     ...r,
     values: r.values ?? {},
     ...(game.kind === "blur" && { blurOrder }),
+    ...(game.kind === "sequence" && { shots }),
   }));
 }
 
@@ -43,20 +47,22 @@ export interface EntryInput {
   photo?: string;
   values?: Record<string, string[]>;
   blurOrder?: number[];
+  shots?: string[];
 }
 
 // Creates the entry (`id` undefined) or changes it. Every attribute needs a value once saved,
 // from the input or already stored; Number values are stored as parseNumberValue gives them.
-// A Blur game's entry instead needs its photo and a complete square order, sent or stored.
+// A Blur game's entry instead needs its photo and a complete square order, sent or stored. A
+// Sequence entry needs only its name: one missing photos just cannot be the answer.
 // Runs in the caller's game transaction (lifecycle.edit), which applies the status rule.
-// `replacedPhoto` is the file the caller should delete.
+// `replaced` are the files the caller should release.
 export async function saveEntry(
   tx: pg.PoolClient,
   game: GameRow,
   id: number | undefined,
   input: EntryInput,
 ): Promise<
-  | { id: number; replacedPhoto: string | null }
+  | { id: number; replaced: string[] }
   | "invalid"
   | "entry_exists"
   | "not_found"
@@ -69,8 +75,9 @@ export async function saveEntry(
       name: string;
       photo: string;
       blurOrder: number[] | null;
+      shots: string[];
     }>(
-      `select name, photo_url as photo, blur_order::int[] as "blurOrder" from entries
+      `select name, photo_url as photo, blur_order::int[] as "blurOrder", shots from entries
        where id = $1 and game_id = $2 and deleted_at is null`,
       [id ?? 0, game.id],
     )
@@ -122,18 +129,22 @@ export async function saveEntry(
   } else if (input.blurOrder !== undefined) {
     return "invalid";
   }
+  if (input.shots !== undefined && game.kind !== "sequence") {
+    return "invalid";
+  }
+  const shots = input.shots ?? current?.shots ?? [];
   let entryId = id;
   if (entryId === undefined) {
     entryId = (
       await tx.query<{ id: number }>(
-        "insert into entries (game_id, name, photo_url) values ($1, $2, $3) returning id::int",
-        [game.id, name, photo],
+        "insert into entries (game_id, name, photo_url, shots) values ($1, $2, $3, $4) returning id::int",
+        [game.id, name, photo, shots],
       )
     ).rows[0]!.id;
   } else {
     await tx.query(
-      "update entries set name = $2, photo_url = $3 where id = $1",
-      [entryId, name, photo],
+      "update entries set name = $2, photo_url = $3, shots = $4 where id = $1",
+      [entryId, name, photo, shots],
     );
   }
   if (input.blurOrder !== undefined) {
@@ -153,9 +164,11 @@ export async function saveEntry(
       [entryId, attrId, items],
     );
   }
+  const before = current ? [current.photo, ...current.shots] : [];
+  const after = new Set([photo, ...shots]);
   return {
     id: entryId,
-    replacedPhoto: current && current.photo !== photo ? current.photo : null,
+    replaced: before.filter((url) => url !== "" && !after.has(url)),
   };
 }
 

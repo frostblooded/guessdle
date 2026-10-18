@@ -1,7 +1,9 @@
-// The editor's Entries tab: list, add, change and delete entries with photo and values.
+// The editor's Entries tab: list, add, change and delete entries with photo and values (a Blur
+// game's image and square order, a Sequence game's photos).
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useCrop } from "../../components/crop-dialog.tsx";
-import { CELLS } from "../../game/blur.ts";
+import { CELLS, type GameKind } from "../../game/blur.ts";
+import type { ImageKind } from "../../game/crop.ts";
 import { FAILURES } from "../../game/failures.ts";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button, buttonVariants } from "../../components/ui/button.tsx";
@@ -13,8 +15,16 @@ import {
   MIN_ENTRIES,
 } from "../../game/limits.ts";
 import { api, errorText, type Reply } from "../../manage-client.ts";
-import { IMAGE_TYPES, type Attribute, type Entry } from "./types.ts";
+import { cn } from "../../lib/utils.ts";
+import {
+  IMAGE_TYPES,
+  isIncomplete,
+  thumbOf,
+  type Attribute,
+  type Entry,
+} from "./types.ts";
 import { BlurOrderEditor } from "./blur-order-editor.tsx";
+import { ShotsEditor } from "./shots-editor.tsx";
 
 // What the form holds: the entry being edited (null: adding), its name, photo URL and values
 interface Draft {
@@ -24,6 +34,8 @@ interface Draft {
   values: Record<string, string>;
   // Blur games: the squares picked so far, in the order they clear
   blurOrder: number[];
+  // Sequence games: the photos, "" for an empty slot
+  shots: string[];
 }
 
 const draftOf = (entry: Entry | null): Draft => ({
@@ -31,6 +43,7 @@ const draftOf = (entry: Entry | null): Draft => ({
   name: entry?.name ?? "",
   photo: entry?.photo ?? "",
   blurOrder: entry?.blurOrder ?? [],
+  shots: entry?.shots ?? [],
   values: Object.fromEntries(
     Object.entries(entry?.values ?? {}).map(([id, items]) => [
       id,
@@ -43,12 +56,15 @@ export function EntriesPanel({
   base,
   initial,
   active,
-  blur = false,
+  kind = "classic",
+  tries = 0,
   onChange,
 }: {
   base: string;
-  // A Blur game: entries have an image and a square order instead of values
-  blur?: boolean;
+  // A Blur game's entries have an image and a square order instead of values, a Sequence
+  // game's its `tries` photos
+  kind?: GameKind;
+  tries?: number;
   initial: { attributes: Attribute[]; entries: Entry[] };
   // The tab is open: refresh the lists, since attributes may have changed
   active: boolean;
@@ -62,6 +78,8 @@ export function EntriesPanel({
   const [formAttributes, setFormAttributes] = useState(initial.attributes);
   const built = useRef(initial.attributes);
   const { crop, dialog } = useCrop(setError);
+  const blur = kind === "blur";
+  const sequence = kind === "sequence";
 
   useEffect(() => {
     if (!active) {
@@ -121,15 +139,17 @@ export function EntriesPanel({
       setError(FAILURES.missing_order.text);
       return;
     }
-    const body = blur
-      ? {
-          name: draft.name,
-          photo: draft.photo,
-          ...(draft.blurOrder.length === CELLS && {
-            blurOrder: draft.blurOrder,
-          }),
-        }
-      : { name: draft.name, photo: draft.photo, values };
+    const body = sequence
+      ? { name: draft.name, shots: draft.shots }
+      : blur
+        ? {
+            name: draft.name,
+            photo: draft.photo,
+            ...(draft.blurOrder.length === CELLS && {
+              blurOrder: draft.blurOrder,
+            }),
+          }
+        : { name: draft.name, photo: draft.photo, values };
     const ok = draft.editing
       ? await run("PATCH", `${base}/entries/${draft.editing.id}`, body)
       : await run("POST", `${base}/entries`, body);
@@ -138,48 +158,59 @@ export function EntriesPanel({
     }
   };
 
-  const upload = async (input: HTMLInputElement): Promise<void> => {
-    const file = input.files?.[0];
-    input.value = "";
-    if (!file) {
-      return;
-    }
+  // Crops and uploads the file; its URL, or null after a cancel or a failure
+  const uploadFile = async (
+    file: File,
+    shape: ImageKind,
+  ): Promise<string | null> => {
     setError("");
-    const cropped = await crop(file, "photo");
+    const cropped = await crop(file, shape);
     if (!cropped) {
-      return;
+      return null;
     }
     const up = await api<{ url?: string }>(
       "POST",
-      "/api/uploads?kind=photo",
+      `/api/uploads?kind=${shape}`,
       cropped,
     );
     const url = up?.status === 200 ? up.data.url : undefined;
-    if (url) {
-      setDraft((d) => ({ ...d, photo: url }));
-    } else {
+    if (!url) {
       setError(errorText(up));
     }
+    return url ?? null;
   };
 
-  const incomplete = (entry: Entry): boolean =>
-    blur
-      ? !entry.photo || !entry.blurOrder
-      : formAttributes.some((attr) => !entry.values[String(attr.id)]?.length);
+  const upload = async (input: HTMLInputElement): Promise<void> => {
+    const file = input.files?.[0];
+    input.value = "";
+    const url = file && (await uploadFile(file, "photo"));
+    if (url) {
+      setDraft((d) => ({ ...d, photo: url }));
+    }
+  };
 
   return (
     <div className="space-y-5">
       {dialog}
-      <p className="lede text-sm text-muted-foreground">
-        {blur
-          ? "Each entry is one possible answer."
-          : "Each entry is a row on the board."}{" "}
-        A game needs at least {MIN_ENTRIES} entries before anyone can play it,
-        and every entry needs{" "}
-        {blur
-          ? "an image and the order its nine squares clear in."
-          : "a value for every attribute."}
-      </p>
+      {sequence ? (
+        <p className="lede text-sm text-muted-foreground">
+          Each entry is one possible answer, shown to players as {tries} photos,
+          one at a time. An entry missing photos can still be guessed but is
+          never a day's answer. A game needs at least {MIN_ENTRIES} entries
+          before anyone can play it.
+        </p>
+      ) : (
+        <p className="lede text-sm text-muted-foreground">
+          {blur
+            ? "Each entry is one possible answer."
+            : "Each entry is a row on the board."}{" "}
+          A game needs at least {MIN_ENTRIES} entries before anyone can play it,
+          and every entry needs{" "}
+          {blur
+            ? "an image and the order its nine squares clear in."
+            : "a value for every attribute."}
+        </p>
+      )}
       <ul
         id="entry-list"
         className="attr-list divide-y rounded-lg border empty:hidden"
@@ -189,10 +220,13 @@ export function EntriesPanel({
             key={entry.id}
             className="attr-row flex items-center gap-3 px-3 py-2"
           >
-            {entry.photo ? (
+            {thumbOf(entry) ? (
               <img
-                className="entry-thumb size-10 shrink-0 rounded-md object-cover"
-                src={entry.photo}
+                className={cn(
+                  "entry-thumb h-10 shrink-0 rounded-md object-cover",
+                  sequence ? "aspect-video" : "w-10",
+                )}
+                src={thumbOf(entry)}
                 alt=""
               />
             ) : (
@@ -204,9 +238,18 @@ export function EntriesPanel({
             <span className="entry-name min-w-0 flex-1 truncate font-medium">
               {entry.name}
             </span>
-            {incomplete(entry) && (
-              <span className="entry-missing shrink-0 text-sm font-medium text-error">
-                {blur ? "Missing image or order" : "Missing values"}
+            {isIncomplete(entry, kind, tries, formAttributes) && (
+              <span
+                className={cn(
+                  "entry-missing shrink-0 text-sm font-medium",
+                  sequence ? "text-muted-foreground" : "text-error",
+                )}
+              >
+                {sequence
+                  ? "Missing photos: guess only"
+                  : blur
+                    ? "Missing image or order"
+                    : "Missing values"}
               </span>
             )}
             <Button
@@ -257,7 +300,15 @@ export function EntriesPanel({
             }
           />
         </div>
-        <div className="space-y-2">
+        {sequence && (
+          <ShotsEditor
+            shots={draft.shots}
+            count={tries}
+            onUpload={(file) => uploadFile(file, "shot")}
+            onChange={(shots) => setDraft((d) => ({ ...d, shots }))}
+          />
+        )}
+        <div className="space-y-2" hidden={sequence}>
           <p className="text-sm font-medium">{blur ? "Image" : "Photo"}</p>
           {blur && !draft.photo && (
             <p className="text-sm text-muted-foreground">
