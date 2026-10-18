@@ -212,6 +212,23 @@ describe("party mode", () => {
       assert.equal((await send("/api/parties/bad!", undefined)).status, 404);
     });
 
+    it("keeps the guess mode the host picked: typing unless selection", async () => {
+      const cookie = await login("host@x.test");
+      const open = async (body: Body): Promise<Body> =>
+        send(
+          `/api/games/${GAME}/parties`,
+          { nickname: "Ana", ...body },
+          cookie,
+        );
+      const view = async (code: string): Promise<Body> =>
+        (await send(`/api/parties/${code}`, undefined)).body;
+      const typed = await open({});
+      assert.equal((await view(typed.body.code)).game.guessMode, "type");
+      const picked = await open({ guessMode: "select" });
+      assert.equal((await view(picked.body.code)).game.guessMode, "select");
+      assert.equal((await open({ guessMode: "list" })).status, 400);
+    });
+
     it("caps open parties per host", async () => {
       for (let i = 0; i < 5; i++) {
         await host();

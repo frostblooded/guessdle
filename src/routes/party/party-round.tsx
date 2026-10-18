@@ -40,7 +40,7 @@ export function PartyRound({
   onNotice: (text: string | null) => void;
 }) {
   const [guess, setGuess] = useState("");
-  const modes = useGuessMode();
+  const modes = useGuessMode(view.game.guessMode);
   const done = mine.solved || mine.gaveUp || mine.lost;
   // Selection mode's list, in place of the board
   const listing = modes.selecting && !done;
