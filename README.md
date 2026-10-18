@@ -6,7 +6,7 @@ A site of Wordle-style daily guessing games. Pick a game and guess its entry of 
 
 ## How it works
 
-- Multi-page static front-end: `index.html` (the gallery, `/`), `game.html` (`/g/<slug>`), `edit.html` (`/g/<slug>/edit`), `create.html`, `my-games.html`, `how-to-play.html`, `login.html`, `verify.html` (the emailed link lands here) and `admin.html`, each with a small entry in `src/` (`script.ts`, `src/pages/*.ts`), bundled by esbuild into `dist/` with one shared `src/styles.css`. Header and footer come from `src/shell.ts` (ADR 0012).
+- React single-page app (`index.html` loads `src/main.tsx`; routes in `src/App.tsx`): `/` the gallery, `/g/<slug>` Play, `/g/<slug>/edit` the editor, `/create`, `/my-games`, `/how-to-play`, `/login`, `/verify` (the emailed link lands here), `/admin`, and `/party` plus `/party/<CODE>` (party mode). Built by Vite into `dist/`, styled with Tailwind and shadcn/ui components (ADR 0018).
 - Express API (`src/server/`) on Postgres. The daily answer is drawn at random on first request and stored per day, graded server-side and never sent to the browser until a win or give-up (ADRs 0008-0010).
 - Anonymous progress is kept in `localStorage`; signing in with an emailed link stores it on the server. Both reset each day.
 - `scripts/server.mjs` serves the static files and mounts the API for local development (needs Postgres, see `docs/deploy.md`).
@@ -20,13 +20,14 @@ A site of Wordle-style daily guessing games. Pick a game and guess its entry of 
 ```sh
 npm install
 npm run build    # bundle to dist/ (or: npm run watch)
+npm run dev      # Vite dev server with hot reload on :5173 (proxies /api to npm start)
 npm run build:prod # minified, no sourcemaps (deploy)
 npm start
 ```
 
-Open <http://127.0.0.1:8080> (set `PORT` to change it). Pages: `/` Play, `/how-to-play`, `/login` (sign in and sign up are one passwordless form), `/admin` (admins only). With `docker compose up -d --build` the sign-in mail lands in Mailpit at <http://localhost:8025>. Run `npm start` from the repo root: it serves `./`.
+Open <http://127.0.0.1:8080> (set `PORT` to change it). Pages: `/` the gallery, `/g/petdle` Play, `/how-to-play`, `/login` (sign in and sign up are one passwordless form), `/admin` (admins only). With `docker compose up -d --build` the sign-in mail lands in Mailpit at <http://localhost:8025>. Run `npm start` from the repo root: it serves `./`.
 
-After editing a `.ts` file, rebuild before refreshing (`npm run typecheck` runs `tsc`). HTML and CSS edits need only a refresh.
+After editing a `.ts`/`.tsx` or CSS file, rebuild before refreshing (`npm run watch`), or use `npm run dev` for hot reload. `npm run typecheck` runs `tsc`.
 
 ## Docker
 

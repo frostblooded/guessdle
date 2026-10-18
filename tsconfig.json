@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "lib": ["ES2020", "DOM"],
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "esnext",
     "moduleResolution": "bundler",
     "noEmit": true,
@@ -17,14 +17,15 @@
     "noPropertyAccessFromIndexSignature": true,
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
-    "types": []
+    "types": ["vite/client"],
+    "jsx": "react-jsx",
+    "skipLibCheck": true
   },
-  "files": [
-    "src/autocomplete.d.ts",
-    "src/script.ts",
-    "src/pages/login.ts",
-    "src/pages/verify.ts",
-    "src/pages/admin.ts",
-    "src/pages/how-to-play.ts"
-  ]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    ".storybook/*.ts",
+    ".storybook/*.tsx"
+  ],
+  "exclude": ["src/server"]
 }

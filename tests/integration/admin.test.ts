@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { after, afterEach, before, beforeEach, describe, it } from "node:test";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  it,
+} from "vitest";
 import {
   dateOfDay as dateOf,
   dayNumber as dayNo,
@@ -114,7 +121,7 @@ describe("admin Answers: peek and overrides", () => {
   const someOtherPet = (...not: number[]): number =>
     ALL_IDS.find((id) => !not.includes(id))!;
 
-  before(async () => {
+  beforeAll(async () => {
     db = await startDb();
     await migrate(db.pool, MIGRATIONS_DIR);
     server = await new Promise<Server>((resolve) => {
@@ -131,7 +138,7 @@ describe("admin Answers: peek and overrides", () => {
     url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
     admin = await login("admin@x.test", true);
   });
-  after(async () => {
+  afterAll(async () => {
     server.close();
     await db.stop();
   });

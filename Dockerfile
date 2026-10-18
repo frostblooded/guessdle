@@ -4,7 +4,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# Dev: esbuild watch + static server; compose syncs source in (see compose.yaml)
+# Dev: Vite build watch + static server; compose syncs source in (see compose.yaml)
 FROM deps AS dev
 COPY . .
 EXPOSE 8080
@@ -12,7 +12,7 @@ CMD ["sh", "-c", "npm run build -- --watch & exec node scripts/server.mjs"]
 
 FROM deps AS build
 COPY . .
-# build:prod writes the hashed-name HTML pages into dist/; they replace the dev ones here
+# build:prod (Vite) writes the built app shell into dist/; it replaces the source index.html here
 RUN npm run build:prod && mv dist/*.html .
 
 # API: Express + migrations, run straight from TypeScript (Node type stripping)
@@ -23,8 +23,8 @@ RUN npm ci --omit=dev
 COPY src/server ./src/server
 COPY src/game ./src/game
 COPY db ./db
-# The game shell the API injects link-preview meta into (hashed asset names from build:prod)
-COPY --from=build /app/game.html ./
+# The app shell the API injects link-preview meta into at /g/<slug> (hashed asset names from build:prod)
+COPY --from=build /app/index.html ./
 # A named volume copies this owner, so the node user can write uploads
 RUN mkdir uploads && chown node uploads
 USER node
@@ -43,5 +43,4 @@ FROM nginxinc/nginx-unprivileged:alpine AS prod
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/*.html /app/favicon.ico /usr/share/nginx/html/
 COPY --from=build /app/dist /usr/share/nginx/html/dist
-COPY --from=build /app/howto /usr/share/nginx/html/howto
 EXPOSE 8080

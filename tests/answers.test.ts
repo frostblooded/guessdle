@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { dayNumber, drawAnswer, todayIn } from "../src/server/answers.ts";
 
 const START = "2025-08-15";

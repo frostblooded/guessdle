@@ -1,22 +1,17 @@
-// Dev static file server for the repo root. Serves only what the pages load.
+// Dev static file server. Serves the built app shell from dist/ (npm run build first) and only what it loads.
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, relative, resolve, sep } from "node:path";
 
 const ROOT = resolve(import.meta.dirname, "..");
+const DIST = join(ROOT, "dist");
 const PORT = process.env.PORT ?? 8080;
 
-// Clean URLs (/login) map to <name>.html; deploy/nginx.conf does the same with try_files
-const PAGES = new Set([
-  "login",
-  "verify",
-  "admin",
-  "how-to-play",
-  "create",
-  "my-games",
-]);
-const ALLOWED =
-  /^\/(index\.html|game\.html|login\.html|verify\.html|admin\.html|how-to-play\.html|create\.html|my-games\.html|edit\.html|party\.html|favicon\.ico|(dist|howto|uploads)\/.+)$/;
+// The app's routes (src/App.tsx) get the shell with 200; deploy/nginx.conf lists the same ones
+const ROUTES =
+  /^\/(|login|verify|admin|how-to-play|create|my-games|party|party\/[A-Za-z]+|g\/[^/]+|g\/[^/]+\/edit)$/;
+// Paths under the repo root the app loads
+const ALLOWED = /^\/(favicon\.ico|(dist|uploads)\/.+)$/;
 
 const TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -29,23 +24,11 @@ const TYPES = {
   ".ico": "image/x-icon",
 };
 
-function pageFor(urlPath) {
-  if (urlPath === "/") return "index.html";
-  // /g/<slug> is the game shell (with DATABASE_URL the API serves it first, with meta injected)
-  if (/^\/g\/[^/]+$/.test(urlPath)) return "game.html";
-  // /g/<slug>/edit is the editor shell
-  if (/^\/g\/[^/]+\/edit$/.test(urlPath)) return "edit.html";
-  // /party and /party/<CODE> are the party page (it reads the code from the path)
-  if (/^\/party(\/[A-Za-z]+)?$/.test(urlPath)) return "party.html";
-  const name = urlPath.slice(1);
-  return PAGES.has(name) ? `${name}.html` : null;
-}
-
 // Absolute path of the file a URL may read, or null if the page may not load it
 function allowedFile(urlPath) {
   try {
-    const route = pageFor(urlPath) ?? decodeURIComponent(urlPath);
-    const file = resolve(join(ROOT, route));
+    if (ROUTES.test(urlPath)) return join(DIST, "index.html");
+    const file = resolve(join(ROOT, decodeURIComponent(urlPath)));
     // Test the resolved path, so an encoded "..%2f" cannot escape the allowlist
     const path = "/" + relative(ROOT, file).split(sep).join("/");
     return ALLOWED.test(path) ? file : null;
@@ -57,10 +40,11 @@ function allowedFile(urlPath) {
 async function serveStatic(req, res) {
   const file = allowedFile(new URL(req.url, "http://localhost").pathname);
   const body = file === null ? null : await readFile(file).catch(() => null);
+  // Anything else is a real 404; the shell still loads and shows the app's not-found page
   if (body === null)
     return res
       .writeHead(404, { "Content-Type": TYPES[".html"] })
-      .end(await readFile(join(ROOT, "404.html")));
+      .end(await readFile(join(DIST, "index.html")));
 
   res.writeHead(200, {
     "Content-Type": TYPES[extname(file)] ?? "application/octet-stream",
@@ -85,6 +69,7 @@ if (process.env.DATABASE_URL) {
     limit: rateLimitFromEnv(process.env),
     backupDir: process.env.BACKUP_DIR || undefined,
     uploadsDir: process.env.UPLOADS_DIR || join(ROOT, "uploads"),
+    shellDir: DIST,
     adminEmails: adminEmailsFromEnv(process.env.ADMIN_EMAILS),
     // Only the e2e suite sets NODE_ENV=test; the stub login never exists elsewhere
     testLogin: process.env.NODE_ENV === "test",

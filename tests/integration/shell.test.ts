@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { after, afterEach, before, describe, it } from "node:test";
+import { afterAll, afterEach, beforeAll, describe, it } from "vitest";
 import { createApp } from "../../src/server/app.ts";
 import { MIGRATIONS_DIR } from "../../src/server/main.ts";
 import { migrate } from "../../src/server/migrate.ts";
@@ -63,7 +63,7 @@ describe("game shell with link-preview meta", () => {
     }
   };
 
-  before(async () => {
+  beforeAll(async () => {
     db = await startDb();
     await migrate(db.pool, MIGRATIONS_DIR);
     server = await new Promise<Server>((resolve) => {
@@ -75,7 +75,7 @@ describe("game shell with link-preview meta", () => {
     });
     url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   });
-  after(async () => {
+  afterAll(async () => {
     server.close();
     await db.stop();
   });
@@ -107,7 +107,9 @@ describe("game shell with link-preview meta", () => {
       /<meta property="og:image" content="http:\/\/127\.0\.0\.1:\d+\/uploads\/c\.webp" \/>/,
     );
     assert.doesNotMatch(html, /noindex/);
-    assert.match(html, /id="board"/);
+    assert.match(html, /id="root"/);
+    // The site-wide description gives way to the game's
+    assert.equal(html.match(/name="description"/g)?.length, 1);
   });
 
   it("omits og:image when the game has no cover", async () => {

@@ -17,6 +17,11 @@
     "verbatimModuleSyntax": true,
     "types": ["node"]
   },
-  "include": ["tests/**/*.ts", "src/server/**/*.ts"],
+  "include": [
+    "tests/**/*.ts",
+    "src/server/**/*.ts",
+    "vite.config.ts",
+    "vitest.config.ts"
+  ],
   "exclude": ["tests/e2e"]
 }

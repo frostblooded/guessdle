@@ -1,6 +1,6 @@
 // Browser side of cropping an upload (issue #82), with no page or framework in it: load a file,
 // mount Cropper.js in a host element, and turn the crop into a file for /api/uploads.
-// The edit page wraps it in a <dialog> (crop-dialog.ts); any other UI can mount it the same way.
+// The editor wraps it in a dialog (src/components/crop-dialog.tsx); the caller revokes the image URL when done.
 import "cropperjs";
 import type { CropperImage, CropperSelection } from "cropperjs";
 import {
@@ -125,7 +125,6 @@ export function mountCropper(
     },
     destroy(): void {
       host.replaceChildren();
-      URL.revokeObjectURL(image.src);
     },
   };
 }

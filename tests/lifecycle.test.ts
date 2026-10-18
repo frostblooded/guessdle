@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import type pg from "pg";
 import type { GameRow, GameStatus } from "../src/server/games.ts";
 import {

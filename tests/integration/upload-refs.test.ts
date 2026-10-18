@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { after, before, beforeEach, describe, it } from "node:test";
+import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import { findGame } from "../../src/server/games.ts";
 import { MIGRATIONS_DIR } from "../../src/server/main.ts";
 import { migrate } from "../../src/server/migrate.ts";
@@ -17,13 +17,13 @@ describe("upload references", () => {
   let refs: ReturnType<typeof uploadRefs>;
   let n = 0;
 
-  before(async () => {
+  beforeAll(async () => {
     db = await startDb();
     await migrate(db.pool, MIGRATIONS_DIR);
     dir = await mkdtemp(join(tmpdir(), "refs-"));
     refs = uploadRefs(db.pool, dir);
   });
-  after(async () => {
+  afterAll(async () => {
     await db.stop();
     await rm(dir, { recursive: true, force: true });
   });

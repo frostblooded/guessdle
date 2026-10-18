@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { after, afterEach, before, describe, it } from "node:test";
+import { afterAll, afterEach, beforeAll, describe, it } from "vitest";
 import { createApp } from "../../src/server/app.ts";
 import { MIGRATIONS_DIR } from "../../src/server/main.ts";
 import { migrate } from "../../src/server/migrate.ts";
@@ -43,7 +43,7 @@ describe("a game with too few entries, opened by its owner", () => {
     }
   };
 
-  before(async () => {
+  beforeAll(async () => {
     db = await startDb();
     await migrate(db.pool, MIGRATIONS_DIR);
     server = await new Promise<Server>((resolve) => {
@@ -61,7 +61,7 @@ describe("a game with too few entries, opened by its owner", () => {
     });
     cookie = res.headers.get("set-cookie")!.split(";")[0]!;
   });
-  after(async () => {
+  afterAll(async () => {
     server.close();
     await db.stop();
   });
