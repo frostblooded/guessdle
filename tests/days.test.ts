@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { dateOfDay } from "../src/game/date.ts";
-import { dayLabel, dayPath, localStatus, statusOf } from "../src/game/days.ts";
+import { dayLabel, dayPath, statusOf } from "../src/game/days.ts";
 
 describe("statusOf", () => {
   const none = { won: false, gaveUp: false, guesses: 0 };
@@ -13,17 +13,18 @@ describe("statusOf", () => {
   });
 });
 
-describe("localStatus", () => {
-  it("reads the browser's Game State", () => {
-    const state = (won: boolean, gaveUp: boolean, ids: number[]) => ({
-      getWon: () => won,
-      getGaveUp: () => gaveUp,
-      getUsedGuesses: () => ids,
-    });
-    assert.equal(localStatus(state(true, false, [1])), "won");
-    assert.equal(localStatus(state(false, true, [])), "gave-up");
-    assert.equal(localStatus(state(false, false, [1, 2])), "playing");
-    assert.equal(localStatus(state(false, false, [])), "unplayed");
+describe("statusOf in a Blur game", () => {
+  const none = { won: false, gaveUp: false, guesses: 0 };
+  it("every try used without the answer is lost; a win or give-up still wins over it", () => {
+    assert.equal(statusOf({ ...none, guesses: 3 }, 3), "lost");
+    assert.equal(statusOf({ ...none, guesses: 2 }, 3), "playing");
+    assert.equal(statusOf({ ...none, won: true, guesses: 3 }, 3), "won");
+    assert.equal(statusOf({ ...none, gaveUp: true, guesses: 3 }, 3), "gave-up");
+  });
+
+  it("a classic game never runs out of tries", () => {
+    assert.equal(statusOf({ ...none, guesses: 40 }, null), "playing");
+    assert.equal(statusOf({ ...none, guesses: 40 }), "playing");
   });
 });
 

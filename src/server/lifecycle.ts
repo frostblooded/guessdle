@@ -2,8 +2,8 @@
 // moves (submit, unpublish, approve, reject), the admin email on entering pending and the
 // owner's approval emails (owner-mail.ts).
 import type pg from "pg";
-import { minEntriesOf } from "../game/blur.ts";
-import { HAS_MISSING_VALUES, type GameRow, type GameStatus } from "./games.ts";
+import { playBlocker } from "./access.ts";
+import { loadRoster, type GameRow, type GameStatus } from "./games.ts";
 import type { OwnerMailKind } from "../mail-settings.ts";
 import type { MailConfig } from "./mailer.ts";
 import { mailOwner, type OwnerNotice } from "./owner-mail.ts";
@@ -186,19 +186,16 @@ export function gameLifecycle(pool: pg.Pool, mail?: MailConfig) {
             return { result: "invalid_state", mails: NO_MAILS };
           }
           if (move === "submit") {
-            const { rows } = await tx.query<{ n: number }>(
-              "select count(*)::int as n from entries where game_id = $1 and deleted_at is null",
-              [game.id],
-            );
-            if (rows[0]!.n < minEntriesOf(game.kind)) {
-              return { result: "too_few_entries", mails: NO_MAILS };
-            }
-            const missing = await tx.query(
-              `select 1 from games g where g.id = $1 and ${HAS_MISSING_VALUES}`,
-              [game.id],
-            );
-            if (missing.rowCount) {
-              return { result: "incomplete_entries", mails: NO_MAILS };
+            // The roster as of the lock, so a concurrent edit cannot slip past
+            const blocker = playBlocker(game, await loadRoster(tx, game));
+            if (blocker) {
+              return {
+                result:
+                  blocker === "not_enough_entries"
+                    ? "too_few_entries"
+                    : "incomplete_entries",
+                mails: NO_MAILS,
+              };
             }
           }
           // Submit keeps the last rejection reason; the others set it (cleared unless rejecting)

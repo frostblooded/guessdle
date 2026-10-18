@@ -8,6 +8,8 @@ Matt Pocock's agent skills, copied unedited from [mattpocock/skills](https://git
 - `CLAUDE.md` wins where a skill disagrees with it.
 - Prettier skips this folder (`.prettierignore`) so the files stay byte-for-byte upstream.
 
+Also here: the `caveman*`, `ultracave`, `megacave` and `ponytail*` skills. They come from other authors and run with always-on hooks; their source, version and update steps are in `.claude/caveman/SOURCE.md` and `.claude/ponytail/SOURCE.md`.
+
 ## Updating
 
 Clone the upstream repo at the new tag, replace each skill folder here with the one listed in its `.claude-plugin/plugin.json`, read the diff (and `CHANGELOG.md`) before committing, and bump the version above. Don't run upstream install scripts.

@@ -6,6 +6,7 @@ import {
   type Entry,
   type GradedAttribute,
 } from "../game/game.ts";
+import { outOfTries } from "../game/blur.ts";
 import type { GameRow, Roster } from "./games.ts";
 
 export interface GameView {
@@ -45,10 +46,7 @@ export const isLost = (
   game: GameRow,
   ids: readonly number[],
   victory: boolean,
-): boolean => {
-  const tries = triesOf(game);
-  return tries !== null && !victory && ids.length >= tries;
-};
+): boolean => outOfTries(triesOf(game), ids.length, victory);
 
 // Each refusal and the HTTP status it answers with
 export const REFUSAL_STATUS = {
