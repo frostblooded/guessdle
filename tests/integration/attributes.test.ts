@@ -297,6 +297,26 @@ describe("game attributes", () => {
       assert.equal(await statusOf(), "pending");
     });
 
+    it("a pure reorder keeps the status; a reorder with any other change does not", async () => {
+      await add("A");
+      await add("B");
+      const [a, b, c] = (await add("C", "number")).body;
+      for (const status of ["approved", "rejected"]) {
+        await db.pool.query("update games set status = $1", [status]);
+        const res = await save([c, a, b]);
+        assert.equal(res.status, 200);
+        assert.deepEqual(
+          res.body.map((x: Body) => x.name),
+          ["C", "A", "B"],
+        );
+        assert.equal(await statusOf(), status);
+        await save([a, b, c]);
+      }
+      await db.pool.query("update games set status = 'approved'");
+      await save([b, { ...a, name: "A2" }, c]);
+      assert.equal(await statusOf(), "pending");
+    });
+
     it("is owner/admin only", async () => {
       const bob = await login("bob@example.test");
       await db.pool.query("update games set status = 'approved'");
