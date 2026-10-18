@@ -3,6 +3,17 @@
     "allow": ["Bash(npx tsc)"]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/cloud-setup.mjs",
+            "timeout": 600
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",
