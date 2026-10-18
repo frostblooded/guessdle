@@ -99,6 +99,14 @@ function UserMenu({ user }: { user: AccountUser }) {
           My games
         </Link>
         <Link
+          id="settings-link"
+          className={menuItem}
+          to="/settings"
+          onClick={() => setOpen(false)}
+        >
+          Settings
+        </Link>
+        <Link
           id="admin-link"
           className={menuItem}
           to="/admin"

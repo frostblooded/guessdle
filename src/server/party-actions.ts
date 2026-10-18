@@ -1,6 +1,6 @@
 // What a player's socket message does to a party (ADR 0016), under the party lock.
 import type pg from "pg";
-import { minEntriesOf } from "../game/blur.ts";
+import { playBlocker } from "./access.ts";
 import { SKIP } from "../game/game.ts";
 import {
   drawAnswer,
@@ -100,13 +100,11 @@ export async function act(
           if (live) {
             return "round_live";
           }
+          const blocker = playBlocker(data.game, data.roster);
+          if (blocker) {
+            return blocker;
+          }
           const active = data.roster.entries.map((e) => e.id);
-          if (active.length < minEntriesOf(data.game.kind)) {
-            return "not_enough_entries";
-          }
-          if (data.roster.incomplete > 0) {
-            return "game_paused";
-          }
           await tx.query(
             `insert into party_rounds (party_id, number, answer_entry_id, started_at)
              values ($1, $2, $3, $4)`,

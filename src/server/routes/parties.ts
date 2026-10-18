@@ -2,7 +2,7 @@
 // goes over the party socket (party-hub.ts).
 import express from "express";
 import type { Express, Request, Response } from "express";
-import { minEntriesOf } from "../../game/blur.ts";
+import { playBlocker } from "../access.ts";
 import { cleanNickname, normalizeCode } from "../../game/party.ts";
 import { requestUser } from "../auth.ts";
 import { createParty, findParty, joinParty, viewsOf } from "../parties.ts";
@@ -40,12 +40,9 @@ export function partyRoutes(
     if (!loaded) {
       return;
     }
-    if (loaded.roster.entries.length < minEntriesOf(loaded.game.kind)) {
-      fail(res, "not_enough_entries");
-      return;
-    }
-    if (loaded.roster.incomplete > 0) {
-      fail(res, "game_paused");
+    const blocker = playBlocker(loaded.game, loaded.roster);
+    if (blocker) {
+      fail(res, blocker);
       return;
     }
     const nickname = cleanNickname(bodyOf(req)["nickname"]);

@@ -17,6 +17,7 @@ import {
 } from "./routes/playlists/profile-page.tsx";
 import { DaysPage } from "./routes/play/days-page.tsx";
 import { PlayPage } from "./routes/play/play-page.tsx";
+import { SettingsPage } from "./routes/settings-page.tsx";
 import { VerifyPage } from "./routes/verify-page.tsx";
 
 // The same paths the dev server and nginx answer with 200 (ADR 0018); anything else is a 404 there and here
@@ -46,6 +47,7 @@ export function App({ legacyWiped }: { legacyWiped: boolean }) {
             path="/how-to-play"
             element={<HowToPlayPage />}
           />
+          <Route caseSensitive path="/settings" element={<SettingsPage />} />
           <Route caseSensitive path="/login" element={<LoginPage />} />
           <Route caseSensitive path="/verify" element={<VerifyPage />} />
           <Route caseSensitive path="/admin" element={<AdminPage />} />

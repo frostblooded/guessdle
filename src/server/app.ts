@@ -17,6 +17,7 @@ import { shellRoutes } from "./routes/shell.ts";
 import { uploadRoutes } from "./routes/uploads.ts";
 import { blurRoutes } from "./routes/blur.ts";
 import { playlistRoutes } from "./routes/playlists.ts";
+import { settingsRoutes } from "./routes/settings.ts";
 
 export interface AppDeps {
   pool: pg.Pool;
@@ -111,6 +112,7 @@ export function createApp({
   partyRoutes(app, ctx, hub);
   blurRoutes(app, ctx, uploadsDir);
   playlistRoutes(app, ctx, writeLimit);
+  settingsRoutes(app, ctx);
   shellRoutes(app, ctx, shellDir);
 
   app.use("/api", (_req, res) => {
