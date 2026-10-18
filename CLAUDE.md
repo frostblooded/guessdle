@@ -15,6 +15,7 @@ Scripts are in `package.json`. `npm run check` runs everything CI runs (lint, fo
 - Deploy uses `npm run build:prod` (`vite build`: minified, no sourcemaps, content-hashed assets in `dist/assets/`, the built shell in `dist/index.html`; ADR 0016). `npm run build` is the same unminified with sourcemaps; the dev server serves the pages from `dist/`. GitHub Pages serves only `deploy/redirect.html` (ADR 0005); the game deploys to the home server from `prod`.
 - `npm run test:e2e` needs Chromium once: `npx playwright install chromium`. `test:integration` and `test:e2e` need Docker.
 - Edits to `.ts`/`.tsx`, `index.html` or CSS need `npm run build` (or `npm run watch`) before the browser refresh, since `npm start` serves `dist/`; `npm run dev` reloads on its own.
+- `npm run storybook` opens Storybook on port 6006 (stories are `src/**/*.stories.tsx`; theme in the toolbar); `npm run build-storybook` builds it into `storybook-static/` (gitignored).
 - `Dockerfile` and the dev `compose.yaml` stay in the repo root (`docker compose up --build -d`); prod compose and nginx live in `deploy/`.
 
 ## Architecture
