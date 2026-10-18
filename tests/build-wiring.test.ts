@@ -8,19 +8,6 @@ import { describe, it } from "vitest";
 const read = (path: string): string =>
   readFileSync(join(import.meta.dirname, "..", path), "utf8");
 
-// Each page and the entry module it loads (Vite rewrites both into dist/ on build)
-const PAGES: Record<string, string> = {
-  "index.html": "src/pages/gallery.ts",
-  "game.html": "src/script.ts",
-  "login.html": "src/pages/login.ts",
-  "verify.html": "src/pages/verify.ts",
-  "admin.html": "src/pages/admin.ts",
-  "how-to-play.html": "src/pages/how-to-play.ts",
-  "create.html": "src/pages/create.ts",
-  "my-games.html": "src/pages/my-games.ts",
-  "edit.html": "src/pages/edit.ts",
-};
-
 // One prod build into a temp folder, shared by the tests that read its output
 let prodOut: string | undefined;
 function prodBuild(): string {
@@ -44,39 +31,19 @@ function prodBuild(): string {
 }
 
 describe("build output is wired through the pages and the deploy", () => {
-  for (const [page, entry] of Object.entries(PAGES)) {
-    it(`${page} loads the shared stylesheet and ${entry}`, () => {
-      const html: string = read(page);
-      for (const asset of ["src/styles.css", entry]) {
-        assert.ok(
-          html.includes(`"/${asset}"`),
-          `/${asset} not referenced in ${page}`,
-        );
-      }
-    });
-  }
-
-  it("vite builds every page", () => {
-    const config: string = read("vite.config.ts");
-    for (const page of [...Object.keys(PAGES), "404.html"]) {
-      assert.ok(config.includes(`"${page.replace(".html", "")}"`), page);
-    }
+  it("index.html is the one page: the app shell loading src/main.tsx", () => {
+    const html: string = read("index.html");
+    assert.ok(html.includes(`"/src/main.tsx"`));
+    assert.match(html, /<div id="root"><\/div>/);
+    // The API swaps these two for a game's own (src/server/routes/shell.ts)
+    assert.match(html, /<title>Guessdle<\/title>\s*<meta\s+name="description"/);
   });
 
-  it("the 404 page links the shared stylesheet and no script", () => {
-    const html: string = read("404.html");
-    assert.ok(html.includes('"/src/styles.css"'));
-    assert.ok(!html.includes("<script src"));
-    assert.ok(!html.includes('type="module"'));
-  });
-
-  it("the header and footer are rendered by the shell, not repeated per page", () => {
-    for (const page of Object.keys(PAGES)) {
-      const html: string = read(page);
-      assert.match(html, /<header id="site-header"[^>]*><\/header>/, page);
-      assert.match(html, /<footer id="site-footer"[^>]*><\/footer>/, page);
-      assert.match(html, /<main id="main"/, page);
-    }
+  it("no other HTML page is left in the repo root", () => {
+    const pages = readdirSync(join(import.meta.dirname, "..")).filter((f) =>
+      f.endsWith(".html"),
+    );
+    assert.deepEqual(pages, ["index.html"]);
   });
 
   it("Pages serves redirect.html as index and 404, all to one URL", () => {
@@ -97,30 +64,18 @@ describe("build output is wired through the pages and the deploy", () => {
     assert.ok(read(".gitignore").split(/\r?\n/).includes("/dist"));
   });
 
-  it("prod build hashes asset names and rewrites every page to match", () => {
+  it("prod build hashes asset names and rewrites the shell to match", () => {
     const out = prodBuild();
-    for (const page of Object.keys(PAGES)) {
-      const prodHtml: string = readFileSync(join(out, page), "utf8");
-      const refs: string[] = [
-        ...prodHtml.matchAll(
-          /"\/dist\/(assets\/[\w-]+-[\w-]{8}\.(?:js|css))"/g,
-        ),
-      ].map((m) => m[1]!);
-      assert.ok(
-        refs.some((r) => r.endsWith(".js")),
-        page,
-      );
-      assert.ok(
-        refs.some((r) => r.startsWith("assets/styles-")),
-        page,
-      );
-      for (const ref of refs) {
-        assert.ok(existsSync(join(out, ref)), ref);
-      }
-      assert.ok(!prodHtml.includes('"/src/'), page);
+    const prodHtml: string = readFileSync(join(out, "index.html"), "utf8");
+    const refs: string[] = [
+      ...prodHtml.matchAll(/"\/dist\/(assets\/[\w-]+-[\w-]{8}\.(?:js|css))"/g),
+    ].map((m) => m[1]!);
+    assert.ok(refs.some((r) => r.endsWith(".js")));
+    assert.ok(refs.some((r) => r.endsWith(".css")));
+    for (const ref of refs) {
+      assert.ok(existsSync(join(out, ref)), ref);
     }
-    const notFound: string = readFileSync(join(out, "404.html"), "utf8");
-    assert.match(notFound, /"\/dist\/assets\/styles-[\w-]{8}\.css"/);
+    assert.ok(!prodHtml.includes('"/src/'));
   });
 
   it("the prod bundle holds no answer or Answer Sequence code, only the grade call", () => {
@@ -135,12 +90,15 @@ describe("build output is wired through the pages and the deploy", () => {
     assert.ok(!js.includes("daily_answers"));
   });
 
-  it("nginx serves the clean page URLs from the HTML files", () => {
+  it("nginx serves the app shell at each app route and as the 404 page", () => {
     const conf: string = read("deploy/nginx.conf");
+    assert.match(conf, /location = \/ \{[^}]*try_files \/index\.html =404;/);
     assert.match(
       conf,
-      /location \/ \{[^}]*try_files \$uri \$uri\/index\.html \$uri\.html =404;/,
+      /location ~ \^\/\(login\|verify\|admin\|how-to-play\|create\|my-games\)\$ \{[^}]*try_files \/index\.html =404;/,
     );
+    assert.match(conf, /error_page 404 \/index\.html;/);
+    assert.match(conf, /location = \/index\.html \{\s*internal;/);
   });
 
   it("nginx proxies /g/<slug> to the API for meta injection", () => {
@@ -151,11 +109,11 @@ describe("build output is wired through the pages and the deploy", () => {
     );
   });
 
-  it("nginx serves /g/<slug>/edit from the editor shell", () => {
+  it("nginx serves /g/<slug>/edit from the app shell", () => {
     const conf: string = read("deploy/nginx.conf");
     assert.match(
       conf,
-      /location ~ \^\/g\/\[\^\/\]\+\/edit\$ \{[^}]*try_files \/edit\.html =404;/,
+      /location ~ \^\/g\/\[\^\/\]\+\/edit\$ \{[^}]*try_files \/index\.html =404;/,
     );
   });
 
