@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { describe, it } from "vitest";
 import * as limits from "../src/game/limits.ts";
 import { RESERVED_SLUGS, slugError, slugify } from "../src/game/slug.ts";
@@ -7,29 +7,42 @@ import { RESERVED_SLUGS, slugError, slugify } from "../src/game/slug.ts";
 const text = (path: string): string =>
   readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
-// The maxlength of the element with this id in a page
-const maxlengthOf = (page: string, id: string): number => {
-  const tag = new RegExp(`<(?:input|textarea)[^>]*id="${id}"[^>]*>`).exec(
-    text(page),
+// The limits constant a component passes as maxLength to the field with this id
+const maxlengthOf = (file: string, id: string): number => {
+  const tag = new RegExp(`<(?:Input|Textarea)[^>]*id="${id}"[^>]*>`).exec(
+    text(file),
   )?.[0];
-  assert.ok(tag, `${page} has #${id}`);
-  return Number(/maxlength="(\d+)"/.exec(tag)?.[1]);
+  assert.ok(tag, `${file} has #${id}`);
+  const name = /maxLength=\{(\w+)\}/.exec(tag)?.[1];
+  return limits[name as keyof typeof limits];
 };
 
-describe("limits shared with the HTML", () => {
+describe("limits shared with the pages", () => {
   it("matches the maxlength of every limited field", () => {
-    assert.equal(maxlengthOf("create.html", "game-name"), limits.MAX_NAME);
-    assert.equal(maxlengthOf("create.html", "game-slug"), limits.MAX_SLUG);
-    assert.equal(maxlengthOf("edit.html", "edit-name"), limits.MAX_NAME);
     assert.equal(
-      maxlengthOf("edit.html", "edit-description"),
+      maxlengthOf("src/routes/create-page.tsx", "game-name"),
+      limits.MAX_NAME,
+    );
+    assert.equal(
+      maxlengthOf("src/routes/create-page.tsx", "game-slug"),
+      limits.MAX_SLUG,
+    );
+    assert.equal(
+      maxlengthOf("src/routes/edit/edit-page.tsx", "edit-name"),
+      limits.MAX_NAME,
+    );
+    assert.equal(
+      maxlengthOf("src/routes/edit/edit-page.tsx", "edit-description"),
       limits.MAX_DESCRIPTION,
     );
     assert.equal(
-      maxlengthOf("edit.html", "attr-name"),
+      maxlengthOf("src/routes/edit/attributes-panel.tsx", "attr-name"),
       limits.MAX_ATTRIBUTE_NAME,
     );
-    assert.equal(maxlengthOf("edit.html", "entry-name"), limits.MAX_ENTRY_NAME);
+    assert.equal(
+      maxlengthOf("src/routes/edit/entries-panel.tsx", "entry-name"),
+      limits.MAX_ENTRY_NAME,
+    );
   });
   it("derives the slug rules from the limits", () => {
     assert.equal(
@@ -40,29 +53,26 @@ describe("limits shared with the HTML", () => {
     assert.equal(slugError("a".repeat(limits.MIN_SLUG)), null);
     assert.equal(slugError("a".repeat(limits.MAX_SLUG + 1)), "invalid");
   });
-  it("says the entry minimum in the editor copy", () => {
+  it("says the entry minimum in the editor copy from the shared limit", () => {
     assert.match(
-      text("edit.html"),
-      new RegExp(`at least ${limits.MIN_ENTRIES} entries`),
+      text("src/routes/edit/entries-panel.tsx"),
+      /at least \{MIN_ENTRIES\}(\{" "\})?\s+entries/,
     );
   });
 });
 
 describe("RESERVED_SLUGS", () => {
   const names = new Set<string>(["api", "g"]);
-  for (const file of readdirSync(new URL("../", import.meta.url))) {
-    if (file.endsWith(".html")) {
-      names.add(file.slice(0, -".html".length));
-    }
-  }
-  // Static folders and clean-URL pages the dev server and nginx expose at the top level
+  // Static folders and app routes the dev server and nginx expose at the top level
   const dev = text("scripts/server.mjs");
   for (const group of dev.matchAll(/\(([a-z|]+)\)\/\.\+/g)) {
     group[1]!.split("|").forEach((folder) => names.add(folder));
   }
-  for (const set of dev.matchAll(/new Set\(\[([^\]]*)\]\)/g)) {
-    for (const page of set[1]!.matchAll(/"([^"]+)"/g)) {
-      names.add(page[1]!);
+  const routes = /const ROUTES =\s*\/\^\\\/\(([^)]*)\)/.exec(dev)?.[1];
+  assert.ok(routes, "scripts/server.mjs lists ROUTES");
+  for (const route of routes.split("|")) {
+    if (/^[a-z-]+$/.test(route)) {
+      names.add(route);
     }
   }
   for (const loc of text("deploy/nginx.conf").matchAll(

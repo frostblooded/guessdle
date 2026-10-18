@@ -29,7 +29,7 @@ const background = (page: Page): Promise<string> =>
 
 const themeButton = (page: Page): Locator => page.locator("#theme-button");
 
-const LIGHT_BG = "rgb(246, 245, 251)";
+const LIGHT_BG = "rgb(250, 250, 250)";
 
 test.describe("dark OS preference, auto mode", () => {
   test.use({ colorScheme: "dark" });
@@ -132,7 +132,7 @@ test.describe("light OS preference", () => {
   });
 
   test("inline script sets data-theme without the bundle", async ({ page }) => {
-    await page.route("**/dist/script.js", (route) => route.abort());
+    await page.route("**/dist/assets/*.js", (route) => route.abort());
     await page.addInitScript(() => localStorage.setItem("theme", "dark"));
     await page.goto("/");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");

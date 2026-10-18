@@ -2,22 +2,23 @@ import { expect, test } from "@playwright/test";
 
 const SERVED = [
   ["/", "text/html"],
-  ["/index.html", "text/html"],
   ["/g/petdle", "text/html"],
-  ["/game.html", "text/html"],
+  ["/g/petdle/edit", "text/html"],
   ["/login", "text/html"],
   ["/verify", "text/html"],
   ["/admin", "text/html"],
   ["/how-to-play", "text/html"],
-  ["/party", "text/html"],
-  ["/party/ABCD", "text/html"],
-  ["/login.html", "text/html"],
+  ["/create", "text/html"],
+  ["/my-games", "text/html"],
   ["/favicon.ico", "image/x-icon"],
-  ["/howto/ati.jpg", "image/jpeg"],
 ] as const;
 
 const NOT_SERVED = [
+  "/index.html",
+  "/game.html",
+  "/login.html",
   "/missing.html",
+  "/howto/ati.jpg",
   "/styles.css",
   "/src/styles.css",
   "/404.html",
@@ -79,11 +80,12 @@ test("every asset a page links is served from dist/assets", async ({
 });
 
 for (const path of NOT_SERVED) {
-  test(`${path} is a 404 with the not-found page`, async ({ request }) => {
+  test(`${path} is a 404 with the app shell`, async ({ request }) => {
     const response = await request.get(path);
 
     expect(response.status()).toBe(404);
     expect(response.headers()["content-type"]).toContain("text/html");
-    expect(await response.text()).toContain("Back to GUESSDLE");
+    // The shell renders the not-found page in the browser (navigation.spec.ts)
+    expect(await response.text()).toContain('<div id="root">');
   });
 }
