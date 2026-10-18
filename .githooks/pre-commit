@@ -1,0 +1,3 @@
+#!/bin/sh
+# Wired by `npm ci` (the prepare script sets core.hooksPath)
+exec node .githooks/pre-commit.mjs
