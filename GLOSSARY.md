@@ -52,6 +52,9 @@ How well one attribute of a guess matches the Daily Answer: correct, partially c
 **Game State**:
 What is remembered about today: the Guesses made (as Entry ids), whether the player gave up, and the day last played. Anonymous players keep it in the browser (`localStorage`). Signed-in players keep it on the server, so it follows them across devices. Victory is never stored: it is derived from the Guesses and the current Daily Answer. It resets on a new calendar day, or when the player resets at any time once they have made a Guess (the Daily Answer stays the same). On first login, leftover browser guesses are merged into the account only if the account has no progress that day; otherwise the server state wins.
 
+**Day of play**:
+One Game on one day, today or a Past Day, together with that day's Daily Answer: what Guesses are graded against, what a finished day reveals, and whose stats a first win counts in.
+
 **Past Day**:
 An earlier day of a Game (Day Number 0 up to yesterday), played from the Past days list at `/g/<slug>/day/<n>` against that day's stored Daily Answer. Each Past Day keeps its own Game State, which never expires: signed in on the server, anonymous in the browser. A finished Past Day can be reset like today. The first win on a Past Day counts in that day's stats, as if played on the day (decided 2026-10-18); later wins after a reset change nothing. Browser guesses of a Past Day are never merged into the account.
 

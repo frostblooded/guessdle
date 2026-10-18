@@ -1,13 +1,8 @@
 // A signed-in player's Game State for one day, stored in Postgres.
 import type pg from "pg";
-import {
-  gradeIds,
-  SKIP,
-  type Entry,
-  type GradedAttribute,
-} from "../game/game.ts";
-import { outOfTries } from "../game/blur.ts";
+import { SKIP, type GradedAttribute } from "../game/game.ts";
 import type { GameRow, Roster } from "./games.ts";
+import { boardOf, isLost, triesOf, type PlayDay } from "./play-day.ts";
 
 export interface GameView {
   day: number;
@@ -30,26 +25,6 @@ const isGuessId = (game: GameRow, roster: Roster, id: unknown): boolean =>
   (id === SKIP && game.kind === "blur") ||
   roster.entries.some((e) => e.id === id);
 
-// A Blur game's tries, null for a classic game with unlimited guesses
-export const triesOf = (game: GameRow): number | null =>
-  game.kind === "blur" ? game.blurTries : null;
-
-// The answer as a finished day reveals it: its name, and a Blur game's whole image
-export const revealOf = (
-  game: GameRow,
-  answer: Entry,
-): { answer: string; answerPhoto?: string } => ({
-  answer: answer.name,
-  ...(game.kind === "blur" && { answerPhoto: answer.photo }),
-});
-
-// Whether `ids` used up a Blur game's tries without the answer
-export const isLost = (
-  game: GameRow,
-  ids: readonly number[],
-  victory: boolean,
-): boolean => outOfTries(triesOf(game), ids.length, victory);
-
 // Each refusal and the HTTP status it answers with
 export const REFUSAL_STATUS = {
   invalid: 400,
@@ -65,23 +40,14 @@ export type GameOutcome = { kind: "ok"; view: GameView } | { kind: Refusal };
 
 type Q = Pick<pg.Pool, "query">;
 
-// Who is playing which day, and against which answer
-export interface GameContext {
-  game: GameRow;
-  roster: Roster;
-  answer: Entry & { revision: number };
+// Who is playing which Day of play
+export interface GameContext extends PlayDay {
   userId: number;
-  date: string;
-  day: number;
-  // An archive day (not today), played from the Past days list
-  past: boolean;
 }
 
 // Graded on read against the current answer, so an overridden answer applies at once
-export async function view(
-  q: Q,
-  { game, roster, answer, userId, date, day }: GameContext,
-): Promise<GameView> {
+export async function view(q: Q, ctx: GameContext): Promise<GameView> {
+  const { game, userId, date, day } = ctx;
   const guesses = await q.query<{ entry_id: number }>(
     // A skip is stored with no entry (migration 011)
     `select coalesce(entry_id, ${SKIP})::int as entry_id from user_guesses
@@ -95,29 +61,21 @@ export async function view(
         [userId, game.id, date],
       )
     ).rowCount === 1;
-  // Soft-deleted entries still resolve, so past guesses keep their rows
   const ids = guesses.rows.map((row) => row.entry_id);
-  const graded = gradeIds(
-    roster.attributes,
-    roster.all,
-    answer,
-    ids,
-    game.kind,
-  );
-  if (graded.kind !== "graded") {
+  const board = boardOf(ctx, ids, gaveUp);
+  if (typeof board === "string") {
     // Stored rows are never duplicated
     throw new Error("stored guesses are not gradable");
   }
-  const lost = isLost(game, ids, graded.victory);
   return {
     day,
-    revision: answer.revision,
+    revision: ctx.revision,
     ids,
-    rows: graded.rows,
-    victory: graded.victory,
+    rows: board.rows,
+    victory: board.victory,
     gaveUp,
-    ...(lost && { lost: true as const }),
-    ...((graded.victory || gaveUp || lost) && revealOf(game, answer)),
+    ...(board.lost && { lost: true as const }),
+    ...board.reveal,
   };
 }
 
@@ -192,7 +150,7 @@ export async function giveUp(
 // in changeGame makes the "no rows yet" check and the inserts one atomic step.
 export async function mergeLocal(
   q: Q,
-  { game, roster, answer, userId, date, day }: GameContext,
+  { game, roster, answer, userId, date, day, revision }: GameContext,
   current: GameView,
   body: Record<string, unknown>,
 ): Promise<Refusal | null> {
@@ -206,7 +164,7 @@ export async function mergeLocal(
     return "invalid";
   }
   // Browsers from before revisions existed send none: they played revision 0
-  if (body["day"] !== day || (body["revision"] ?? 0) !== answer.revision) {
+  if (body["day"] !== day || (body["revision"] ?? 0) !== revision) {
     return "stale_day";
   }
   if (current.ids.length > 0 || current.gaveUp) {
