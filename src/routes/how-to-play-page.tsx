@@ -151,9 +151,9 @@ export function HowToPlayPage() {
         <p className="text-muted-foreground">
           Some games show a picture instead of a table. You start with a close
           zoom on part of the secret answer&apos;s image. Every wrong guess
-          shows the next, wider part, and you have one try per part: miss on
-          the last one and the day is over. Tap the small pictures to look at
-          the parts again.
+          shows the next, wider part, and you have one try per part: miss on the
+          last one and the day is over. Tap the small pictures to look at the
+          parts again.
         </p>
       </Card>
       <p className="cta mt-8 text-center">

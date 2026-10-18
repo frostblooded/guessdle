@@ -5,6 +5,7 @@ import {
   type GameState,
   type StateStorage,
   gameStorage,
+  pastDayStorage,
   forgetAllGames,
   wipeLegacyState,
 } from "../src/game/game-state.ts";
@@ -221,6 +222,30 @@ describe("gameStorage", () => {
     assert.deepEqual(a.getUsedGuesses(), [1]);
     assert.deepEqual(b.getUsedGuesses(), []);
     assert.equal(storage.getItem("game:a:usedGuesses"), "[1]");
+  });
+});
+
+describe("a past day's state", () => {
+  it("lives under its own keys and never expires", () => {
+    const past = (): GameState =>
+      createGameState(pastDayStorage(storage, "a", 3), () => today, false);
+    past().addUsedGuess(1);
+    past().setGaveUp();
+    assert.equal(storage.getItem("game:a:day:3:usedGuesses"), "[1]");
+    today = TUESDAY;
+    assert.deepEqual(past().getUsedGuesses(), [1]);
+    assert.equal(past().getGaveUp(), true);
+    assert.deepEqual(
+      createGameState(gameStorage(storage, "a"), () => today).getUsedGuesses(),
+      [],
+    );
+  });
+
+  it("remembers a win until reset", () => {
+    state.setWon();
+    assert.equal(state.getWon(), true);
+    state.reset();
+    assert.equal(state.getWon(), false);
   });
 });
 

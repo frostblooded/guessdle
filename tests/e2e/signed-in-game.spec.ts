@@ -5,6 +5,7 @@ import {
   findAnswerName,
   signOutViaMenu,
   submitGuess,
+  winGame,
 } from "./helpers.ts";
 
 // Each test is its own player, so stored games never collide
@@ -62,7 +63,7 @@ test("winning shows the answer, locks guessing, and reset restarts across a relo
   const answer = await findAnswerName(request);
   await stubLogin(page, newEmail());
   await page.goto("/g/petdle");
-  await submitGuess(page, answer);
+  await winGame(page, answer);
   await expect(page.locator("#victory-answer-name")).toHaveText(answer);
   await expect(page.locator("#reset-button")).toBeVisible();
   await expect(page.locator("#new-guess-row")).toBeHidden();

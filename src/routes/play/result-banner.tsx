@@ -1,5 +1,6 @@
 // The result card above the guesses after a win, a give-up or (Zoom games) running out of tries.
 import type { EntryRef } from "../../game/game.ts";
+import type { Reveal } from "../../game/play.ts";
 
 export type Result = {
   kind: "victory" | "give-up" | "lost";
@@ -7,6 +8,12 @@ export type Result = {
   // A Zoom game's answer image, which its roster does not carry
   photo?: string | undefined;
 } | null;
+
+// The result a finished day's response reveals
+export const resultOf = (
+  kind: NonNullable<Result>["kind"],
+  reveal: Reveal,
+): Result => ({ kind, answer: reveal.answer!, photo: reveal.answerPhoto });
 
 const TITLES = {
   victory: "You did it!",
@@ -24,8 +31,7 @@ export function ResultBanner({
 }) {
   const victory = result.kind === "victory";
   const photo =
-    result.photo ??
-    roster.find((entry) => entry.name === result.answer)?.photo;
+    result.photo ?? roster.find((entry) => entry.name === result.answer)?.photo;
   return (
     <div
       id={victory ? "victory-title" : "give-up-title"}

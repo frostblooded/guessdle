@@ -63,6 +63,8 @@ export interface GameContext {
   userId: number;
   date: string;
   day: number;
+  // An archive day (not today): playable, but its wins stay out of the daily stats
+  past: boolean;
 }
 
 // Graded on read against the current answer, so an overridden answer applies at once
@@ -83,7 +85,13 @@ export async function view(
     ).rowCount === 1;
   // Soft-deleted entries still resolve, so past guesses keep their rows
   const ids = guesses.rows.map((row) => row.entry_id);
-  const graded = gradeIds(roster.attributes, roster.all, answer, ids, game.kind);
+  const graded = gradeIds(
+    roster.attributes,
+    roster.all,
+    answer,
+    ids,
+    game.kind,
+  );
   if (graded.kind !== "graded") {
     // Stored rows are never duplicated
     throw new Error("stored guesses are not gradable");

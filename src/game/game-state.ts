@@ -3,7 +3,8 @@ import { dateToString } from "./date.ts";
 // Game State: what the browser remembers about today.
 
 const LOCAL_STORAGE_USED_GUESSES_STRING: string = "usedGuesses";
-const LOCAL_STORAGE_VICTORY_STRING: string = "victory"; // no longer stored: victory comes from the server
+// Only a hint for the Past days list: the board's victory always comes from the server
+const LOCAL_STORAGE_VICTORY_STRING: string = "victory";
 const LOCAL_STORAGE_DAY_STRING: string = "day";
 const LOCAL_STORAGE_GAVE_UP_STRING: string = "gaveUp";
 const LOCAL_LAST_PLAYED_STRING: string = "lastPlayed";
@@ -26,6 +27,9 @@ export interface GameState {
   // Whether the player gave up today (the answer was revealed)
   getGaveUp(): boolean;
   setGaveUp(): void;
+  // Whether a server reply said the guesses won
+  getWon(): boolean;
+  setWon(): void;
   // Forgets guesses, day and give-up (a newer day was seen, or the player reset)
   reset(): void;
 }
@@ -57,6 +61,15 @@ export function forgetAllGames(
       storage.removeItem(key);
     }
   }
+}
+
+// One past day's keys inside a game's, so archive play never touches today's
+export function pastDayStorage(
+  storage: StateStorage,
+  slug: string,
+  day: number,
+): StateStorage {
+  return gameStorage(storage, `${slug}:day:${day}`);
 }
 
 // One game's keys inside the shared browser storage, so games never share state
@@ -116,10 +129,12 @@ function readJson(storage: StateStorage, key: string): unknown {
 }
 
 // Clears guesses and victory unless last played is today (a missing or invalid
-// last played counts as another day), then marks today as played.
+// last played counts as another day), then marks today as played. A past day's
+// state (`expires` false) is kept for good.
 export function createGameState(
   rawStorage: StateStorage,
   now: () => Date,
+  expires: boolean = true,
 ): GameState {
   const storage: StateStorage = tolerantStorage(rawStorage);
   const getUsedGuesses = (): number[] => {
@@ -134,7 +149,7 @@ export function createGameState(
   };
 
   const today: string = dateToString(now());
-  if (readJson(storage, LOCAL_LAST_PLAYED_STRING) !== today) {
+  if (expires && readJson(storage, LOCAL_LAST_PLAYED_STRING) !== today) {
     storage.removeItem(LOCAL_STORAGE_VICTORY_STRING);
     storage.removeItem(LOCAL_STORAGE_USED_GUESSES_STRING);
     storage.removeItem(LOCAL_STORAGE_DAY_STRING);
@@ -178,7 +193,16 @@ export function createGameState(
       storage.setItem(LOCAL_STORAGE_GAVE_UP_STRING, "true");
     },
 
+    getWon(): boolean {
+      return readJson(storage, LOCAL_STORAGE_VICTORY_STRING) === true;
+    },
+
+    setWon(): void {
+      storage.setItem(LOCAL_STORAGE_VICTORY_STRING, "true");
+    },
+
     reset(): void {
+      storage.removeItem(LOCAL_STORAGE_VICTORY_STRING);
       storage.removeItem(LOCAL_STORAGE_GAVE_UP_STRING);
       storage.removeItem(LOCAL_STORAGE_USED_GUESSES_STRING);
       storage.removeItem(LOCAL_STORAGE_DAY_STRING);

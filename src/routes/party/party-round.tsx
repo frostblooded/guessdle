@@ -86,17 +86,15 @@ export function PartyRound({
         )}
       </div>
       {zoom !== null && (
-        <div className="mb-6">
-          <ZoomView
-            partUrl={(n) =>
-              `/api/parties/${encodeURIComponent(view.code)}/zoom/${round.number}/${n}`
-            }
-            tries={zoom}
-            wrong={mine.rows.filter((row) => !isAnswerRow(row)).length}
-            finished={done}
-            reveal={done ? mine.answer?.photo : undefined}
-          />
-        </div>
+        <ZoomView
+          partUrl={(n) =>
+            `/api/parties/${encodeURIComponent(view.code)}/zoom/${round.number}/${n}`
+          }
+          tries={zoom}
+          wrong={mine.rows.filter((row) => !isAnswerRow(row)).length}
+          finished={done}
+          reveal={done ? mine.answer?.photo : undefined}
+        />
       )}
       {!done && (
         <Card id="guess-card" className="play-card mb-6 gap-3 p-4 sm:p-5">

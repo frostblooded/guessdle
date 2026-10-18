@@ -1,20 +1,12 @@
-// /g/:slug: play today's game. Anonymous players keep guesses in the browser, signed-in ones on the server.
+// /g/:slug: play today's game; /g/:slug/day/:day: play or review a past day. Anonymous players keep
+// guesses in the browser, signed-in ones on the server.
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
-import { Link, useParams } from "react-router";
+import { Navigate, useParams } from "react-router";
 import { ZoomView } from "../../components/zoom-view.tsx";
-import { MessageCard, PageHead } from "../../components/page.tsx";
+import { PageHead } from "../../components/page.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogTitle,
-} from "../../components/ui/alert-dialog.tsx";
-import { Button, buttonVariants } from "../../components/ui/button.tsx";
+import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
 import { FAILURES } from "../../game/failures.ts";
 import {
@@ -25,21 +17,32 @@ import {
   type GameAttribute,
   type GradedAttribute,
 } from "../../game/game.ts";
-import { gameStorage } from "../../game/game-state.ts";
 import { MIN_ENTRIES } from "../../game/limits.ts";
-import { mergeLocalGame } from "../../game/merge.ts";
-import { createPlay, type Play, type Reveal } from "../../game/play.ts";
+import { openPlay } from "../../game/open-play.ts";
+import type { Play } from "../../game/play.ts";
 import type { GameKind } from "../../game/zoom.ts";
-import { createServerPlay } from "../../game/server-play.ts";
 import { browserFetch, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { GuessBox } from "./guess-box.tsx";
-import { PlayResults } from "./play-results.tsx";
+import {
+  GameNotFound,
+  NoSuchDay,
+  PastDayLede,
+  PastDaysLink,
+} from "./past-day.tsx";
+import { partUrl, PlayResults } from "./play-results.tsx";
 import { PlayActions, PlayStatus, type StatusView } from "./play-status.tsx";
-import { ResultBanner, type Result } from "./result-banner.tsx";
+import { ResetDialog } from "./reset-dialog.tsx";
+import { ResultBanner, resultOf, type Result } from "./result-banner.tsx";
+import { StatsDialog } from "./stats-dialog.tsx";
+import { useVictoryStats } from "./use-victory-stats.ts";
 
-type PlayableGame = {
+export type PlayableGame = {
   name: string;
+  // Today's Day Number; past days are 0 up to it
+  today: number;
+  // Day 0's date, "YYYY-MM-DD"
+  startDate: string;
   canEdit: boolean;
   // Some entries miss values, so the game cannot be played for now
   paused: boolean;
@@ -52,7 +55,7 @@ type PlayableGame = {
 } & StatusView;
 
 // The game's attributes and entries, "missing" for no such game, or null when it could not be loaded
-async function loadGame(
+export async function loadGame(
   slug: string,
 ): Promise<PlayableGame | "missing" | null> {
   try {
@@ -79,7 +82,8 @@ const GAME_FAILED =
 const STATE_FAILED =
   "Could not load your game. Your connection may be down or the server may have a problem. Refresh the page; if it keeps failing, try again in a few minutes.";
 
-function Game({ slug }: { slug: string }) {
+// `day`: a past day's Day Number from the address, or null for today
+function Game({ slug, day }: { slug: string; day: number | null }) {
   const { data: game, isPending } = useQuery({
     queryKey: ["game", slug],
     queryFn: () => loadGame(slug),
@@ -101,12 +105,18 @@ function Game({ slug }: { slug: string }) {
   const started = useRef(false);
   const submitting = useRef(false);
   const opener = useRef<HTMLButtonElement | null>(null);
+  const victory = useVictoryStats(slug, play);
 
   const playable = typeof game === "object" && game !== null ? game : null;
   const roster = playable?.entries ?? [];
   const tooSmall = playable !== null && roster.length < MIN_ENTRIES;
   // Not playable for now: too few entries, or paused
   const closed = tooSmall || playable?.paused === true;
+  // A past day the game has; today's and later Day Numbers are handled below
+  const past = playable !== null && day !== null && day < playable.today;
+  const pastDay = past ? day : undefined;
+  // A finished past day is a read-only record (no Reset)
+  const resettable = !past;
 
   useTitle(
     game === "missing"
@@ -122,38 +132,32 @@ function Game({ slug }: { slug: string }) {
     setBoard((n) => n + 1);
   };
 
-  const resultOf = (
-    kind: NonNullable<Result>["kind"],
-    reveal: Reveal,
-  ): Result => ({ kind, answer: reveal.answer!, photo: reveal.answerPhoto });
-
   // Once the game and who is signed in are known: pick where the game lives, then load it.
   // The ref keeps StrictMode's second effect run from merging twice.
   useEffect(() => {
-    if (!playable || closed || me.isPending || started.current) {
+    if (
+      !playable ||
+      closed ||
+      me.isPending ||
+      started.current ||
+      (day !== null && pastDay === undefined)
+    ) {
       return;
     }
     started.current = true;
-    const storage = gameStorage(localStorage, slug);
     void (async () => {
-      let current: Play = createPlay({
+      const { play: current, rateLimited } = await openPlay({
         slug,
         roster: playable.entries,
-        storage,
+        storage: localStorage,
+        signedIn: me.data !== null && me.data !== undefined,
+        day: pastDay,
         now,
         fetch: browserFetch,
         onNewDay: clearBoard,
       });
-      if (me.data) {
-        const merged = await mergeLocalGame(slug, storage, now, browserFetch);
-        if (merged === "rate_limited") {
-          setNotice(RATE_LIMITED);
-        }
-        current = createServerPlay({
-          slug,
-          fetch: browserFetch,
-          onNewDay: clearBoard,
-        });
+      if (rateLimited) {
+        setNotice(RATE_LIMITED);
       }
       play.current = current;
       const loaded = await current.load();
@@ -176,7 +180,7 @@ function Game({ slug }: { slug: string }) {
       }
       setReady(true);
     })();
-  }, [playable, closed, me.isPending, me.data, slug]);
+  }, [playable, closed, me.isPending, me.data, slug, day, pastDay]);
 
   async function submit(name: string): Promise<void> {
     const id = findEntryId(roster, name);
@@ -202,8 +206,15 @@ function Game({ slug }: { slug: string }) {
     if (res.kind === "duplicate") {
       return;
     }
+    // A past day's win stays out of the daily stats
+    if (rows.length === 0 && !past) {
+      victory.startClock();
+    }
     if (res.answer !== undefined && (res.isAnswer || res.lost)) {
       setResult(resultOf(res.isAnswer ? "victory" : "lost", res));
+      if (res.isAnswer && !past) {
+        void victory.show();
+      }
     }
     setRows((old) => [res.row, ...old]);
   }
@@ -237,20 +248,15 @@ function Game({ slug }: { slug: string }) {
   };
 
   if (game === "missing") {
-    return (
-      <>
-        <PageHead
-          titleId="game-title"
-          title="Game not found"
-          lede={<p id="game-lede">There is no game at this address.</p>}
-        />
-        <MessageCard id="not-found">
-          <Link className={buttonVariants()} to="/">
-            See all games
-          </Link>
-        </MessageCard>
-      </>
-    );
+    return <GameNotFound />;
+  }
+
+  if (playable && day !== null && !past) {
+    // Today's Day Number is the game's own page; a later one does not exist yet
+    if (day === playable.today) {
+      return <Navigate replace to={`/g/${encodeURIComponent(slug)}`} />;
+    }
+    return <NoSuchDay slug={slug} name={playable.name} />;
   }
 
   // The game cannot be played on this page view: the reason shows as the notice
@@ -284,6 +290,16 @@ function Game({ slug }: { slug: string }) {
         centered
         titleId="game-title"
         title={playable?.name ?? "Guess today's answer"}
+        lede={
+          playable &&
+          pastDay !== undefined && (
+            <PastDayLede
+              slug={slug}
+              day={pastDay}
+              startDate={playable.startDate}
+            />
+          )
+        }
         actions={
           <>
             {/* Up here, well away from Guess, so a slightly-off tap cannot hit them */}
@@ -301,12 +317,13 @@ function Game({ slug }: { slug: string }) {
               id="reset-guesses-button"
               variant="outline"
               size="sm"
-              hidden={finished}
+              hidden={finished || !resettable}
               disabled={cannotPlay || rows.length === 0}
               onClick={askReset}
             >
               Reset
             </Button>
+            <PastDaysLink slug={slug} />
             <PlayActions
               slug={slug}
               canHost={playable !== null && !closed}
@@ -328,17 +345,13 @@ function Game({ slug }: { slug: string }) {
         aria-busy={isPending || loading ? true : undefined}
       >
         {zoom !== null && ready && (
-          <div className="mb-6">
-            <ZoomView
-              partUrl={(n) =>
-                `/api/games/${encodeURIComponent(slug)}/zoom/${n}?b=${board}`
-              }
-              tries={zoom}
-              wrong={wrong}
-              finished={finished}
-              reveal={result?.photo}
-            />
-          </div>
+          <ZoomView
+            partUrl={(n) => partUrl(slug, n, board, pastDay)}
+            tries={zoom}
+            wrong={wrong}
+            finished={finished}
+            reveal={result?.photo}
+          />
         )}
         <Card className="play-card mb-6 gap-3 p-4 sm:p-5">
           <div
@@ -362,10 +375,21 @@ function Game({ slug }: { slug: string }) {
               Guess
             </Button>
           </div>
-          <div className="game-actions flex justify-center" hidden={!finished}>
+          <div
+            className="game-actions flex flex-wrap justify-center gap-2"
+            hidden={!finished || !resettable}
+          >
+            <Button
+              id="stats-button"
+              variant="outline"
+              hidden={result?.kind !== "victory"}
+              onClick={() => void victory.show()}
+            >
+              See stats
+            </Button>
             <Button
               id="reset-button"
-              hidden={!finished}
+              hidden={!finished || !resettable}
               disabled={cannotPlay}
               onClick={askReset}
             >
@@ -373,30 +397,27 @@ function Game({ slug }: { slug: string }) {
             </Button>
           </div>
         </Card>
-        <AlertDialog open={confirming} onOpenChange={setConfirming}>
-          <AlertDialogContent
-            id="reset-dialog"
-            onCloseAutoFocus={(event) => {
-              event.preventDefault();
-              opener.current?.focus();
-            }}
-          >
-            <AlertDialogTitle>Reset today&apos;s guesses?</AlertDialogTitle>
-            <AlertDialogDescription>
-              The Daily Answer stays the same; you start with a fresh board.
-            </AlertDialogDescription>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction value="confirm" onClick={() => void reset()}>
-                Reset
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {result?.kind === "victory" && !past && (
+          <StatsDialog
+            open={victory.open}
+            onOpenChange={victory.setOpen}
+            answer={result.answer}
+            stats={victory.stats}
+            failed={victory.failed}
+            returnFocusId="stats-button"
+          />
+        )}
+        <ResetDialog
+          open={confirming}
+          onOpenChange={setConfirming}
+          onConfirm={() => void reset()}
+          opener={opener}
+        />
         <PlayResults
           rows={rows}
           titles={zoom === null ? titles : null}
           loading={isPending || loading}
+          loadingText={past ? "Loading the game…" : "Loading today's game…"}
           empty={ready && rows.length === 0}
         />
       </section>
@@ -405,7 +426,14 @@ function Game({ slug }: { slug: string }) {
 }
 
 export function PlayPage() {
-  const { slug = "" } = useParams();
-  // A new game is a fresh board: no state carries over from the last one
-  return <Game key={slug} slug={slug} />;
+  const { slug = "", day: dayParam } = useParams();
+  // Anything but digits (NaN) or a day after today shows the no-such-day card
+  const day =
+    dayParam === undefined
+      ? null
+      : /^\d+$/.test(dayParam)
+        ? Number(dayParam)
+        : Number.NaN;
+  // A new game or day is a fresh board: no state carries over from the last one
+  return <Game key={`${slug}/${dayParam ?? ""}`} slug={slug} day={day} />;
 }

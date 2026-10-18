@@ -5,16 +5,27 @@ import { EmptyState } from "../../components/page.tsx";
 import { ZoomGuesses } from "../../components/zoom-view.tsx";
 import type { GradedAttribute } from "../../game/game.ts";
 
+// A Zoom game's part image; `board` refetches it on a fresh board, `day` names a past day
+export const partUrl = (
+  slug: string,
+  n: number,
+  board: number,
+  day: number | undefined,
+): string =>
+  `/api/games/${encodeURIComponent(slug)}/zoom/${n}?b=${board}${day === undefined ? "" : `&day=${day}`}`;
+
 export function PlayResults({
   rows,
   titles,
   loading,
+  loadingText,
   empty,
 }: {
   rows: readonly GradedAttribute[][];
   // A classic game's column titles; null for a Zoom game
   titles: readonly string[] | null;
   loading: boolean;
+  loadingText: string;
   empty: boolean;
 }) {
   return (
@@ -32,9 +43,7 @@ export function PlayResults({
           ))}
         </BoardRow>
       )}
-      {loading && (
-        <EmptyState id="loading-state">Loading today&apos;s game…</EmptyState>
-      )}
+      {loading && <EmptyState id="loading-state">{loadingText}</EmptyState>}
       {empty && (
         <EmptyState id="empty-state">
           {titles

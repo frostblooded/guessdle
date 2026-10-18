@@ -7,10 +7,10 @@ import { normalizeCode } from "../../game/party.ts";
 import { partRenderer } from "../images.ts";
 import { findParty, loadData } from "../parties.ts";
 import {
+  dayOf,
   fail,
   loadGame,
   paramOf,
-  todayOf,
   todaysAnswer,
   type AppContext,
 } from "./context.ts";
@@ -43,7 +43,7 @@ export function zoomRoutes(
     res.type("image/webp").send(image);
   };
 
-  // Part n of today's answer
+  // Part n of today's answer, or a past day's (`?day=N`)
   app.get("/api/games/:slug/zoom/:n", async (req, res) => {
     res.set("Cache-Control", "no-store");
     const loaded = await loadGame(ctx, req, res);
@@ -54,7 +54,12 @@ export function zoomRoutes(
       fail(res, "not_found");
       return;
     }
-    const { date, day } = todayOf(ctx, loaded.game);
+    const played = dayOf(ctx, req, loaded.game);
+    if (!played) {
+      fail(res, "not_found");
+      return;
+    }
+    const { date, day } = played;
     const answer = await todaysAnswer(ctx, res, loaded, date, day);
     if (answer) {
       await send(res, answer, partOf(req));

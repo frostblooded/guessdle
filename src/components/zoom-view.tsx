@@ -30,15 +30,14 @@ export function ZoomView({
   const [picked, setPicked] = useState<{ board: string; n: number } | null>(
     null,
   );
-  const viewing =
-    picked?.board === board ? picked.n : whole ? 0 : shown;
+  const viewing = picked?.board === board ? picked.n : whole ? 0 : shown;
   const setViewing = (n: number): void => setPicked({ board, n });
 
   const src = viewing === 0 && whole ? whole : partUrl(Math.max(1, viewing));
   const parts = Array.from({ length: shown }, (_, i) => i + 1);
 
   return (
-    <div id="zoom-view" className="flex flex-col items-center gap-3">
+    <div id="zoom-view" className="mb-6 flex flex-col items-center gap-3">
       <div className="aspect-square w-full max-w-sm overflow-hidden rounded-xl border bg-muted shadow-sm">
         <img
           id="zoom-current"

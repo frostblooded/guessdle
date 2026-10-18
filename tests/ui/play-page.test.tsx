@@ -51,12 +51,17 @@ function fakeServer(game?: Response) {
         json(200, {
           name: "Pets",
           canEdit: false,
+          today: 5,
+          startDate: "2026-10-13",
           attributes: [{ name: "Color", type: "text" }],
           entries: ENTRIES.map(({ id, name, photo }) => ({ id, name, photo })),
         })
       );
     }
-    if (url === "/api/games/pets/grade") {
+    if (
+      url === "/api/games/pets/grade" ||
+      url === "/api/games/pets/grade?day=3"
+    ) {
       const { ids } = JSON.parse(String(init?.body)) as { ids: number[] };
       return json(200, {
         day: 1,
@@ -65,22 +70,38 @@ function fakeServer(game?: Response) {
         ...(ids.includes(ANSWER) && { answer: "Dido" }),
       });
     }
-    if (url === "/api/games/pets/give-up") {
+    if (url === "/api/games/pets/result") {
+      const { ids } = JSON.parse(String(init?.body)) as { ids: number[] };
+      return json(200, {
+        day: 1,
+        you: { guesses: ids.length, seconds: 75 },
+        players: 3,
+        guesses: [0, 1, 2, 0, 0, 0, 0, 0, 0, 0],
+        times: [1, 0, 2, 0, 0, 0],
+        fewerGuessesThan: 50,
+        fasterThan: 50,
+      });
+    }
+    if (
+      url === "/api/games/pets/give-up" ||
+      url === "/api/games/pets/give-up?day=3"
+    ) {
       return json(200, { day: 1, answer: "Dido" });
     }
     return json(404, {});
   });
 }
 
-function renderPlay(): void {
+function renderPlay(path: string = "/g/pets"): void {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={["/g/pets"]}>
+      <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="/g/:slug" element={<PlayPage />} />
+          <Route path="/g/:slug/day/:day" element={<PlayPage />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -157,8 +178,54 @@ describe("PlayPage", () => {
       document.querySelector("#victory-answer-name")!.textContent,
       "Dido",
     );
+    // The stats popup opens over the page; the board is behind it
+    await screen.findByRole("dialog");
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => assert.equal(screen.queryByRole("dialog"), null));
     assert.ok(screen.getByRole("button", { name: "Reset today's game" }));
     assert.equal(screen.queryByRole("button", { name: "Give up" }), null);
+  });
+
+  it("a win opens the stats popup, and See stats opens it again", async () => {
+    const server = fakeServer();
+    vi.stubGlobal("fetch", server);
+    renderPlay();
+    await screen.findByText(/No guesses yet/);
+    await guess("Bela");
+    await guess("Dido");
+    const dialog = await screen.findByRole("dialog");
+    assert.ok(screen.getByRole("heading", { name: "Congratulations!" }));
+    await waitFor(() =>
+      assert.equal(document.querySelector("#stats-guesses")!.textContent, "2"),
+    );
+    assert.equal(document.querySelector("#stats-time")!.textContent, "1m 15s");
+    assert.ok(screen.getByText("Fewer guesses than 50% of players"));
+    assert.ok(screen.getByText("3 players solved it today."));
+    const mine = document.querySelector("#stats-guess-chart [data-mine]");
+    assert.equal(mine?.getAttribute("aria-label"), "2: 1 player, you");
+    const sent = server.mock.calls.find(
+      ([url]) => url === "/api/games/pets/result",
+    )!;
+    const body = JSON.parse(String(sent[1]?.body)) as Record<string, unknown>;
+    assert.deepEqual(body["ids"], [1, 2]);
+    assert.equal(typeof body["player"], "string");
+
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() => assert.ok(!dialog.isConnected));
+    const again = screen.getByRole("button", { name: "See stats" });
+    assert.equal(document.activeElement, again);
+    await userEvent.click(again);
+    await screen.findByRole("dialog");
+  });
+
+  it("giving up shows no stats", async () => {
+    vi.stubGlobal("fetch", fakeServer());
+    renderPlay();
+    await screen.findByText(/No guesses yet/);
+    await userEvent.click(screen.getByRole("button", { name: "Give up" }));
+    await screen.findByText("Better luck tomorrow");
+    assert.equal(screen.queryByRole("dialog"), null);
+    assert.equal(screen.queryByRole("button", { name: "See stats" }), null);
   });
 
   it("reset asks first; Cancel keeps the board, Reset clears it", async () => {
@@ -213,5 +280,62 @@ describe("PlayPage", () => {
         name,
       );
     }
+  });
+});
+
+describe("PlayPage on a past day", () => {
+  it("names the day, grades against it and keeps its guesses apart from today's", async () => {
+    const server = fakeServer();
+    vi.stubGlobal("fetch", server);
+    renderPlay("/g/pets/day/3");
+    await screen.findByText(/No guesses yet/);
+    assert.match(
+      document.querySelector("#game-lede")!.textContent ?? "",
+      /^Day 3, Fri 16 Oct 2026\./,
+    );
+    assert.ok(screen.getByRole("link", { name: "Play today's game" }));
+    assert.ok(screen.getByRole("link", { name: "Past days" }));
+    await guess("Bela");
+    assert.ok(
+      server.mock.calls.some(([url]) => url === "/api/games/pets/grade?day=3"),
+    );
+    assert.deepEqual(
+      JSON.parse(localStorage.getItem("game:pets:day:3:usedGuesses")!),
+      [1],
+    );
+    assert.equal(localStorage.getItem("game:pets:usedGuesses"), null);
+    assert.equal(screen.queryByRole("button", { name: "Reset" }), null);
+  });
+
+  it("a finished past day is a record: no reset, and no stats", async () => {
+    const server = fakeServer();
+    vi.stubGlobal("fetch", server);
+    renderPlay("/g/pets/day/3");
+    await screen.findByText(/No guesses yet/);
+    await guess("Dido");
+    await screen.findByText("You did it!");
+    assert.ok(!server.mock.calls.some(([url]) => url.includes("/result")));
+    assert.equal(screen.queryByRole("button", { name: "See stats" }), null);
+    assert.equal(screen.queryByRole("dialog"), null);
+    assert.equal(
+      screen.queryByRole("button", { name: "Reset today's game" }),
+      null,
+    );
+  });
+
+  it("a day after today does not exist yet", async () => {
+    vi.stubGlobal("fetch", fakeServer());
+    renderPlay("/g/pets/day/9");
+    await screen.findByText(/no puzzle for that day/);
+    assert.equal(document.querySelector("#board"), null);
+    assert.ok(screen.getByRole("link", { name: "Past days" }));
+  });
+
+  it("today's Day Number opens the game's own page", async () => {
+    vi.stubGlobal("fetch", fakeServer());
+    renderPlay("/g/pets/day/5");
+    await screen.findByText(/No guesses yet/);
+    assert.equal(document.querySelector("#game-lede"), null);
+    assert.ok(screen.getByRole("button", { name: "Reset" }));
   });
 });

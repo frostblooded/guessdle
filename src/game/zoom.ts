@@ -83,11 +83,7 @@ export function fillParts(
 // Moves and resizes a part so it stays a square inside the image
 export function clampPart(part: ZoomPart, size: ImageSize): ZoomPart {
   const s = Math.round(
-    Math.min(
-      Math.max(part.size, MIN_ZOOM_PART),
-      size.width,
-      size.height,
-    ),
+    Math.min(Math.max(part.size, MIN_ZOOM_PART), size.width, size.height),
   );
   const clamp = (v: number, max: number): number =>
     Math.round(Math.min(Math.max(v, 0), max));
