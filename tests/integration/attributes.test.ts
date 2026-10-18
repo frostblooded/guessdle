@@ -3,6 +3,7 @@ import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import { createApp } from "../../src/server/app.ts";
+import { MAX_ATTRIBUTES } from "../../src/game/limits.ts";
 import { MIGRATIONS_DIR } from "../../src/server/main.ts";
 import { migrate } from "../../src/server/migrate.ts";
 import { startDb } from "./postgres.ts";
@@ -142,7 +143,7 @@ describe("game attributes", () => {
     const dup = await add(" color ");
     assert.equal(dup.status, 409);
     assert.equal(dup.body.error, "attribute_exists");
-    for (let i = 1; i < 10; i++) {
+    for (let i = 1; i < MAX_ATTRIBUTES; i++) {
       assert.equal((await add(`A${i}`)).status, 200);
     }
     assert.equal((await add("One too many")).status, 400);
@@ -261,7 +262,11 @@ describe("game attributes", () => {
           400,
           "invalid",
         ],
-        [Array(11).fill({ name: "X", type: "text" }), 400, "invalid"],
+        [
+          Array(MAX_ATTRIBUTES + 1).fill({ name: "X", type: "text" }),
+          400,
+          "invalid",
+        ],
         [[{ id: foreign, name: "X", type: "text" }], 404, "not_found"],
         [
           [

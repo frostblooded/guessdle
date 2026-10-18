@@ -193,7 +193,7 @@ describe("submit", () => {
     assert.deepEqual(play.getUsedGuesses(), [one!.id]);
     if (result.kind === "accepted") {
       assert.equal(result.isAnswer, false);
-      assert.equal(result.row[1]!.value, one!.name);
+      assert.equal(result.row[0]!.value, one!.name);
     }
   });
 
