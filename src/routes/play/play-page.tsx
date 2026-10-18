@@ -17,10 +17,9 @@ import {
   type GameAttribute,
   type GradedAttribute,
 } from "../../game/game.ts";
-import { MIN_ENTRIES } from "../../game/limits.ts";
 import { openPlay } from "../../game/open-play.ts";
 import type { Play } from "../../game/play.ts";
-import type { GameKind } from "../../game/blur.ts";
+import { minEntriesOf, type GameKind } from "../../game/blur.ts";
 import { browserFetch, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { GuessBox } from "./guess-box.tsx";
@@ -107,7 +106,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const gameFailure =
     typeof game === "string" && game !== "missing" ? game : null;
   const roster = playable?.entries ?? [];
-  const tooSmall = playable !== null && roster.length < MIN_ENTRIES;
+  const tooSmall = playable !== null && roster.length < minEntriesOf(playable.kind);
   // Not playable for now: too few entries, or paused
   const closed = tooSmall || playable?.paused === true;
   // A past day the game has; today's and later Day Numbers are handled below

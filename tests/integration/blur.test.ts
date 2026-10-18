@@ -242,6 +242,31 @@ describe("blur games", () => {
     assert.equal((await fetch(`${url}/api/games/petdle/blur/1`)).status, 404);
   });
 
+  it("plays, lists and submits with a single entry", async () => {
+    const [only] = (await addEntry("Alpha")).body;
+    assert.equal((await request("POST", `${G}/submit`, ann)).status, 200);
+    await db.pool.query("update games set status = 'approved'");
+    const game = (await request("GET", G)).body;
+    assert.equal(game.paused, false);
+    assert.equal((await fetch(`${url}${G}/blur/1`)).status, 200);
+    const won = (
+      await request("POST", `${G}/grade`, undefined, { ids: [only.id] })
+    ).body;
+    assert.equal(won.victory, true);
+    assert.ok(
+      (await request("GET", "/api/games")).body.some(
+        (c: Body) => c.slug === "blurry",
+      ),
+    );
+    // A classic game still needs two
+    await request("POST", "/api/games", ann, { name: "Classic" });
+    await request("POST", "/api/games/classic/entries", ann, { name: "One" });
+    assert.equal(
+      (await request("POST", "/api/games/classic/submit", ann)).body.error,
+      "too_few_entries",
+    );
+  });
+
   it("grades by name only and ends the day after the last try", async () => {
     const entries = [];
     for (const name of ["Alpha", "Beta", "Gamma", "Delta"]) {

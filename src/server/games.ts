@@ -160,7 +160,7 @@ export interface GalleryCard {
   kind: GameKind;
 }
 
-// Approved games with at least MIN_ENTRIES active entries and none missing a value: the original
+// Approved games with enough active entries (MIN_ENTRIES, one for a Blur game) and none missing a value: the original
 // first, then newest first
 export async function listGallery(q: Q): Promise<GalleryCard[]> {
   const { rows } = await q.query<GalleryCard>(
@@ -173,7 +173,7 @@ export async function listGallery(q: Q): Promise<GalleryCard[]> {
        count(e.id)::int as "entryCount", g.kind
      from games g join entries e on e.game_id = g.id and e.deleted_at is null
      where g.status = 'approved' and not ${HAS_MISSING_VALUES}
-     group by g.id having count(e.id) >= $1
+     group by g.id having count(e.id) >= case when g.kind = 'blur' then 1 else $1 end
      order by g.slug = 'petdle' desc, g.created_at desc, g.id desc`,
     [MIN_ENTRIES, MAX_TILES],
   );

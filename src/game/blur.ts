@@ -1,12 +1,17 @@
 // Blur games (ADR 0019): players guess an entry from its square image split into a 3x3 grid.
 // At first only one square is clear; each wrong guess clears the next one, in the order the
 // owner picked. Pure, so the server, the editor and Play share it.
-import { MAX_BLUR_TRIES } from "./limits.ts";
+import { MAX_BLUR_TRIES, MIN_ENTRIES } from "./limits.ts";
 
 export type GameKind = "classic" | "blur";
 
 export const isGameKind = (value: unknown): value is GameKind =>
   value === "classic" || value === "blur";
+
+// The fewest active entries a game plays with. A Blur game plays with one: guessing it is still
+// a matter of reading the picture.
+export const minEntriesOf = (kind: GameKind): number =>
+  kind === "blur" ? 1 : MIN_ENTRIES;
 
 // The grid is GRID x GRID squares, numbered 0..CELLS-1 row by row from the top left
 export const GRID = 3;

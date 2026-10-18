@@ -1,6 +1,6 @@
 // What a player's socket message does to a party (ADR 0016), under the party lock.
 import type pg from "pg";
-import { MIN_ENTRIES } from "../game/limits.ts";
+import { minEntriesOf } from "../game/blur.ts";
 import {
   drawAnswer,
   everyoneDone,
@@ -95,7 +95,7 @@ export async function act(
             return "round_live";
           }
           const active = data.roster.entries.map((e) => e.id);
-          if (active.length < MIN_ENTRIES) {
+          if (active.length < minEntriesOf(data.game.kind)) {
             return "not_enough_entries";
           }
           if (data.roster.incomplete > 0) {
