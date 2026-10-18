@@ -17,9 +17,9 @@ export const Default: Story = {
   render: () => (
     <Card className="max-w-sm">
       <CardHeader>
-        <CardTitle>Petdle</CardTitle>
+        <CardTitle>Catdle</CardTitle>
         <CardDescription>
-          Guess the pet of the day from its colors and owners.
+          Guess the cat of the day from its colors and owners.
         </CardDescription>
       </CardHeader>
       <CardContent>
