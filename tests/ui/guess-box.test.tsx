@@ -15,7 +15,7 @@ function Harness({ onSubmit }: { onSubmit: (text: string) => void }) {
       names={NAMES}
       value={value}
       onChange={setValue}
-      onSubmit={() => onSubmit(value)}
+      onSubmit={onSubmit}
       disabled={false}
     />
   );
@@ -51,7 +51,7 @@ describe("GuessBox", () => {
     screen.getByText('Found No Results for "Nobody"');
   });
 
-  it("picking an option fills the box without submitting", async () => {
+  it("picking an option fills the box and submits it at once", async () => {
     const onSubmit = vi.fn();
     render(<Harness onSubmit={onSubmit} />);
     const input = screen.getByRole<HTMLInputElement>("combobox", {
@@ -61,7 +61,7 @@ describe("GuessBox", () => {
     await userEvent.click(screen.getByRole("option", { name: "Dido" }));
     assert.equal(input.value, "Dido");
     assert.equal(screen.queryAllByRole("option").length, 0);
-    assert.equal(onSubmit.mock.calls.length, 0);
+    assert.deepEqual(onSubmit.mock.calls, [["Dido"]]);
   });
 
   it("Enter with no highlighted option submits the typed text", async () => {
@@ -74,7 +74,7 @@ describe("GuessBox", () => {
     assert.deepEqual(onSubmit.mock.calls, [["eddie"]]);
   });
 
-  it("arrow keys highlight an option and Enter picks it", async () => {
+  it("arrow keys highlight an option and Enter submits it", async () => {
     const onSubmit = vi.fn();
     render(<Harness onSubmit={onSubmit} />);
     const input = screen.getByRole<HTMLInputElement>("combobox", {
@@ -82,6 +82,6 @@ describe("GuessBox", () => {
     });
     await userEvent.type(input, "b{ArrowDown}{Enter}");
     assert.equal(input.value, "Bela");
-    assert.equal(onSubmit.mock.calls.length, 0);
+    assert.deepEqual(onSubmit.mock.calls, [["Bela"]]);
   });
 });

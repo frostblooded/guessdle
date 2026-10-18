@@ -33,8 +33,8 @@ export function PartyRound({
   const names = entries.map((e) => e.name).filter((name) => !used.has(name));
   const titles = ["Photo", "Name", ...view.game.attributes.map((a) => a.name)];
 
-  const submit = (): void => {
-    const id = findEntryId(entries, guess);
+  const submit = (name: string): void => {
+    const id = findEntryId(entries, name);
     if (id === null) {
       onNotice("Pick a name from the list.");
       return;
@@ -93,7 +93,7 @@ export function PartyRound({
             <Button
               id="submit-new-guess-button"
               className="h-11"
-              onClick={submit}
+              onClick={() => submit(guess)}
             >
               Guess
             </Button>
