@@ -23,7 +23,7 @@ The order a Blur Game Entry's nine image squares clear in, picked by the Owner. 
 A Game's first status. Only its Owner and Admins can see it (everyone else gets a 404) until it is submitted. Statuses: draft, pending, approved, rejected.
 
 **Entry**:
-One item in a Game's Roster: a name, a photo, a value per Attribute and an optional **Description** (up to 500 characters, any Kind), shown with the answer once it is revealed (a win, a give-up, or a Blur Game's last try). A missing Description never pauses a Game. Replaces "Pet" (the old Petdle word). Entry ids are numeric and never reused. Deleting an Entry is soft: it leaves autocomplete and future draws, but past Guesses and Daily Answers still resolve.
+One item in a Game's Roster: a name, a value per Attribute and an optional **Description** (a Blur game's Entry: a name, an image, a square order and the Description). The Description (up to 500 characters, any Kind) shows with the answer once it is revealed (a win, a give-up, or a Blur Game's last try); a missing one never pauses a Game. Pictures are Image Attribute values; an Entry's photo, where one picture stands for it (guess suggestions, the result card, party rounds), is its first non-blank Image value. Replaces "Pet" (the old Petdle word). Entry ids are numeric and never reused. Deleting an Entry is soft: it leaves autocomplete and future draws, but past Guesses and Daily Answers still resolve.
 
 **Roster**:
 The list of a Game's active Entries. A Game is playable with at least 2.

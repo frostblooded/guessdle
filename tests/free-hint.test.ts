@@ -109,6 +109,36 @@ describe("pickHint and revealHint", () => {
       description: "Loves boxes.",
     });
   });
+  it("marks an Image attribute's value as a picture", () => {
+    const withImage = [
+      ...ATTRIBUTES,
+      { name: "Photo", type: "image" as const },
+    ];
+    const pictured: Entry = {
+      ...answer,
+      values: [...answer.values, "/uploads/ati.webp"],
+    };
+    assert.deepEqual(
+      revealHint(withImage, pictured, {
+        kind: "attribute",
+        attribute: "Photo",
+      }),
+      {
+        kind: "attribute",
+        attribute: "Photo",
+        value: "/uploads/ati.webp",
+        image: true,
+      },
+    );
+    assert.ok(
+      isFreeHint({
+        kind: "attribute",
+        attribute: "P",
+        value: "/x",
+        image: true,
+      }),
+    );
+  });
   it("shows nothing for an attribute that no longer exists", () => {
     assert.equal(
       revealHint(ATTRIBUTES, answer, { kind: "attribute", attribute: "Gone" }),

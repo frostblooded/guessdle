@@ -42,10 +42,22 @@ export function FreeHintCard({
         <div className="min-w-0 flex-1">
           <p className="font-semibold">Free hint</p>
           {hint.kind === "attribute" ? (
-            <p id="free-hint-text" className="break-words">
-              {hint.attribute}:{" "}
-              <span className="font-semibold">{shown(hint)}</span>
-            </p>
+            <>
+              <p id="free-hint-text" className="break-words">
+                {hint.attribute}:
+                {hint.image ? null : (
+                  <span className="font-semibold"> {shown(hint)}</span>
+                )}
+              </p>
+              {hint.image && (
+                <img
+                  id="free-hint-image"
+                  className="mt-2 aspect-square size-24 rounded-md bg-muted object-cover"
+                  src={hint.value as string}
+                  alt={`The answer's ${hint.attribute}`}
+                />
+              )}
+            </>
           ) : (
             <p id="free-hint-text" className="whitespace-pre-line break-words">
               {shown(hint)}

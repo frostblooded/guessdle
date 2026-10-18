@@ -21,6 +21,9 @@ test("the Entries tab adds, edits and deletes entries and counts what is missing
   });
   const { slug } = (await created.json()) as { slug: string };
   await page.request.post(`/api/games/${slug}/attributes`, {
+    data: { name: "Photo", type: "image" },
+  });
+  await page.request.post(`/api/games/${slug}/attributes`, {
     data: { name: "Color", type: "list" },
   });
   await page.goto(`/g/${slug}/edit`);
@@ -43,13 +46,13 @@ test("the Entries tab adds, edits and deletes entries and counts what is missing
   await expect(page.locator("#details-form")).toBeHidden();
 
   await page.locator("#entry-name").fill("Rex");
-  await page.locator("#entry-photo").setInputFiles({
+  await page.locator("#entry-fields input[type=file]").setInputFiles({
     name: "rex.png",
     mimeType: "image/png",
     buffer: PNG,
   });
   await page.locator("#crop-confirm").click();
-  await expect(page.locator("#entry-photo-preview")).toBeVisible();
+  await expect(page.locator(".entry-image-preview")).toBeVisible();
   await page.getByLabel("Color (one per line)").fill("Red\nBlue");
   const refreshed = page.waitForResponse(
     (r) => r.url().endsWith("/entries") && r.request().method() === "GET",
@@ -73,7 +76,7 @@ test("the Entries tab adds, edits and deletes entries and counts what is missing
   await expect(page.locator("#entry-error")).toContainText(
     "already has that name",
   );
-  // Every attribute needs a value
+  // Every attribute but a picture needs a value
   await page.locator("#entry-name").fill("Fido");
   await page.getByRole("button", { name: "Add entry" }).click();
   await expect(page.locator("#entry-error")).toContainText(
@@ -83,6 +86,7 @@ test("the Entries tab adds, edits and deletes entries and counts what is missing
   await page.getByLabel("Color (one per line)").fill("Brown");
   await page.getByRole("button", { name: "Add entry" }).click();
   await expect(page.locator("#entry-list li")).toHaveCount(2);
+  await expect(page.locator("#entry-list img")).toHaveCount(1);
   await expect(page.locator("#status-notice")).not.toContainText("needs");
 
   // Editing loads the saved values back into the form
@@ -90,6 +94,7 @@ test("the Entries tab adds, edits and deletes entries and counts what is missing
   await expect(page.getByLabel("Color (one per line)")).toHaveValue(
     "Red\nBlue",
   );
+  await expect(page.locator(".entry-image-preview")).toBeVisible();
   await page.locator("#entry-name").fill("Rexy");
   await page.getByRole("button", { name: "Save entry" }).click();
   await expect(page.locator("#entry-list")).toContainText("Rexy");

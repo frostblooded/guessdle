@@ -224,7 +224,7 @@ describe("partyView", () => {
       { playerId: 2, guesses: 2, solved: false, gaveUp: false, lost: false },
     ]);
     assert.equal(mine.round!.yours!.rows.length, 1);
-    assert.equal(mine.round!.yours!.rows[0]![1]!.value, "Dido");
+    assert.equal(mine.round!.yours!.rows[0]![0]!.value, "Dido");
     assert.equal(mine.round!.yours!.answer, undefined);
     assert.deepEqual(mine.history, []);
     // Nothing in a visitor's view names the answer or anyone's guesses
@@ -255,9 +255,8 @@ describe("partyView", () => {
     );
     const bo = out.history[1]!.results[0]!;
     assert.deepEqual(bo.guessNames, ["Dido", "Bela"]);
-    // Photo, name, Color: Dido is White like Bela
+    // Name, Color: Dido is White like Bela
     assert.deepEqual(bo.grades[0], [
-      Correctness.Incorrect,
       Correctness.Incorrect,
       Correctness.Correct,
     ]);

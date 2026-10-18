@@ -14,7 +14,13 @@ export type HintPick =
 
 // What the player is shown
 export type FreeHint =
-  | { kind: "attribute"; attribute: string; value: AttributeValue }
+  // `image`: an Image attribute, whose value is a picture URL
+  | {
+      kind: "attribute";
+      attribute: string;
+      value: AttributeValue;
+      image?: true;
+    }
   | { kind: "description"; description: string };
 
 // A FreeHint read back from storage or the network; anything else is not one
@@ -28,6 +34,7 @@ export function isFreeHint(value: unknown): value is FreeHint {
     ? typeof hint["description"] === "string"
     : hint["kind"] === "attribute" &&
         typeof hint["attribute"] === "string" &&
+        (hint["image"] === undefined || hint["image"] === true) &&
         (typeof text === "string" ||
           (Array.isArray(text) && text.every((v) => typeof v === "string")));
 }
@@ -113,5 +120,6 @@ export function revealHint(
         kind: "attribute",
         attribute: pick.attribute,
         value: answer.values[i]!,
+        ...(attributes[i]!.type === "image" && { image: true as const }),
       };
 }

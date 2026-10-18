@@ -50,10 +50,10 @@ describe("Free Hints and entry descriptions", () => {
       ANSWER,
       text,
     ]);
-  // The attribute names no row matched (column 0 is the photo, 1 the name)
+  // The attribute names no row matched (column 0 is the name)
   const unmatched = (rows: Body[][]): string[] =>
     rows[0]!
-      .slice(2)
+      .slice(1)
       .map((cell: Body) => cell.key as string)
       .filter(
         (key: string) =>

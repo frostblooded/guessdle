@@ -164,7 +164,7 @@ describe("PlayPage", () => {
     const titles = [...document.querySelectorAll(".guess-result-title")].map(
       (t) => t.textContent,
     );
-    assert.deepEqual(titles, ["Photo", "Name", "Color"]);
+    assert.deepEqual(titles, ["Name", "Color"]);
     assert.equal(document.title, "Pets - Guessdle");
   });
 
