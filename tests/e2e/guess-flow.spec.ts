@@ -346,6 +346,12 @@ test.describe("give up", () => {
     await expect(giveUpButton(page)).toBeHidden();
     await expect(resetButton(page)).toBeVisible();
     await expect(resetButton(page)).toHaveText("Reset today's game");
+    // Centred in the play card once the game is over
+    const card = await page.locator(".play-card").boundingBox();
+    const button = await resetButton(page).boundingBox();
+    expect(
+      Math.abs(card!.x + card!.width / 2 - (button!.x + button!.width / 2)),
+    ).toBeLessThan(2);
   });
 
   test("works before any guess", async ({ page }) => {

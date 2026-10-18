@@ -303,7 +303,9 @@ function Game({ slug }: { slug: string }) {
               Guess
             </Button>
           </div>
-          <div className="game-actions flex flex-wrap justify-end gap-2">
+          <div
+            className={`game-actions flex flex-wrap gap-2 ${finished ? "justify-center" : "justify-end"}`}
+          >
             <Button
               id="reset-guesses-button"
               variant="ghost"
