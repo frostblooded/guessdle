@@ -1024,6 +1024,18 @@ td button {
   cursor: pointer;
 }
 
+/* As tall as the row buttons, so locked and overridable rows match (issue #83) */
+td .action-locked {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.25rem;
+}
+
+/* Date, pills and action stay on one line, so rows stay even on phones (the table scrolls) */
+#ans-days td:not(:nth-child(2)) {
+  white-space: nowrap;
+}
+
 td button:hover:not(:disabled) {
   background-color: var(--surface-2);
 }
