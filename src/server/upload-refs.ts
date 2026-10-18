@@ -1,5 +1,5 @@
 // Upload references (spec #66): who may attach an uploaded file, and when a file is deleted.
-// A file lives while a game cover or an entry photo (soft-deleted ones too) uses it; callers state
+// A file lives while a game cover, an entry photo (soft-deleted ones too) or a tutorial pet uses it; callers state
 // intent (attach, release, drop a game or user) and never unlink files themselves.
 import { readdir, stat, unlink } from "node:fs/promises";
 import { join } from "node:path";
@@ -23,7 +23,8 @@ export function uploadRefs(pool: pg.Pool, dir: string) {
   const isReferenced = async (url: string): Promise<boolean> =>
     (
       await pool.query(
-        "select 1 from games where cover_url = $1 union all select 1 from entries where photo_url = $1",
+        `select 1 from games where cover_url = $1 union all select 1 from entries where photo_url = $1
+         union all select 1 from tutorial_photos where url = $1`,
         [url],
       )
     ).rowCount! > 0;
@@ -31,7 +32,7 @@ export function uploadRefs(pool: pg.Pool, dir: string) {
   // URLs still used by content (soft-deleted entries stay, they can be restored)
   const referencedUrls = async (): Promise<Set<string>> => {
     const { rows } = await pool.query<{ url: string }>(
-      "select cover_url as url from games union select photo_url from entries",
+      "select cover_url as url from games union select photo_url from entries union select url from tutorial_photos",
     );
     return new Set(rows.map((r) => r.url));
   };
