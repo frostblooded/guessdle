@@ -20,7 +20,12 @@ const KEPT = [
 
 describe("brand", () => {
   it("keeps Petdle only as the game's data or as infrastructure identifiers", () => {
-    const files = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" })
+    // Untracked files too, so a new file fails here before it fails in CI
+    const files = execFileSync(
+      "git",
+      ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+      { encoding: "utf8" },
+    )
       .split("\0")
       .filter(
         (f) => f && !EXEMPT_FILES.test(f) && !/\.(jpg|png|webp|ico)$/.test(f),
