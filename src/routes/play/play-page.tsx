@@ -28,7 +28,7 @@ import {
 import { isImageGame, minEntriesOf } from "../../game/blur.ts";
 import { browserFetch, gameKey, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
-import { GuessForm } from "./guess-form.tsx";
+import { GuessForm, useGuessMode } from "./guess-form.tsx";
 import {
   GameNotFound,
   NoSuchDay,
@@ -40,6 +40,7 @@ import { loadGame } from "./load-game.ts";
 import { PlayActions, PlayStatus } from "./play-status.tsx";
 import { ResetDialog } from "./reset-dialog.tsx";
 import { ResultBanner, resultOf, type Result } from "./result-banner.tsx";
+import { SelectList } from "./select-list.tsx";
 import { StatsDialog } from "./stats-dialog.tsx";
 import { useVictoryStats } from "./use-victory-stats.ts";
 
@@ -82,6 +83,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const started = useRef(false);
   const submitting = useRef(false);
   const opener = useRef<HTMLButtonElement | null>(null);
+  const modes = useGuessMode();
 
   const playable = typeof game === "object" ? game : null;
   // Why the game could not be loaded
@@ -186,6 +188,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
     if (id !== SKIP) {
       setGuess("");
     }
+    modes.setSelecting(false);
     if (res.kind === "duplicate") {
       return;
     }
@@ -255,9 +258,8 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const blur =
     playable && isImageGame(playable.kind) ? (playable.blurTries ?? 1) : null;
   const wrong = rows.filter((row) => !isAnswerRow(row)).length;
-  const names = roster
-    .map((entry) => entry.name)
-    .filter((name) => !used.has(name));
+  const unguessed = roster.filter((entry) => !used.has(entry.name));
+  const names = unguessed.map((entry) => entry.name);
   const titles = boardColumns(playable?.attributes ?? []);
 
   return (
@@ -333,6 +335,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
         )}
         <Card className="play-card mb-6 gap-3 p-4 sm:p-5">
           <GuessForm
+            modes={modes}
             names={names}
             value={guess}
             onChange={setGuess}
@@ -382,13 +385,21 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
           opener={opener}
           past={past}
         />
-        <PlayResults
-          rows={rows}
-          titles={blur === null ? titles : null}
-          loading={isPending || loading}
-          loadingText={past ? "Loading the game…" : "Loading today's game…"}
-          empty={ready && rows.length === 0}
-        />
+        {modes.selecting && !finished && !cannotPlay ? (
+          <SelectList
+            entries={unguessed}
+            attributes={blur === null ? (playable?.attributes ?? []) : null}
+            onPick={(name) => void submit(name)}
+          />
+        ) : (
+          <PlayResults
+            rows={rows}
+            titles={blur === null ? titles : null}
+            loading={isPending || loading}
+            loadingText={past ? "Loading the game…" : "Loading today's game…"}
+            empty={ready && rows.length === 0}
+          />
+        )}
       </section>
     </>
   );

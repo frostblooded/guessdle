@@ -15,7 +15,8 @@ import {
   SKIP,
 } from "../../game/game.ts";
 import type { LiveRound, PartyView } from "../../game/party.ts";
-import { GuessForm } from "../play/guess-form.tsx";
+import { GuessForm, useGuessMode } from "../play/guess-form.tsx";
+import { SelectList } from "../play/select-list.tsx";
 
 type Board = NonNullable<LiveRound["yours"]>;
 
@@ -36,13 +37,17 @@ export function PartyRound({
   onNotice: (text: string | null) => void;
 }) {
   const [guess, setGuess] = useState("");
-  const entries = view.game.entries;
+  const modes = useGuessMode();
   const done = mine.solved || mine.gaveUp || mine.lost;
+  // Selection mode's list, in place of the board
+  const listing = modes.selecting && !done;
+  const entries = view.game.entries;
   const used = guessedNames(mine.rows);
   // A Blur or Sequence game's tries
   const blur = isImageGame(view.game.kind) ? (view.game.blurTries ?? 1) : null;
   const newestFirst = [...mine.rows].reverse();
-  const names = entries.map((e) => e.name).filter((name) => !used.has(name));
+  const unguessed = entries.filter((e) => !used.has(e.name));
+  const names = unguessed.map((e) => e.name);
   const titles = boardColumns(view.game.attributes);
 
   const submit = (name: string): void => {
@@ -54,6 +59,7 @@ export function PartyRound({
     if (onGuess(id)) {
       onNotice(null);
       setGuess("");
+      modes.setSelecting(false);
     }
   };
 
@@ -109,6 +115,7 @@ export function PartyRound({
       {!done && (
         <Card id="guess-card" className="play-card mb-6 gap-3 p-4 sm:p-5">
           <GuessForm
+            modes={modes}
             names={names}
             value={guess}
             onChange={setGuess}
@@ -127,8 +134,15 @@ export function PartyRound({
           </div>
         </Card>
       )}
-      {blur !== null && <BlurGuesses rows={newestFirst} />}
-      {blur === null && mine.rows.length > 0 && (
+      {listing && (
+        <SelectList
+          entries={unguessed}
+          attributes={blur === null ? view.game.attributes : null}
+          onPick={submit}
+        />
+      )}
+      {!listing && blur !== null && <BlurGuesses rows={newestFirst} />}
+      {!listing && blur === null && mine.rows.length > 0 && (
         <div id="board" className="results flex flex-col gap-2 sm:gap-2.5">
           <TitleRow columns={titles} />
           <div id="guess-results-container" className="flex flex-col gap-2">

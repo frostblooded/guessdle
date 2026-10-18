@@ -11,12 +11,13 @@ import { MAX_TILES } from "../../game/banner.ts";
 import { blurRenderer, fileOf, tileRenderer } from "../images.ts";
 import { findParty, loadData } from "../parties.ts";
 import type { GameRow } from "../games.ts";
+import { openDay } from "../play-day.ts";
 import {
-  dayOf,
   fail,
   loadGame,
   paramOf,
-  todaysAnswer,
+  queryOf,
+  sendRefusal,
   type AppContext,
 } from "./context.ts";
 
@@ -79,15 +80,18 @@ export function blurRoutes(
       if (!loaded) {
         return;
       }
-      const played = dayOf(ctx, req, loaded.game);
-      if (loaded.game.kind !== kind || !played) {
+      if (loaded.game.kind !== kind) {
         fail(res, "not_found");
         return;
       }
-      const { date, day } = played;
-      const answer = await todaysAnswer(ctx, res, loaded, date, day);
-      if (answer) {
-        await send(req, res, loaded.game, answer);
+      const day = await openDay(ctx, loaded, queryOf(req)["day"]);
+      if (!("refusal" in day)) {
+        await send(req, res, day.game, day.answer);
+      } else if (day.refusal === "no_such_day") {
+        // An image that does not exist, rather than a day
+        fail(res, "not_found");
+      } else {
+        sendRefusal(res, day);
       }
     };
 

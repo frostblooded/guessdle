@@ -2,18 +2,16 @@
 import type { Request, Response } from "express";
 import type pg from "pg";
 import { FAILURES, type FailureCode } from "../../game/failures.ts";
-import type { Entry } from "../../game/game.ts";
-import { isImageGame } from "../../game/blur.ts";
-import { dateOfDay, dayNumber, ensureAnswer, todayIn } from "../answers.ts";
 import {
-  playBlocker,
   resolveGame,
   type LoadedGame,
   type Need,
   type Resolved,
 } from "../access.ts";
+import { isImageGame } from "../../game/blur.ts";
 import type { MailConfig } from "../mailer.ts";
 import type { GameRow, Roster } from "../games.ts";
+import { openDay, type DayRefusal, type PlayDay } from "../play-day.ts";
 
 export interface AppContext {
   pool: pg.Pool;
@@ -39,8 +37,8 @@ export const fail = (res: Response, code: FailureCode): void => {
   res.status(FAILURES[code].status).json({ error: code });
 };
 
-// A guess list as a request sends it: at most one guess per entry, or for a Blur or Sequence game
-// (which may skip, ADR 0019) one per try
+// A guess list as a request sends it: at most one guess per entry, or for a Blur or Sequence
+// game (which may skip, ADR 0019) one per try
 export const isIdList = (
   game: GameRow,
   { entries }: Roster,
@@ -78,67 +76,27 @@ export const loadGame = (
   res: Response,
 ): Promise<LoadedGame | undefined> => guardGame(ctx, req, res, "play");
 
-// Today's date and Day Number in the game's calendar
-export function todayOf(
-  { now, timeZone }: AppContext,
-  game: GameRow,
-): { date: string; day: number } {
-  const date = todayIn(now(), timeZone);
-  return { date, day: dayNumber(date, game.startDate) };
-}
-
-// The day a request plays: today, or a past day named by `?day=N` (0 up to today).
-// `past` marks an archive day, whose wins stay out of the daily stats.
-export function dayOf(
+// The Day of play a request names (`?day=N`, today when absent) with its answer, or the
+// refusal sent and undefined. `accepts` validates the rest of the request (openDay).
+export async function playDayOf(
   ctx: AppContext,
   req: Request,
-  game: GameRow,
-): { date: string; day: number; past: boolean } | null {
-  const today = todayOf(ctx, game);
-  const raw = queryOf(req)["day"];
-  if (raw === undefined) {
-    return { ...today, past: false };
-  }
-  if (typeof raw !== "string" || !/^\d{1,6}$/.test(raw)) {
-    return null;
-  }
-  const day = Number(raw);
-  if (day > today.day) {
-    return null;
-  }
-  return {
-    date: dateOfDay(day, game.startDate),
-    day,
-    past: day !== today.day,
-  };
-}
-
-// The answer for `date` (today or a past day), or the failure sent and undefined
-export async function todaysAnswer(
-  { pool, random }: AppContext,
   res: Response,
-  { game, roster }: LoadedGame,
-  date: string,
-  day: number,
-): Promise<Entry | undefined> {
-  // Only the owner and admins reach a game too small to draw an answer from
-  const blocker = playBlocker(game, roster);
-  if (blocker) {
-    res
-      .status(FAILURES[blocker].status)
-      .json({ error: blocker satisfies FailureCode, day });
+  loaded: LoadedGame,
+  accepts?: () => boolean,
+): Promise<PlayDay | undefined> {
+  const out = await openDay(ctx, loaded, queryOf(req)["day"], accepts);
+  if ("refusal" in out) {
+    sendRefusal(res, out);
     return undefined;
   }
-  const answerId = await ensureAnswer(
-    pool,
-    game,
-    roster.answerIds,
-    date,
-    random,
-  );
-  const answer = roster.all.find((entry) => entry.id === answerId);
-  if (!answer) {
-    res.status(500).json({ error: "answer_missing", day });
-  }
-  return answer;
+  return out;
+}
+
+// A day's refusal with its status; once the day is known the reply names it
+export function sendRefusal(res: Response, out: DayRefusal): void {
+  res.status(FAILURES[out.refusal].status).json({
+    error: out.refusal satisfies FailureCode,
+    ...("day" in out && { day: out.day }),
+  });
 }

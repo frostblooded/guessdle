@@ -18,10 +18,12 @@ export interface GameAttribute {
 
 // What the client knows of an entry: enough to autocomplete and show a photo. A classic
 // entry's photo is its first Image value (blank when it has none); a Blur entry's is its image.
+// A classic entry carries its values too, for the selection list.
 export interface EntryRef {
   id: number;
   name: string;
   photo: string;
+  values?: AttributeValue[];
 }
 
 // An entry with its values, one per game attribute in attribute order (Text, Number and
@@ -57,14 +59,14 @@ export interface BoardColumn {
   attribute?: number;
 }
 
-// The guess grid's columns: Name, then a classic game's Attributes in their order. A Blur game
-// shows the name only.
+// The guess grid's columns: Name, then a classic game's Attributes in their order. A Blur or
+// Sequence game shows the name only.
 export function boardColumns(
   attributes: readonly GameAttribute[],
   kind: GameKind = "classic",
 ): BoardColumn[] {
   const name: BoardColumn = { title: "Name", image: false };
-  if (kind === "blur") {
+  if (isImageGame(kind)) {
     return [name];
   }
   return [
