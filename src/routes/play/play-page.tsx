@@ -326,6 +326,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
               slug={slug}
               canHost={playable !== null && !closed}
               canEdit={playable?.canEdit === true}
+              saveName={playable && !closed ? playable.name : undefined}
             />
           </>
         }
