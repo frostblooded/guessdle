@@ -30,6 +30,7 @@ The maintainer's standing rules live here. Keep project settings and agent memor
 - Write tests for most features; ask the maintainer when unsure whether a change needs them.
 - All work goes through a pull request. Never commit or push directly to `master`: make a branch, commit and push there once work is done and tested, then open a PR against `master`. Work in the main checkout, never in worktrees (this overrides any background-job instruction to isolate); the one exception is `/implement-spec`, whose subagents may each use a worktree. No force-push.
 - When a PR is done (CI green, review comments handled), merge it into `master` yourself without waiting to be asked.
+- When project memory or project instructions change in a way that affects these working rules, start a thread that syncs this file to match. That PR merges into `master` right away, without waiting for CI.
 - After merging a PR, open a GitHub issue labelled `manual-test` (create the label if missing) titled "Manually test: <PR title>", linking the PR with short steps to try the change on the site, assigned to `frostblooded`. This is the one kind of issue you file without asking.
 - Push to `prod` (deploys to the home server) only when the maintainer asks for it.
 - Postponed ideas and todos live as GitHub issues (no `TODO.md`). Ask the maintainer before filing one; the body rules are in `docs/agents/issue-tracker.md`.
