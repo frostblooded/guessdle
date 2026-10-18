@@ -47,6 +47,11 @@ type Client = Pick<pg.PoolClient, "query">;
 
 // Runs `work` in a transaction holding the game's answer lock, so generation,
 // overrides and re-draws never interleave.
+// Takes the game's answer lock in `tx`, held until that transaction ends
+async function lockAnswers(tx: Client, game: GameRow): Promise<void> {
+  await tx.query("select pg_advisory_xact_lock($1, $2)", [LOCK_KEY, game.id]);
+}
+
 async function locked<T>(
   pool: pg.Pool,
   game: GameRow,
@@ -55,10 +60,7 @@ async function locked<T>(
   const client = await pool.connect();
   try {
     await client.query("begin");
-    await client.query("select pg_advisory_xact_lock($1, $2)", [
-      LOCK_KEY,
-      game.id,
-    ]);
+    await lockAnswers(client, game);
     const out = await work(client);
     await client.query("commit");
     return out;
@@ -327,51 +329,51 @@ export function clearOverride(
 // After an entry is soft-deleted: overrides after today pointing at it are cleared and every
 // stored day after today that pointed at it is re-drawn over the `ids` that remain.
 // Today and the past keep their answer (players saw it; the soft-deleted row still resolves).
-export function releaseEntry(
-  pool: pg.Pool,
+// Runs in the deleting transaction `tx`, so the delete and the re-draw land together.
+export async function releaseEntry(
+  tx: Client,
   game: GameRow,
   ids: readonly number[],
   today: string,
   entryId: number,
   random: () => number,
 ): Promise<void> {
-  return locked(pool, game, async (client) => {
-    const cleared = await client.query<{ day: string }>(
-      `update daily_answers set source = 'generated'
-       where game_id = $1 and entry_id = $2 and day > $3 and source = 'override'
-       returning to_char(day, 'YYYY-MM-DD') as day`,
-      [game.id, entryId, today],
-    );
-    const stale = await client.query<{ day: string | null }>(
-      `select to_char(min(day), 'YYYY-MM-DD') as day from daily_answers
-       where game_id = $1 and entry_id = $2 and day > $3`,
-      [game.id, entryId, today],
-    );
-    const days = [...cleared.rows.map((r) => r.day), stale.rows[0]!.day]
-      .filter((d): d is string => d !== null)
-      .sort();
-    if (days[0] !== undefined && ids.length > 0) {
-      await redrawFrom(client, game, ids, days[0], random);
-    }
-  });
+  await lockAnswers(tx, game);
+  const cleared = await tx.query<{ day: string }>(
+    `update daily_answers set source = 'generated'
+     where game_id = $1 and entry_id = $2 and day > $3 and source = 'override'
+     returning to_char(day, 'YYYY-MM-DD') as day`,
+    [game.id, entryId, today],
+  );
+  const stale = await tx.query<{ day: string | null }>(
+    `select to_char(min(day), 'YYYY-MM-DD') as day from daily_answers
+     where game_id = $1 and entry_id = $2 and day > $3`,
+    [game.id, entryId, today],
+  );
+  const days = [...cleared.rows.map((r) => r.day), stale.rows[0]!.day]
+    .filter((d): d is string => d !== null)
+    .sort();
+  if (days[0] !== undefined && ids.length > 0) {
+    await redrawFrom(tx, game, ids, days[0], random);
+  }
 }
 
 // After the skip period changed: re-draws every stored generated day after `today`
-// under the game's new rule. Today and the past stay as players saw them.
-export function redrawFuture(
-  pool: pg.Pool,
+// under the game's new rule. Today and the past stay as players saw them. Runs in the editing
+// transaction `tx`.
+export async function redrawFuture(
+  tx: Client,
   game: GameRow,
   ids: readonly number[],
   today: string,
   random: () => number,
 ): Promise<void> {
-  return locked(pool, game, (client) =>
-    redrawFrom(
-      client,
-      game,
-      ids,
-      dateOfDay(dayNumber(today, game.startDate) + 1, game.startDate),
-      random,
-    ),
+  await lockAnswers(tx, game);
+  await redrawFrom(
+    tx,
+    game,
+    ids,
+    dateOfDay(dayNumber(today, game.startDate) + 1, game.startDate),
+    random,
   );
 }
