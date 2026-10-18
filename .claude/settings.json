@@ -3,6 +3,37 @@
     "allow": ["Bash(npx tsc)"]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/cloud-setup.mjs",
+            "timeout": 600
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/caveman/caveman-activate.js",
+            "timeout": 30,
+            "statusMessage": "Loading caveman mode..."
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/ponytail/ponytail-activate.js",
+            "timeout": 30,
+            "statusMessage": "Loading ponytail mode..."
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",
@@ -29,28 +60,6 @@
             "type": "command",
             "command": "node .claude/caveman/caveman-stats.js --record",
             "timeout": 5
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node .claude/caveman/caveman-activate.js",
-            "timeout": 30,
-            "statusMessage": "Loading caveman mode..."
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node .claude/ponytail/ponytail-activate.js",
-            "timeout": 30,
-            "statusMessage": "Loading ponytail mode..."
           }
         ]
       }

@@ -13,7 +13,12 @@ const IMAGE = "petdle-backup-test";
 const docker = (...args: string[]): string =>
   execFileSync("docker", args, { encoding: "utf8", stdio: "pipe" });
 
-describe("backup sidecar scripts (real Postgres, real sidecar image)", () => {
+// Building the sidecar needs Docker Hub and Alpine packages, out of reach in cloud sessions (.claude/hooks/cloud-setup.mjs)
+const withImage = process.env["SKIP_BACKUP_IMAGE_TEST"]
+  ? describe.skip
+  : describe;
+
+withImage("backup sidecar scripts (real Postgres, real sidecar image)", () => {
   let network: StartedNetwork;
   let db: StartedPostgreSqlContainer;
   let pool: pg.Pool;
