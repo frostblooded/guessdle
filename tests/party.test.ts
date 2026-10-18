@@ -202,7 +202,7 @@ describe("partyView", () => {
   const view = (rounds: RoundData[], viewer: number | null, ended = false) =>
     partyView({
       code: "KWZP",
-      game: { slug: "petdle", name: "Petdle" },
+      game: { slug: "pets", name: "Pets" },
       attributes: [{ name: "Color", type: "text" }],
       entries: all,
       all,
