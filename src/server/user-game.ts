@@ -1,6 +1,11 @@
 // A signed-in player's Game State for one day, stored in Postgres.
 import type pg from "pg";
-import { gradeIds, type Entry, type GradedAttribute } from "../game/game.ts";
+import {
+  gradeIds,
+  SKIP,
+  type Entry,
+  type GradedAttribute,
+} from "../game/game.ts";
 import type { GameRow, Roster } from "./games.ts";
 
 export interface GameView {
@@ -16,6 +21,11 @@ export interface GameView {
   // Blur games, once the day is over: the answer's whole image
   answerPhoto?: string;
 }
+
+// An id a player may guess: an active entry, or in a Blur game SKIP
+const isGuessId = (game: GameRow, roster: Roster, id: unknown): boolean =>
+  (id === SKIP && game.kind === "blur") ||
+  roster.entries.some((e) => e.id === id);
 
 // A Blur game's tries, null for a classic game with unlimited guesses
 export const triesOf = (game: GameRow): number | null =>
@@ -63,7 +73,7 @@ export interface GameContext {
   userId: number;
   date: string;
   day: number;
-  // An archive day (not today): playable, but its wins stay out of the daily stats
+  // An archive day (not today), played from the Past days list
   past: boolean;
 }
 
@@ -73,7 +83,9 @@ export async function view(
   { game, roster, answer, userId, date, day }: GameContext,
 ): Promise<GameView> {
   const guesses = await q.query<{ entry_id: number }>(
-    "select entry_id::int from user_guesses where user_id = $1 and game_id = $2 and day = $3 order by seq",
+    // A skip is stored with no entry (migration 011)
+    `select coalesce(entry_id, ${SKIP})::int as entry_id from user_guesses
+     where user_id = $1 and game_id = $2 and day = $3 order by seq`,
     [userId, game.id, date],
   );
   const gaveUp =
@@ -147,7 +159,7 @@ export async function addGuess(
   current: GameView,
   id: unknown,
 ): Promise<Refusal | null> {
-  if (typeof id !== "number" || !roster.entries.some((e) => e.id === id)) {
+  if (typeof id !== "number" || !isGuessId(game, roster, id)) {
     return "invalid";
   }
   if (finished(current)) {
@@ -155,7 +167,7 @@ export async function addGuess(
   }
   const { rowCount } = await q.query(
     "insert into user_guesses (user_id, game_id, day, entry_id) values ($1, $2, $3, $4) on conflict do nothing",
-    [userId, game.id, date, id],
+    [userId, game.id, date, id === SKIP ? null : id],
   );
   return rowCount === 1 ? null : "duplicate";
 }
@@ -186,8 +198,8 @@ export async function mergeLocal(
   const { ids, gaveUp } = body;
   if (
     !Array.isArray(ids) ||
-    ids.length > roster.entries.length ||
-    !ids.every((id) => roster.entries.some((e) => e.id === id)) ||
+    ids.length > (triesOf(game) ?? roster.entries.length) ||
+    !ids.every((id) => isGuessId(game, roster, id)) ||
     (gaveUp !== undefined && typeof gaveUp !== "boolean")
   ) {
     return "invalid";
@@ -198,8 +210,10 @@ export async function mergeLocal(
   if (current.ids.length > 0 || current.gaveUp) {
     return "has_progress";
   }
-  // Keep first occurrences in order, stop after the answer
-  const keep = [...new Set(ids as number[])];
+  // Keep first occurrences (and every skip) in order, stop after the answer
+  const keep = (ids as number[]).filter(
+    (id, i) => id === SKIP || ids.indexOf(id) === i,
+  );
   const end = keep.indexOf(answer.id);
   const adopted = (end === -1 ? keep : keep.slice(0, end + 1)).slice(
     0,
@@ -208,7 +222,7 @@ export async function mergeLocal(
   for (const id of adopted) {
     await q.query(
       "insert into user_guesses (user_id, game_id, day, entry_id) values ($1, $2, $3, $4)",
-      [userId, game.id, date, id],
+      [userId, game.id, date, id === SKIP ? null : id],
     );
   }
   if (gaveUp === true && end === -1 && !isLost(game, adopted, false)) {

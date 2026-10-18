@@ -2,7 +2,7 @@
 // moves (submit, unpublish, approve, reject), the admin email on entering pending and the
 // owner's approval emails (owner-mail.ts).
 import type pg from "pg";
-import { MIN_ENTRIES } from "../game/limits.ts";
+import { minEntriesOf } from "../game/blur.ts";
 import { HAS_MISSING_VALUES, type GameRow, type GameStatus } from "./games.ts";
 import type { OwnerMailKind } from "../mail-settings.ts";
 import type { MailConfig } from "./mailer.ts";
@@ -190,7 +190,7 @@ export function gameLifecycle(pool: pg.Pool, mail?: MailConfig) {
               "select count(*)::int as n from entries where game_id = $1 and deleted_at is null",
               [game.id],
             );
-            if (rows[0]!.n < MIN_ENTRIES) {
+            if (rows[0]!.n < minEntriesOf(game.kind)) {
               return { result: "too_few_entries", mails: NO_MAILS };
             }
             const missing = await tx.query(

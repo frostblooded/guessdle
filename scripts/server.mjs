@@ -19,6 +19,7 @@ const TYPES = {
   ".css": "text/css; charset=utf-8",
   ".map": "application/json",
   ".jpg": "image/jpeg",
+  ".png": "image/png",
   ".webp": "image/webp",
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon",

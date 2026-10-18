@@ -1,6 +1,7 @@
 // What a player's socket message does to a party (ADR 0016), under the party lock.
 import type pg from "pg";
-import { MIN_ENTRIES } from "../game/limits.ts";
+import { minEntriesOf } from "../game/blur.ts";
+import { SKIP } from "../game/game.ts";
 import {
   drawAnswer,
   everyoneDone,
@@ -65,10 +66,15 @@ export async function act(
               [live.id, me.id, now],
             );
           } else {
-            if (!data.roster.entries.some((e) => e.id === msg.entryId)) {
+            const skip = msg.entryId === SKIP && data.game.kind === "blur";
+            if (
+              !skip &&
+              !data.roster.entries.some((e) => e.id === msg.entryId)
+            ) {
               return "invalid";
             }
             if (
+              !skip &&
               live.guesses.some(
                 (g) => g.playerId === me.id && g.entryId === msg.entryId,
               )
@@ -77,7 +83,7 @@ export async function act(
             }
             await tx.query(
               "insert into party_guesses (round_id, player_id, entry_id, guessed_at) values ($1, $2, $3, $4)",
-              [live.id, me.id, msg.entryId, now],
+              [live.id, me.id, skip ? null : msg.entryId, now],
             );
           }
           await endIfAllDone();
@@ -95,7 +101,7 @@ export async function act(
             return "round_live";
           }
           const active = data.roster.entries.map((e) => e.id);
-          if (active.length < MIN_ENTRIES) {
+          if (active.length < minEntriesOf(data.game.kind)) {
             return "not_enough_entries";
           }
           if (data.roster.incomplete > 0) {

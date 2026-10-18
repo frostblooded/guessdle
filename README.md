@@ -63,6 +63,6 @@ All rights reserved. See [`LICENSE`](LICENSE).
 
 ## More docs
 
-- [`CONTEXT.md`](CONTEXT.md): domain terms
+- [`GLOSSARY.md`](GLOSSARY.md): domain terms
 - [`docs/adr/`](docs/adr): architecture decisions
 - [`CLAUDE.md`](CLAUDE.md): guidance for AI coding agents

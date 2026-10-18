@@ -213,8 +213,19 @@ describe("blur games", () => {
     const card = (await request("GET", "/api/games")).body.find(
       (c: Body) => c.slug === "blurry",
     );
-    assert.deepEqual(card.photos, []);
     assert.equal(card.kind, "blur");
+    // The banner collage is blurred tiles served by index, never the photos themselves
+    assert.deepEqual(card.photos, [
+      "/api/games/blurry/tile/0",
+      "/api/games/blurry/tile/1",
+    ]);
+    const tile = await fetch(`${url}${card.photos[1]}`);
+    assert.equal(tile.status, 200);
+    assert.equal(tile.headers.get("content-type"), "image/webp");
+    const meta = await sharp(Buffer.from(await tile.arrayBuffer())).metadata();
+    assert.deepEqual([meta.width, meta.height], [240, 240]);
+    assert.equal((await fetch(`${url}${G}/tile/2`)).status, 404);
+    assert.equal((await fetch(`${url}/api/games/petdle/tile/0`)).status, 404);
   });
 
   it("serves today's answer blurred but for the earned squares, up to the tries", async () => {
@@ -240,6 +251,31 @@ describe("blur games", () => {
     assert.equal((await fetch(`${url}${G}/blur/4`)).status, 404);
     assert.equal((await fetch(`${url}${G}/blur/0`)).status, 404);
     assert.equal((await fetch(`${url}/api/games/petdle/blur/1`)).status, 404);
+  });
+
+  it("plays, lists and submits with a single entry", async () => {
+    const [only] = (await addEntry("Alpha")).body;
+    assert.equal((await request("POST", `${G}/submit`, ann)).status, 200);
+    await db.pool.query("update games set status = 'approved'");
+    const game = (await request("GET", G)).body;
+    assert.equal(game.paused, false);
+    assert.equal((await fetch(`${url}${G}/blur/1`)).status, 200);
+    const won = (
+      await request("POST", `${G}/grade`, undefined, { ids: [only.id] })
+    ).body;
+    assert.equal(won.victory, true);
+    assert.ok(
+      (await request("GET", "/api/games")).body.some(
+        (c: Body) => c.slug === "blurry",
+      ),
+    );
+    // A classic game still needs two
+    await request("POST", "/api/games", ann, { name: "Classic" });
+    await request("POST", "/api/games/classic/entries", ann, { name: "One" });
+    assert.equal(
+      (await request("POST", "/api/games/classic/submit", ann)).body.error,
+      "too_few_entries",
+    );
   });
 
   it("grades by name only and ends the day after the last try", async () => {
@@ -281,6 +317,56 @@ describe("blur games", () => {
     assert.equal(won.victory, true);
     assert.equal(won.lost, undefined);
     assert.ok(won.answerPhoto);
+  });
+
+  it("takes skips as tries, beyond the entry count, signed in or not", async () => {
+    const [only] = (await addEntry("Alpha")).body;
+    await db.pool.query("update games set status = 'approved'");
+    const grade = (ids: number[]) =>
+      request("POST", `${G}/grade`, undefined, { ids });
+    const one = (await grade([0])).body;
+    assert.deepEqual(one.rows, [
+      [{ key: "skip", value: "Skipped", correctness: 0 }],
+    ]);
+    const lost = (await grade([0, 0, 0])).body;
+    assert.equal(lost.lost, true);
+    assert.equal(lost.answer, "Alpha");
+    assert.equal((await grade([0, 0, 0, 0])).body.error, "invalid");
+    assert.equal((await grade([0, only.id])).body.victory, true);
+
+    const bob = await login("bob@example.test");
+    await request("GET", `${G}/state`, bob);
+    const skipped = (await request("POST", `${G}/state/guess`, bob, { id: 0 }))
+      .body;
+    assert.deepEqual(skipped.ids, [0]);
+    const again = (await request("POST", `${G}/state/guess`, bob, { id: 0 }))
+      .body;
+    assert.deepEqual(again.ids, [0, 0]);
+    const won = (
+      await request("POST", `${G}/state/guess`, bob, { id: only.id })
+    ).body;
+    assert.deepEqual(won.ids, [0, 0, only.id]);
+    assert.equal(won.victory, true);
+
+    // A local game with skips merges into a fresh account in order
+    const cy = await login("cy@example.test");
+    const merged = (
+      await request("POST", `${G}/state/merge`, cy, {
+        day: 0,
+        ids: [0, 0, only.id],
+      })
+    ).body;
+    assert.deepEqual(merged.ids, [0, 0, only.id]);
+
+    // A classic game takes no skip
+    assert.equal(
+      (
+        await request("POST", "/api/games/petdle/grade", undefined, {
+          ids: [0],
+        })
+      ).body.error,
+      "invalid",
+    );
   });
 
   it("keeps a signed-in player to the tries", async () => {

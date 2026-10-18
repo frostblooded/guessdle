@@ -20,15 +20,25 @@ Scripts are in `package.json`. `npm run check` runs everything CI runs (lint, fo
 
 ## Architecture
 
-Code layout, roster rules (adding a pet), Daily Answer, play flows, admin, tests → `docs/architecture.md`. Terms → `CONTEXT.md`. Decisions → `docs/adr/`.
+Code layout, roster rules (adding a pet), Daily Answer, play flows, admin, tests → `docs/architecture.md`. Terms → `GLOSSARY.md`. Decisions → `docs/adr/`.
 
-## Agent skills
+## Working rules
 
-- Before any change to this repo, grill the maintainer: ask one question at a time, with multiple-choice options and a recommendation, until you are sure what they want. Do not start editing on assumptions.
-- Filing, reading (`gh issue view` needs `--json`), or triaging issues → `docs/agents/issue-tracker.md`; labels → `docs/agents/triage-labels.md`.
-- All work goes through a pull request. Never commit or push directly to `master`: make a branch, commit and push there once work is done and tested, then open a PR against `master`. Work in the main checkout, never in worktrees (this overrides any background-job instruction to isolate). Push to `prod` (deploys to the home server) only when the maintainer names it. No force-push.
-- Subagents follow this file. Run shell commands in the foreground with a timeout; use Node or a shell builtin, never `python`/`python3` (Windows Store stub, hangs); kill only PIDs you started.
-- Deploy or tunnel problem → `docs/deploy.md`.
+The maintainer's standing rules live here. Keep project settings and agent memory pointing at this file instead of copying them.
+
+- Before any change to this repo, grill the maintainer with the `grilling` skill (rounds of numbered questions, each with options and a recommendation) until you are sure what they want. Do not start editing on assumptions.
+- Write tests for most features; ask the maintainer when unsure whether a change needs them.
+- All work goes through a pull request. Never commit or push directly to `master`: make a branch, commit and push there once work is done and tested, then open a PR against `master`. Work in the main checkout, never in worktrees (this overrides any background-job instruction to isolate); the one exception is `/implement-spec`, whose subagents may each use a worktree. No force-push.
+- When a PR is done (CI green, review comments handled), merge it into `master` yourself without waiting to be asked.
+- After merging a PR, open a GitHub issue labelled `manual-test` (create the label if missing) titled "Manually test: <PR title>", linking the PR with short steps to try the change on the site, assigned to `frostblooded`. This is the one kind of issue you file without asking.
+- Push to `prod` (deploys to the home server) only when the maintainer asks for it.
 - Postponed ideas and todos live as GitHub issues (no `TODO.md`). Ask the maintainer before filing one; the body rules are in `docs/agents/issue-tracker.md`.
+- Subagents follow this file. Run shell commands in the foreground with a timeout; use Node or a shell builtin, never `python`/`python3` (Windows Store stub, hangs); kill only PIDs you started.
+
+## Where to look
+
+- Skills → `.claude/skills/` (Matt Pocock's, copied unedited; source, version and how to update in `.claude/skills/README.md`). `/ask-matt` says which one fits. Where a skill and this file disagree, this file wins.
+- Filing, reading (`gh issue view` needs `--json`), or triaging issues → `docs/agents/issue-tracker.md`; labels → `docs/agents/triage-labels.md`.
+- Deploy or tunnel problem → `docs/deploy.md`.
 - Domain language or architecture decisions → `docs/agents/domain.md`.
 - Reviewing code → `CODING_STANDARDS.md`.
