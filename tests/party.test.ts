@@ -316,7 +316,8 @@ describe("Free Hints in a round", () => {
     });
     assert.equal(ana.hints, undefined);
     assert.equal(view([live], 2).round!.yours!.hint, undefined);
-    assert.ok(!JSON.stringify(view([live], null)).includes("White"));
+    // Entries carry their values for Select mode, so look for the hint itself
+    assert.ok(!JSON.stringify(view([live], null).round).includes('"hint"'));
   });
 
   it("reveals the answer's description once the player is done", () => {

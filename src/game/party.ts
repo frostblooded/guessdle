@@ -364,10 +364,11 @@ export function partyView(input: ViewInput): PartyView {
       ...input.game,
       kind,
       attributes: [...attributes],
-      entries: input.entries.map((e) => ({
-        ...ref(e),
-        photo: kind === "blur" ? "" : e.photo,
-      })),
+      entries: input.entries.map((e) =>
+        kind === "blur"
+          ? { ...ref(e), photo: "" }
+          : { ...ref(e), values: e.values },
+      ),
     },
     ended: input.ended,
     you: me ? { playerId: me.id, host: me.host } : null,

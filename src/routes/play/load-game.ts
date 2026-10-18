@@ -1,7 +1,7 @@
-// The game Play and Past Days show: its attributes and entries, loaded from the API
+// Play's view of a game: what GET /api/games/:slug answers.
 import { failureText, UNREACHABLE } from "../../game/failures.ts";
-import type { EntryRef, GameAttribute } from "../../game/game.ts";
 import type { GameKind } from "../../game/blur.ts";
+import type { EntryRef, GameAttribute } from "../../game/game.ts";
 import type { StatusView } from "./play-status.tsx";
 
 export type PlayableGame = {
