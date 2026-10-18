@@ -15,6 +15,8 @@ import { boardOf, isLost, triesOf, type PlayDay } from "./play-day.ts";
 
 export interface GameView {
   day: number;
+  // The answer's revision: a changed one means the day started over (migration 015)
+  revision: number;
   ids: number[];
   rows: GradedAttribute[][];
   victory: boolean;
@@ -45,7 +47,7 @@ export const REFUSAL_STATUS = {
   finished: 409,
   // merge: the account already has rows for the day
   has_progress: 409,
-  // merge: the payload is for another day
+  // merge: the payload is for another day, or for an answer since changed
   stale_day: 409,
   // hint: none on offer (too few guesses, already used, finished, or nothing to reveal)
   no_hint: 409,
@@ -86,6 +88,7 @@ export async function view(q: Q, ctx: GameContext): Promise<GameView> {
   const hint = pick && revealHint(ctx.roster.attributes, ctx.answer, pick);
   return {
     day,
+    revision: ctx.revision,
     ids,
     rows: board.rows,
     victory: board.victory,
@@ -217,7 +220,7 @@ export async function takeHint(
 // in changeGame makes the "no rows yet" check and the inserts one atomic step.
 export async function mergeLocal(
   q: Q,
-  { game, roster, answer, userId, date, day }: GameContext,
+  { game, roster, answer, userId, date, day, revision }: GameContext,
   current: GameView,
   body: Record<string, unknown>,
 ): Promise<Refusal | null> {
@@ -230,7 +233,8 @@ export async function mergeLocal(
   ) {
     return "invalid";
   }
-  if (body["day"] !== day) {
+  // Browsers from before revisions existed send none: they played revision 0
+  if (body["day"] !== day || (body["revision"] ?? 0) !== revision) {
     return "stale_day";
   }
   if (current.ids.length > 0 || current.gaveUp) {

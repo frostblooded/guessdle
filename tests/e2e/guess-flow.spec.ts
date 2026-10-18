@@ -381,7 +381,7 @@ test.describe("state stored in the browser", () => {
   });
 });
 
-test("the how-to-play page is linked from the nav and shows five steps", async ({
+test("the how-to-play page is linked from the nav and plays a practice game to a win", async ({
   page,
 }) => {
   await openOnDay(page);
@@ -393,51 +393,45 @@ test("the how-to-play page is linked from the nav and shows five steps", async (
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "How to play",
   );
-  await expect(page.locator(".help-step")).toHaveCount(5);
-  await expect(
-    page.locator(
-      ".help-example .correct, .help-example .partially-correct, .help-example .incorrect",
-    ),
-  ).toHaveCount(12);
+  const step = page.locator(".practice-step");
+  await expect(step).toHaveAttribute("data-step", "secret");
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(step).toHaveAttribute("data-step", "first");
+  await page.getByRole("button", { name: "Eddie", exact: true }).click();
+  await expect(step).toHaveAttribute("data-step", "clues");
+  await expect(page.locator(".practice-clues li").first()).toHaveText(
+    "Name is red: Eddie is not the secret pet.",
+  );
+  await page.getByRole("button", { name: "Next guess" }).click();
+  await expect(step).toHaveAttribute("data-step", "narrow");
+  await expect(page.locator(".pet-option.ruled-out").first()).toBeVisible();
+  await page.getByRole("button", { name: "Ati", exact: true }).click();
+  await expect(step).toHaveAttribute("data-step", "won");
+  await expect(page.locator(".practice-result")).toHaveText(
+    "Ati was the secret pet. You got it in 2 guesses.",
+  );
+  await expect(rows(page)).toHaveCount(2);
   await page.getByRole("link", { name: "Start playing" }).click();
   await expect(page).toHaveURL(/\/$/);
 });
 
-test("how-to-play examples use real roster pets and fit a phone screen", async ({
+test("the practice game offers every pet of the pet game and fits a phone screen", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 667 });
   await page.goto("/how-to-play");
-
-  const shown: string[] = await page
-    .locator(".help-example .guess-result-cell:nth-child(2)")
-    .allTextContents();
-  for (const name of [...shown, "Ati"]) {
-    expect(names, name).toContain(name);
-  }
-  // The guide's green/orange/red claims must still hold for the roster data.
-  const pet = (n: string) => GUESS_DATA.find((p) => p.name === n)!;
-  const [ati, cookie, eddie] = [pet("Ati"), pet("Cookie"), pet("Eddie")];
-  expect(cookie.colors).toEqual(ati.colors);
-  expect(cookie.owners).toEqual(ati.owners);
-  expect(
-    ati.colors.filter((c) => eddie.colors.includes(c)).length,
-  ).toBeGreaterThan(0);
-  expect(ati.colors).not.toEqual(eddie.colors);
-  expect(ati.owners.some((o) => eddie.owners.includes(o))).toBe(false);
-  await expect(page.locator(".help-example img")).toHaveCount(4);
-  for (const img of await page.locator(".help-step img").all()) {
-    await img.scrollIntoViewIfNeeded();
-    await expect(img).toBeVisible();
-    expect(
-      await img.evaluate((el: HTMLImageElement) => el.naturalWidth),
-    ).toBeGreaterThan(0);
-  }
-  expect(
-    await page.evaluate(
+  const fits = (): Promise<boolean> =>
+    page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-  ).toBe(true);
+    );
+  expect(await fits()).toBe(true);
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  expect((await page.locator(".pet-option").allTextContents()).sort()).toEqual(
+    [...names].sort(),
+  );
+  await page.getByRole("button", { name: "Bela", exact: true }).click();
+  await page.getByRole("button", { name: "Next guess" }).click();
+  expect(await fits()).toBe(true);
 });
 
 const giveUpButton = (page: Page): Locator => page.locator("#give-up-button");

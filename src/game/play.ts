@@ -25,6 +25,8 @@ export interface Reveal {
 // over (victory, or a Blur game's tries used up: `lost`)
 interface GradeResponse extends Reveal {
   day: number;
+  // The answer's revision; it grows when an override changes the day's answer
+  revision: number;
   rows: GradedAttribute[][];
   victory: boolean;
   lost?: true;
@@ -35,12 +37,14 @@ interface GradeResponse extends Reveal {
 // POST /api/games/:slug/hint
 interface HintResponse {
   day: number;
+  revision: number;
   hint: FreeHint;
 }
 
 // POST /api/games/:slug/give-up
 interface GiveUpResponse extends Reveal {
   day: number;
+  revision: number;
   answer: string;
 }
 
@@ -79,6 +83,10 @@ type Refused = { kind: "rate_limited" } | { kind: "error"; message: string };
 export const RATE_LIMITED =
   "Too many requests in a short time. Wait a minute, then try again.";
 
+// What the Play page says once the owner changed the day's answer and the board started over
+export const ANSWER_CHANGED =
+  "Today's answer was changed, so your board started over.";
+
 // The player's text for a refused POST
 export const refusalText = (refused: Refused): string =>
   refused.kind === "error" ? refused.message : RATE_LIMITED;
@@ -114,7 +122,8 @@ export type GiveUpResult =
   | { kind: "finished" }
   | { kind: "error"; message: string }
   | { kind: "rate_limited" }
-  // The server is on a newer day: the game started over and nothing was revealed
+  // The server is on a newer day, or the day's answer changed: the game started over and
+  // nothing was revealed
   | { kind: "newday" };
 
 export interface Play {
@@ -140,9 +149,11 @@ export interface PlayDeps {
   storage: StateStorage;
   now: () => Date;
   fetch: Fetch;
-  // Called when a response shows the server is on a newer day and the stored
-  // game was forgotten, so the page can clear what it shows
+  // Called when a response shows the server is on a newer day (or the day's answer
+  // changed) and the stored game was forgotten, so the page can clear what it shows
   onNewDay?: () => void;
+  // Called after onNewDay when it was the day's answer that changed, not the day
+  onAnswerChanged?: () => void;
   // A past day's Day Number: graded against that day's answer, and its
   // `storage` (pastDayStorage) never expires
   day?: number;
@@ -155,6 +166,7 @@ export function createPlay({
   now,
   fetch,
   onNewDay = (): void => {},
+  onAnswerChanged = (): void => {},
   day: pastDay,
 }: PlayDeps): Play {
   const state: GameState = createGameState(storage, now, pastDay === undefined);
@@ -180,16 +192,25 @@ export function createPlay({
       : { kind: "error", message: failureMessage(res) };
   }
 
-  // True if the response is from a newer day than the stored game, which is
-  // then forgotten
-  function isNewDay(responseDay: number): boolean {
+  // True if the response is from a newer day than the stored game, or the day's answer
+  // changed since; the stored game is then forgotten. Otherwise stores the day and revision.
+  function isNewDay({
+    day: responseDay,
+    revision,
+  }: Pick<GradeResponse, "day" | "revision">): boolean {
     const day: number | null = state.getDay();
-    if (day !== null && day !== responseDay) {
+    const newDay: boolean = day !== null && day !== responseDay;
+    const stored: number | null = state.getRevision();
+    if (newDay || (stored !== null && stored !== revision)) {
       state.reset();
       finished = false;
       onNewDay();
+      if (!newDay) {
+        onAnswerChanged();
+      }
       return true;
     }
+    state.setDay(responseDay, revision);
     return false;
   }
 
@@ -203,10 +224,9 @@ export function createPlay({
         if ("kind" in res) {
           return { failure: refusalText(res) };
         }
-        if (isNewDay(res.day)) {
+        if (isNewDay(res)) {
           return { rows: [], victory: false };
         }
-        state.setDay(res.day);
         loaded.rows = res.rows;
         loaded.victory = res.victory;
         if (res.victory) {
@@ -227,10 +247,9 @@ export function createPlay({
         if ("kind" in res) {
           return { failure: refusalText(res) };
         }
-        if (isNewDay(res.day)) {
+        if (isNewDay(res)) {
           return { rows: [], victory: false };
         }
-        state.setDay(res.day);
         Object.assign(loaded, revealIn(res));
         loaded.gaveUp = true;
       }
@@ -258,11 +277,10 @@ export function createPlay({
       if ("kind" in res) {
         return res;
       }
-      if (isNewDay(res.day)) {
+      if (isNewDay(res)) {
         return play.submit(id);
       }
       state.addUsedGuess(id);
-      state.setDay(res.day);
       const row: GradedAttribute[] = res.rows[res.rows.length - 1]!;
       const isAnswer: boolean = isAnswerRow(row);
       finished = isAnswer || res.lost === true;
@@ -288,7 +306,7 @@ export function createPlay({
       if ("kind" in res) {
         return res;
       }
-      if (isNewDay(res.day)) {
+      if (isNewDay(res)) {
         return { kind: "newday" };
       }
       state.setHint(res.hint);
@@ -303,11 +321,10 @@ export function createPlay({
       if ("kind" in res) {
         return res;
       }
-      if (isNewDay(res.day)) {
+      if (isNewDay(res)) {
         return { kind: "newday" };
       }
       state.setGaveUp();
-      state.setDay(res.day);
       finished = true;
       return { kind: "gaveUp", answer: res.answer, ...revealIn(res) };
     },

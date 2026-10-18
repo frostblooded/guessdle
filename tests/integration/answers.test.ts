@@ -272,7 +272,12 @@ describe("stored daily answers and anonymous grading", () => {
       assert.equal(status, 200);
       assert.equal(body.day, dayNumber(BACKFILL_END));
       assert.equal(body.victory, false);
-      assert.deepEqual(Object.keys(body).sort(), ["day", "rows", "victory"]);
+      assert.deepEqual(Object.keys(body).sort(), [
+        "day",
+        "revision",
+        "rows",
+        "victory",
+      ]);
       assert.deepEqual(
         body.rows!.map((row) => row[0]!.value),
         wrong.map(petName),
@@ -375,7 +380,7 @@ describe("stored daily answers and anonymous grading", () => {
       assert.equal(status, 200);
       assert.equal(body.day, dayNumber(BACKFILL_END));
       assert.equal(petName(answer), body.answer);
-      assert.deepEqual(Object.keys(body).sort(), ["answer", "day"]);
+      assert.deepEqual(Object.keys(body).sort(), ["answer", "day", "revision"]);
     });
 
     it("is stateless: ignores the body, same reply every time", async () => {

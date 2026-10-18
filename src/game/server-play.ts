@@ -1,6 +1,7 @@
 // Signed-in play: guesses, give-up and reset live on the server (/api/game).
 import { isAnswerRow, type GradedAttribute } from "./game.ts";
 import type { HintKind } from "./free-hint.ts";
+import type { StateStorage } from "./game-state.ts";
 import {
   RATE_LIMITED,
   revealIn,
@@ -18,6 +19,8 @@ import { call, failureMessage, type Fetch } from "./transport.ts";
 // The server's view of today's game
 interface GameResponse extends Reveal, HintState {
   day: number;
+  // The answer's revision; it grows when an override changes the day's answer
+  revision: number;
   ids: number[];
   rows: GradedAttribute[][];
   victory: boolean;
@@ -30,14 +33,24 @@ export interface ServerPlayDeps {
   fetch: Fetch;
   // Called when a response shows the server is on a newer day than the page
   onNewDay?: () => void;
+  // Called after onNewDay when the day's answer changed since this browser last saw
+  // progress on it: the server already wiped that progress
+  onAnswerChanged?: () => void;
+  // The game's (or past day's) browser keys: where the last seen revision is kept
+  storage?: StateStorage;
   // A past day's Day Number; today when absent
   day?: number;
 }
+
+// The day and revision this browser last saw the player's progress on
+const SEEN_KEY = "progressSeen";
 
 export function createServerPlay({
   slug,
   fetch,
   onNewDay = (): void => {},
+  onAnswerChanged = (): void => {},
+  storage,
   day: pastDay,
 }: ServerPlayDeps): Play {
   const base = `/api/games/${slug}/state`;
@@ -53,6 +66,30 @@ export function createServerPlay({
     day = game.day;
     ids = game.ids;
     finished = game.victory || game.gaveUp || game.lost === true;
+    noteRevision(game);
+  }
+
+  // Tells the page once when the progress this browser saw was wiped by an answer change.
+  // Blocked storage only loses the notice.
+  function noteRevision(game: GameResponse): void {
+    try {
+      const seen: unknown = JSON.parse(storage?.getItem(SEEN_KEY) ?? "null");
+      if (
+        Array.isArray(seen) &&
+        seen[0] === game.day &&
+        seen[1] !== game.revision
+      ) {
+        onNewDay();
+        onAnswerChanged();
+      }
+      if (game.ids.length > 0 || game.gaveUp) {
+        storage?.setItem(SEEN_KEY, JSON.stringify([game.day, game.revision]));
+      } else {
+        storage?.removeItem(SEEN_KEY);
+      }
+    } catch {
+      // no notice
+    }
   }
 
   const hintsIn = (game: GameResponse): HintState => ({

@@ -134,6 +134,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       }
       res.json({
         day: day.day,
+        revision: day.revision,
         rows: board.rows,
         victory: board.victory,
         ...(board.lost && { lost: true }),
@@ -179,7 +180,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         res.status(409).json({ error: "no_hint", day: day.day });
         return;
       }
-      res.json({ day: day.day, hint });
+      res.json({ day: day.day, revision: day.revision, hint });
     },
   );
 
@@ -191,7 +192,11 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
     }
     const day = await playDayOf(ctx, req, res, loaded);
     if (day) {
-      res.json({ day: day.day, ...revealOf(day.game, day.answer) });
+      res.json({
+        day: day.day,
+        revision: day.revision,
+        ...revealOf(day.game, day.answer),
+      });
     }
   });
 
