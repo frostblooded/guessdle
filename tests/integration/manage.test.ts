@@ -343,14 +343,25 @@ describe("creating and editing a game", () => {
       assert.equal(existsSync(join(uploads, cover.slice(9))), true);
     });
 
-    it("refuses another user's upload as a cover or an entry photo", async () => {
+    // The game's Image attribute's id, added on first use
+    const imageAttr = async (): Promise<number> => {
+      const attrs = (
+        await request("POST", "/api/games/ann-game/attributes", ann, {
+          name: "Photo",
+          type: "image",
+        })
+      ).body;
+      return attrs.find((a: Body) => a.type === "image").id;
+    };
+
+    it("refuses another user's upload as a cover or an entry picture", async () => {
       await login("bob@example.test");
       const theirs = await upload("bob@example.test");
       const cover = await patch(ann, { coverUrl: theirs });
       assert.deepEqual([cover.status, cover.body.error], [400, "invalid"]);
       const photo = await request("POST", "/api/games/ann-game/entries", ann, {
         name: "Rex",
-        photo: theirs,
+        values: { [await imageAttr()]: theirs },
       });
       assert.equal(photo.status, 400);
       assert.equal(existsSync(join(uploads, theirs.slice(9))), true);
@@ -366,13 +377,14 @@ describe("creating and editing a game", () => {
       assert.equal((await patch(root, { coverUrl: third })).status, 400);
     });
 
-    it("keeps a file that another cover or photo still uses", async () => {
+    it("keeps a file that another cover or picture still uses", async () => {
       const shared = await upload("ann@example.test");
       await patch(ann, { coverUrl: shared });
-      await request("POST", "/api/games/ann-game/entries", ann, {
+      const added = await request("POST", "/api/games/ann-game/entries", ann, {
         name: "Rex",
-        photo: shared,
+        values: { [await imageAttr()]: shared },
       });
+      assert.equal(added.status, 200);
       assert.equal((await patch(ann, { coverUrl: "" })).status, 200);
       assert.equal(existsSync(join(uploads, shared.slice(9))), true);
       const left = await db.pool.query(

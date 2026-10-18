@@ -111,7 +111,7 @@ describe("submit", () => {
     }
     assert.equal(result.isAnswer, false);
     assert.equal(result.answer, undefined);
-    assert.equal(result.row[1]!.value, one!.name);
+    assert.equal(result.row[0]!.value, one!.name);
     assert.deepEqual(play.getUsedGuesses(), [one!.id]);
     assert.deepEqual(JSON.parse(storage.getItem("usedGuesses")!), [one!.id]);
     assert.equal(storage.getItem("day"), "100");
@@ -220,7 +220,7 @@ describe("load", () => {
     await open().submit(two!.id);
     const loaded = await loadedOf(open());
     assert.deepEqual(
-      loaded?.rows.map((row) => row[1]!.value),
+      loaded?.rows.map((row) => row[0]!.value),
       [one!.name, two!.name],
     );
     assert.equal(loaded?.victory, false);
