@@ -18,14 +18,14 @@ export const Form: Story = {
     <div className="grid max-w-md gap-4">
       <div className="grid gap-2">
         <Label htmlFor="story-name">Name</Label>
-        <Input id="story-name" defaultValue="Petdle" />
+        <Input id="story-name" defaultValue="Catdle" />
       </div>
       <div className="grid gap-2">
         <Label htmlFor="story-description">Description</Label>
         <Textarea
           id="story-description"
           rows={3}
-          defaultValue="Guess the pet of the day from its colors and owners."
+          defaultValue="Guess the cat of the day from its colors and owners."
         />
       </div>
       <div className="grid gap-2">

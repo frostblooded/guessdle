@@ -8,7 +8,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const GAMES = [
-  { name: "Petdle", owner: "Sam", status: "Published" },
+  { name: "Catdle", owner: "Sam", status: "Published" },
   { name: "Plantdle", owner: "Niki", status: "In review" },
 ];
 
