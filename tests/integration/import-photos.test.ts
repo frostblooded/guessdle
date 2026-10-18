@@ -21,10 +21,12 @@ describe("importPhotos", () => {
 
   const urls = async (): Promise<string[]> =>
     (
-      await db.pool.query<{ photo_url: string }>(
-        "select photo_url from entries order by id",
+      await db.pool.query<{ url: string }>(
+        `select v.value as url from entry_values v
+         join attributes a on a.id = v.attribute_id and a.type = 'image'
+         order by v.entry_id`,
       )
-    ).rows.map((r) => r.photo_url);
+    ).rows.map((r) => r.url);
 
   beforeAll(async () => {
     db = await startDb();

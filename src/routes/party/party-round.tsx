@@ -1,11 +1,16 @@
 // The viewer's own board in a live party round: the guess box, their graded rows (a Blur game's
 // image and guessed names) and, once they solved it, gave up or ran out of tries, the answer.
 import { useState } from "react";
-import { BoardRow, GuessRow, TitleTile } from "../../components/board.tsx";
+import { GuessRow, TitleRow } from "../../components/board.tsx";
 import { BlurGuesses, BlurView } from "../../components/blur-view.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
-import { findEntryId, isAnswerRow, nameCell } from "../../game/game.ts";
+import {
+  boardColumns,
+  findEntryId,
+  isAnswerRow,
+  nameCell,
+} from "../../game/game.ts";
 import type { LiveRound, PartyView } from "../../game/party.ts";
 import { GuessBox } from "../play/guess-box.tsx";
 
@@ -34,7 +39,7 @@ export function PartyRound({
   const blur = view.game.kind === "blur" ? (view.game.blurTries ?? 1) : null;
   const newestFirst = [...mine.rows].reverse();
   const names = entries.map((e) => e.name).filter((name) => !used.has(name));
-  const titles = ["Photo", "Name", ...view.game.attributes.map((a) => a.name)];
+  const titles = boardColumns(view.game.attributes);
 
   const submit = (name: string): void => {
     const id = findEntryId(entries, name);
@@ -129,17 +134,7 @@ export function PartyRound({
       {blur !== null && <BlurGuesses rows={newestFirst} />}
       {blur === null && mine.rows.length > 0 && (
         <div id="board" className="results flex flex-col gap-2 sm:gap-2.5">
-          <BoardRow
-            id="guess-results-titles-row"
-            columns={titles.length}
-            aria-hidden="true"
-          >
-            {titles.map((title, i) => (
-              <TitleTile key={i} className="guess-result-title">
-                {title}
-              </TitleTile>
-            ))}
-          </BoardRow>
+          <TitleRow columns={titles} />
           <div id="guess-results-container" className="flex flex-col gap-2">
             {newestFirst.map((row, i) => (
               <GuessRow key={mine.rows.length - i} row={row} />

@@ -14,6 +14,7 @@ const TYPES = [
   ["text", "Text"],
   ["list", "List"],
   ["number", "Number"],
+  ["image", "Image"],
 ] as const;
 
 // One row of the unsaved list: a saved attribute (with its id) or a new one

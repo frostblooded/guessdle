@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { Correctness } from "../src/game/correctness.ts";
 import {
+  boardColumns,
   findEntryId,
+  firstImage,
   gradeGuess,
   gradeIds,
   hasAllValues,
@@ -27,12 +29,11 @@ const third = entry(3, "Cookie", ["Red"], "Niki");
 const ROSTER = [first, second, third];
 
 describe("gradeGuess", () => {
-  it("lists the photo, the name, then each attribute in order", () => {
+  it("lists the name, then each attribute in order", () => {
     const row = gradeGuess(ATTRIBUTES, first, second);
     assert.deepEqual(
       row.map((cell) => [cell.key, cell.value]),
       [
-        ["photo", "/p/2.webp"],
         ["name", "Bela"],
         ["Colors", ["Orange", "Grey"]],
         ["Owner", "Beti"],
@@ -51,13 +52,12 @@ describe("gradeGuess", () => {
       gradeGuess(ATTRIBUTES, first, second).map((c) => [c.key, c.correctness]),
     );
     assert.deepEqual(byKey, {
-      photo: Correctness.Incorrect,
       name: Correctness.Incorrect,
       Colors: Correctness.PartiallyCorrect,
       Owner: Correctness.Incorrect,
     });
     assert.equal(
-      gradeGuess(ATTRIBUTES, first, third)[3]!.correctness,
+      gradeGuess(ATTRIBUTES, first, third)[2]!.correctness,
       Correctness.Correct,
     );
   });
@@ -65,19 +65,92 @@ describe("gradeGuess", () => {
   it("grades empty against empty as correct and against a value as incorrect", () => {
     const empty = entry(4, "Empty", [], "");
     const row = gradeGuess(ATTRIBUTES, empty, empty);
+    assert.equal(row[1]!.correctness, Correctness.Correct);
     assert.equal(row[2]!.correctness, Correctness.Correct);
-    assert.equal(row[3]!.correctness, Correctness.Correct);
     const against = gradeGuess(ATTRIBUTES, first, empty);
+    assert.equal(against[1]!.correctness, Correctness.Incorrect);
     assert.equal(against[2]!.correctness, Correctness.Incorrect);
-    assert.equal(against[3]!.correctness, Correctness.Incorrect);
+  });
+});
+
+describe("gradeGuess: Image attributes", () => {
+  const attrs: GameAttribute[] = [
+    { name: "Owner", type: "text" },
+    { name: "Photo", type: "image" },
+  ];
+  const pic = (id: number, url: string): Entry => ({
+    id,
+    name: `E${id}`,
+    photo: url,
+    values: ["Niki", url],
   });
 
-  it("marks only the answer's own photo cell correct, even with equal photos", () => {
-    const twin = { ...second, id: 9, photo: first.photo };
+  it("keeps the column in Attribute order, flagged as a picture", () => {
+    const row = gradeGuess(attrs, pic(1, "/a.webp"), pic(2, "/b.webp"));
+    assert.deepEqual(
+      row.map((cell) => [cell.key, cell.value, cell.image ?? false]),
+      [
+        ["name", "E2", false],
+        ["Owner", "Niki", false],
+        ["Photo", "/b.webp", true],
+      ],
+    );
+  });
+
+  it("is correct only on the answer itself, even with the same picture", () => {
+    const answer = pic(1, "/a.webp");
     assert.equal(
-      gradeGuess(ATTRIBUTES, first, twin)[0]!.correctness,
+      gradeGuess(attrs, answer, pic(2, "/a.webp"))[2]!.correctness,
       Correctness.Incorrect,
     );
+    assert.equal(
+      gradeGuess(attrs, answer, answer)[2]!.correctness,
+      Correctness.Correct,
+    );
+  });
+
+  it("allows a blank picture", () => {
+    const cell = gradeGuess(attrs, pic(1, "/a.webp"), pic(2, ""))[2]!;
+    assert.equal(cell.value, "");
+    assert.equal(cell.image, true);
+  });
+});
+
+describe("boardColumns", () => {
+  it("puts Name first, then every attribute in order", () => {
+    const attrs: GameAttribute[] = [
+      { name: "Colors", type: "list" },
+      { name: "Photo", type: "image" },
+    ];
+    assert.deepEqual(boardColumns(attrs), [
+      { title: "Name", image: false },
+      { title: "Colors", image: false, attribute: 0 },
+      { title: "Photo", image: true, attribute: 1 },
+    ]);
+  });
+
+  it("shows only the name in a Blur game", () => {
+    assert.deepEqual(boardColumns(ATTRIBUTES, "blur"), [
+      { title: "Name", image: false },
+    ]);
+  });
+});
+
+describe("firstImage", () => {
+  const attrs: GameAttribute[] = [
+    { name: "Owner", type: "text" },
+    { name: "Side", type: "image" },
+    { name: "Front", type: "image" },
+  ];
+
+  it("is the first Image value that is not blank", () => {
+    assert.equal(firstImage(attrs, ["x", "/s.webp", "/f.webp"]), "/s.webp");
+    assert.equal(firstImage(attrs, ["x", "", "/f.webp"]), "/f.webp");
+  });
+
+  it("is blank without a picture, and never takes another type's value", () => {
+    assert.equal(firstImage(attrs, ["/not.webp", "", ""]), "");
+    assert.equal(firstImage([], []), "");
   });
 });
 
@@ -92,10 +165,10 @@ describe("gradeGuess: Number attributes", () => {
 
   it("adds the hint only to a wrong number", () => {
     const answer = aged(1, "7");
-    const wrong = gradeGuess(attrs, answer, aged(2, "3"))[2]!;
+    const wrong = gradeGuess(attrs, answer, aged(2, "3"))[1]!;
     assert.equal(wrong.correctness, Correctness.Incorrect);
     assert.equal(wrong.hint, "higher");
-    const right = gradeGuess(attrs, answer, aged(3, "7.0"))[2]!;
+    const right = gradeGuess(attrs, answer, aged(3, "7.0"))[1]!;
     assert.equal(right.correctness, Correctness.Correct);
     assert.equal("hint" in right, false);
   });
@@ -108,11 +181,22 @@ describe("gradeGuess: Number attributes", () => {
 });
 
 describe("hasAllValues", () => {
+  const attrs: GameAttribute[] = [
+    { name: "T", type: "text" },
+    { name: "L", type: "list" },
+    { name: "N", type: "number" },
+    { name: "I", type: "image" },
+  ];
+
   it("needs every Text, Number and List value filled", () => {
-    assert.equal(hasAllValues(["a", ["b"], "3"]), true);
-    assert.equal(hasAllValues(["a", [], "3"]), false);
-    assert.equal(hasAllValues(["", ["b"]]), false);
-    assert.equal(hasAllValues([]), true);
+    assert.equal(hasAllValues(attrs, ["a", ["b"], "3", "/i.webp"]), true);
+    assert.equal(hasAllValues(attrs, ["a", [], "3", "/i.webp"]), false);
+    assert.equal(hasAllValues(attrs, ["", ["b"], "3", ""]), false);
+    assert.equal(hasAllValues([], []), true);
+  });
+
+  it("lets an Image value stay blank", () => {
+    assert.equal(hasAllValues(attrs, ["a", ["b"], "3", ""]), true);
   });
 });
 
@@ -125,7 +209,7 @@ describe("gradeIds", () => {
     }
     assert.equal(result.victory, false);
     assert.deepEqual(
-      result.rows.map((row) => row[1]!.value),
+      result.rows.map((row) => row[0]!.value),
       ["Bela", "Cookie"],
     );
   });

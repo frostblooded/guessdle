@@ -10,6 +10,7 @@ import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
 import { FAILURES, failureText, UNREACHABLE } from "../../game/failures.ts";
 import {
+  boardColumns,
   findEntryId,
   isAnswerRow,
   nameCell,
@@ -274,11 +275,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const names = roster
     .map((entry) => entry.name)
     .filter((name) => !used.has(name));
-  const titles = [
-    "Photo",
-    "Name",
-    ...(playable?.attributes.map((a) => a.name) ?? []),
-  ];
+  const titles = boardColumns(playable?.attributes ?? []);
 
   return (
     <>

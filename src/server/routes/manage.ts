@@ -145,7 +145,9 @@ export function manageRoutes(
 
   const attrBase = "/api/games/:slug/attributes";
   const typeOf = (v: unknown): AttributeType | undefined =>
-    v === "text" || v === "list" || v === "number" ? v : undefined;
+    v === "text" || v === "list" || v === "number" || v === "image"
+      ? v
+      : undefined;
   const nameOf = (v: unknown): string | undefined =>
     nameIn(v, MAX_ATTRIBUTE_NAME);
   const idOf = (req: Request): number => {
@@ -246,17 +248,27 @@ export function manageRoutes(
         ? undefined
         : (await listEntries(pool, game)).find((e) => e.id === id);
     const input = parseEntryInput(bodyOf(req));
-    if (
-      !input ||
-      (id === undefined && !input.name) ||
-      (input.photo !== undefined &&
-        !(await refs.mayAttach(
-          input.photo,
-          current?.photo ?? "",
-          user.id,
-          game.ownerId,
-        )))
-    ) {
+    // Every picture sent, the photo and each Image value, with what it replaces
+    const images = (await listAttributes(pool, game))
+      .filter(
+        (a) => a.type === "image" && String(a.id) in (input?.values ?? {}),
+      )
+      .map((a) => ({
+        url: input!.values![String(a.id)]![0] ?? "",
+        current: current?.values[String(a.id)]?.[0] ?? "",
+      }));
+    if (input?.photo !== undefined) {
+      images.push({ url: input.photo, current: current?.photo ?? "" });
+    }
+    const allowed = async (): Promise<boolean> => {
+      for (const { url, current } of images) {
+        if (!(await refs.mayAttach(url, current, user.id, game.ownerId))) {
+          return false;
+        }
+      }
+      return true;
+    };
+    if (!input || (id === undefined && !input.name) || !(await allowed())) {
       fail(res, "invalid");
       return;
     }
@@ -270,7 +282,7 @@ export function manageRoutes(
       fail(res, out);
       return;
     }
-    await refs.release([out.replacedPhoto]);
+    await refs.release(out.replaced);
     res.json(await listEntries(pool, game));
   });
   app.get(

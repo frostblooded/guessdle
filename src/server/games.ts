@@ -3,6 +3,7 @@ import { MAX_ATTRIBUTES, MIN_ENTRIES } from "../game/limits.ts";
 import type pg from "pg";
 import type { AttributeValue } from "../game/correctness.ts";
 import {
+  firstImage,
   hasAllValues,
   type AttributeType,
   type Entry,
@@ -74,22 +75,26 @@ export interface Roster {
   incomplete: number;
 }
 
-// SQL true when the game aliased `g` has an active entry missing a value (no value rows for an
-// attribute; blanks are never stored), or, in a Blur game, missing its photo or its square
-// order. Such a game is paused.
+// SQL true when the game aliased `g` has an active entry missing a value (no value rows for a
+// non-Image attribute; blanks are never stored), or, in a Blur game, missing its photo or its
+// square order. Such a game is paused.
 export const HAS_MISSING_VALUES = `(case when g.kind = 'blur' then exists (
   select 1 from entries e
   where e.game_id = g.id and e.deleted_at is null and (e.photo_url = '' or e.blur_order is null))
 else exists (
   select 1 from entries e join attributes a on a.game_id = e.game_id
-  where e.game_id = g.id and e.deleted_at is null and not exists (
+  where e.game_id = g.id and e.deleted_at is null and a.type <> 'image' and not exists (
     select 1 from entry_values v where v.entry_id = e.id and v.attribute_id = a.id)) end)`;
 
 // An entry that pauses its game: a value missing, or in a Blur game its photo or square order
-export const isIncomplete = (game: GameRow, entry: Entry): boolean =>
+export const isIncomplete = (
+  game: GameRow,
+  roster: readonly GameAttribute[],
+  entry: Entry,
+): boolean =>
   game.kind === "blur"
     ? entry.photo === "" || entry.blurOrder === undefined
-    : !hasAllValues(entry.values);
+    : !hasAllValues(roster, entry.values);
 
 // A game's attributes and entries with their values
 export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
@@ -132,19 +137,24 @@ export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
     const list = byCell.get(`${entryId}:${attr.id}`) ?? [];
     return (attr.type === "list" ? list : (list[0] ?? "")) as AttributeValue;
   };
-  const all = entries.rows.map(({ id, name, photo, blurOrder }): Entry => ({
-    id,
-    name,
-    photo,
-    values: attributes.rows.map((attr) => cell(id, attr)),
-    ...(game.kind === "blur" && blurOrder && { blurOrder }),
-  }));
+  const attrs = attributes.rows.map(({ name, type }) => ({ name, type }));
+  const all = entries.rows.map(({ id, name, photo, blurOrder }): Entry => {
+    const values = attributes.rows.map((attr) => cell(id, attr));
+    return {
+      id,
+      name,
+      photo: game.kind === "blur" ? photo : firstImage(attrs, values),
+      values,
+      ...(game.kind === "blur" && blurOrder && { blurOrder }),
+    };
+  });
   const active = all.filter((_, i) => !entries.rows[i]!.deleted);
   return {
-    attributes: attributes.rows.map(({ name, type }) => ({ name, type })),
+    attributes: attrs,
     entries: active,
     all,
-    incomplete: active.filter((entry) => isIncomplete(game, entry)).length,
+    incomplete: active.filter((entry) => isIncomplete(game, attrs, entry))
+      .length,
   };
 }
 
@@ -160,15 +170,21 @@ export interface GalleryCard {
   kind: GameKind;
 }
 
+// SQL for the first Image value of the entry aliased `alias` (null when it has none)
+const FIRST_IMAGE = (alias: string): string =>
+  `(select v.value from entry_values v join attributes a on a.id = v.attribute_id
+     where v.entry_id = ${alias}.id and a.type = 'image' order by a.position, a.id limit 1)`;
+
 // Approved games with at least MIN_ENTRIES active entries and none missing a value: the original
 // first, then newest first
 export async function listGallery(q: Q): Promise<GalleryCard[]> {
   const { rows } = await q.query<GalleryCard>(
     `select g.slug, g.name, g.description, g.cover_url as cover,
        case when g.cover_url = '' and g.kind = 'classic' then array(
-         select p.photo_url from entries p
-         where p.game_id = g.id and p.deleted_at is null and p.photo_url <> ''
-         order by p.id limit $2
+         select x.photo from (
+           select p.id, ${FIRST_IMAGE("p")} as photo from entries p
+           where p.game_id = g.id and p.deleted_at is null) x
+         where x.photo is not null order by x.id limit $2
        ) else '{}'::text[] end as photos,
        count(e.id)::int as "entryCount", g.kind
      from games g join entries e on e.game_id = g.id and e.deleted_at is null
