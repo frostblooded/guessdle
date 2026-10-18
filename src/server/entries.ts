@@ -3,6 +3,7 @@ import type pg from "pg";
 import { parseNumberValue } from "../game/number.ts";
 import { listAttributes } from "./attributes.ts";
 import type { GameRow } from "./games.ts";
+import type { QuizSpec } from "../game/quiz.ts";
 
 export interface EntryRow {
   id: number;
@@ -13,6 +14,8 @@ export interface EntryRow {
   values: Record<string, string[]>;
   // Blur games only: the order the grid's squares clear in, once picked
   blurOrder?: number[] | null;
+  // Quiz games only: the question's answer (its text is the name, its picture the photo)
+  quiz?: QuizSpec | null;
 }
 
 export async function listEntries(
@@ -25,18 +28,20 @@ export async function listEntries(
     photo: string;
     values: Record<string, string[]> | null;
     blurOrder: number[] | null;
+    quiz: QuizSpec | null;
   }>(
-    `select e.id::int, e.name, e.photo_url as photo, e.blur_order::int[] as "blurOrder",
+    `select e.id::int, e.name, e.photo_url as photo, e.blur_order::int[] as "blurOrder", e.quiz,
        (select jsonb_object_agg(attribute_id, items) from (
           select attribute_id, jsonb_agg(value order by position) as items
           from entry_values where entry_id = e.id group by attribute_id) v) as values
      from entries e where e.game_id = $1 and e.deleted_at is null order by e.id`,
     [game.id],
   );
-  return rows.map(({ blurOrder, ...r }) => ({
+  return rows.map(({ blurOrder, quiz, ...r }) => ({
     ...r,
     values: r.values ?? {},
     ...(game.kind === "blur" && { blurOrder }),
+    ...(game.kind === "quiz" && { quiz }),
   }));
 }
 
@@ -45,12 +50,14 @@ export interface EntryInput {
   photo?: string;
   values?: Record<string, string[]>;
   blurOrder?: number[];
+  quiz?: QuizSpec;
 }
 
 // Creates the entry (`id` undefined) or changes it. Every attribute but Image needs a value once
 // saved, from the input or already stored; Number values are stored as parseNumberValue gives
 // them, an Image value is one upload URL. A Blur game's entry instead needs its photo and a
-// complete square order, sent or stored; only a Blur entry has a photo.
+// complete square order, sent or stored. A Quiz question needs its answer (quiz), sent or stored,
+// may share its text with another and may have a picture; only Blur and Quiz entries have a photo.
 // Runs in the caller's game transaction (lifecycle.edit), which applies the status rule.
 // `replaced` lists the files the edit stopped using, for the caller to release.
 export async function saveEntry(
@@ -66,14 +73,16 @@ export async function saveEntry(
   | "missing_values"
   | "not_a_number"
   | "missing_order"
+  | "missing_answer"
 > {
   const current = (
     await tx.query<{
       name: string;
       photo: string;
       blurOrder: number[] | null;
+      quiz: QuizSpec | null;
     }>(
-      `select name, photo_url as photo, blur_order::int[] as "blurOrder" from entries
+      `select name, photo_url as photo, blur_order::int[] as "blurOrder", quiz from entries
        where id = $1 and game_id = $2 and deleted_at is null`,
       [id ?? 0, game.id],
     )
@@ -88,7 +97,7 @@ export async function saveEntry(
        and lower(name) = lower($3)`,
     [game.id, id ?? 0, name],
   );
-  if (clash.rowCount) {
+  if (clash.rowCount && game.kind !== "quiz") {
     return "entry_exists";
   }
   const attrs = await listAttributes(tx, game);
@@ -117,8 +126,15 @@ export async function saveEntry(
   if (!attrs.every((a) => a.type === "image" || filled(String(a.id)))) {
     return "missing_values";
   }
-  if (game.kind !== "blur" && input.photo !== undefined) {
+  if (game.kind === "classic" && input.photo !== undefined) {
     return "invalid";
+  }
+  if (game.kind !== "quiz" && input.quiz !== undefined) {
+    return "invalid";
+  }
+  const quiz = input.quiz ?? current?.quiz ?? null;
+  if (game.kind === "quiz" && quiz === null) {
+    return "missing_answer";
   }
   if (game.kind === "blur") {
     const order = input.blurOrder ?? current?.blurOrder ?? null;
@@ -141,6 +157,12 @@ export async function saveEntry(
       "update entries set name = $2, photo_url = $3 where id = $1",
       [entryId, name, photo],
     );
+  }
+  if (input.quiz !== undefined) {
+    await tx.query("update entries set quiz = $2 where id = $1", [
+      entryId,
+      input.quiz,
+    ]);
   }
   if (input.blurOrder !== undefined) {
     await tx.query("update entries set blur_order = $2 where id = $1", [

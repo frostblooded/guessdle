@@ -1,4 +1,4 @@
-import { Grid3x3, Table2, type LucideIcon } from "lucide-react";
+import { CircleHelp, Grid3x3, Table2, type LucideIcon } from "lucide-react";
 import type { GameKind } from "../game/blur.ts";
 import { cn } from "../lib/utils.ts";
 
@@ -10,6 +10,7 @@ export const KIND_LABELS: Record<
 > = {
   classic: { label: "Classic", icon: Table2 },
   blur: { label: "Blur", icon: Grid3x3 },
+  quiz: { label: "Quiz", icon: CircleHelp },
 };
 
 export function GameKindLabel({

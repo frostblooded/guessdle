@@ -1,7 +1,6 @@
 // The editor's Entries tab: list, add, change and delete entries with their values (a Blur
 // entry: its image and square order).
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useCrop } from "../../components/crop-dialog.tsx";
 import { CELLS } from "../../game/blur.ts";
 import { FAILURES } from "../../game/failures.ts";
 import { Alert } from "../../components/ui/alert.tsx";
@@ -15,7 +14,7 @@ import {
 } from "../../game/limits.ts";
 import { api, errorText, type Reply } from "../../manage-client.ts";
 import type { Attribute, Entry } from "./types.ts";
-import { ImagePicker, ImageValue } from "./image-value.tsx";
+import { ImagePicker, ImageValue, usePhotoUpload } from "./image-value.tsx";
 import { BlurOrderEditor } from "./blur-order-editor.tsx";
 
 // What the form holds: the entry being edited (null: adding), its name, Blur image URL and
@@ -64,7 +63,7 @@ export function EntriesPanel({
   // The attributes the form was built for; the ref lets the refresh compare without re-running
   const [formAttributes, setFormAttributes] = useState(initial.attributes);
   const built = useRef(initial.attributes);
-  const { crop, dialog } = useCrop(setError);
+  const { upload, dialog } = usePhotoUpload(setError);
 
   useEffect(() => {
     if (!active) {
@@ -138,34 +137,6 @@ export function EntriesPanel({
     await (draft.editing
       ? run("PATCH", `${base}/entries/${draft.editing.id}`, body, true)
       : run("POST", `${base}/entries`, body, true));
-  };
-
-  // Crops and uploads the chosen picture, then hands its URL to `done`
-  const upload = async (
-    input: HTMLInputElement,
-    done: (url: string) => void,
-  ): Promise<void> => {
-    const file = input.files?.[0];
-    input.value = "";
-    if (!file) {
-      return;
-    }
-    setError("");
-    const cropped = await crop(file, "photo");
-    if (!cropped) {
-      return;
-    }
-    const up = await api<{ url?: string }>(
-      "POST",
-      "/api/uploads?kind=photo",
-      cropped,
-    );
-    const url = up?.status === 200 ? up.data.url : undefined;
-    if (url) {
-      done(url);
-    } else {
-      setError(errorText(up));
-    }
   };
 
   const incomplete = (entry: Entry): boolean =>

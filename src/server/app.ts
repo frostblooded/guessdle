@@ -16,6 +16,7 @@ import { createPartyHub, type PartyHub } from "./party-hub.ts";
 import { shellRoutes } from "./routes/shell.ts";
 import { uploadRoutes } from "./routes/uploads.ts";
 import { blurRoutes } from "./routes/blur.ts";
+import { quizRoutes } from "./routes/quiz.ts";
 import { playlistRoutes } from "./routes/playlists.ts";
 import { settingsRoutes } from "./routes/settings.ts";
 
@@ -106,6 +107,7 @@ export function createApp({
   authRoutes(app, ctx, { mail, adminEmails, testLogin });
   adminRoutes(app, ctx, backupDir, uploadsDir);
   gameRoutes(app, ctx);
+  quizRoutes(app, ctx);
   manageRoutes(app, ctx, uploadsDir, writeLimit);
   uploadRoutes(app, ctx, uploadsDir, uploadLimit, uploadQuotaBytes);
   answersRoutes(app, ctx);

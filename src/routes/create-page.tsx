@@ -22,6 +22,11 @@ const KINDS: { kind: GameKind; title: string; text: string }[] = [
     title: "Blur",
     text: "Players guess from an image split into nine blurred squares that clear one by one.",
   },
+  {
+    kind: "quiz",
+    title: "Quiz",
+    text: "Players answer your questions, multiple choice or a number, and get a score at the end.",
+  },
 ];
 
 function CreateForm() {

@@ -23,6 +23,7 @@ import { useTitle } from "../../lib/use-title.ts";
 import { AnswersPanel } from "./answers-panel.tsx";
 import { AttributesPanel } from "./attributes-panel.tsx";
 import { EntriesPanel } from "./entries-panel.tsx";
+import { QuestionsPanel } from "./questions-panel.tsx";
 import { StatusBar } from "./status-bar.tsx";
 import { BlurTriesField } from "./blur-tries-field.tsx";
 import { IMAGE_TYPES, type Attribute, type Entry } from "./types.ts";
@@ -204,12 +205,16 @@ function Editor({
         />
         <Tabs value={tab} onValueChange={setTab} className="space-y-4">
           <TabsList aria-label="Editor sections">
-            {/* A Blur game has no attributes */}
+            {/* Only a classic game has attributes; a Quiz game has questions and no daily answers */}
             {TABS.filter(
-              ([value]) => saved.kind !== "blur" || value !== "attributes",
+              ([value]) =>
+                (saved.kind === "classic" || value !== "attributes") &&
+                (saved.kind !== "quiz" || value !== "answers"),
             ).map(([value, label, panel]) => (
               <TabsTrigger key={value} value={value} panelId={panel}>
-                {label}
+                {saved.kind === "quiz" && value === "entries"
+                  ? "Questions"
+                  : label}
               </TabsTrigger>
             ))}
           </TabsList>
@@ -297,7 +302,7 @@ function Editor({
                     }
                   />
                 )}
-                <div className="space-y-2">
+                <div className="space-y-2" hidden={saved.kind === "quiz"}>
                   <Label htmlFor="edit-skip">
                     Skip period (days before an entry can repeat)
                   </Label>
@@ -340,13 +345,21 @@ function Editor({
           </TabsContent>
           <TabsContent value="entries" selected={tab} asChild>
             <Card id="panel-entries" className="p-6">
-              <EntriesPanel
-                base={base}
-                initial={initial}
-                active={tab === "entries"}
-                blur={saved.kind === "blur"}
-                onChange={refreshStatus}
-              />
+              {saved.kind === "quiz" ? (
+                <QuestionsPanel
+                  base={base}
+                  initial={initial.entries}
+                  onChange={refreshStatus}
+                />
+              ) : (
+                <EntriesPanel
+                  base={base}
+                  initial={initial}
+                  active={tab === "entries"}
+                  blur={saved.kind === "blur"}
+                  onChange={refreshStatus}
+                />
+              )}
             </Card>
           </TabsContent>
           <TabsContent value="answers" selected={tab} asChild>

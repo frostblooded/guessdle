@@ -79,7 +79,8 @@ export async function openDay(
   accepts: () => boolean = () => true,
 ): Promise<PlayDay | DayRefusal> {
   const played = dayOf(clock, game, raw);
-  if (!played) {
+  // A Quiz game has no days: it is taken whole, any time (ADR 0020)
+  if (!played || game.kind === "quiz") {
     return { refusal: "no_such_day" };
   }
   const { date, day } = played;

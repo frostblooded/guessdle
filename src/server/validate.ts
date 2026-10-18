@@ -8,6 +8,7 @@ import {
   MAX_VALUE_LENGTH,
 } from "../game/limits.ts";
 import { isBlurOrder, isTryCount } from "../game/blur.ts";
+import { parseQuizSpec } from "../game/quiz.ts";
 import type { GamePatch } from "./games.ts";
 import type { EntryInput } from "./entries.ts";
 
@@ -72,12 +73,20 @@ export function parseGamePatch(
 }
 
 // The entry fields in a request body; undefined when any is malformed. A photo is only
-// shape-checked here.
+// shape-checked here. `maxName` is longer for a Quiz question, whose name is its text.
 export function parseEntryInput(
   body: Record<string, unknown>,
+  maxName: number = MAX_ENTRY_NAME,
 ): EntryInput | undefined {
-  const { name, photo, values, blurOrder } = body;
+  const { name, photo, values, blurOrder, quiz } = body;
   const out: EntryInput = {};
+  if (quiz !== undefined) {
+    const spec = parseQuizSpec(quiz);
+    if (!spec) {
+      return undefined;
+    }
+    out.quiz = spec;
+  }
   if (blurOrder !== undefined) {
     if (!isBlurOrder(blurOrder)) {
       return undefined;
@@ -85,7 +94,7 @@ export function parseEntryInput(
     out.blurOrder = blurOrder;
   }
   if (name !== undefined) {
-    const title = nameIn(name, MAX_ENTRY_NAME);
+    const title = nameIn(name, maxName);
     if (title === undefined) {
       return undefined;
     }

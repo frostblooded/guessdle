@@ -4,7 +4,12 @@ import express from "express";
 import type { Express, Request, Response } from "express";
 import { slugBase, slugError } from "../../game/slug.ts";
 import { gameLifecycle, type Move } from "../lifecycle.ts";
-import { MAX_ATTRIBUTE_NAME, MAX_NAME } from "../../game/limits.ts";
+import {
+  MAX_ATTRIBUTE_NAME,
+  MAX_ENTRY_NAME,
+  MAX_NAME,
+  MAX_QUESTION,
+} from "../../game/limits.ts";
 import { nameIn, parseEntryInput, parseGamePatch } from "../validate.ts";
 import { redrawFuture, releaseEntry, todayIn } from "../answers.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
@@ -178,8 +183,8 @@ export function manageRoutes(
   ) =>
     manageRoute(async ({ game }, _user, req, res) => {
       const edit = build(req);
-      // A Blur game has no attributes
-      if (!edit || game.kind === "blur") {
+      // Only a classic game has attributes
+      if (!edit || game.kind !== "classic") {
         fail(res, "invalid");
         return;
       }
@@ -249,7 +254,10 @@ export function manageRoutes(
       id === undefined
         ? undefined
         : (await listEntries(pool, game)).find((e) => e.id === id);
-    const input = parseEntryInput(bodyOf(req));
+    const input = parseEntryInput(
+      bodyOf(req),
+      game.kind === "quiz" ? MAX_QUESTION : MAX_ENTRY_NAME,
+    );
     // Every picture sent, the photo and each Image value, with what it replaces
     const images = (await listAttributes(pool, game))
       .filter(

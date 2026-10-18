@@ -8,6 +8,7 @@ import {
   type Hint,
 } from "./correctness.ts";
 import type { GameKind } from "./blur.ts";
+import type { QuizSpec } from "./quiz.ts";
 
 export type AttributeType = "text" | "list" | "number" | "image";
 
@@ -32,6 +33,8 @@ export interface Entry extends EntryRef {
   values: AttributeValue[];
   // Blur games only: the order the grid's squares clear in (cells 0-8), once picked
   blurOrder?: number[];
+  // Quiz games only: what makes the question (the entry) gradable, once saved
+  quiz?: QuizSpec;
 }
 
 // One column of a guessed entry, graded against the Daily Answer, in boardColumns order. A

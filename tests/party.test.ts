@@ -10,7 +10,6 @@ import {
   normalizeCode,
   ordinal,
   parseClientMessage,
-  partyView,
   progressLabel,
   randomCode,
   roundResults,
@@ -18,6 +17,7 @@ import {
   type PartyPlayer,
   type RoundData,
 } from "../src/game/party.ts";
+import { partyView } from "../src/game/party-view.ts";
 
 const player = (id: number, nickname: string, joinedAt = 0): PartyPlayer => ({
   id,

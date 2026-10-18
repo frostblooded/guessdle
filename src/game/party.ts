@@ -1,19 +1,18 @@
 // Party mode (issue #90, ADR 0016): pure rules shared by the server and the party page.
 // A round is won with the fewest guesses, ties broken by time from the round's start;
-// rounds add up by placement points.
-import type { Correctness } from "./correctness.ts";
-import {
-  gradeGuess,
-  nameCell,
-  SKIP,
-  skippedRow,
-  type Entry,
-  type EntryRef,
-  type GameAttribute,
-  type GradedAttribute,
-} from "./game.ts";
+// rounds add up by placement points. A Quiz game's round is one question (ADR 0020): the most
+// quiz points win it, ties broken by time, and a wrong answer gets no placement points.
 import { MAX_NICKNAME, MIN_ENTRIES } from "./limits.ts";
-import { outOfTries, type GameKind } from "./blur.ts";
+import { outOfTries } from "./blur.ts";
+import type { QuizRound } from "./quiz.ts";
+import type { LiveRound, PartyView } from "./party-view.ts";
+
+export type {
+  FinishedRound,
+  LiveRound,
+  PartyView,
+  ViewInput,
+} from "./party-view.ts";
 
 // No I or O, so a code read aloud or off a screen is never mistaken for 1 or 0
 export const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -65,6 +64,8 @@ export interface RoundData {
   giveUps: { playerId: number; at: number }[];
   // Blur games: guesses each player gets (ADR 0019); unlimited when absent
   tries?: number;
+  // Quiz games: the round's question, its right answer and each player's one answer, graded
+  quiz?: QuizRound;
 }
 
 // Who plays a round: everyone in the party when it ended (or now, while live), late joiners too
@@ -83,9 +84,24 @@ export interface Progress {
   lost: boolean;
   // From the round's start to the solving guess
   timeMs: number | null;
+  // Quiz games: the answer's quiz points (0 to 1), absent before answering. An answer with
+  // points counts as solved, one without as lost.
+  score?: number;
 }
 
 export function progressOf(round: RoundData, playerId: number): Progress {
+  if (round.quiz) {
+    const answer = round.quiz.answers.find((a) => a.playerId === playerId);
+    return {
+      playerId,
+      guesses: answer ? 1 : 0,
+      solved: answer !== undefined && answer.points > 0,
+      gaveUp: false,
+      lost: answer !== undefined && answer.points === 0,
+      timeMs: answer ? answer.at - round.startedAt : null,
+      ...(answer && { score: answer.points }),
+    };
+  }
   const mine = round.guesses.filter((g) => g.playerId === playerId);
   const solving = mine.find((g) => g.entryId === round.answerId);
   return {
@@ -119,8 +135,12 @@ export interface RoundResult extends Progress {
   points: number;
 }
 
-const better = (a: Progress, b: Progress): boolean =>
-  a.guesses < b.guesses || (a.guesses === b.guesses && a.timeMs! < b.timeMs!);
+// Fewer guesses, or in a Quiz game more points, then less time
+const better = (a: Progress, b: Progress): boolean => {
+  const [mine, theirs] =
+    a.score === undefined ? [b.guesses, a.guesses] : [a.score, b.score!];
+  return mine > theirs || (mine === theirs && a.timeMs! < b.timeMs!);
+};
 
 // Placement points: with N players, 1st gets N, 2nd N - 1, and so on; unsolved gets 0
 export function roundResults(
@@ -183,155 +203,6 @@ export function standings(
     );
 }
 
-// What every phone is sent: the live round shows only counts, a finished round everything
-export interface PartyView {
-  code: string;
-  game: {
-    slug: string;
-    name: string;
-    kind: GameKind;
-    // Blur games: tries per round
-    blurTries?: number;
-    attributes: GameAttribute[];
-    // A Blur game's entries come without photos
-    entries: EntryRef[];
-  };
-  ended: boolean;
-  // The viewer's own player, or null for a visitor who has not joined
-  you: { playerId: number; host: boolean } | null;
-  players: Standing[];
-  // The latest round, live or finished; null before the first
-  round: LiveRound | null;
-  // Finished rounds, newest first
-  history: FinishedRound[];
-}
-
-export interface LiveRound {
-  number: number;
-  live: boolean;
-  progress: Omit<Progress, "timeMs">[];
-  // The viewer's own board; the answer once they solved it, gave up or ran out of tries
-  yours: {
-    rows: GradedAttribute[][];
-    solved: boolean;
-    gaveUp: boolean;
-    lost: boolean;
-    answer?: EntryRef;
-  } | null;
-}
-
-export interface FinishedRound {
-  number: number;
-  answer: EntryRef;
-  results: (RoundResult & {
-    guessNames: string[];
-    grades: Correctness[][];
-  })[];
-}
-
-export interface ViewInput {
-  code: string;
-  game: { slug: string; name: string; kind?: GameKind; blurTries?: number };
-  attributes: readonly GameAttribute[];
-  // Active entries (offered to guess) and every entry (so old guesses still resolve)
-  entries: readonly Entry[];
-  all: readonly Entry[];
-  ended: boolean;
-  players: readonly PartyPlayer[];
-  // Oldest first
-  rounds: readonly RoundData[];
-  viewer: number | null;
-}
-
-const ref = ({ id, name, photo }: Entry): EntryRef => ({ id, name, photo });
-
-export function partyView(input: ViewInput): PartyView {
-  const { attributes, all, players, rounds, viewer } = input;
-  const kind = input.game.kind ?? "classic";
-  const entry = (id: number): Entry =>
-    all.find((e) => e.id === id) ?? {
-      id,
-      name: "?",
-      photo: "",
-      values: attributes.map(() => ""),
-    };
-  const graded = (round: RoundData, playerId: number): GradedAttribute[][] =>
-    round.guesses
-      .filter((g) => g.playerId === playerId)
-      .map((g) =>
-        g.entryId === SKIP && kind === "blur"
-          ? skippedRow()
-          : gradeGuess(
-              attributes,
-              entry(round.answerId),
-              entry(g.entryId),
-              kind,
-            ),
-      );
-  const latest = rounds.at(-1);
-  const me = players.find((p) => p.id === viewer);
-  let round: LiveRound | null = null;
-  if (latest) {
-    const mine = me && progressOf(latest, me.id);
-    round = {
-      number: latest.number,
-      live: latest.endedAt === null,
-      progress: participants(players, latest).map((p) => {
-        const { playerId, guesses, solved, gaveUp, lost } = progressOf(
-          latest,
-          p.id,
-        );
-        return { playerId, guesses, solved, gaveUp, lost };
-      }),
-      yours: mine
-        ? {
-            rows: graded(latest, mine.playerId),
-            solved: mine.solved,
-            gaveUp: mine.gaveUp,
-            lost: mine.lost,
-            ...(isDone(mine) && { answer: ref(entry(latest.answerId)) }),
-          }
-        : null,
-    };
-  }
-  const history = rounds
-    .filter((r) => r.endedAt !== null)
-    .map((r): FinishedRound => ({
-      number: r.number,
-      answer: ref(entry(r.answerId)),
-      results: roundResults(players, r).map((res) => {
-        const rows = graded(r, res.playerId);
-        return {
-          ...res,
-          guessNames: rows.map((row) => String(nameCell(row).value)),
-          // Image columns are never colored, so they get no square
-          grades: rows.map((row) =>
-            row.filter((cell) => !cell.image).map((cell) => cell.correctness),
-          ),
-        };
-      }),
-    }))
-    .reverse();
-  return {
-    code: input.code,
-    game: {
-      ...input.game,
-      kind,
-      attributes: [...attributes],
-      entries: input.entries.map((e) =>
-        kind === "blur"
-          ? { ...ref(e), photo: "" }
-          : { ...ref(e), values: e.values },
-      ),
-    },
-    ended: input.ended,
-    you: me ? { playerId: me.id, host: me.host } : null,
-    players: standings(players, rounds),
-    round,
-    history,
-  };
-}
-
 // The next secret entry: random among active entries this party has not had yet (all of them once used up)
 export function drawAnswer(
   activeIds: readonly number[],
@@ -347,6 +218,8 @@ export function drawAnswer(
 export type ClientMessage =
   | { type: "hello"; token?: string }
   | { type: "guess"; entryId: number }
+  // Quiz games: the one answer to the round's question
+  | { type: "answer"; answer: string }
   | { type: "give-up" }
   | { type: "start-round" }
   | { type: "end-round" }
@@ -370,6 +243,7 @@ export type PartyRefusal =
   | "party_ended"
   | "not_enough_entries"
   | "game_paused"
+  | "no_questions_left"
   | "server_error";
 
 const ACTIONS = new Set(["give-up", "start-round", "end-round", "end-party"]);
@@ -396,6 +270,10 @@ export function parseClientMessage(raw: string): ClientMessage | null {
     case "guess":
       return Number.isInteger(msg["entryId"])
         ? { type: "guess", entryId: msg["entryId"] as number }
+        : null;
+    case "answer":
+      return typeof msg["answer"] === "string" && msg["answer"].length <= 40
+        ? { type: "answer", answer: msg["answer"] }
         : null;
     case "remove-player":
       return Number.isInteger(msg["playerId"])
@@ -428,7 +306,10 @@ export function clockTime(ms: number): string {
 }
 
 // How a player is doing in the live round, as the scoreboard says it
-export function progressLabel(p: Omit<Progress, "timeMs">): string {
+export function progressLabel(p: LiveRound["progress"][number]): string {
+  if (p.answered !== undefined) {
+    return p.answered ? "Answered" : "Thinking…";
+  }
   const count = `${p.guesses} ${p.guesses === 1 ? "guess" : "guesses"}`;
   return p.solved
     ? `${count}, solved`
@@ -440,7 +321,8 @@ export function progressLabel(p: Omit<Progress, "timeMs">): string {
 }
 
 export const REFUSAL_TEXT: Record<PartyRefusal, string> = {
-  invalid: "That is not one of this game's entries.",
+  invalid:
+    "That is not one of this game's entries, or an answer this question takes.",
   not_host: "Only the host can do that.",
   not_player: "Join the party to play.",
   no_round: "There is no round going on right now.",
@@ -448,9 +330,10 @@ export const REFUSAL_TEXT: Record<PartyRefusal, string> = {
   finished: "You are done with this round. Wait for the next one.",
   duplicate: "You already guessed that one.",
   party_ended: "This party has ended.",
-  not_enough_entries: `This game needs at least ${MIN_ENTRIES} entries (one for a Blur game) before a round can start.`,
+  not_enough_entries: `This game needs at least ${MIN_ENTRIES} entries (one for a Blur or Quiz game) before a round can start.`,
   game_paused:
     "This game is paused while some of its entries are missing values.",
+  no_questions_left: "Every question of this quiz has been played.",
   server_error: "The server hit an unexpected problem. Try again in a moment.",
 };
 

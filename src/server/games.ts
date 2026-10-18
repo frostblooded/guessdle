@@ -12,6 +12,7 @@ import {
 import { MAX_TILES } from "../game/banner.ts";
 import { slugError } from "../game/slug.ts";
 import type { GameKind } from "../game/blur.ts";
+import type { QuizSpec } from "../game/quiz.ts";
 import type { EditKind } from "./lifecycle.ts";
 
 type Q = Pick<pg.Pool, "query">;
@@ -77,8 +78,10 @@ export interface Roster {
 
 // SQL true when the game aliased `g` has an active entry missing a value (no value rows for a
 // non-Image attribute; blanks are never stored), or, in a Blur game, missing its photo or its
-// square order. Such a game is paused.
-export const HAS_MISSING_VALUES = `(case when g.kind = 'blur' then exists (
+// square order, or a Quiz question missing its answer. Such a game is paused.
+export const HAS_MISSING_VALUES = `(case when g.kind = 'quiz' then exists (
+  select 1 from entries e where e.game_id = g.id and e.deleted_at is null and e.quiz is null)
+when g.kind = 'blur' then exists (
   select 1 from entries e
   where e.game_id = g.id and e.deleted_at is null and (e.photo_url = '' or e.blur_order is null))
 else exists (
@@ -87,10 +90,10 @@ else exists (
     select 1 from entry_values v where v.entry_id = e.id and v.attribute_id = a.id)) end)`;
 
 // SQL true when the game aliased `g` is one the gallery shows: approved, with enough active
-// entries (one for a Blur game, MIN_ENTRIES otherwise) and none missing a value
+// entries (MIN_ENTRIES for a classic game, one otherwise) and none missing a value
 export const IN_GALLERY = `(g.status = 'approved' and not ${HAS_MISSING_VALUES}
   and (select count(*) from entries n where n.game_id = g.id and n.deleted_at is null)
-    >= case when g.kind = 'blur' then 1 else ${MIN_ENTRIES} end)`;
+    >= case when g.kind = 'classic' then ${MIN_ENTRIES} else 1 end)`;
 
 // An entry that pauses its game: a value missing, or in a Blur game its photo or square order
 export const isIncomplete = (
@@ -98,9 +101,11 @@ export const isIncomplete = (
   roster: readonly GameAttribute[],
   entry: Entry,
 ): boolean =>
-  game.kind === "blur"
-    ? entry.photo === "" || entry.blurOrder === undefined
-    : !hasAllValues(roster, entry.values);
+  game.kind === "quiz"
+    ? entry.quiz === undefined
+    : game.kind === "blur"
+      ? entry.photo === "" || entry.blurOrder === undefined
+      : !hasAllValues(roster, entry.values);
 
 // A game's attributes and entries with their values
 export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
@@ -118,9 +123,10 @@ export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
     photo: string;
     deleted: boolean;
     blurOrder: number[] | null;
+    quiz: QuizSpec | null;
   }>(
     `select id::int, name, photo_url as photo, deleted_at is not null as deleted,
-       blur_order::int[] as "blurOrder"
+       blur_order::int[] as "blurOrder", quiz
      from entries where game_id = $1 order by id`,
     [game.id],
   );
@@ -144,16 +150,19 @@ export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
     return (attr.type === "list" ? list : (list[0] ?? "")) as AttributeValue;
   };
   const attrs = attributes.rows.map(({ name, type }) => ({ name, type }));
-  const all = entries.rows.map(({ id, name, photo, blurOrder }): Entry => {
-    const values = attributes.rows.map((attr) => cell(id, attr));
-    return {
-      id,
-      name,
-      photo: game.kind === "blur" ? photo : firstImage(attrs, values),
-      values,
-      ...(game.kind === "blur" && blurOrder && { blurOrder }),
-    };
-  });
+  const all = entries.rows.map(
+    ({ id, name, photo, blurOrder, quiz }): Entry => {
+      const values = attributes.rows.map((attr) => cell(id, attr));
+      return {
+        id,
+        name,
+        photo: game.kind === "classic" ? firstImage(attrs, values) : photo,
+        values,
+        ...(game.kind === "blur" && blurOrder && { blurOrder }),
+        ...(game.kind === "quiz" && quiz && { quiz }),
+      };
+    },
+  );
   const active = all.filter((_, i) => !entries.rows[i]!.deleted);
   return {
     attributes: attrs,
@@ -210,7 +219,7 @@ export async function listGallery(
      ${inPlaylist ? "join playlist_games pl on pl.game_id = g.id and pl.playlist_id = $3" : ""}
      where g.status = 'approved' and not ${HAS_MISSING_VALUES}
        ${scope.ownerId !== undefined ? "and g.owner_id = $3" : ""}
-     group by g.id${inPlaylist ? ", pl.position" : ""} having count(e.id) >= case when g.kind = 'blur' then 1 else $1 end
+     group by g.id${inPlaylist ? ", pl.position" : ""} having count(e.id) >= case when g.kind = 'classic' then $1 else 1 end
      order by ${
        inPlaylist
          ? "pl.position"

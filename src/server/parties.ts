@@ -2,13 +2,20 @@
 import { randomBytes } from "node:crypto";
 import type pg from "pg";
 import { MAX_OPEN_PARTIES, MAX_PARTY_PLAYERS } from "../game/limits.ts";
+import { partyView } from "../game/party-view.ts";
 import {
-  partyView,
   randomCode,
   type PartyPlayer,
   type PartyView,
   type RoundData,
 } from "../game/party.ts";
+import {
+  answerText,
+  type QuizRound,
+  questionOf,
+  rightAnswerText,
+  scoreAnswer,
+} from "../game/quiz.ts";
 import { hash } from "./auth.ts";
 import {
   findGameById,
@@ -237,6 +244,49 @@ export async function loadData(q: Q, party: PartyRow): Promise<PartyData> {
      where r.party_id = $1`,
     [party.id],
   );
+  const answers =
+    game.kind === "quiz"
+      ? (
+          await q.query<{
+            roundId: number;
+            playerId: number;
+            answer: string;
+            at: number;
+          }>(
+            `select a.round_id::int as "roundId", a.player_id::int as "playerId", a.answer,
+               (extract(epoch from a.answered_at) * 1000)::float8 as at
+             from party_quiz_answers a join party_rounds r on r.id = a.round_id
+             where r.party_id = $1 order by a.answered_at, a.player_id`,
+            [party.id],
+          )
+        ).rows
+      : [];
+  // A Quiz round's question, graded against its answer (soft-deleted ones still resolve)
+  const quizOf = (r: {
+    id: number;
+    answerId: number;
+  }): QuizRound | undefined => {
+    const question = roster.all.find((e) => e.id === r.answerId);
+    const spec = question?.quiz;
+    return question && spec
+      ? {
+          question: questionOf(question, spec),
+          right: rightAnswerText(spec),
+          answers: answers
+            .filter((a) => a.roundId === r.id)
+            .map(({ playerId, answer, at }) => ({
+              playerId,
+              text: answerText(spec, answer),
+              points: scoreAnswer(spec, answer),
+              at,
+            })),
+        }
+      : undefined;
+  };
+  const quizRound = (r: { id: number; answerId: number }) => {
+    const quiz = quizOf(r);
+    return quiz ? { quiz } : {};
+  };
   return {
     game,
     roster,
@@ -244,6 +294,7 @@ export async function loadData(q: Q, party: PartyRow): Promise<PartyData> {
     rounds: rounds.rows.map((r) => ({
       ...r,
       ...(game.kind === "blur" && { tries: game.blurTries }),
+      ...(game.kind === "quiz" && quizRound(r)),
       guesses: guesses.rows
         .filter((g) => g.roundId === r.id)
         .map(({ playerId, entryId, at }) => ({ playerId, entryId, at })),
@@ -278,9 +329,11 @@ export async function viewsOf(
           name: game.name,
           kind: game.kind,
           ...(game.kind === "blur" && { blurTries: game.blurTries }),
+          ...(game.kind === "quiz" && { questions: roster.entries.length }),
         },
         attributes: roster.attributes,
-        entries: roster.entries,
+        // A Quiz round sends its own question
+        entries: game.kind === "quiz" ? [] : roster.entries,
         all: roster.all,
         ended,
         players,

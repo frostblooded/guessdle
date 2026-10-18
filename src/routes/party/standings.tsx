@@ -11,6 +11,7 @@ import {
   type PartyView,
   type Standing,
 } from "../../game/party.ts";
+import { quizPoints } from "../../game/quiz.ts";
 import { cn } from "../../lib/utils.ts";
 
 const points = (n: number): string => `${n} ${n === 1 ? "point" : "points"}`;
@@ -153,9 +154,15 @@ function Round({ view, round }: { view: PartyView; round: FinishedRound }) {
         )}
         <div>
           <h3 className="font-semibold">Round {round.number}</h3>
-          <p className="text-sm text-muted-foreground">
-            The answer was {round.answer.name}
-          </p>
+          {round.right === undefined ? (
+            <p className="text-sm text-muted-foreground">
+              The answer was {round.answer.name}
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground [overflow-wrap:anywhere]">
+              {round.answer.name} The right answer was {round.right}.
+            </p>
+          )}
         </div>
       </div>
       <ol className="party-results mt-3 divide-y">
@@ -172,13 +179,17 @@ function Round({ view, round }: { view: PartyView; round: FinishedRound }) {
                 +{result.points}
               </span>
               <span className="party-player-detail col-start-2 text-sm text-muted-foreground">
-                {result.solved
-                  ? `${result.guesses} ${result.guesses === 1 ? "guess" : "guesses"} in ${clockTime(result.timeMs!)}`
-                  : result.gaveUp
-                    ? "Gave up"
-                    : result.lost
-                      ? "Out of tries"
-                      : "Did not solve"}
+                {result.score !== undefined
+                  ? `${quizPoints(result.score)} in ${clockTime(result.timeMs!)}`
+                  : round.right !== undefined
+                    ? "No answer"
+                    : result.solved
+                      ? `${result.guesses} ${result.guesses === 1 ? "guess" : "guesses"} in ${clockTime(result.timeMs!)}`
+                      : result.gaveUp
+                        ? "Gave up"
+                        : result.lost
+                          ? "Out of tries"
+                          : "Did not solve"}
               </span>
             </div>
             <div className="party-guesses grid gap-0.5 pb-2 pl-[3.25rem] text-sm">

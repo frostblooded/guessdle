@@ -6,6 +6,7 @@ import type { DaysResponse } from "../../game/days.ts";
 import { listDays } from "../days.ts";
 import { isPlayerToken } from "../../game/stats.ts";
 import { listGallery } from "../games.ts";
+import { quizQuestions } from "../quiz.ts";
 import { canApprove, canManage } from "../access.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
 import {
@@ -74,11 +75,16 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       attributes: roster.attributes,
       // Some entries miss values: nobody can play until they are filled in
       paused: roster.incomplete > 0,
-      entries: roster.entries.map(({ id, name, photo, values }) =>
-        game.kind === "blur"
-          ? { id, name, photo: "" }
-          : { id, name, photo, values },
-      ),
+      entries:
+        game.kind === "quiz"
+          ? []
+          : roster.entries.map(({ id, name, photo, values }) =>
+              game.kind === "blur"
+                ? { id, name, photo: "" }
+                : { id, name, photo, values },
+            ),
+      // A Quiz game's questions, without their answers
+      ...(game.kind === "quiz" && { questions: quizQuestions(roster) }),
     });
   });
 
