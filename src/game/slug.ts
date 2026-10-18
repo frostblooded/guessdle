@@ -22,6 +22,9 @@ export const RESERVED_SLUGS: readonly string[] = [
   "edit",
   "404",
   "party",
+  "profile",
+  "u",
+  "p",
 ];
 
 export const slugify = (name: string): string =>

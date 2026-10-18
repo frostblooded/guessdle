@@ -9,6 +9,12 @@ import { LoginPage } from "./routes/login-page.tsx";
 import { MyGamesPage } from "./routes/my-games-page.tsx";
 import { NotFoundPage } from "./routes/not-found-page.tsx";
 import { PartyPage } from "./routes/party/party-page.tsx";
+import { PlaylistEditPage } from "./routes/playlists/playlist-edit-page.tsx";
+import { PlaylistPage } from "./routes/playlists/playlist-page.tsx";
+import {
+  OwnProfilePage,
+  ProfilePage,
+} from "./routes/playlists/profile-page.tsx";
 import { DaysPage } from "./routes/play/days-page.tsx";
 import { PlayPage } from "./routes/play/play-page.tsx";
 import { SettingsPage } from "./routes/settings-page.tsx";
@@ -47,6 +53,14 @@ export function App({ legacyWiped }: { legacyWiped: boolean }) {
           <Route caseSensitive path="/admin" element={<AdminPage />} />
           <Route caseSensitive path="/party" element={<PartyPage />} />
           <Route caseSensitive path="/party/:code" element={<PartyPage />} />
+          <Route caseSensitive path="/profile" element={<OwnProfilePage />} />
+          <Route caseSensitive path="/u/:username" element={<ProfilePage />} />
+          <Route caseSensitive path="/p/:id" element={<PlaylistPage />} />
+          <Route
+            caseSensitive
+            path="/p/:id/edit"
+            element={<PlaylistEditPage />}
+          />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       )}

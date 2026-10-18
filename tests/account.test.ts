@@ -20,7 +20,12 @@ const down: Fetch = () => Promise.reject(new Error("offline"));
 
 describe("fetchUser", () => {
   it("returns the signed-in user", async () => {
-    const user = { name: "Ann", email: "a@x.test", admin: false };
+    const user = {
+      name: "Ann",
+      email: "a@x.test",
+      username: "ann",
+      admin: false,
+    };
     assert.deepEqual(await fetchUser(reply(true, { user })), user);
   });
 
