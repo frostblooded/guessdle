@@ -26,15 +26,46 @@
       <div id="page-head" class="page-head">
         <div class="title-row">
           <h1 id="game-title">Guess today's answer</h1>
-          <a id="edit-link" class="btn btn-secondary btn-sm" href="#" hidden
-            >Edit game</a
-          >
+          <div class="button-row">
+            <a
+              id="party-host-link"
+              class="btn btn-secondary btn-sm"
+              href="#"
+              hidden
+              >Host a party</a
+            >
+            <a id="edit-link" class="btn btn-secondary btn-sm" href="#" hidden
+              >Edit game</a
+            >
+          </div>
         </div>
         <p id="game-lede" class="lede">
           One mystery a day, unlimited guesses. Each row shows how close you
           are. <a href="/how-to-play">How to play</a>
         </p>
       </div>
+      <div class="game-status">
+        <p
+          id="status-notice"
+          class="alert alert-warn play-status"
+          role="status"
+          hidden
+        ></p>
+        <button
+          id="approve-button"
+          class="btn btn-primary btn-sm play-status"
+          type="button"
+          hidden
+        >
+          Approve
+        </button>
+      </div>
+      <p
+        id="approve-error"
+        class="alert alert-error play-status"
+        role="alert"
+        hidden
+      ></p>
       <section id="not-found" class="card auth-card center" hidden>
         <a class="btn btn-primary" href="/">See all games</a>
       </section>

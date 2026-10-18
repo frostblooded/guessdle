@@ -1,6 +1,7 @@
 // The game editor: top tabs, Details, Attributes, Entries and Answers.
 import { statusNotice, type Details } from "../game/editor.ts";
 import { MAX_ATTRIBUTE_NAME, MIN_ENTRIES } from "../game/limits.ts";
+import { cropForUpload } from "../crop-dialog.ts";
 import { api, errorText, signInThen, type Reply } from "../manage-client.ts";
 import { initAnswers } from "./edit-answers.ts";
 import { initEntries } from "./edit-entries.ts";
@@ -145,10 +146,14 @@ void initShell(browserFetch).then(async (user) => {
     }
     error.textContent = "";
     saved.textContent = "";
+    const cropped = await cropForUpload(file, "cover", error);
+    if (!cropped) {
+      return;
+    }
     const up = await api<{ url?: string }>(
       "POST",
       "/api/uploads?kind=cover",
-      file,
+      cropped,
     );
     if (up?.status === 200 && up.data.url) {
       await save({ coverUrl: up.data.url });

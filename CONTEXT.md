@@ -51,3 +51,15 @@ A signed-in user with the admin flag. Admins get an Admin link in the account me
 
 **Day Number**:
 Whole calendar days since the game's start date. The start date itself is day 0. Each Day Number maps to exactly one Daily Answer.
+
+**Party**:
+A live competition on one Game, opened by a signed-in **Host**, that friends join from their phones with a 4-letter code (ADR 0016). It runs any number of **Rounds** and ends when the Host ends it or after 12 idle hours; its results stay at its link for 30 days.
+
+**Party Player**:
+Someone in a Party, known by a nickname and a token on their phone; the Host is one too. Guests need no account.
+
+**Round**:
+One secret Entry in a Party, drawn at random for it (never the Daily Answer). Fewest guesses wins, ties broken by time from the round's start. It ends when every player has solved it or given up, or when the Host ends it.
+
+**Placement Points**:
+What a Round gives: with N players, 1st gets N points, 2nd N - 1, and so on; unsolved gets 0. A Party's standings add them up.

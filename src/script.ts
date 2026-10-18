@@ -1,6 +1,4 @@
-import autoComplete from "@tarekraafat/autocomplete.js";
-import "@tarekraafat/autocomplete.js/dist/css/autoComplete.css";
-import { correctnessClass } from "./game/correctness.ts";
+import type autoComplete from "@tarekraafat/autocomplete.js";
 import {
   findEntryId,
   type EntryRef,
@@ -19,12 +17,13 @@ import {
   type Play,
   type SubmitResult,
 } from "./game/play.ts";
+import {
+  attachGuessInput,
+  guessRowElement,
+  showColumnTitles,
+} from "./guess-board.ts";
+import { showGameStatus, type StatusView } from "./play-status.ts";
 import { browserFetch, initShell } from "./shell.ts";
-import type {
-  AutoCompleteItem,
-  AutoCompleteResults,
-  AutoCompleteSelectionEvent,
-} from "@tarekraafat/autocomplete.js";
 
 const now = (): Date => new Date();
 
@@ -40,44 +39,25 @@ let play: Play;
 
 let autoCompleteJs: autoComplete | null = null;
 
+// What GET /api/games/:slug gives the Play page
+type GameView = {
+  name: string;
+  canEdit: boolean;
+  attributes: GameAttribute[];
+  entries: EntryRef[];
+} & StatusView;
+
 // The game's attributes and entries, or null when it could not be loaded
-async function loadGame(): Promise<
-  | {
-      name: string;
-      canEdit: boolean;
-      attributes: GameAttribute[];
-      entries: EntryRef[];
-    }
-  | "missing"
-  | null
-> {
+async function loadGame(): Promise<GameView | "missing" | null> {
   try {
     const res = await fetch(`/api/games/${encodeURIComponent(SLUG)}`);
     if (res.status === 404) {
       return "missing";
     }
-    return res.ok
-      ? ((await res.json()) as {
-          name: string;
-          canEdit: boolean;
-          attributes: GameAttribute[];
-          entries: EntryRef[];
-        })
-      : null;
+    return res.ok ? ((await res.json()) as GameView) : null;
   } catch {
     return null;
   }
-}
-
-function showColumnTitles(attributes: GameAttribute[]): void {
-  document.querySelector("#guess-results-titles-row")!.replaceChildren(
-    ...["Photo", "Name", ...attributes.map((a) => a.name)].map((title) => {
-      const cell = document.createElement("div");
-      cell.className = "guess-result-title cell";
-      cell.textContent = title;
-      return cell;
-    }),
-  );
 }
 
 window.onload = async function (): Promise<void> {
@@ -105,6 +85,7 @@ window.onload = async function (): Promise<void> {
     edit.href = `/g/${encodeURIComponent(SLUG)}/edit`;
     edit.hidden = false;
   }
+  showGameStatus(SLUG, game);
   showColumnTitles(game.attributes);
   // Only the owner and admins reach a game this small; there is no answer to draw
   if (roster.length < MIN_ENTRIES) {
@@ -113,6 +94,10 @@ window.onload = async function (): Promise<void> {
     );
     return;
   }
+  // Party mode (issue #90): friends play this game against each other, each on their phone
+  const party = document.querySelector<HTMLAnchorElement>("#party-host-link")!;
+  party.href = `/party?host=${encodeURIComponent(SLUG)}`;
+  party.hidden = false;
   const storage = gameStorage(localStorage, SLUG);
   // Signed-in players use the server-stored game instead
   play = createPlay({
@@ -123,26 +108,7 @@ window.onload = async function (): Promise<void> {
     fetch: browserFetch,
     onNewDay: clearBoard,
   });
-  autoCompleteJs = new autoComplete({
-    selector: "#new-guess-input",
-    placeHolder: "Guess a name...",
-    data: {
-      src: roster.map((item: EntryRef): string => item.name),
-      filter: filterOutGuesses,
-    },
-    resultsList: {
-      element: handleResultsList,
-      noResults: true,
-    },
-    resultItem: {
-      highlight: true,
-    },
-    events: {
-      input: {
-        selection: handleAutocompleteSelection,
-      },
-    },
-  });
+  autoCompleteJs = attachGuessInput(roster, () => play.getUsedGuesses());
 
   initButtons();
   initNewGuessSubmit();
@@ -183,18 +149,6 @@ function initNewGuessSubmit(): void {
       void handleSubmitSelection();
     }
   };
-
-  newGuessInput.addEventListener("open", (_event: Event): void => {
-    // Hack to fix a bug on mobile where if you click on the autocomplete list item, the autocomplete list opens again immediately
-    const isValidGuess: boolean =
-      roster.findIndex(
-        (item: EntryRef): boolean => item.name === newGuessInput.value,
-      ) !== -1;
-
-    if (isValidGuess) {
-      autoCompleteJs?.close();
-    }
-  });
 }
 
 // The game cannot be played on this page view: say why and leave nothing on the board usable
@@ -363,35 +317,9 @@ async function loadInitialUsedGuessesElements(): Promise<void> {
 }
 
 function addGuessResultElement(row: GradedAttribute[]): void {
-  const resultElement: HTMLDivElement = document.createElement("div");
-  resultElement.setAttribute("class", "guess-result-row row");
-
-  for (const [i, { value, correctness }] of row.entries()) {
-    const resultCell: HTMLDivElement = document.createElement("div");
-    resultCell.setAttribute("class", "guess-result-cell cell");
-
-    if (i === 0) {
-      const image: HTMLImageElement = document.createElement("img");
-      image.src = value as string;
-      image.alt = "";
-      resultCell.appendChild(image);
-    } else {
-      resultCell.textContent = Array.isArray(value) ? value.join(", ") : value;
-      resultCell.classList.add(correctnessClass(correctness));
-    }
-
-    resultElement.appendChild(resultCell);
-  }
-
-  const guessResultsContainer: Element = document.querySelector(
-    "#guess-results-container",
-  )!;
-  guessResultsContainer.prepend(resultElement);
-}
-
-function handleAutocompleteSelection(event: AutoCompleteSelectionEvent): void {
-  const newGuessInput: HTMLInputElement = getNewGuessInput();
-  newGuessInput.value = event.detail.selection.value;
+  document
+    .querySelector("#guess-results-container")!
+    .prepend(guessRowElement(row));
 }
 
 let submitting: boolean = false;
@@ -439,22 +367,4 @@ async function handleSubmitSelection(): Promise<void> {
   }
   addGuessResultElement(result.row);
   refreshEmptyState();
-}
-
-function handleResultsList(list: HTMLElement, data: AutoCompleteResults): void {
-  if (!data.results.length) {
-    const message: HTMLDivElement = document.createElement("div");
-    message.setAttribute("class", "no_result");
-    message.innerHTML = `<span>Found No Results for "${data.query}"</span>`;
-    list.prepend(message);
-  }
-}
-
-function filterOutGuesses(list: AutoCompleteItem[]): AutoCompleteItem[] {
-  // Filter out already used guesses
-  const usedIds: number[] = play.getUsedGuesses();
-  return list.filter((item: AutoCompleteItem): boolean => {
-    const id: number | null = findEntryId(roster, item.value);
-    return id === null || !usedIds.includes(id);
-  });
 }
