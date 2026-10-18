@@ -277,17 +277,6 @@ const revealed = (entry: Entry): RevealedEntry => ({
   ...(entry.description && { description: entry.description }),
 });
 
-// The Free Hint a player used in a round, shown against its answer
-export function hintOf(
-  attributes: readonly GameAttribute[],
-  answer: Entry,
-  round: RoundData,
-  playerId: number,
-): FreeHint | null {
-  const used = round.hints?.find((h) => h.playerId === playerId);
-  return used ? revealHint(attributes, answer, used.pick) : null;
-}
-
 export function partyView(input: ViewInput): PartyView {
   const { attributes, all, players, rounds, viewer } = input;
   const kind = input.game.kind ?? "classic";
@@ -317,7 +306,10 @@ export function partyView(input: ViewInput): PartyView {
   if (latest) {
     const mine = me && progressOf(latest, me.id);
     const answer = entry(latest.answerId);
-    const hint = mine && hintOf(attributes, answer, latest, mine.playerId);
+    // The Free Hint the viewer used this round, shown against its answer
+    const used =
+      mine && latest.hints?.find((h) => h.playerId === mine.playerId);
+    const hint = used && revealHint(attributes, answer, used.pick);
     const hints =
       mine &&
       kind === "classic" &&
