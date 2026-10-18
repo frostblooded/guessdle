@@ -122,3 +122,55 @@ test("a slow attribute load neither shows the editor early nor overwrites typing
   await page.locator("#tab-details").click();
   await expect(page.locator("#edit-name")).toHaveValue("Typed name");
 });
+
+test("attributes reorder with the arrows or by dragging, and Save keeps the order", async ({
+  page,
+}) => {
+  await page.request.post("/api/test/login", {
+    data: { email: `order-${unique()}@example.test` },
+  });
+  const created = await page.request.post("/api/games", {
+    data: { name: `Order ${unique()}` },
+  });
+  const { slug } = (await created.json()) as { slug: string };
+  for (const name of ["A", "B", "C"]) {
+    await page.request.post(`/api/games/${slug}/attributes`, {
+      data: { name, type: "text" },
+    });
+  }
+  await page.goto(`/g/${slug}/edit`);
+  await expect(page.locator("#loading-state")).toBeHidden();
+  await page.locator("#tab-attributes").click();
+  const names = page.locator("#attr-list li input");
+  const order = async (): Promise<string[]> =>
+    Promise.all((await names.all()).map((n) => n.inputValue()));
+
+  await expect(page.getByRole("button", { name: "Move A up" })).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Move C down" }),
+  ).toBeDisabled();
+  await page.getByRole("button", { name: "Move C up" }).click();
+  await expect.poll(order).toEqual(["A", "C", "B"]);
+  await expect(page.locator("#attr-unsaved")).toBeVisible();
+  await page.getByRole("button", { name: "Move C up" }).click();
+  await expect.poll(order).toEqual(["C", "A", "B"]);
+
+  // Dragging B's handle above A
+  const handle = page.getByRole("button", { name: "Drag B" });
+  const target = page.locator("#attr-list li").nth(1);
+  const from = (await handle.boundingBox())!;
+  const to = (await target.boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2, to.y + 4, { steps: 10 });
+  await page.mouse.up();
+  await expect.poll(order).toEqual(["C", "B", "A"]);
+
+  // A reorder erases nothing, so it saves without a warning
+  await page.locator("#attr-save").click();
+  await expect(page.locator("#attr-unsaved")).toBeHidden();
+  await page.reload();
+  await expect(page.locator("#loading-state")).toBeHidden();
+  await page.locator("#tab-attributes").click();
+  await expect.poll(order).toEqual(["C", "B", "A"]);
+});
