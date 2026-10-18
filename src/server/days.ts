@@ -4,7 +4,7 @@ import type pg from "pg";
 import { statusOf, type DayItem, type DayProgress } from "../game/days.ts";
 import { dateOfDay } from "./answers.ts";
 import type { GameRow } from "./games.ts";
-import { triesOf } from "./user-game.ts";
+import { triesOf } from "./play-day.ts";
 
 type Q = Pick<pg.Pool, "query">;
 
