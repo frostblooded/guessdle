@@ -1,5 +1,15 @@
 // A signed-in player's Game State for one day, stored in Postgres.
 import type pg from "pg";
+import {
+  hintChoices,
+  isHintKind,
+  pickHint,
+  revealHint,
+  type FreeHint,
+  type HintChoices,
+  type HintKind,
+  type HintPick,
+} from "../game/free-hint.ts";
 import { gradeIds, type Entry, type GradedAttribute } from "../game/game.ts";
 import type { GameRow, Roster } from "./games.ts";
 
@@ -15,19 +25,27 @@ export interface GameView {
   answer?: string;
   // Blur games, once the day is over: the answer's whole image
   answerPhoto?: string;
+  // Once the day is over, when the answer has one
+  answerDescription?: string;
+  // Classic games: the Free Hint the player used
+  hint?: FreeHint;
+  // Classic games: the hint kinds on offer, while the day is on and no hint was used
+  hints?: HintChoices;
 }
 
 // A Blur game's tries, null for a classic game with unlimited guesses
 export const triesOf = (game: GameRow): number | null =>
   game.kind === "blur" ? game.blurTries : null;
 
-// The answer as a finished day reveals it: its name, and a Blur game's whole image
+// The answer as a finished day reveals it: its name, its description when it has one, and a
+// Blur game's whole image
 export const revealOf = (
   game: GameRow,
   answer: Entry,
-): { answer: string; answerPhoto?: string } => ({
+): { answer: string; answerPhoto?: string; answerDescription?: string } => ({
   answer: answer.name,
   ...(game.kind === "blur" && { answerPhoto: answer.photo }),
+  ...(answer.description && { answerDescription: answer.description }),
 });
 
 // Whether `ids` used up a Blur game's tries without the answer
@@ -49,6 +67,8 @@ export const REFUSAL_STATUS = {
   has_progress: 409,
   // merge: the payload is for another day
   stale_day: 409,
+  // hint: none on offer (too few guesses, already used, finished, or nothing to reveal)
+  no_hint: 409,
 } as const;
 export type Refusal = keyof typeof REFUSAL_STATUS;
 export type GameOutcome = { kind: "ok"; view: GameView } | { kind: Refusal };
@@ -97,6 +117,13 @@ export async function view(
     throw new Error("stored guesses are not gradable");
   }
   const lost = isLost(game, ids, graded.victory);
+  const over = graded.victory || gaveUp || lost;
+  const pick = await storedHint(q, userId, game.id, date);
+  const hint = pick && revealHint(roster.attributes, answer, pick);
+  const hints =
+    game.kind === "classic" && !over && !hint
+      ? hintChoices(roster.attributes, answer, graded.rows)
+      : null;
   return {
     day,
     ids,
@@ -104,8 +131,28 @@ export async function view(
     victory: graded.victory,
     gaveUp,
     ...(lost && { lost: true as const }),
-    ...((graded.victory || gaveUp || lost) && revealOf(game, answer)),
+    ...(over && revealOf(game, answer)),
+    ...(hint && { hint }),
+    ...(hints && { hints }),
   };
+}
+
+async function storedHint(
+  q: Q,
+  userId: number,
+  gameId: number,
+  date: string,
+): Promise<HintPick | null> {
+  const { rows } = await q.query<{ kind: HintKind; attribute: string | null }>(
+    "select kind, attribute from user_hints where user_id = $1 and game_id = $2 and day = $3",
+    [userId, gameId, date],
+  );
+  const row = rows[0];
+  return !row
+    ? null
+    : row.kind === "attribute"
+      ? { kind: "attribute", attribute: row.attribute ?? "" }
+      : { kind: "description" };
 }
 
 // Runs `action` in a transaction holding the user's row lock, so one player's
@@ -175,6 +222,37 @@ export async function giveUp(
   return null;
 }
 
+// Uses the day's Free Hint: draws it and stores the pick
+export async function takeHint(
+  q: Q,
+  { game, roster, answer, userId, date }: GameContext,
+  current: GameView,
+  kind: unknown,
+  random: () => number,
+): Promise<Refusal | null> {
+  if (!isHintKind(kind)) {
+    return "invalid";
+  }
+  if (!current.hints) {
+    return "no_hint";
+  }
+  const pick = pickHint(roster.attributes, answer, current.rows, kind, random);
+  if (!pick) {
+    return "no_hint";
+  }
+  await q.query(
+    "insert into user_hints (user_id, game_id, day, kind, attribute) values ($1, $2, $3, $4, $5)",
+    [
+      userId,
+      game.id,
+      date,
+      pick.kind,
+      pick.kind === "attribute" ? pick.attribute : null,
+    ],
+  );
+  return null;
+}
+
 // Adopts anonymous local history (POST /api/games/:slug/state/merge body); the user-row lock
 // in changeGame makes the "no rows yet" check and the inserts one atomic step.
 export async function mergeLocal(
@@ -225,7 +303,7 @@ export async function resetGame(
   { game, userId, date }: GameContext,
 ): Promise<Refusal | null> {
   // Any time, even with no rows: deleting nothing is fine
-  for (const table of ["user_guesses", "user_give_ups"]) {
+  for (const table of ["user_guesses", "user_give_ups", "user_hints"]) {
     await q.query(
       `delete from ${table} where user_id = $1 and game_id = $2 and day = $3`,
       [userId, game.id, date],

@@ -1,7 +1,10 @@
 // Signed-in play: guesses, give-up and reset live on the server (/api/game).
 import { isAnswerRow, type GradedAttribute } from "./game.ts";
+import type { HintKind } from "./free-hint.ts";
 import {
   revealIn,
+  type HintResult,
+  type HintState,
   type GiveUpResult,
   type LoadFailure,
   type Loaded,
@@ -12,7 +15,7 @@ import {
 import { call, failureMessage, type Fetch } from "./transport.ts";
 
 // The server's view of today's game
-interface GameResponse extends Reveal {
+interface GameResponse extends Reveal, HintState {
   day: number;
   ids: number[];
   rows: GradedAttribute[][];
@@ -51,6 +54,11 @@ export function createServerPlay({
     finished = game.victory || game.gaveUp || game.lost === true;
   }
 
+  const hintsIn = (game: GameResponse): HintState => ({
+    ...(game.hint && { hint: game.hint }),
+    ...(game.hints && { hints: game.hints }),
+  });
+
   const errorOf = (data: unknown): string | undefined =>
     (data as { error?: string } | null)?.error;
 
@@ -65,6 +73,7 @@ export function createServerPlay({
       return {
         rows: game.rows,
         victory: game.victory,
+        ...hintsIn(game),
         ...revealIn(game),
         ...(game.gaveUp && { gaveUp: true as const }),
         ...(game.lost && { lost: true as const }),
@@ -87,6 +96,7 @@ export function createServerPlay({
           kind: "accepted",
           row,
           isAnswer: isAnswerRow(row),
+          ...(game.hints && { hints: game.hints }),
           ...(game.lost && { lost: true as const }),
           ...revealIn(game),
         };
@@ -118,6 +128,19 @@ export function createServerPlay({
       if (errorOf(res?.data) === "finished") {
         finished = true;
         return { kind: "finished" };
+      }
+      return { kind: "error", message: failureMessage(res) };
+    },
+
+    async takeHint(kind: HintKind): Promise<HintResult> {
+      const res = await call(fetch, `${base}/hint${query}`, { kind });
+      if (res?.status === 429) {
+        return { kind: "rate_limited" };
+      }
+      const game = res?.data as GameResponse | undefined;
+      if (res?.status === 200 && game?.hint) {
+        adopt(game);
+        return { kind: "hint", hint: game.hint };
       }
       return { kind: "error", message: failureMessage(res) };
     },

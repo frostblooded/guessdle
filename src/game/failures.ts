@@ -1,6 +1,7 @@
 // Every failure code the server sends: its HTTP status and the text the browser shows.
 // One table so a new code cannot reach one side without the other.
 
+import { FREE_HINT_AFTER } from "./free-hint.ts";
 import { MAX_OPEN_PARTIES, MIN_ENTRIES } from "./limits.ts";
 
 const failure = (status: number, text: string) => ({ status, text });
@@ -90,6 +91,10 @@ export const FAILURES = {
   answer_missing: failure(
     500,
     "Today's answer could not be found for this game. Reload the page; if it keeps happening, ask the game owner or an admin to check the entries.",
+  ),
+  no_hint: failure(
+    409,
+    `No free hint is available right now. It opens after ${FREE_HINT_AFTER} wrong guesses, once per game.`,
   ),
   rate_limited: failure(
     429,

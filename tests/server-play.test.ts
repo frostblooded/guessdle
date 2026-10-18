@@ -15,6 +15,7 @@ class FakeServer {
   day: number = 100;
   ids: number[] = [];
   gaveUp: boolean = false;
+  hinted: boolean = false;
   down: boolean = false;
   status: number | null = null; // forces an error response
   plain: boolean = false; // the error body is not JSON, like nginx's 429
@@ -31,6 +32,11 @@ class FakeServer {
       victory: g.victory,
       gaveUp: this.gaveUp,
       ...((g.victory || this.gaveUp) && { answer: answer.name }),
+      ...(this.hinted
+        ? { hint: { kind: "attribute", attribute: "Owner", value: "Niki" } }
+        : this.ids.length >= 3 && {
+            hints: { attribute: true, description: false },
+          }),
     };
   }
 
@@ -77,6 +83,14 @@ class FakeServer {
         return reply(409, { error: "finished", day: this.day });
       }
       this.gaveUp = true;
+      return reply(200, this.view());
+    }
+    if (url === `/api/games/${SLUG}/state/hint`) {
+      assert.deepEqual(JSON.parse(init!.body), { kind: "attribute" });
+      if (this.hinted || this.ids.length < 3) {
+        return reply(409, { error: "no_hint", day: this.day });
+      }
+      this.hinted = true;
       return reply(200, this.view());
     }
     assert.equal(url, `/api/games/${SLUG}/state/reset`);
@@ -284,6 +298,34 @@ describe("give up", () => {
   it("is finished when another device already ended the game", async () => {
     server.ids = [answer.id];
     assert.deepEqual(await open().giveUp(), { kind: "finished" });
+  });
+});
+
+describe("takeHint", () => {
+  const three = [GUESS_DATA[1]!, GUESS_DATA[2]!, GUESS_DATA[3]!];
+  it("offers it after 3 guesses, then shows the hint used", async () => {
+    const play = open();
+    for (const entry of three.slice(0, 2)) {
+      const res = await play.submit(entry.id);
+      assert.ok(res.kind === "accepted" && res.hints === undefined);
+    }
+    const third = await play.submit(three[2]!.id);
+    assert.ok(third.kind === "accepted");
+    assert.deepEqual(third.hints, { attribute: true, description: false });
+    assert.deepEqual(await play.takeHint("attribute"), {
+      kind: "hint",
+      hint: { kind: "attribute", attribute: "Owner", value: "Niki" },
+    });
+    const loaded = await loadedOf(open());
+    assert.equal(loaded.hint?.kind, "attribute");
+    assert.equal(loaded.hints, undefined);
+  });
+
+  it("says why the server refused", async () => {
+    assert.deepEqual(await open().takeHint("attribute"), {
+      kind: "error",
+      message: FAILURES.no_hint.text,
+    });
   });
 });
 

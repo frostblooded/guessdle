@@ -48,6 +48,27 @@ test("a correct guess shows the victory banner with the answer", async ({
   await expect(rows(page).first().locator(".cell.incorrect")).toHaveCount(0);
 });
 
+test("a free hint opens after 3 wrong guesses and stays after a reload", async ({
+  page,
+}) => {
+  const wrong = names.filter((name) => name !== answerName).slice(0, 3);
+  const hint = page.locator("#free-hint");
+  await submitGuess(page, wrong[0]!);
+  await submitGuess(page, wrong[1]!);
+  await expect(hint).toBeHidden();
+  await submitGuess(page, wrong[2]!);
+  await expect(hint).toContainText("You earned a free hint");
+  // The fixture game's entries have no description
+  await expect(page.locator("#hint-description-button")).toBeDisabled();
+  await page.locator("#hint-attribute-button").click();
+  await expect(hint).toContainText("Free hint");
+  const text = await page.locator("#free-hint-text").textContent();
+  expect(text).toMatch(/^.+: .+$/);
+  await page.reload();
+  await expect(page.locator("#free-hint-text")).toHaveText(text!);
+  await expect(page.locator("#hint-attribute-button")).toHaveCount(0);
+});
+
 test("a win opens the stats popup; See stats brings it back after a reload", async ({
   page,
 }) => {

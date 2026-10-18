@@ -68,7 +68,21 @@ function fakeServer(game?: Response) {
         day: 1,
         rows: ids.map(row),
         victory: ids.includes(ANSWER),
-        ...(ids.includes(ANSWER) && { answer: "Dido" }),
+        ...(ids.includes(ANSWER) && {
+          answer: "Dido",
+          answerDescription: "Naps in the sun.",
+        }),
+        // This small fake offers the Free Hint after 2 wrong guesses
+        ...(ids.length >= 2 &&
+          !ids.includes(ANSWER) && {
+            hints: { attribute: true, description: false },
+          }),
+      });
+    }
+    if (url === "/api/games/pets/hint") {
+      return json(200, {
+        day: 1,
+        hint: { kind: "attribute", attribute: "Color", value: "White" },
       });
     }
     if (
@@ -182,6 +196,7 @@ describe("PlayPage", () => {
       document.querySelector("#victory-answer-name")!.textContent,
       "Dido",
     );
+    assert.ok(screen.getByText("Naps in the sun."));
     // The stats popup opens over the page; the board is behind it
     await screen.findByRole("dialog");
     await userEvent.keyboard("{Escape}");
@@ -220,6 +235,33 @@ describe("PlayPage", () => {
     assert.equal(document.activeElement, again);
     await userEvent.click(again);
     await screen.findByRole("dialog");
+  });
+
+  it("offers the free hint once earned, then shows the hint it drew", async () => {
+    vi.stubGlobal("fetch", fakeServer());
+    renderPlay();
+    await screen.findByText(/No guesses yet/);
+    await guess("Bela");
+    assert.equal(screen.queryByText("You earned a free hint"), null);
+    await guess("Abby");
+    await screen.findByText("You earned a free hint");
+    assert.equal(
+      screen
+        .getByRole<HTMLButtonElement>("button", {
+          name: "Reveal the description",
+        })
+        .hasAttribute("disabled"),
+      true,
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Reveal an attribute" }),
+    );
+    await screen.findByText("Free hint");
+    assert.equal(
+      document.querySelector("#free-hint-text")!.textContent,
+      "Color: White",
+    );
+    assert.equal(screen.queryByText("You earned a free hint"), null);
   });
 
   it("giving up shows no stats", async () => {

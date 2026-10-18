@@ -6,8 +6,11 @@ import { BlurGuesses, BlurView } from "../../components/blur-view.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
 import { findEntryId, isAnswerRow, nameCell } from "../../game/game.ts";
+import type { HintKind } from "../../game/free-hint.ts";
 import type { LiveRound, PartyView } from "../../game/party.ts";
+import { FreeHintCard } from "../play/free-hint.tsx";
 import { GuessBox } from "../play/guess-box.tsx";
+import { AnswerDescription } from "../play/result-banner.tsx";
 
 type Board = NonNullable<LiveRound["yours"]>;
 
@@ -17,6 +20,7 @@ export function PartyRound({
   mine,
   onGuess,
   onGiveUp,
+  onHint,
   onNotice,
 }: {
   view: PartyView;
@@ -25,6 +29,7 @@ export function PartyRound({
   // False when the socket is down and the guess was not sent
   onGuess: (entryId: number) => boolean;
   onGiveUp: () => void;
+  onHint: (kind: HintKind) => void;
   onNotice: (text: string | null) => void;
 }) {
   const [guess, setGuess] = useState("");
@@ -81,6 +86,9 @@ export function PartyRound({
                 The answer is {mine.answer.name}. Waiting for the others to
                 finish.
               </span>
+              {mine.answer.description && (
+                <AnswerDescription text={mine.answer.description} />
+              )}
             </div>
           </div>
         )}
@@ -125,6 +133,13 @@ export function PartyRound({
             </Button>
           </div>
         </Card>
+      )}
+      {blur === null && (
+        <FreeHintCard
+          hint={mine.hint}
+          hints={done ? undefined : mine.hints}
+          onTake={onHint}
+        />
       )}
       {blur !== null && <BlurGuesses rows={newestFirst} />}
       {blur === null && mine.rows.length > 0 && (

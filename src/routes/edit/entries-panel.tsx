@@ -7,6 +7,7 @@ import { Alert } from "../../components/ui/alert.tsx";
 import { Button, buttonVariants } from "../../components/ui/button.tsx";
 import { Input, Label, Textarea } from "../../components/ui/input.tsx";
 import {
+  MAX_DESCRIPTION,
   MAX_ENTRY_NAME,
   MAX_LIST_ITEMS,
   MAX_VALUE_LENGTH,
@@ -16,11 +17,13 @@ import { api, errorText, type Reply } from "../../manage-client.ts";
 import { IMAGE_TYPES, type Attribute, type Entry } from "./types.ts";
 import { BlurOrderEditor } from "./blur-order-editor.tsx";
 
-// What the form holds: the entry being edited (null: adding), its name, photo URL and values
+// What the form holds: the entry being edited (null: adding), its name, photo URL, description
+// and values
 interface Draft {
   editing: Entry | null;
   name: string;
   photo: string;
+  description: string;
   values: Record<string, string>;
   // Blur games: the squares picked so far, in the order they clear
   blurOrder: number[];
@@ -30,6 +33,7 @@ const draftOf = (entry: Entry | null): Draft => ({
   editing: entry,
   name: entry?.name ?? "",
   photo: entry?.photo ?? "",
+  description: entry?.description ?? "",
   blurOrder: entry?.blurOrder ?? [],
   values: Object.fromEntries(
     Object.entries(entry?.values ?? {}).map(([id, items]) => [
@@ -125,11 +129,17 @@ export function EntriesPanel({
       ? {
           name: draft.name,
           photo: draft.photo,
+          description: draft.description,
           ...(draft.blurOrder.length === CELLS && {
             blurOrder: draft.blurOrder,
           }),
         }
-      : { name: draft.name, photo: draft.photo, values };
+      : {
+          name: draft.name,
+          photo: draft.photo,
+          description: draft.description,
+          values,
+        };
     const ok = draft.editing
       ? await run("PATCH", `${base}/entries/${draft.editing.id}`, body)
       : await run("POST", `${base}/entries`, body);
@@ -346,6 +356,27 @@ export function EntriesPanel({
               </div>
             );
           })}
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="entry-description">Description (optional)</Label>
+          <Textarea
+            id="entry-description"
+            rows={3}
+            maxLength={MAX_DESCRIPTION}
+            aria-describedby="entry-description-help"
+            value={draft.description}
+            onChange={(event) =>
+              setDraft((d) => ({ ...d, description: event.target.value }))
+            }
+          />
+          <p
+            id="entry-description-help"
+            className="text-sm text-muted-foreground"
+          >
+            {blur
+              ? "Shown with the answer once a player finds it or the day is over."
+              : "Shown with the answer once a player finds it or the day is over. Players can also reveal it as their free hint."}
+          </p>
         </div>
         <Alert id="entry-error" variant="error" role="alert">
           {error}

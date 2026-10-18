@@ -23,6 +23,9 @@ import type { Play } from "../../game/play.ts";
 import type { GameKind } from "../../game/blur.ts";
 import { browserFetch, gameKey, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
+import { FreeHintCard } from "./free-hint.tsx";
+import { useFreeHint } from "./use-free-hint.ts";
+import { noticeOf, RATE_LIMITED } from "./notice.ts";
 import { GuessBox } from "./guess-box.tsx";
 import {
   GameNotFound,
@@ -74,9 +77,6 @@ export async function loadGame(
 
 const now = (): Date => new Date();
 
-export const RATE_LIMITED =
-  "Too many requests in a short time. Wait a minute, then try again.";
-
 // `day`: a past day's Day Number from the address, or null for today
 function Game({ slug, day }: { slug: string; day: number | null }) {
   const { data: game, isPending } = useQuery({
@@ -114,6 +114,8 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const pastDay = past ? day : undefined;
   // A past day's first win counts in that day's stats, like today's
   const victory = useVictoryStats(slug, play, pastDay);
+  const freeHint = useFreeHint(play, board, (res) => setNotice(noticeOf(res)));
+  const adoptHint = freeHint.adopt;
 
   useTitle(
     game === "missing"
@@ -164,6 +166,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
         return;
       }
       setRows([...loaded.rows].reverse());
+      adoptHint(loaded);
       if (
         loaded.answer !== undefined &&
         (loaded.victory || loaded.gaveUp || loaded.lost)
@@ -177,7 +180,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
       }
       setReady(true);
     })();
-  }, [playable, closed, me.isPending, me.data, slug, day, pastDay]);
+  }, [playable, closed, me.isPending, me.data, slug, day, pastDay, adoptHint]);
 
   async function submit(name: string): Promise<void> {
     const id = findEntryId(roster, name);
@@ -188,13 +191,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
     const res = await play.current.submit(id).finally(() => {
       submitting.current = false;
     });
-    setNotice(
-      res.kind === "rate_limited"
-        ? RATE_LIMITED
-        : res.kind === "error"
-          ? res.message
-          : null,
-    );
+    setNotice(noticeOf(res));
     // The typed guess stays when the server could not grade it, to retry
     if (res.kind !== "accepted" && res.kind !== "duplicate") {
       return;
@@ -206,6 +203,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
     if (rows.length === 0) {
       victory.startClock();
     }
+    freeHint.offer(res.hints);
     if (res.answer !== undefined && (res.isAnswer || res.lost)) {
       setResult(resultOf(res.isAnswer ? "victory" : "lost", res));
       if (res.isAnswer) {
@@ -220,13 +218,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
     if (!res) {
       return;
     }
-    setNotice(
-      res.kind === "rate_limited"
-        ? RATE_LIMITED
-        : res.kind === "error"
-          ? res.message
-          : null,
-    );
+    setNotice(noticeOf(res));
     if (res.kind === "gaveUp") {
       setResult(resultOf("give-up", res));
     }
@@ -411,6 +403,13 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
           opener={opener}
           past={past}
         />
+        {blur === null && (
+          <FreeHintCard
+            {...freeHint}
+            hints={finished || cannotPlay ? undefined : freeHint.hints}
+            onTake={(kind) => void freeHint.take(kind)}
+          />
+        )}
         <PlayResults
           rows={rows}
           titles={blur === null ? titles : null}

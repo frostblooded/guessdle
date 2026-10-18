@@ -3,6 +3,12 @@ import express from "express";
 import type { Express, Request, Response } from "express";
 import type pg from "pg";
 import { gradeIds } from "../../game/game.ts";
+import {
+  hintChoices,
+  isHintKind,
+  pickHint,
+  revealHint,
+} from "../../game/free-hint.ts";
 import type { DaysResponse } from "../../game/days.ts";
 import { listDays } from "../days.ts";
 import { isPlayerToken, MAX_SECONDS } from "../../game/stats.ts";
@@ -19,6 +25,7 @@ import {
   resetGame,
   REFUSAL_STATUS,
   revealOf,
+  takeHint,
   triesOf,
   view,
   type GameContext,
@@ -39,6 +46,24 @@ import {
 export function gameRoutes(app: Express, ctx: AppContext): void {
   const { pool, now } = ctx;
   const base = "/api/games/:slug";
+
+  // The game and the day a request plays (today, or a past day named by ?day=N), or the
+  // failure sent and undefined
+  const playedDay = async (
+    req: Request,
+    res: Response,
+  ): Promise<{ loaded: LoadedGame; date: string; day: number } | undefined> => {
+    const loaded = await loadGame(ctx, req, res);
+    if (!loaded) {
+      return undefined;
+    }
+    const played = dayOf(ctx, req, loaded.game);
+    if (!played) {
+      failWith(res, "no_such_day");
+      return undefined;
+    }
+    return { loaded, date: played.date, day: played.day };
+  };
 
   app.get("/api/games", async (_req, res) => {
     res.set("Cache-Control", "no-store");
@@ -107,17 +132,12 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
     `${base}/grade`,
     express.json({ limit: "10kb" }),
     async (req, res) => {
-      const loaded = await loadGame(ctx, req, res);
-      if (!loaded) {
-        return;
-      }
-      const { game, roster } = loaded;
-      const played = dayOf(ctx, req, game);
+      const played = await playedDay(req, res);
       if (!played) {
-        failWith(res, "no_such_day");
         return;
       }
-      const { date, day } = played;
+      const { loaded, date, day } = played;
+      const { game, roster } = loaded;
       const fail = (status: number, error: string): void => {
         res.status(status).json({ error, day });
       };
@@ -148,28 +168,68 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         return;
       }
       const lost = isLost(game, ids, graded.victory);
+      // The browser knows whether it already used its hint, and hides these then
+      const hints =
+        game.kind === "classic" && !graded.victory
+          ? hintChoices(roster.attributes, answer, graded.rows)
+          : null;
       res.json({
         day,
         rows: graded.rows,
         victory: graded.victory,
         ...(lost && { lost: true }),
         ...((graded.victory || lost) && revealOf(game, answer)),
+        ...(hints && { hints }),
       });
+    },
+  );
+
+  // Stateless Free Hint for anonymous players: draws one of the offered kind for these
+  // guesses. Like give-up it is open to anyone; the browser keeps it and asks only once.
+  app.post(
+    `${base}/hint`,
+    express.json({ limit: "10kb" }),
+    async (req, res) => {
+      const played = await playedDay(req, res);
+      if (!played) {
+        return;
+      }
+      const { loaded, date, day } = played;
+      const { game, roster } = loaded;
+      const { ids, kind } = bodyOf(req);
+      if (!isIdList(roster, ids) || !isHintKind(kind)) {
+        res.status(400).json({ error: "invalid", day });
+        return;
+      }
+      const answer = await todaysAnswer(ctx, res, loaded, date, day);
+      if (!answer) {
+        return;
+      }
+      const graded = gradeIds(roster.attributes, roster.all, answer, ids);
+      if (graded.kind !== "graded") {
+        res.status(400).json({ error: "invalid", day });
+        return;
+      }
+      const pick =
+        game.kind === "classic" && !graded.victory
+          ? pickHint(roster.attributes, answer, graded.rows, kind, ctx.random)
+          : null;
+      const hint = pick && revealHint(roster.attributes, answer, pick);
+      if (!hint) {
+        res.status(409).json({ error: "no_hint", day });
+        return;
+      }
+      res.json({ day, hint });
     },
   );
 
   // Stateless and open to anyone by decision (spec #38): reveals the day's answer
   app.post(`${base}/give-up`, async (req, res) => {
-    const loaded = await loadGame(ctx, req, res);
-    if (!loaded) {
-      return;
-    }
-    const played = dayOf(ctx, req, loaded.game);
+    const played = await playedDay(req, res);
     if (!played) {
-      failWith(res, "no_such_day");
       return;
     }
-    const { date, day } = played;
+    const { loaded, date, day } = played;
     const answer = await todaysAnswer(ctx, res, loaded, date, day);
     if (answer) {
       res.json({ day, ...revealOf(loaded.game, answer) });
@@ -333,6 +393,13 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
     // Only today's browser guesses are adopted; past days stay where they were played
     changeRoute(async ({ body, ...game }, current, q) =>
       game.past ? "stale_day" : mergeLocal(q, game, current, body),
+    ),
+  );
+  app.post(
+    `${base}/state/hint`,
+    json,
+    changeRoute(({ body, ...game }, current, q) =>
+      takeHint(q, game, current, body["kind"], ctx.random),
     ),
   );
   app.post(

@@ -26,3 +26,12 @@ export const OutOfTries: Story = {
     roster: [{ id: 1, name: "Ati", photo: "" }],
   },
 };
+export const WithDescription: Story = {
+  args: {
+    result: {
+      kind: "victory",
+      answer: "Ati",
+      description: "A grey tabby who sleeps on the radiator all winter.",
+    },
+  },
+};
