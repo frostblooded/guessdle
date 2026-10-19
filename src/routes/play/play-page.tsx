@@ -8,14 +8,7 @@ import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
 import { FAILURES } from "../../game/failures.ts";
-import {
-  boardColumns,
-  findEntryId,
-  guessedNames,
-  SKIP,
-  isAnswerRow,
-  type GradedAttribute,
-} from "../../game/game.ts";
+import { findEntryId, SKIP, type GradedAttribute } from "../../game/game.ts";
 import { openPlay } from "../../game/open-play.ts";
 import {
   ANSWER_CHANGED,
@@ -27,7 +20,7 @@ import {
   type Play,
   type SubmitResult,
 } from "../../game/play.ts";
-import { isImageGame, minEntriesOf } from "../../game/blur.ts";
+import { minEntriesOf } from "../../game/blur.ts";
 import { browserFetch, gameKey, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { FreeHintCard } from "./free-hint.tsx";
@@ -39,7 +32,12 @@ import {
   PastDayLede,
   PastDaysLink,
 } from "./past-day.tsx";
-import { AnswerImage, answerImageUrl, PlayResults } from "./play-results.tsx";
+import {
+  AnswerImage,
+  answerImageUrl,
+  boardOf,
+  PlayResults,
+} from "./play-results.tsx";
 import { loadGame } from "./load-game.ts";
 import { PlayActions, PlayStatus } from "./play-status.tsx";
 import { ResetDialog } from "./reset-dialog.tsx";
@@ -268,15 +266,11 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
           : (notice ?? (restarted ? ANSWER_CHANGED : null));
   const loading = !cannotPlay && !ready;
   const finished = result !== null;
-  // Each row names its guess; those names leave the suggestions
-  const used = guessedNames(rows);
-  // A Blur or Sequence game's tries
-  const blur =
-    playable && isImageGame(playable.kind) ? (playable.blurTries ?? 1) : null;
-  const wrong = rows.filter((row) => !isAnswerRow(row)).length;
-  const unguessed = roster.filter((entry) => !used.has(entry.name));
-  const names = unguessed.map((entry) => entry.name);
-  const titles = boardColumns(playable?.attributes ?? []);
+  const { tries, wrong, unguessed, names, titles } = boardOf(
+    playable ?? { kind: "classic", attributes: [] },
+    roster,
+    rows,
+  );
 
   return (
     <>
@@ -339,11 +333,11 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
         aria-label="Game board"
         aria-busy={isPending || loading ? true : undefined}
       >
-        {blur !== null && ready && playable && (
+        {tries !== null && ready && playable && (
           <AnswerImage
             kind={playable.kind}
             url={(path, n) => answerImageUrl(path, slug, n, board, pastDay)}
-            tries={blur}
+            tries={tries}
             wrong={wrong}
             finished={finished}
             reveal={result?.photo}
@@ -356,7 +350,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
             value={guess}
             onChange={setGuess}
             onSubmit={(name) => void submit(name)}
-            onSkip={blur === null ? undefined : () => void submitId(SKIP)}
+            onSkip={tries === null ? undefined : () => void submitId(SKIP)}
             disabled={cannotPlay}
             busy={loading}
             hidden={finished}
@@ -401,7 +395,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
           opener={opener}
           past={past}
         />
-        {blur === null && (
+        {titles && (
           <FreeHintCard
             {...freeHint}
             hints={finished || cannotPlay ? undefined : freeHint.hints}
@@ -411,13 +405,13 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
         {modes.selecting && !finished && !cannotPlay ? (
           <SelectList
             entries={unguessed}
-            attributes={blur === null ? (playable?.attributes ?? []) : null}
+            attributes={titles && (playable?.attributes ?? [])}
             onPick={(name) => void submit(name)}
           />
         ) : (
           <PlayResults
             rows={rows}
-            titles={blur === null ? titles : null}
+            titles={titles}
             loading={isPending || loading}
             loadingText={past ? "Loading the game…" : "Loading today's game…"}
             empty={ready && rows.length === 0}

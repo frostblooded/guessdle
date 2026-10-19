@@ -4,8 +4,42 @@ import { GuessRow, TitleRow } from "../../components/board.tsx";
 import { EmptyState } from "../../components/page.tsx";
 import { BlurGuesses, BlurView } from "../../components/blur-view.tsx";
 import { SequenceView } from "../../components/sequence-view.tsx";
-import type { GameKind } from "../../game/blur.ts";
-import type { BoardColumn, GradedAttribute } from "../../game/game.ts";
+import { isImageGame, type GameKind } from "../../game/blur.ts";
+import {
+  boardColumns,
+  guessedNames,
+  isAnswerRow,
+  type BoardColumn,
+  type EntryRef,
+  type GameAttribute,
+  type GradedAttribute,
+} from "../../game/game.ts";
+
+// What a board of guesses shows (Play and party rounds): a Blur or Sequence game's tries and wrong
+// guesses, the entries left to guess, and a classic game's columns
+export function boardOf(
+  game: {
+    kind: GameKind;
+    blurTries?: number | undefined;
+    attributes: readonly GameAttribute[];
+  },
+  entries: readonly EntryRef[],
+  rows: readonly GradedAttribute[][],
+) {
+  const image = isImageGame(game.kind);
+  // Each row names its guess; those names leave the suggestions
+  const used = guessedNames(rows);
+  const unguessed = entries.filter((entry) => !used.has(entry.name));
+  return {
+    // Null for a classic game, whose guesses are unlimited
+    tries: image ? (game.blurTries ?? 1) : null,
+    wrong: rows.filter((row) => !isAnswerRow(row)).length,
+    unguessed,
+    names: unguessed.map((entry) => entry.name),
+    // Null for a Blur or Sequence game, which shows names only
+    titles: image ? null : boardColumns(game.attributes),
+  };
+}
 
 // What a Blur or Sequence game shows of the answer: the image with n squares clear (`blur`), or
 // photo n (`shot`). `board` refetches it on a fresh board, `day` names a past day.

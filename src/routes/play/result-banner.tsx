@@ -1,4 +1,5 @@
 // The result card above the guesses after a win, a give-up or (Blur games) running out of tries.
+import type { ReactNode } from "react";
 import type { EntryRef } from "../../game/game.ts";
 import type { Reveal } from "../../game/play.ts";
 
@@ -40,13 +41,18 @@ export function AnswerDescription({ text }: { text: string }) {
   );
 }
 
-// The result card above the guesses: the answer's photo, name and description
+// The result card above the guesses (Play and party rounds): the answer's photo, name and
+// description. A party round names its own title and adds a line under the answer.
 export function ResultBanner({
   result,
   roster,
+  title = TITLES[result.kind],
+  children,
 }: {
   result: NonNullable<Result>;
   roster: readonly EntryRef[];
+  title?: string;
+  children?: ReactNode;
 }) {
   const victory = result.kind === "victory";
   const photo =
@@ -67,7 +73,7 @@ export function ResultBanner({
       )}
       <div className="flex min-w-0 flex-col gap-1">
         <strong className="text-3xl font-bold uppercase sm:text-5xl">
-          {TITLES[result.kind]}
+          {title}
         </strong>
         <span className="break-words">
           {victory ? "The answer is " : "The answer was "}
@@ -78,6 +84,7 @@ export function ResultBanner({
             {result.answer}
           </span>
         </span>
+        {children}
         {result.description && <AnswerDescription text={result.description} />}
       </div>
     </div>
