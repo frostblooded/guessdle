@@ -79,6 +79,9 @@ Whole calendar days since the game's start date. The start date itself is day 0.
 **Username**:
 A signed-in player's one public name, picked once (lowercase letters, digits, underscores). Their **Profile** at `/u/<username>` shows their Playlists and their gallery Games. The account's `name` is its email and is never shown publicly.
 
+**Friend**:
+A signed-in player another one asked by exact username or email, who accepted. Friends see each other's first try of the day (or first quiz score) on the result screen; a request waits on the Friends page (`/friends`) until it is accepted or declined.
+
 **Playlist**:
 A player's named, ordered list of Games, public (anyone with the link, and on their Profile) or private (only them). Only Games the gallery shows can be added, and a Game that leaves the gallery drops out of view until it returns.
 

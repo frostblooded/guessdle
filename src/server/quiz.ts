@@ -8,6 +8,7 @@ import {
   type QuizSpec,
   type QuizStats,
 } from "../game/quiz.ts";
+import { quizFriendResults, userIdOf } from "./friends.ts";
 import type { Roster } from "./games.ts";
 
 type Q = Pick<pg.Pool, "query">;
@@ -49,7 +50,11 @@ export async function recordScore(
     "select player, score::float8 as score from quiz_results where game_id = $1",
     [gameId],
   );
+  const userId = userIdOf(player);
   return {
+    ...(userId !== null && {
+      friends: await quizFriendResults(q, userId, gameId),
+    }),
     first: rows.find((row) => row.player === player)?.score ?? null,
     players: rows.length,
     spread: spreadOf(

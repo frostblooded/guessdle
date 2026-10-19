@@ -11,6 +11,7 @@ export const RESERVED_SLUGS: readonly string[] = [
   "g",
   "my-games",
   "settings",
+  "friends",
   "create",
   "uploads",
   "dist",

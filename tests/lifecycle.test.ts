@@ -127,6 +127,7 @@ const ALL_ON: MailSettings = {
   approved: true,
   rejected: true,
   review: true,
+  friends: true,
 };
 
 // A scripted pool: the game is at `status`; records the statements and the mails.

@@ -39,7 +39,7 @@ export const FAILURES = {
   forbidden: failure(403, "You cannot change this game."),
   banned: failure(
     403,
-    "Your account is banned, so you cannot create or change games or playlists. You can still play.",
+    "Your account is banned, so you cannot create or change games or playlists, or send friend requests. You can still play.",
   ),
   quota_exceeded: failure(403, "You have used all your upload space."),
   not_found: failure(404, "This game no longer exists."),
@@ -121,6 +121,19 @@ export const FAILURES = {
   game_not_listed: failure(
     409,
     "Only games shown in the gallery can go in a playlist.",
+  ),
+  player_not_found: failure(
+    404,
+    "No player has that username or email. Check the spelling: it must match exactly.",
+  ),
+  friend_self: failure(400, "That is you. Add someone else."),
+  friend_exists: failure(
+    409,
+    "You are already friends, or your request is waiting for their answer.",
+  ),
+  friend_request_not_found: failure(
+    404,
+    "That friend request is gone: they may have cancelled it. Reload the page.",
   ),
   too_large: failure(413, "That image is over 5 MB."),
   unsupported: failure(415, "Use a JPEG, PNG or WebP image."),

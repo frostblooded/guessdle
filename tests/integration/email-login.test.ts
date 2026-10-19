@@ -284,6 +284,7 @@ describe("email magic-link sign-in", () => {
         email: "ann@x.test",
         username: null,
         admin: false,
+        friendRequests: 0,
       });
       assert.equal(await count("users"), 1);
     });
@@ -377,6 +378,7 @@ describe("email magic-link sign-in", () => {
         email: "Ann@X.test",
         username: null,
         admin: false,
+        friendRequests: 0,
       });
       assert.equal(await count("users", "google_sub = 'g-1'"), 1);
     });

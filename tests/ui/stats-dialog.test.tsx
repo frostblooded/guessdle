@@ -65,3 +65,31 @@ describe("StatsDialog", () => {
     assert.equal(document.querySelector("#stats-guesses")!.textContent, "1");
   });
 });
+
+describe("StatsDialog friends", () => {
+  it("lists the friends who played, with guesses and time or not solved", async () => {
+    show({
+      ...base,
+      friends: [
+        { name: "ann", won: true, guesses: 1, seconds: 65 },
+        { name: "bob@x.test", won: true, guesses: 4, seconds: null },
+        { name: "cy", won: false, guesses: 2, seconds: null },
+      ],
+    });
+    await screen.findByRole("dialog");
+    const rows = [...document.querySelectorAll(".friend-result")].map(
+      (row) => row.textContent,
+    );
+    assert.deepEqual(rows, [
+      "1.ann1 guess, 1m 05s",
+      "2.bob@x.test4 guesses",
+      "3.cyNot solved",
+    ]);
+  });
+
+  it("shows no friends list when none played", async () => {
+    show({ ...base, friends: [] });
+    await screen.findByRole("dialog");
+    assert.equal(document.querySelector("#friend-results"), null);
+  });
+});

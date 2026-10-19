@@ -18,6 +18,7 @@ const ON: MailSettings = {
   approved: true,
   rejected: true,
   review: true,
+  friends: true,
 };
 
 // Stores what PUT sends, or answers it with `putStatus`
@@ -107,6 +108,19 @@ describe("SettingsPage", () => {
       assert.equal((toggle(name) as HTMLButtonElement).disabled, true);
     }
     assert.equal(toggle(/review/i).getAttribute("aria-checked"), "false");
+  });
+
+  it("saves the friend request switch, which the approval master switch leaves alone", async () => {
+    const puts = fakeServer({ ...ON, all: false });
+    renderSettings();
+    const friends = await screen.findByRole("switch", {
+      name: /friend request emails/i,
+    });
+    assert.equal((friends as HTMLButtonElement).disabled, false);
+    await userEvent.click(friends);
+    await waitFor(() =>
+      assert.deepEqual(puts, [{ ...ON, all: false, friends: false }]),
+    );
   });
 
   it("puts the switch back and says so when saving fails", async () => {

@@ -303,7 +303,13 @@ describe("approval flow", () => {
       });
     const settings = (body: unknown, cookie = ann) =>
       request("PUT", "/api/settings/mail", cookie, body);
-    const ON = { all: true, approved: true, rejected: true, review: true };
+    const ON = {
+      all: true,
+      approved: true,
+      rejected: true,
+      review: true,
+      friends: true,
+    };
 
     it("mails the owner when an admin approves the game", async () => {
       await makeGame("pending");
