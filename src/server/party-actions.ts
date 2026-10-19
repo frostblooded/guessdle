@@ -85,12 +85,7 @@ export async function act(
           }
           await tx.query(
             "insert into party_hints (round_id, player_id, kind, attribute) values ($1, $2, $3, $4)",
-            [
-              live.id,
-              me.id,
-              pick.kind,
-              pick.kind === "attribute" ? pick.attribute : null,
-            ],
+            [live.id, me.id, pick.kind, pick.attribute],
           );
           return null;
         }

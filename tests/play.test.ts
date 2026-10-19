@@ -580,7 +580,7 @@ describe("takeHint", () => {
     assert.ok(second.kind === "accepted" && second.hints === undefined);
     const third = await play.submit(three!.id);
     assert.ok(third.kind === "accepted");
-    assert.deepEqual(third.hints, { attribute: true, description: false });
+    assert.deepEqual(third.hints, { attribute: true });
   });
 
   it("sends the guesses and the kind, keeps the hint and stops the offer", async () => {

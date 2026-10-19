@@ -12,7 +12,6 @@ import { ATTRIBUTES, GUESS_DATA } from "./roster-fixture.ts";
 
 // Ati: Colors Black, Orange; Owner Niki
 const answer: Entry = { ...GUESS_DATA[0]!, description: "Loves boxes." };
-const plain: Entry = GUESS_DATA[0]!;
 const rowsOf = (ids: number[], of: Entry = answer) => {
   const graded = gradeIds(ATTRIBUTES, GUESS_DATA, of, ids);
   assert.equal(graded.kind, "graded");
@@ -42,24 +41,17 @@ describe("hintChoices", () => {
   it("offers nothing before 3 guesses", () => {
     assert.equal(hintChoices(ATTRIBUTES, answer, rowsOf([2, 3])), null);
   });
-  it("offers both kinds after 3 wrong guesses", () => {
+  it("offers an attribute after 3 wrong guesses", () => {
     assert.deepEqual(hintChoices(ATTRIBUTES, answer, rowsOf([2, 3, 4])), {
       attribute: true,
-      description: true,
     });
   });
-  it("offers no description when the answer has none", () => {
-    assert.deepEqual(hintChoices(ATTRIBUTES, plain, rowsOf([2, 3, 4], plain)), {
-      attribute: true,
-      description: false,
-    });
-  });
-  it("offers nothing when every attribute is matched and there is no description", () => {
-    const twin: Entry = { ...GUESS_DATA[2]!, values: plain.values };
+  it("offers nothing when every attribute is matched, even with a description", () => {
+    const twin: Entry = { ...GUESS_DATA[2]!, values: answer.values };
     const roster = [...GUESS_DATA.slice(0, 2), twin, ...GUESS_DATA.slice(3)];
-    const graded = gradeIds(ATTRIBUTES, roster, plain, [2, 3, 4]);
+    const graded = gradeIds(ATTRIBUTES, roster, answer, [2, 3, 4]);
     assert.ok(graded.kind === "graded");
-    assert.equal(hintChoices(ATTRIBUTES, plain, graded.rows), null);
+    assert.equal(hintChoices(ATTRIBUTES, answer, graded.rows), null);
   });
 });
 
@@ -85,18 +77,13 @@ describe("pickHint and revealHint", () => {
       { kind: "attribute", attribute: "Colors" },
     );
   });
-  it("refuses a kind not on offer", () => {
-    const own = rowsOf([2, 3, 4], plain);
-    assert.equal(
-      pickHint(ATTRIBUTES, plain, own, "description", () => 0),
-      null,
-    );
+  it("refuses a hint not on offer", () => {
     assert.equal(
       pickHint(ATTRIBUTES, answer, rowsOf([2]), "attribute", () => 0),
       null,
     );
   });
-  it("shows the answer's value or description", () => {
+  it("shows the answer's value", () => {
     assert.deepEqual(
       revealHint(ATTRIBUTES, answer, {
         kind: "attribute",
@@ -104,10 +91,6 @@ describe("pickHint and revealHint", () => {
       }),
       { kind: "attribute", attribute: "Colors", value: ["Black", "Orange"] },
     );
-    assert.deepEqual(revealHint(ATTRIBUTES, answer, { kind: "description" }), {
-      kind: "description",
-      description: "Loves boxes.",
-    });
   });
   it("marks an Image attribute's value as a picture", () => {
     const withImage = [
@@ -148,8 +131,8 @@ describe("pickHint and revealHint", () => {
 });
 
 describe("isFreeHint", () => {
-  it("accepts both kinds and refuses anything else", () => {
-    assert.ok(isFreeHint({ kind: "description", description: "x" }));
+  it("accepts an attribute hint and refuses anything else", () => {
+    assert.ok(!isFreeHint({ kind: "description", description: "x" }));
     assert.ok(isFreeHint({ kind: "attribute", attribute: "A", value: "1" }));
     assert.ok(isFreeHint({ kind: "attribute", attribute: "A", value: ["1"] }));
     assert.ok(!isFreeHint(null));

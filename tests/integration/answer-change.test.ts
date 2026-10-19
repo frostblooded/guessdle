@@ -75,8 +75,8 @@ describe("changing today's answer restarts the day", () => {
     await send("POST", `${G}/state/give-up`, {}, quitter);
     await send("POST", `${G}/result`, { ids: [BELA], player: TOKEN });
     await db.pool.query(
-      `insert into user_hints (user_id, game_id, day, kind)
-       select u.id, g.id, $1, 'description' from users u, games g
+      `insert into user_hints (user_id, game_id, day, kind, attribute)
+       select u.id, g.id, $1, 'attribute', 'Color' from users u, games g
        where u.email = 'player@example.com' and g.slug = $2`,
       [TODAY, GAME],
     );
