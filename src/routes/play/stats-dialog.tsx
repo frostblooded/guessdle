@@ -1,5 +1,6 @@
 // The victory popup: congratulations, the player's guesses and time, and how the day's winners did.
 import type { ReactNode } from "react";
+import { FriendResults } from "../../components/friend-results.tsx";
 import {
   Dialog,
   DialogContent,
@@ -236,6 +237,16 @@ export function StatsPanel({
       />
       {hasTimes && (
         <BarChart id="stats-time-chart" title="Time" bars={timeBars(stats)} />
+      )}
+      {stats.friends && stats.friends.length > 0 && (
+        <FriendResults
+          rows={stats.friends.map((friend) => ({
+            name: friend.name,
+            result: friend.won
+              ? `${guessesWord(friend.guesses)}${friend.seconds === null ? "" : `, ${formatSeconds(friend.seconds)}`}`
+              : "Not solved",
+          }))}
+        />
       )}
     </div>
   );

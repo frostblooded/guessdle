@@ -1,4 +1,5 @@
 // Victory stats: how today's winners did, and how one player compares to them.
+import type { FriendResult } from "./friends.ts";
 import { call, type Fetch } from "./transport.ts";
 
 // Guess counts above this share the last bar ("10+")
@@ -40,6 +41,8 @@ export interface DayStats {
   // The player's first attempt today ended without a win (a give-up or out of tries), so
   // no later win that day counts; `you` is then null
   firstTryFailed?: true;
+  // Signed-in players only: the friends who played this day, best first
+  friends?: FriendResult[];
 }
 
 export const guessBar = (guesses: number): number =>

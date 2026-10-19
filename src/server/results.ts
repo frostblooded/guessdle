@@ -9,6 +9,8 @@ import {
   type WinResult,
 } from "../game/stats.ts";
 
+import { friendResults, userIdOf } from "./friends.ts";
+
 type Q = Pick<pg.Pool, "query">;
 
 export interface ResultKey {
@@ -67,6 +69,7 @@ export async function dayStats(
     [gameId, date, player],
   );
   const mine = rows.find((row) => row.player === player);
+  const userId = userIdOf(player);
   const results = rows
     .filter((row) => row.won)
     .map(({ guesses, seconds }) => ({ guesses, seconds }));
@@ -77,5 +80,8 @@ export async function dayStats(
       mine?.won ? { guesses: mine.guesses, seconds: mine.seconds } : null,
     ),
     ...(mine?.won === false && { firstTryFailed: true as const }),
+    ...(userId !== null && {
+      friends: await friendResults(q, userId, gameId, date),
+    }),
   };
 }

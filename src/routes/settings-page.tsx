@@ -147,6 +147,25 @@ export function SettingsPage() {
           )
         )}
       </section>
+      {s && (
+        <section
+          aria-labelledby="friend-mail-heading"
+          className="mt-6 rounded-xl border bg-card p-4 shadow-sm sm:p-6"
+        >
+          <h2 id="friend-mail-heading" className="text-lg font-semibold">
+            Friends
+          </h2>
+          <ul className="divide-y">
+            <Row
+              id="mail-friends"
+              label="Friend request emails"
+              hint="An email when someone sends you a friend request."
+              checked={s.friends}
+              onChange={(friends) => void change({ ...s, friends })}
+            />
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

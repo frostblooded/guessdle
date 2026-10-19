@@ -3,6 +3,7 @@ import { Layout } from "./components/layout.tsx";
 import { AdminPage } from "./routes/admin/admin-page.tsx";
 import { CreatePage } from "./routes/create-page.tsx";
 import { EditPage } from "./routes/edit/edit-page.tsx";
+import { FriendsPage } from "./routes/friends-page.tsx";
 import { GalleryPage } from "./routes/gallery-page.tsx";
 import { HowToPlayPage } from "./routes/how-to-play-page.tsx";
 import { LoginPage } from "./routes/login-page.tsx";
@@ -48,6 +49,7 @@ export function App({ legacyWiped }: { legacyWiped: boolean }) {
             element={<HowToPlayPage />}
           />
           <Route caseSensitive path="/settings" element={<SettingsPage />} />
+          <Route caseSensitive path="/friends" element={<FriendsPage />} />
           <Route caseSensitive path="/login" element={<LoginPage />} />
           <Route caseSensitive path="/verify" element={<VerifyPage />} />
           <Route caseSensitive path="/admin" element={<AdminPage />} />

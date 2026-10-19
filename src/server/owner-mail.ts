@@ -11,7 +11,8 @@ import type { MailConfig } from "./mailer.ts";
 type Q = Pick<pg.Pool, "query">;
 
 const COLUMNS = `mail_approval as "all", mail_approved as approved,
-  mail_rejected as rejected, mail_review as review`;
+  mail_rejected as rejected, mail_review as review,
+  mail_friend_requests as friends`;
 
 export async function mailSettings(
   q: Q,
@@ -30,7 +31,7 @@ export function parseMailSettings(value: unknown): MailSettings | undefined {
     return undefined;
   }
   const v = value as Record<string, unknown>;
-  const keys = ["all", ...MAIL_KINDS] as const;
+  const keys = ["all", ...MAIL_KINDS, "friends"] as const;
   if (!keys.every((k) => typeof v[k] === "boolean")) {
     return undefined;
   }
@@ -39,6 +40,7 @@ export function parseMailSettings(value: unknown): MailSettings | undefined {
     approved: v["approved"] as boolean,
     rejected: v["rejected"] as boolean,
     review: v["review"] as boolean,
+    friends: v["friends"] as boolean,
   };
 }
 
@@ -48,9 +50,10 @@ export async function saveMailSettings(
   s: MailSettings,
 ): Promise<MailSettings> {
   const { rows } = await q.query<MailSettings>(
-    `update users set mail_approval = $2, mail_approved = $3, mail_rejected = $4, mail_review = $5
+    `update users set mail_approval = $2, mail_approved = $3, mail_rejected = $4, mail_review = $5,
+       mail_friend_requests = $6
      where id = $1 returning ${COLUMNS}`,
-    [userId, s.all, s.approved, s.rejected, s.review],
+    [userId, s.all, s.approved, s.rejected, s.review, s.friends],
   );
   return rows[0]!;
 }

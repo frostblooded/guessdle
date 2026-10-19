@@ -2,6 +2,7 @@
 // answer scored by closeness. A player takes the whole quiz and sees the right answers only at
 // the end; a party plays one question per round. Pure, so the server, the editor and Play share it.
 import { MAX_OPTION, MAX_OPTIONS, MIN_OPTIONS } from "./limits.ts";
+import type { QuizFriendResult } from "./friends.ts";
 import { parseNumberValue } from "./number.ts";
 import { Correctness } from "./correctness.ts";
 
@@ -140,6 +141,8 @@ export interface QuizStats {
   players: number;
   // spread[i]: players whose first score was at least i and under i + 1 (the last bar: a full score)
   spread: number[];
+  // Signed-in players only: their friends' first scores, best first
+  friends?: QuizFriendResult[];
 }
 
 // Grades every active question (a question left out scores 0) and builds the review

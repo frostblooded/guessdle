@@ -15,7 +15,8 @@ import {
   type QuizQuestion,
   type QuizResult,
 } from "../../game/quiz.ts";
-import { playerToken } from "../../game/stats.ts";
+import { formatSeconds, playerToken } from "../../game/stats.ts";
+import { FriendResults } from "../../components/friend-results.tsx";
 import { cn } from "../../lib/utils.ts";
 import { api, errorText } from "../../manage-client.ts";
 import type { PlayableGame } from "./load-game.ts";
@@ -129,6 +130,16 @@ function Review({
             mine: i === mine,
           }))}
         />
+        {stats.friends && stats.friends.length > 0 && (
+          <div className="mt-6">
+            <FriendResults
+              rows={stats.friends.map((friend) => ({
+                name: friend.name,
+                result: `${scoreText(friend.score)} / ${result.total}${friend.seconds === null ? "" : `, ${formatSeconds(friend.seconds)}`}`,
+              }))}
+            />
+          </div>
+        )}
       </Card>
       <ol id="quiz-review" className="space-y-3">
         {result.review.map((item, i) => (

@@ -27,6 +27,7 @@ const ADMIN: AccountUser = {
   username: null,
   admin: true,
   pending: 2,
+  friendRequests: 0,
 };
 
 afterEach(() => {
@@ -83,6 +84,27 @@ describe("AccountArea", () => {
         .getAttribute("href"),
       "/profile",
     );
+  });
+
+  it("links Friends with the count of requests waiting, and marks the avatar", async () => {
+    renderAs({ ...ADMIN, friendRequests: 3 });
+    await userEvent.click(
+      await screen.findByRole("button", {
+        name: "Account menu for Niki, 3 friend requests",
+      }),
+    );
+    assert.equal(
+      screen.getByRole("link", { name: "Friends (3)" }).getAttribute("href"),
+      "/friends",
+    );
+    assert.ok(document.getElementById("account-dot"));
+    cleanup();
+    renderAs(ADMIN);
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Account menu for Niki" }),
+    );
+    assert.ok(screen.getByRole("link", { name: "Friends" }));
+    assert.equal(document.getElementById("account-dot"), null);
   });
 
   it("Escape closes the menu and returns focus to its button", async () => {

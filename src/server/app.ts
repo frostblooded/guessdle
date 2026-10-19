@@ -18,6 +18,7 @@ import { uploadRoutes } from "./routes/uploads.ts";
 import { blurRoutes } from "./routes/blur.ts";
 import { quizRoutes } from "./routes/quiz.ts";
 import { playlistRoutes } from "./routes/playlists.ts";
+import { friendRoutes } from "./routes/friends.ts";
 import { settingsRoutes } from "./routes/settings.ts";
 import { tutorialRoutes } from "./routes/tutorial.ts";
 
@@ -124,6 +125,7 @@ export function createApp({
   partyRoutes(app, ctx, hub);
   blurRoutes(app, ctx, uploadsDir);
   playlistRoutes(app, ctx, writeLimit);
+  friendRoutes(app, ctx, writeLimit);
   settingsRoutes(app, ctx);
   tutorialRoutes(app, ctx);
   shellRoutes(app, ctx, shellDir);

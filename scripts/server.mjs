@@ -9,7 +9,7 @@ const PORT = process.env.PORT ?? 8080;
 
 // The app's routes (src/App.tsx) get the shell with 200; deploy/nginx.conf lists the same ones
 const ROUTES =
-  /^\/(|login|verify|admin|how-to-play|create|my-games|profile|settings|u\/[a-z0-9_]+|p\/[0-9]+|p\/[0-9]+\/edit|party|party\/[A-Za-z]+|g\/[^/]+|g\/[^/]+\/edit|g\/[^/]+\/days|g\/[^/]+\/day\/[0-9]+)$/;
+  /^\/(|login|verify|admin|how-to-play|create|my-games|profile|settings|friends|u\/[a-z0-9_]+|p\/[0-9]+|p\/[0-9]+\/edit|party|party\/[A-Za-z]+|g\/[^/]+|g\/[^/]+\/edit|g\/[^/]+\/days|g\/[^/]+\/day\/[0-9]+)$/;
 // Paths under the repo root the app loads
 const ALLOWED = /^\/(favicon\.ico|(dist|uploads)\/.+)$/;
 

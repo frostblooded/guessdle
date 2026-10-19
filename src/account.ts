@@ -7,6 +7,8 @@ export interface AccountUser {
   // The public profile name; null until the player picks one
   username: string | null;
   admin: boolean;
+  // Friend requests waiting for this player's answer
+  friendRequests: number;
   // Games waiting for review; sent to admins only
   pending?: number;
   // Sent only to a banned player, with the reason the admin gave

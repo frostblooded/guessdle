@@ -20,6 +20,7 @@ import {
 } from "../email-login.ts";
 import { mailDueAdmins } from "../lifecycle.ts";
 import { usernameOf } from "../playlists.ts";
+import { incomingCount } from "../friends.ts";
 import { bodyOf, type AppContext } from "./context.ts";
 
 export interface AuthOptions {
@@ -46,6 +47,8 @@ export function authRoutes(
         admin: user.admin,
         // The banner on every page
         ...(user.banned && { banned: true, banReason: user.banReason }),
+        // Friend requests waiting for an answer: the Friends link's badge
+        friendRequests: await incomingCount(pool, user.id),
         // The Admin link's badge
         ...(user.admin && { pending: await pendingCount(pool) }),
       },

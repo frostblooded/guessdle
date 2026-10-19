@@ -12,6 +12,7 @@ const SERVED = [
   ["/how-to-play", "text/html"],
   ["/create", "text/html"],
   ["/my-games", "text/html"],
+  ["/friends", "text/html"],
   ["/party", "text/html"],
   ["/party/ABCD", "text/html"],
   ["/favicon.ico", "image/x-icon"],

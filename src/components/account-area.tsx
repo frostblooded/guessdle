@@ -58,15 +58,21 @@ function UserMenu({ user }: { user: AccountUser }) {
         )}
         aria-expanded={open}
         aria-controls="user-menu-panel"
-        aria-label={`Account menu for ${user.name}`}
+        aria-label={`Account menu for ${user.name}${user.friendRequests ? `, ${user.friendRequests} friend requests` : ""}`}
         onClick={() => setOpen(!open)}
       >
         <span
           id="account-avatar"
           aria-hidden="true"
-          className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
+          className="relative grid size-6 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
         >
           {(user.name[0] ?? "?").toUpperCase()}
+          {user.friendRequests > 0 && (
+            <span
+              id="account-dot"
+              className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full border-2 border-card bg-destructive"
+            />
+          )}
         </span>
         <span id="account-name" className="user-name truncate">
           {user.name}
@@ -97,6 +103,14 @@ function UserMenu({ user }: { user: AccountUser }) {
           onClick={() => setOpen(false)}
         >
           My games
+        </Link>
+        <Link
+          id="friends-link"
+          className={menuItem}
+          to="/friends"
+          onClick={() => setOpen(false)}
+        >
+          {user.friendRequests ? `Friends (${user.friendRequests})` : "Friends"}
         </Link>
         <Link
           id="settings-link"

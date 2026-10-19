@@ -104,6 +104,7 @@ describe("Sessions and CSRF protection", () => {
         email: "ann@x.test",
         username: null,
         admin: false,
+        friendRequests: 0,
       });
     });
 
@@ -361,6 +362,7 @@ describe("Sessions and CSRF protection", () => {
         email: "ann@x.test",
         username: null,
         admin: false,
+        friendRequests: 0,
       });
     });
 

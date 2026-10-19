@@ -1,9 +1,11 @@
-// The owner's approval email switches (Settings page): `all` off stops every kind.
+// The Settings page's email switches: the owner's approval emails (`all` off stops every
+// kind) and friend request emails.
 export interface MailSettings {
   all: boolean;
   approved: boolean;
   rejected: boolean;
   review: boolean;
+  friends: boolean;
 }
 
 export type OwnerMailKind = "approved" | "rejected" | "review";
