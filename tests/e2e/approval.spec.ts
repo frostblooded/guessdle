@@ -40,6 +40,7 @@ test("submit, admin reject, resubmit, approve, unpublish", async ({
   await expect(page.locator("#submit-button")).toBeHidden();
 
   // The admin was mailed, sees the count and rejects with a reason
+  await page.request.post("/api/test/admin-mails", { data: {} });
   const mail = await mailTo(publishedMailpitUrl(), adminEmail);
   expect(mail.Text).toContain(`/g/${slug}`);
   await admin.goto("/");

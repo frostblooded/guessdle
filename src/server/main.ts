@@ -3,6 +3,7 @@ import { join } from "node:path";
 import pg from "pg";
 import { attachPartySockets, createApp } from "./app.ts";
 import { adminEmailsFromEnv } from "./auth.ts";
+import { mailDueAdmins } from "./lifecycle.ts";
 import { mailConfigFromEnv } from "./mailer.ts";
 import { migrate } from "./migrate.ts";
 import { rateLimitFromEnv } from "./rate-limit.ts";
@@ -51,10 +52,15 @@ if (import.meta.main) {
       console.error("Party sweep failed", err),
     );
   }, 3600_000).unref();
+  const mail = mailConfigFromEnv(process.env);
+  // Sends the admin email for games still pending 5 minutes after they were sent for approval
+  if (mail) {
+    setInterval(() => void mailDueAdmins(pool, mail), 60_000).unref();
+  }
   const app = createApp({
     pool,
     timeZone: process.env["SERVER_TIMEZONE"],
-    mail: mailConfigFromEnv(process.env),
+    mail,
     adminEmails: adminEmailsFromEnv(process.env["ADMIN_EMAILS"]),
     secureCookies: true,
     limit: rateLimitFromEnv(process.env),
