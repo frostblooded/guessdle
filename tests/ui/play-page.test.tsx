@@ -265,6 +265,10 @@ describe("PlayPage", () => {
       "Color: White",
     );
     assert.equal(screen.queryByText("You earned a free hint"), null);
+    // The hint goes once the answer is guessed
+    await guess("Dido");
+    await screen.findByText("Naps in the sun.");
+    assert.equal(document.querySelector("#free-hint"), null);
   });
 
   it("giving up shows no stats", async () => {

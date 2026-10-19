@@ -271,10 +271,11 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
           opener={opener}
           past={past}
         />
-        {titles && (
+        {/* The hint goes once the answer is revealed */}
+        {titles && !finished && (
           <FreeHintCard
             {...freeHint}
-            hints={finished || cannotPlay ? undefined : freeHint.hints}
+            hints={cannotPlay ? undefined : freeHint.hints}
             onTake={(kind) => void freeHint.take(kind)}
           />
         )}
