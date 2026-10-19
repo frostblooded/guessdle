@@ -48,7 +48,14 @@ test("the Answers tab lists real dates and overrides, edits and clears a future 
   await expect(page.locator("#override-warning")).toBeVisible();
   const current = await target.locator("td").nth(1).innerText();
   const other = ["Rex", "Fido", "Bella", "Max"].find((n) => n !== current)!;
-  await page.locator("#override-entry").selectOption({ label: other });
+  // The popup's search narrows the entries; tapping one picks it
+  await page.locator("#override-search").fill(other.slice(0, 3));
+  await expect(page.locator(".override-choice")).toHaveCount(1);
+  await page.getByRole("option", { name: other }).click();
+  await expect(page.getByRole("option", { name: other })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
   await page.locator("#override-save").click();
   await expect(target).toContainText(other);
   await expect(target).toContainText("override");
@@ -84,7 +91,7 @@ test("changing today's answer asks first, then restarts the player's board with 
   await expect(page.locator("#loading-state")).toBeHidden();
   await page.locator("#tab-answers").click();
   await today.locator("button").click();
-  await page.locator("#override-entry").selectOption({ label: next! });
+  await page.getByRole("option", { name: next! }).click();
   await page.locator("#override-save").click();
   await expect(page.locator("#restart-dialog")).toContainText(
     "everyone starts today over",
