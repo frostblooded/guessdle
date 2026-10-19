@@ -22,21 +22,24 @@ test("the Attributes tab keeps edits until Save, which warns before erasing valu
   await expect(page.locator("#details-form")).toBeHidden();
 
   await expect(page.locator("#attr-save")).toBeDisabled();
+  await page.locator("#attr-new").click();
   await page.locator("#attr-name").fill("Color");
   await page.locator("#attr-type").selectOption("list");
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "Add attribute" }).click();
   await expect(page.getByLabel("Name of Color")).toHaveValue("Color");
   await expect(page.getByLabel("Type of Color")).toHaveValue("list");
-  await expect(page.locator("#attr-name")).toHaveValue("");
+  await expect(page.locator("#attr-dialog")).toBeHidden();
   await expect(page.locator("#attr-unsaved")).toBeVisible();
 
-  // A clash is refused with a readable error and the list stays as it was
+  // A clash is refused with a readable error, the popup stays open and the list stays as it was
+  await page.locator("#attr-new").click();
   await page.locator("#attr-name").fill("color");
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "Add attribute" }).click();
   await expect(page.locator("#attr-error")).toContainText(
     "already has that name",
   );
   await expect(page.locator("#attr-list li")).toHaveCount(1);
+  await page.locator("#attr-cancel").click();
 
   // Nothing is saved until Save: a reload loses the unsaved column
   await page.reload();
@@ -44,9 +47,10 @@ test("the Attributes tab keeps edits until Save, which warns before erasing valu
   await page.locator("#tab-attributes").click();
   await expect(page.locator("#attr-list li")).toHaveCount(0);
 
+  await page.locator("#attr-new").click();
   await page.locator("#attr-name").fill("Color");
   await page.locator("#attr-type").selectOption("list");
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "Add attribute" }).click();
   await page.locator("#attr-save").click();
   await expect(page.locator("#attr-unsaved")).toBeHidden();
   await expect(page.locator("#attr-save")).toBeDisabled();
@@ -114,8 +118,9 @@ test("a slow attribute load neither shows the editor early nor overwrites typing
   await expect(page.locator("#loading-state")).toBeHidden();
   await page.locator("#edit-name").fill("Typed name");
   await page.locator("#tab-attributes").click();
+  await page.locator("#attr-new").click();
   await page.locator("#attr-name").fill("Color");
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "Add attribute" }).click();
   await expect(page.getByLabel("Name of Color")).toBeVisible();
   await page.locator("#attr-save").click();
   await expect(page.locator("#attr-unsaved")).toBeHidden();
