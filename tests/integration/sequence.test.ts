@@ -278,12 +278,22 @@ describe("sequence games", () => {
     assert.equal((await fetch(`${url}${G}/shot/4`)).status, 404);
     assert.equal((await fetch(`${url}${G}/shot/0`)).status, 404);
     assert.equal((await fetch(`${url}/api/games/petdle/shot/1`)).status, 404);
-    // The gallery shows no entry photo
+    // The banner collage is each entry's first photo, served by index, never its URL
     const card = (await request("GET", "/api/games")).body.find(
       (c: Body) => c.slug === "seq",
     );
     assert.equal(card.kind, "sequence");
-    assert.deepEqual(card.photos, []);
+    assert.deepEqual(card.photos, [
+      "/api/games/seq/tile/0",
+      "/api/games/seq/tile/1",
+    ]);
+    const tile = await fetch(`${url}${card.photos[0]}`);
+    assert.equal(tile.status, 200);
+    assert.deepEqual(
+      Buffer.from(await tile.arrayBuffer()),
+      await readFile(join(dir, a.shots[0].slice("/uploads/".length))),
+    );
+    assert.equal((await fetch(`${url}${G}/tile/2`)).status, 404);
   });
 
   it("counts a skip as a try, anonymous or signed in", async () => {
