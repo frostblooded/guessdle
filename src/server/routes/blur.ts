@@ -1,6 +1,6 @@
 // What a Blur or Sequence game shows of the answer before the day or round is over: a Blur
 // board (ADR 0019), the answer's image with only some squares clear, or a Sequence photo
-// (ADR 0020), one of those unlocked so far; also a Blur game's gallery banner tiles. All are
+// (ADR 0020), one of those unlocked so far; also Blur and Sequence gallery banner tiles. All are
 // sent from the stored uploads, so their URLs stay secret.
 import { readFile } from "node:fs/promises";
 import type { Express, Request, Response } from "express";
@@ -62,13 +62,20 @@ export function blurRoutes(
     );
   };
 
+  // An upload's bytes as stored, or null
+  const stored = async (url: string): Promise<Buffer | null> => {
+    const file = fileOf(uploadsDir, url);
+    return file ? await readFile(file).catch(() => null) : null;
+  };
+
   const shot: Send = async (req, res, game, answer) => {
     const n = shownOf(req);
-    const file =
+    image(
+      res,
       n >= 1 && n <= game.blurTries
-        ? fileOf(uploadsDir, answer.shots?.[n - 1] ?? "")
-        : null;
-    image(res, file ? await readFile(file).catch(() => null) : null);
+        ? await stored(answer.shots?.[n - 1] ?? "")
+        : null,
+    );
   };
 
   // Today's answer, or a past day's (`?day=N`)
@@ -127,24 +134,28 @@ export function blurRoutes(
   app.get("/api/games/:slug/shot/:n", dayRoute("sequence", shot));
   app.get("/api/parties/:code/shot/:round/:n", roundRoute("sequence", shot));
 
-  // Tile n of the gallery banner: the nth entry photo, by entry id, heavily blurred. Not a
-  // secret, so browsers may keep it a while.
+  // Tile n of the gallery banner: the nth entry photo, by entry id, heavily blurred for a Blur
+  // game, a Sequence game's first photo as stored. Not a secret, so browsers may keep it a while.
   app.get("/api/games/:slug/tile/:n", async (req, res) => {
     const loaded = await loadGame(ctx, req, res);
     if (!loaded) {
       return;
     }
     const n = Number(paramOf(req, "n"));
+    const { kind } = loaded.game;
     const photo = loaded.roster.entries
-      .map((entry) => entry.photo)
+      .map((entry) =>
+        kind === "sequence" ? (entry.shots?.[0] ?? "") : entry.photo,
+      )
       .filter((p) => p !== "")[n];
     const image =
-      loaded.game.kind === "blur" &&
-      Number.isInteger(n) &&
-      n < MAX_TILES &&
-      photo
-        ? await tile(photo)
-        : null;
+      !Number.isInteger(n) || n >= MAX_TILES || !photo
+        ? null
+        : kind === "blur"
+          ? await tile(photo)
+          : kind === "sequence"
+            ? await stored(photo)
+            : null;
     if (!image) {
       fail(res, "not_found");
       return;
