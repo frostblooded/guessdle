@@ -20,8 +20,8 @@ export interface GalleryCard {
   description: string;
   cover: string;
   // Banner collage photos of active entries, by id; only for a game without a cover. A Blur
-  // game's photos are its answers, so it gets blurred tiles instead (`blurTileUrl`); a Sequence
-  // game gets none.
+  // game's photos are its answers, so it gets blurred tiles instead (`tileUrl`); a Sequence
+  // game gets each entry's first photo, through the same tile route so its URL stays secret.
   photos: string[];
   entryCount: number;
   kind: GameKind;
@@ -52,7 +52,7 @@ export async function listGallery(
     `select g.slug, g.name, g.description, g.cover_url as cover,
        case when g.cover_url = '' then array(
          select x.photo from (
-           select p.id, coalesce(nullif(p.photo_url, ''), ${FIRST_IMAGE("p")}) as photo
+           select p.id, coalesce(nullif(p.photo_url, ''), ${FIRST_IMAGE("p")}, nullif(p.shots[1], '')) as photo
            from entries p where p.game_id = g.id and p.deleted_at is null) x
          where x.photo is not null order by x.id limit $2
        ) else '{}'::text[] end as photos,
@@ -72,15 +72,16 @@ export async function listGallery(
     [MIN_ENTRIES, MAX_TILES, ...narrowedBy],
   );
   return rows.map((card) =>
-    card.kind === "blur"
+    card.kind === "blur" || card.kind === "sequence"
       ? {
           ...card,
-          photos: card.photos.map((_, i) => blurTileUrl(card.slug, i)),
+          photos: card.photos.map((_, i) => tileUrl(card.slug, i)),
         }
       : card,
   );
 }
 
-// Tile n of a Blur game's banner collage: its nth entry photo with a photo, blurred (ADR 0019)
-export const blurTileUrl = (slug: string, n: number): string =>
+// Tile n of a Blur or Sequence game's banner collage: its nth entry photo with a photo, blurred
+// for Blur (ADR 0019), the first of its photos for Sequence
+export const tileUrl = (slug: string, n: number): string =>
   `/api/games/${encodeURIComponent(slug)}/tile/${n}`;
