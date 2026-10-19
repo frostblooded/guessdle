@@ -242,9 +242,10 @@ export function PracticeGame({ tutorial }: { tutorial: Tutorial }) {
               you did here.
             </li>
             <li>
-              New to this? On a game&apos;s page, switch from <b>Type</b> to{" "}
-              <b>Select</b>
-              to pick from a list of every answer instead of typing names.
+              Real games start with you typing names, not picking from a list
+              like here. New to this? On a game&apos;s page, switch from{" "}
+              <b>Typing</b> to <b>Selecting</b> to pick from a list of every
+              answer instead.
             </li>
           </ul>
           <div className="flex flex-wrap gap-2">
