@@ -1,4 +1,4 @@
-// The guess controls, shared by Play and party rounds: the Type / Select switch, then the guess box
+// The guess controls, shared by Play and party rounds: the Typing / Selecting switch, then the guess box
 // and its Guess button, or in selection mode the button that opens the list of every entry; with
 // a Skip button under them for games that allow skipping (Blur games, ADR 0019).
 import { useState } from "react";
@@ -37,8 +37,8 @@ export function useGuessMode(fixed?: GuessMode) {
 export type GuessModeState = ReturnType<typeof useGuessMode>;
 
 const MODES: readonly { mode: GuessMode; label: string }[] = [
-  { mode: "type", label: "Type" },
-  { mode: "select", label: "Select" },
+  { mode: "type", label: "Typing" },
+  { mode: "select", label: "Selecting" },
 ];
 
 export function ModeSwitch({
