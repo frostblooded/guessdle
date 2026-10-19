@@ -22,7 +22,7 @@ import {
   type GradedAttribute,
 } from "./game.ts";
 import { MAX_NICKNAME } from "./limits.ts";
-import { outOfTries, type GameKind } from "./blur.ts";
+import { isImageGame, outOfTries, type GameKind } from "./blur.ts";
 import type { GuessMode } from "./guess-mode.ts";
 
 // No I or O, so a code read aloud or off a screen is never mistaken for 1 or 0
@@ -202,10 +202,10 @@ export interface PartyView {
     slug: string;
     name: string;
     kind: GameKind;
-    // Blur games: tries per round
+    // Blur and Sequence games: tries per round
     blurTries?: number;
     attributes: GameAttribute[];
-    // A Blur game's entries come without photos
+    // A Blur or Sequence game's entries come without photos
     entries: EntryRef[];
     // How every player picks a guess, set by the host when opening the party
     guessMode: GuessMode;
@@ -274,6 +274,8 @@ export interface ViewInput {
 const ref = ({ id, name, photo }: Entry): EntryRef => ({ id, name, photo });
 const revealed = (entry: Entry): RevealedEntry => ({
   ...ref(entry),
+  // A Sequence entry shows its first photo
+  photo: entry.photo || (entry.shots?.[0] ?? ""),
   ...(entry.description && { description: entry.description }),
 });
 
@@ -291,7 +293,7 @@ export function partyView(input: ViewInput): PartyView {
     round.guesses
       .filter((g) => g.playerId === playerId)
       .map((g) =>
-        g.entryId === SKIP && kind === "blur"
+        g.entryId === SKIP && isImageGame(kind)
           ? skippedRow()
           : gradeGuess(
               attributes,
@@ -367,7 +369,7 @@ export function partyView(input: ViewInput): PartyView {
       guessMode: input.game.guessMode ?? "type",
       attributes: [...attributes],
       entries: input.entries.map((e) =>
-        kind === "blur"
+        isImageGame(kind)
           ? { ...ref(e), photo: "" }
           : { ...ref(e), values: e.values },
       ),

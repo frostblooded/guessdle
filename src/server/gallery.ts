@@ -3,7 +3,7 @@ import type pg from "pg";
 import { MAX_TILES } from "../game/banner.ts";
 import type { GameKind } from "../game/blur.ts";
 import { MIN_ENTRIES } from "../game/limits.ts";
-import { HAS_MISSING_VALUES } from "./games.ts";
+import { HAS_MISSING_VALUES } from "./completeness.ts";
 import { OWNER_BANNED } from "./users.ts";
 
 type Q = Pick<pg.Pool, "query">;
@@ -20,7 +20,8 @@ export interface GalleryCard {
   description: string;
   cover: string;
   // Banner collage photos of active entries, by id; only for a game without a cover. A Blur
-  // game's photos are its answers, so it gets blurred tiles instead (`blurTileUrl`).
+  // game's photos are its answers, so it gets blurred tiles instead (`blurTileUrl`); a Sequence
+  // game gets none.
   photos: string[];
   entryCount: number;
   kind: GameKind;

@@ -58,7 +58,7 @@ export const FAILURES = {
   ),
   game_paused: failure(
     409,
-    "This game is paused while some of its entries are missing values (in a Blur game, an image or its square order). It comes back once they are filled in.",
+    "This game is paused while some of its entries are missing values (in a Blur game, an image or its square order; in a Sequence game, until one entry has all its photos). It comes back once they are filled in.",
   ),
   invalid_state: failure(
     409,

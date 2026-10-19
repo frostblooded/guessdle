@@ -66,7 +66,7 @@ export async function storeWebp(dir: string, webp: Buffer): Promise<string> {
 }
 
 // The file a stored upload URL names, or null for anything else
-const fileOf = (dir: string, url: string): string | null => {
+export const fileOf = (dir: string, url: string): string | null => {
   const name = /^\/uploads\/([0-9a-f]{32}\.webp)$/.exec(url)?.[1];
   return name === undefined ? null : join(dir, name);
 };

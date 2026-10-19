@@ -3,7 +3,7 @@
 // the day is over and what that reveals, and records a first win in the day's stats. Routes
 // only read the request and turn these outcomes into HTTP replies.
 import type pg from "pg";
-import { outOfTries } from "../game/blur.ts";
+import { isImageGame, outOfTries } from "../game/blur.ts";
 import { hintChoices, type HintChoices } from "../game/free-hint.ts";
 import { gradeIds, type Entry, type GradedAttribute } from "../game/game.ts";
 import { MAX_SECONDS, type DayStats } from "../game/stats.ts";
@@ -94,25 +94,19 @@ export async function openDay(
   if (blocker) {
     return { refusal: blocker, day };
   }
-  const stored = await ensureAnswer(
-    pool,
-    game,
-    roster.entries.map((entry) => entry.id),
-    date,
-    random,
-  );
+  const stored = await ensureAnswer(pool, game, roster.answerIds, date, random);
   const answer = roster.all.find((entry) => entry.id === stored?.entryId);
   return answer
     ? { game, roster, answer, revision: stored!.revision, ...played }
     : { refusal: "answer_missing", day };
 }
 
-// A Blur game's tries, null for a classic game with unlimited guesses
+// A Blur or Sequence game's tries, null for a classic game with unlimited guesses
 export const triesOf = (game: GameRow): number | null =>
-  game.kind === "blur" ? game.blurTries : null;
+  isImageGame(game.kind) ? game.blurTries : null;
 
 // The answer as a finished day reveals it: its name, its description when it has one, and a
-// Blur game's whole image
+// Blur game's whole image or a Sequence game's first photo
 export interface Reveal {
   answer: string;
   answerPhoto?: string;
@@ -122,10 +116,12 @@ export interface Reveal {
 export const revealOf = (game: GameRow, answer: Entry): Reveal => ({
   answer: answer.name,
   ...(game.kind === "blur" && { answerPhoto: answer.photo }),
+  ...(game.kind === "sequence" &&
+    answer.shots?.[0] && { answerPhoto: answer.shots[0] }),
   ...(answer.description && { answerDescription: answer.description }),
 });
 
-// Whether `ids` used up a Blur game's tries without the answer
+// Whether `ids` used up a Blur or Sequence game's tries without the answer
 export const isLost = (
   game: GameRow,
   ids: readonly number[],
@@ -133,7 +129,7 @@ export const isLost = (
 ): boolean => outOfTries(triesOf(game), ids.length, victory);
 
 // A list of guesses graded against the day's answer. `reveal` is set once the day is over:
-// won, given up, or (Blur games) every try used.
+// won, given up, or (Blur and Sequence games) every try used.
 export interface Board {
   rows: GradedAttribute[][];
   victory: boolean;

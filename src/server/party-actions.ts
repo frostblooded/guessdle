@@ -1,5 +1,6 @@
 // What a player's socket message does to a party (ADR 0016), under the party lock.
 import type pg from "pg";
+import { isImageGame } from "../game/blur.ts";
 import { pickHint } from "../game/free-hint.ts";
 import { gradeGuess } from "../game/game.ts";
 import { playBlocker } from "./access.ts";
@@ -106,7 +107,7 @@ export async function act(
               [live.id, me.id, now],
             );
           } else {
-            const skip = msg.entryId === SKIP && data.game.kind === "blur";
+            const skip = msg.entryId === SKIP && isImageGame(data.game.kind);
             if (
               !skip &&
               !data.roster.entries.some((e) => e.id === msg.entryId)
@@ -144,7 +145,6 @@ export async function act(
           if (blocker) {
             return blocker;
           }
-          const active = data.roster.entries.map((e) => e.id);
           await tx.query(
             `insert into party_rounds (party_id, number, answer_entry_id, started_at)
              values ($1, $2, $3, $4)`,
@@ -152,7 +152,7 @@ export async function act(
               party.id,
               (latest?.number ?? 0) + 1,
               drawAnswer(
-                active,
+                data.roster.answerIds,
                 data.rounds.map((r) => r.answerId),
                 random,
               ),

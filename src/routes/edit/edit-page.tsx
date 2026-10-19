@@ -25,6 +25,7 @@ import { AttributesPanel } from "./attributes-panel.tsx";
 import { EntriesPanel } from "./entries-panel.tsx";
 import { StatusBar } from "./status-bar.tsx";
 import { BlurTriesField } from "./blur-tries-field.tsx";
+import { isImageGame } from "../../game/blur.ts";
 import { IMAGE_TYPES, type Attribute, type Entry } from "./types.ts";
 
 type Loaded =
@@ -157,7 +158,7 @@ function Editor({
   const submitDetails = (event: FormEvent): void => {
     event.preventDefault();
     const skip = fields.skip.trim();
-    const blur = saved.kind === "blur";
+    const blur = isImageGame(saved.kind);
     void save({
       name: fields.name,
       description: fields.description,
@@ -204,9 +205,9 @@ function Editor({
         />
         <Tabs value={tab} onValueChange={setTab} className="space-y-4">
           <TabsList aria-label="Editor sections">
-            {/* A Blur game has no attributes */}
+            {/* A Blur or Sequence game has no attributes */}
             {TABS.filter(
-              ([value]) => saved.kind !== "blur" || value !== "attributes",
+              ([value]) => !isImageGame(saved.kind) || value !== "attributes",
             ).map(([value, label, panel]) => (
               <TabsTrigger key={value} value={value} panelId={panel}>
                 {label}
@@ -289,8 +290,9 @@ function Editor({
                     )}
                   </div>
                 </div>
-                {saved.kind === "blur" && (
+                {isImageGame(saved.kind) && (
                   <BlurTriesField
+                    sequence={saved.kind === "sequence"}
                     value={fields.blurTries}
                     onChange={(blurTries) =>
                       setFields((f) => ({ ...f, blurTries }))
@@ -344,7 +346,8 @@ function Editor({
                 base={base}
                 initial={initial}
                 active={tab === "entries"}
-                blur={saved.kind === "blur"}
+                kind={saved.kind}
+                tries={saved.blurTries}
                 onChange={refreshStatus}
               />
             </Card>

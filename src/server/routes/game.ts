@@ -2,6 +2,7 @@
 import express from "express";
 import type { Express, Request, Response } from "express";
 import type pg from "pg";
+import { isImageGame } from "../../game/blur.ts";
 import { isHintKind, pickHint, revealHint } from "../../game/free-hint.ts";
 import type { DaysResponse } from "../../game/days.ts";
 import { listDays } from "../days.ts";
@@ -48,9 +49,9 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
     res.json(await listGallery(pool));
   });
 
-  // What a player needs to render the game: its attributes and active entries. A Blur game's
-  // entries go without photos: those are its answers (ADR 0019). A classic game's carry their values
-  // for the selection list.
+  // What a player needs to render the game: its attributes and active entries. A Blur or
+  // Sequence game's entries go without photos: those are its answers (ADR 0019, 0020). A classic
+  // game's carry their values for the selection list.
   app.get(base, async (req, res) => {
     res.set("Cache-Control", "no-store");
     const loaded = await loadGame(ctx, req, res);
@@ -69,7 +70,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       description: game.description,
       cover: game.coverUrl,
       kind: game.kind,
-      ...(game.kind === "blur" && { blurTries: game.blurTries }),
+      ...(isImageGame(game.kind) && { blurTries: game.blurTries }),
       // Today's Day Number: past days are 0 up to it
       today: todayOf(ctx, game).day,
       startDate: game.startDate,
@@ -77,7 +78,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       // Some entries miss values: nobody can play until they are filled in
       paused: roster.incomplete > 0,
       entries: roster.entries.map(({ id, name, photo, values }) =>
-        game.kind === "blur"
+        isImageGame(game.kind)
           ? { id, name, photo: "" }
           : { id, name, photo, values },
       ),

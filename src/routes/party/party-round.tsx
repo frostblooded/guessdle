@@ -1,8 +1,10 @@
 // The viewer's own board in a live party round: the guess box, their graded rows (a Blur game's
-// image and guessed names) and, once they solved it, gave up or ran out of tries, the answer.
+// image or a Sequence game's photos, and guessed names) and, once they solved it, gave up or ran out of tries, the answer.
 import { useState } from "react";
 import { GuessRow, TitleRow } from "../../components/board.tsx";
-import { BlurGuesses, BlurView } from "../../components/blur-view.tsx";
+import { BlurGuesses } from "../../components/blur-view.tsx";
+import { AnswerImage } from "../play/play-results.tsx";
+import { isImageGame } from "../../game/blur.ts";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
 import {
@@ -46,7 +48,8 @@ export function PartyRound({
   const listing = modes.selecting && !done;
   const entries = view.game.entries;
   const used = guessedNames(mine.rows);
-  const blur = view.game.kind === "blur" ? (view.game.blurTries ?? 1) : null;
+  // A Blur or Sequence game's tries
+  const blur = isImageGame(view.game.kind) ? (view.game.blurTries ?? 1) : null;
   const newestFirst = [...mine.rows].reverse();
   const unguessed = entries.filter((e) => !used.has(e.name));
   const names = unguessed.map((e) => e.name);
@@ -106,9 +109,10 @@ export function PartyRound({
         )}
       </div>
       {blur !== null && (
-        <BlurView
-          boardUrl={(n) =>
-            `/api/parties/${encodeURIComponent(view.code)}/blur/${round.number}/${n}`
+        <AnswerImage
+          kind={view.game.kind}
+          url={(path, n) =>
+            `/api/parties/${encodeURIComponent(view.code)}/${path}/${round.number}/${n}`
           }
           tries={blur}
           wrong={mine.rows.filter((row) => !isAnswerRow(row)).length}

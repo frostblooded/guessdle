@@ -1,10 +1,16 @@
 // Editing a game as its owner or an admin. Each edit comes with everything it sets off: the
 // checks a route cannot make alone (an upload the editor may attach, a Blur game having no
-// attributes), the game lock and status rule with its emails (lifecycle.ts), the Daily Answers
+// attributes, a Sequence game's schedule), the game lock and status rule with its emails (lifecycle.ts), the Daily Answers
 // it changes (answers.ts), and the uploads it frees (upload-refs.ts). The data change and the
 // answer re-draw commit together. Routes parse the request and turn the outcome into a reply.
 import type pg from "pg";
-import { redrawFuture, releaseEntry, todayIn } from "./answers.ts";
+import { isImageGame } from "../game/blur.ts";
+import {
+  redrawFuture,
+  releaseEntry,
+  rescheduleFuture,
+  todayIn,
+} from "./answers.ts";
 import type { SessionUser } from "./auth.ts";
 import {
   deleteEntry,
@@ -44,9 +50,9 @@ type AttributeResult =
   | Awaited<ReturnType<typeof saveAttributes>>
   | Awaited<ReturnType<typeof editAttributes>>;
 
-// The active entry ids as of the game lock
-const activeIds = async (tx: pg.PoolClient, game: GameRow): Promise<number[]> =>
-  (await loadRoster(tx, game)).entries.map((entry) => entry.id);
+// The ids of the active entries that may be the answer, as of the game lock
+const answerIds = async (tx: pg.PoolClient, game: GameRow): Promise<number[]> =>
+  (await loadRoster(tx, game)).answerIds;
 
 export function gameEdits(ctx: EditContext, uploadsDir: string) {
   const { pool, random } = ctx;
@@ -64,12 +70,12 @@ export function gameEdits(ctx: EditContext, uploadsDir: string) {
 
   return {
     // One change, or the editor's whole list. Only a real change resets the status; a reorder
-    // does not. A Blur game has no attributes.
+    // does not. A Blur or Sequence game has no attributes.
     async attributes(
       game: GameRow,
       edit: AttributeEdit | AttributeDraft[],
     ): Promise<AttributeResult> {
-      if (game.kind === "blur") {
+      if (isImageGame(game.kind)) {
         return "invalid";
       }
       return lifecycle.edit(
@@ -83,7 +89,8 @@ export function gameEdits(ctx: EditContext, uploadsDir: string) {
       );
     },
 
-    // Creates (no `id`) or changes an entry; replaced pictures are freed
+    // Creates (no `id`) or changes an entry; replaced pictures are freed. A Sequence game's
+    // future days follow which entries may be the answer (ADR 0020).
     async saveEntry(
       game: GameRow,
       editor: SessionUser,
@@ -94,7 +101,8 @@ export function gameEdits(ctx: EditContext, uploadsDir: string) {
         id === undefined
           ? undefined
           : (await listEntries(pool, game)).find((e) => e.id === id);
-      // Every picture sent, the photo and each Image value, with what it replaces
+      // Every picture sent, the photo, each Image value and each Sequence shot, with what it
+      // replaces
       const images = (await listAttributes(pool, game))
         .filter(
           (a) => a.type === "image" && String(a.id) in (input.values ?? {}),
@@ -106,6 +114,9 @@ export function gameEdits(ctx: EditContext, uploadsDir: string) {
       if (input.photo !== undefined) {
         images.push({ url: input.photo, current: current?.photo ?? "" });
       }
+      for (const url of input.shots ?? []) {
+        images.push({ url, current: current?.shots?.includes(url) ? url : "" });
+      }
       for (const { url, current } of images) {
         if (!(await mayAttach(game, editor, url, current))) {
           return "invalid";
@@ -114,7 +125,13 @@ export function gameEdits(ctx: EditContext, uploadsDir: string) {
       const out = await lifecycle.edit(
         game,
         "entries",
-        (tx) => saveEntry(tx, game, id, input),
+        async (tx) => {
+          const saved = await saveEntry(tx, game, id, input);
+          if (typeof saved !== "string") {
+            await rescheduleFuture(tx, game, today(), random);
+          }
+          return saved;
+        },
         (r) => typeof r !== "string",
       );
       if (typeof out !== "string") {
@@ -135,7 +152,7 @@ export function gameEdits(ctx: EditContext, uploadsDir: string) {
           await releaseEntry(
             tx,
             game,
-            await activeIds(tx, game),
+            await answerIds(tx, game),
             today(),
             id,
             random,
@@ -147,8 +164,9 @@ export function gameEdits(ctx: EditContext, uploadsDir: string) {
       return deleted ? "ok" : "not_found";
     },
 
-    // Name, description, cover, tries and skip period. A changed skip period re-draws the
-    // future days in the same transaction; a replaced cover is freed.
+    // Name, description, cover, tries and skip period. A changed skip period (or a Sequence
+    // game's photo count) re-draws the future days in the same transaction; a replaced cover is
+    // freed.
     async patch(
       game: GameRow,
       editor: SessionUser,
@@ -163,8 +181,14 @@ export function gameEdits(ctx: EditContext, uploadsDir: string) {
         patchKind(game, patch),
         async (tx) => {
           const old = await updateGame(tx, game, patch);
-          if (skipOf(edited) !== skipOf(game)) {
-            const ids = await activeIds(tx, game);
+          if (
+            game.kind === "sequence" &&
+            (skipOf(edited) !== skipOf(game) ||
+              edited.blurTries !== game.blurTries)
+          ) {
+            await rescheduleFuture(tx, edited, today(), random);
+          } else if (skipOf(edited) !== skipOf(game)) {
+            const ids = await answerIds(tx, game);
             if (ids.length > 0) {
               await redrawFuture(tx, edited, ids, today(), random);
             }

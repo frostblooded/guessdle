@@ -19,6 +19,13 @@ import {
 } from "./ui/alert-dialog.tsx";
 import { Button } from "./ui/button.tsx";
 
+// What the dialog calls each kind: a Sequence photo is still a photo to the owner
+const LABELS: Record<ImageKind, string> = {
+  photo: "photo",
+  shot: "photo",
+  cover: "cover",
+};
+
 interface Job {
   kind: ImageKind;
   image: HTMLImageElement;
@@ -65,7 +72,9 @@ function CropDialog({ job }: { job: Job }) {
           document.querySelector<HTMLElement>("#crop-confirm")?.focus();
         }}
       >
-        <AlertDialogTitle id="crop-title">Crop the {job.kind}</AlertDialogTitle>
+        <AlertDialogTitle id="crop-title">
+          Crop the {LABELS[job.kind]}
+        </AlertDialogTitle>
         <AlertDialogDescription>
           Drag the frame to move it; zoom to pick how much shows.
         </AlertDialogDescription>
@@ -101,7 +110,7 @@ function CropDialog({ job }: { job: Job }) {
             disabled={busy}
             onClick={() => void confirm()}
           >
-            Use {job.kind}
+            Use {LABELS[job.kind]}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

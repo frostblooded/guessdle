@@ -40,6 +40,15 @@ export function HowToPlayPage() {
           you have: miss on the last one and the day is over.
         </p>
       </Card>
+      <Card id="help-sequence" className="mt-4 p-5 sm:p-6">
+        <h2 className="mb-2 text-lg font-semibold">Sequence games</h2>
+        <p className="text-muted-foreground">
+          Other games show the answer as a series of photos. You start with the
+          first one, and every wrong guess or skip unlocks the next, usually a
+          little easier. Tap a number to look back at a photo you already have.
+          Name the answer before you run out of photos.
+        </p>
+      </Card>
     </div>
   );
 }

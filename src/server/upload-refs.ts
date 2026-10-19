@@ -1,7 +1,7 @@
 // Upload references (spec #66): who may attach an uploaded file, and when a file is deleted.
-// A file lives while a game cover, a Blur entry's photo, an Image value (soft-deleted entries
-// too) or a tutorial picture uses it; callers state intent (attach, release, drop a game or
-// user) and never unlink files themselves.
+// A file lives while a game cover, a Blur entry's photo, a Sequence shot, an Image value
+// (soft-deleted entries too) or a tutorial picture uses it; callers state intent (attach,
+// release, drop a game or user) and never unlink files themselves.
 import { readdir, stat, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import type pg from "pg";
@@ -29,7 +29,8 @@ export function uploadRefs(pool: pg.Pool, dir: string) {
   const isReferenced = async (url: string): Promise<boolean> =>
     (
       await pool.query(
-        `select 1 from games where cover_url = $1 union all select 1 from entries where photo_url = $1
+        `select 1 from games where cover_url = $1
+         union all select 1 from entries where photo_url = $1 or $1 = any(shots)
          union all select 1 from (${IMAGE_VALUES}) i where i.url = $1
          union all select 1 from tutorial_photos where url = $1`,
         [url],
@@ -40,6 +41,7 @@ export function uploadRefs(pool: pg.Pool, dir: string) {
   const referencedUrls = async (): Promise<Set<string>> => {
     const { rows } = await pool.query<{ url: string }>(
       `select cover_url as url from games union select photo_url from entries
+       union select unnest(shots) from entries
        union select url from (${IMAGE_VALUES}) i union select url from tutorial_photos`,
     );
     return new Set(rows.map((r) => r.url));
@@ -56,34 +58,36 @@ export function uploadRefs(pool: pg.Pool, dir: string) {
     }
   };
 
+  // A cover or photo may be cleared, kept, or a file stored for the acting user or the game's owner
+  const mayAttach = async (
+    url: string,
+    current: string,
+    actorId: number,
+    ownerId: number | null,
+  ): Promise<boolean> => {
+    const name = URL_RE.exec(url)?.[1];
+    return (
+      url === "" ||
+      url === current ||
+      (name !== undefined &&
+        (
+          await pool.query(
+            "select 1 from uploads where name = $1 and user_id = any($2)",
+            [name, [actorId, ownerId].filter((o) => o !== null)],
+          )
+        ).rowCount === 1)
+    );
+  };
+
   return {
     release,
-
-    // A cover or photo may be cleared, kept, or a file stored for the acting user or the game's owner
-    async mayAttach(
-      url: string,
-      current: string,
-      actorId: number,
-      ownerId: number | null,
-    ): Promise<boolean> {
-      const name = URL_RE.exec(url)?.[1];
-      return (
-        url === "" ||
-        url === current ||
-        (name !== undefined &&
-          (
-            await pool.query(
-              "select 1 from uploads where name = $1 and user_id = any($2)",
-              [name, [actorId, ownerId].filter((o) => o !== null)],
-            )
-          ).rowCount === 1)
-      );
-    },
+    mayAttach,
 
     // Deletes the game (everything under it cascades), then releases its cover and pictures
     async dropGame(game: GameRow): Promise<void> {
       const { rows } = await pool.query<{ url: string }>(
         `select photo_url as url from entries where game_id = $1
+         union select unnest(shots) from entries where game_id = $1
          union select url from (${IMAGE_VALUES}) i where i.game_id = $1`,
         [game.id],
       );
@@ -98,6 +102,7 @@ export function uploadRefs(pool: pg.Pool, dir: string) {
         `select '/uploads/' || name as url from uploads where user_id = $1
          union select cover_url from games where owner_id = $1
          union select e.photo_url from entries e join games g on g.id = e.game_id where g.owner_id = $1
+         union select unnest(e.shots) from entries e join games g on g.id = e.game_id where g.owner_id = $1
          union select i.url from (${IMAGE_VALUES}) i join games g on g.id = i.game_id where g.owner_id = $1`,
         [userId],
       );

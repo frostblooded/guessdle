@@ -8,6 +8,7 @@ import {
   type Need,
   type Resolved,
 } from "../access.ts";
+import { isImageGame } from "../../game/blur.ts";
 import type { MailConfig } from "../mailer.ts";
 import type { GameRow, Roster } from "../games.ts";
 import { openDay, type DayRefusal, type PlayDay } from "../play-day.ts";
@@ -36,15 +37,15 @@ export const fail = (res: Response, code: FailureCode): void => {
   res.status(FAILURES[code].status).json({ error: code });
 };
 
-// A guess list as a request sends it: at most one guess per entry, or for a Blur game (which
-// may skip, ADR 0019) one per try
+// A guess list as a request sends it: at most one guess per entry, or for a Blur or Sequence
+// game (which may skip, ADR 0019) one per try
 export const isIdList = (
   game: GameRow,
   { entries }: Roster,
   value: unknown,
 ): value is number[] =>
   Array.isArray(value) &&
-  value.length <= (game.kind === "blur" ? game.blurTries : entries.length) &&
+  value.length <= (isImageGame(game.kind) ? game.blurTries : entries.length) &&
   value.every((id: unknown) => Number.isInteger(id));
 
 // Resolves `:slug` for what the viewer wants to do (access.ts) and sends the 404/401/403 itself.

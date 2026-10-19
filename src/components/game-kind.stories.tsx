@@ -14,6 +14,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Classic: Story = {};
 export const Blur: Story = { args: { kind: "blur" } };
+export const Sequence: Story = { args: { kind: "sequence" } };
 // As the gallery card footer shows it
 export const InCardFooter: Story = {
   render: (args) => (

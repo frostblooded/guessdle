@@ -3,7 +3,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { Navigate, useParams } from "react-router";
-import { BlurView } from "../../components/blur-view.tsx";
 import { PageHead } from "../../components/page.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
@@ -28,7 +27,7 @@ import {
   type Play,
   type SubmitResult,
 } from "../../game/play.ts";
-import { minEntriesOf } from "../../game/blur.ts";
+import { isImageGame, minEntriesOf } from "../../game/blur.ts";
 import { browserFetch, gameKey, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { FreeHintCard } from "./free-hint.tsx";
@@ -40,7 +39,7 @@ import {
   PastDayLede,
   PastDaysLink,
 } from "./past-day.tsx";
-import { boardUrl, PlayResults } from "./play-results.tsx";
+import { AnswerImage, answerImageUrl, PlayResults } from "./play-results.tsx";
 import { loadGame } from "./load-game.ts";
 import { PlayActions, PlayStatus } from "./play-status.tsx";
 import { ResetDialog } from "./reset-dialog.tsx";
@@ -267,7 +266,9 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const finished = result !== null;
   // Each row names its guess; those names leave the suggestions
   const used = guessedNames(rows);
-  const blur = playable?.kind === "blur" ? (playable.blurTries ?? 1) : null;
+  // A Blur or Sequence game's tries
+  const blur =
+    playable && isImageGame(playable.kind) ? (playable.blurTries ?? 1) : null;
   const wrong = rows.filter((row) => !isAnswerRow(row)).length;
   const unguessed = roster.filter((entry) => !used.has(entry.name));
   const names = unguessed.map((entry) => entry.name);
@@ -334,9 +335,10 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
         aria-label="Game board"
         aria-busy={isPending || loading ? true : undefined}
       >
-        {blur !== null && ready && (
-          <BlurView
-            boardUrl={(n) => boardUrl(slug, n, board, pastDay)}
+        {blur !== null && ready && playable && (
+          <AnswerImage
+            kind={playable.kind}
+            url={(path, n) => answerImageUrl(path, slug, n, board, pastDay)}
             tries={blur}
             wrong={wrong}
             finished={finished}

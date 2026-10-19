@@ -10,6 +10,7 @@ import {
   type HintPick,
 } from "../game/free-hint.ts";
 import { SKIP, type GradedAttribute } from "../game/game.ts";
+import { isImageGame } from "../game/blur.ts";
 import type { GameRow, Roster } from "./games.ts";
 import { boardOf, isLost, triesOf, type PlayDay } from "./play-day.ts";
 import { recordFailure } from "./results.ts";
@@ -22,7 +23,7 @@ export interface GameView {
   rows: GradedAttribute[][];
   victory: boolean;
   gaveUp: boolean;
-  // Blur games: every try was used without finding the answer
+  // Blur and Sequence games: every try was used without finding the answer
   lost?: true;
   // The answer's name: present once the day is over (victory, give-up or lost)
   answer?: string;
@@ -36,9 +37,9 @@ export interface GameView {
   hints?: HintChoices;
 }
 
-// An id a player may guess: an active entry, or in a Blur game SKIP
+// An id a player may guess: an active entry, or in a Blur or Sequence game SKIP
 const isGuessId = (game: GameRow, roster: Roster, id: unknown): boolean =>
-  (id === SKIP && game.kind === "blur") ||
+  (id === SKIP && isImageGame(game.kind)) ||
   roster.entries.some((e) => e.id === id);
 
 // Each refusal and the HTTP status it answers with

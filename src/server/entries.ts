@@ -15,6 +15,8 @@ export interface EntryRow {
   values: Record<string, string[]>;
   // Blur games only: the order the grid's squares clear in, once picked
   blurOrder?: number[] | null;
+  // Sequence games only: the photos in order, "" for a slot not uploaded yet
+  shots?: string[];
 }
 
 export async function listEntries(
@@ -28,18 +30,20 @@ export async function listEntries(
     description: string;
     values: Record<string, string[]> | null;
     blurOrder: number[] | null;
+    shots: string[];
   }>(
-    `select e.id::int, e.name, e.photo_url as photo, e.description, e.blur_order::int[] as "blurOrder",
+    `select e.id::int, e.name, e.photo_url as photo, e.description, e.blur_order::int[] as "blurOrder", e.shots,
        (select jsonb_object_agg(attribute_id, items) from (
           select attribute_id, jsonb_agg(value order by position) as items
           from entry_values where entry_id = e.id group by attribute_id) v) as values
      from entries e where e.game_id = $1 and e.deleted_at is null order by e.id`,
     [game.id],
   );
-  return rows.map(({ blurOrder, ...r }) => ({
+  return rows.map(({ blurOrder, shots, ...r }) => ({
     ...r,
     values: r.values ?? {},
     ...(game.kind === "blur" && { blurOrder }),
+    ...(game.kind === "sequence" && { shots }),
   }));
 }
 
@@ -49,12 +53,14 @@ export interface EntryInput {
   description?: string;
   values?: Record<string, string[]>;
   blurOrder?: number[];
+  shots?: string[];
 }
 
 // Creates the entry (`id` undefined) or changes it. Every attribute but Image needs a value once
 // saved, from the input or already stored; Number values are stored as parseNumberValue gives
 // them, an Image value is one upload URL. A Blur game's entry instead needs its photo and a
-// complete square order, sent or stored; only a Blur entry has a photo.
+// complete square order, sent or stored; only a Blur entry has a photo. A Sequence entry needs
+// only its name: one missing photos just cannot be the answer.
 // Runs in the caller's game transaction (lifecycle.edit), which applies the status rule.
 // `replaced` lists the files the edit stopped using, for the caller to release.
 export async function saveEntry(
@@ -77,8 +83,9 @@ export async function saveEntry(
       photo: string;
       description: string;
       blurOrder: number[] | null;
+      shots: string[];
     }>(
-      `select name, photo_url as photo, description, blur_order::int[] as "blurOrder" from entries
+      `select name, photo_url as photo, description, blur_order::int[] as "blurOrder", shots from entries
        where id = $1 and game_id = $2 and deleted_at is null`,
       [id ?? 0, game.id],
     )
@@ -134,18 +141,22 @@ export async function saveEntry(
   } else if (input.blurOrder !== undefined) {
     return "invalid";
   }
+  if (input.shots !== undefined && game.kind !== "sequence") {
+    return "invalid";
+  }
+  const shots = input.shots ?? current?.shots ?? [];
   let entryId = id;
   if (entryId === undefined) {
     entryId = (
       await tx.query<{ id: number }>(
-        "insert into entries (game_id, name, photo_url, description) values ($1, $2, $3, $4) returning id::int",
-        [game.id, name, photo, description],
+        "insert into entries (game_id, name, photo_url, description, shots) values ($1, $2, $3, $4, $5) returning id::int",
+        [game.id, name, photo, description, shots],
       )
     ).rows[0]!.id;
   } else {
     await tx.query(
-      "update entries set name = $2, photo_url = $3, description = $4 where id = $1",
-      [entryId, name, photo, description],
+      "update entries set name = $2, photo_url = $3, description = $4, shots = $5 where id = $1",
+      [entryId, name, photo, description, shots],
     );
   }
   if (input.blurOrder !== undefined) {
@@ -176,11 +187,13 @@ export async function saveEntry(
       [entryId, attrId, items],
     );
   }
+  const before = current ? [current.photo, ...current.shots] : [];
+  const after = new Set([photo, ...shots]);
   return {
     id: entryId,
     replaced: [
       ...replaced,
-      ...(current && current.photo !== photo ? [current.photo] : []),
+      ...before.filter((url) => url !== "" && !after.has(url)),
     ],
   };
 }

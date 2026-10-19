@@ -22,6 +22,8 @@ export const MAX_PARTY_PLAYERS = 30;
 export const MAX_OPEN_PARTIES = 5;
 // Blur games: the most tries a game may give, one per square of its 3x3 grid
 export const MAX_BLUR_TRIES = 9;
+// Sequence games: how many photos (and tries) a new game starts with, like guessthe.game
+export const DEFAULT_SHOTS = 6;
 // Playlists: a player's public username, and how many playlists and games each may hold
 export const MIN_USERNAME = 3;
 export const MAX_USERNAME = 20;

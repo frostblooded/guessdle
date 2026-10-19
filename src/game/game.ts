@@ -7,7 +7,7 @@ import {
   gradeNumber,
   type Hint,
 } from "./correctness.ts";
-import type { GameKind } from "./blur.ts";
+import { isImageGame, type GameKind } from "./blur.ts";
 
 export type AttributeType = "text" | "list" | "number" | "image";
 
@@ -32,13 +32,15 @@ export interface Entry extends EntryRef {
   values: AttributeValue[];
   // Blur games only: the order the grid's squares clear in (cells 0-8), once picked
   blurOrder?: number[];
+  // Sequence games only: the photos in the order players see them, "" for a missing one
+  shots?: string[];
   // Optional text about the entry, shown once it is revealed as the answer; "" or absent for none
   description?: string;
 }
 
 // One column of a guessed entry, graded against the Daily Answer, in boardColumns order. A
-// Blur game's rows hold the name only, so no entry's image reaches the player before the day
-// ends.
+// Blur or Sequence game's rows hold the name only, so no entry's image reaches the player
+// before the day ends.
 export interface GradedAttribute {
   key: string;
   value: AttributeValue;
@@ -59,14 +61,14 @@ export interface BoardColumn {
   attribute?: number;
 }
 
-// The guess grid's columns: Name, then a classic game's Attributes in their order. A Blur game
-// shows the name only.
+// The guess grid's columns: Name, then a classic game's Attributes in their order. A Blur or
+// Sequence game shows the name only.
 export function boardColumns(
   attributes: readonly GameAttribute[],
   kind: GameKind = "classic",
 ): BoardColumn[] {
   const name: BoardColumn = { title: "Name", image: false };
-  if (kind === "blur") {
+  if (isImageGame(kind)) {
     return [name];
   }
   return [
@@ -100,7 +102,7 @@ export const hasAllValues = (
       attributes[i]?.type === "image" || value.length > 0,
   );
 
-// A Blur game's skip (ADR 0019): the id that stands for "no entry" in a guess list. It uses a
+// A Blur or Sequence game's skip (ADR 0019, 0020): the id that stands for "no entry" in a guess list. It uses a
 // try like a wrong guess, and any number of them may be made.
 export const SKIP = 0;
 
@@ -142,7 +144,7 @@ export function gradeGuess(
     value: guess.name,
     correctness: gradeCorrectness(guess.name, answer.name),
   };
-  if (kind === "blur") {
+  if (isImageGame(kind)) {
     return [
       {
         ...name,
@@ -187,8 +189,8 @@ export type GradeIdsResult =
   | { kind: "graded"; rows: GradedAttribute[][]; victory: boolean };
 
 // Grades guesses given by entry id, in order. Any unknown id makes the whole
-// batch invalid; otherwise any repeated id makes it a duplicate. A Blur game also takes SKIP,
-// as often as it likes.
+// batch invalid; otherwise any repeated id makes it a duplicate. A Blur or Sequence game also
+// takes SKIP, as often as it likes.
 export function gradeIds(
   attributes: readonly GameAttribute[],
   roster: readonly Entry[],
@@ -201,7 +203,7 @@ export function gradeIds(
     const entry: Entry | undefined = roster.find(
       (item: Entry): boolean => item.id === id,
     );
-    if (!entry && !(id === SKIP && kind === "blur")) {
+    if (!entry && !(id === SKIP && isImageGame(kind))) {
       return { kind: "invalid" };
     }
     guesses.push(entry ?? null);
