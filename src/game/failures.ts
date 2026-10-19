@@ -7,7 +7,6 @@ import {
   MAX_PLAYLIST_GAMES,
   MAX_PLAYLISTS,
   MAX_USERNAME,
-  MIN_ENTRIES,
   MIN_USERNAME,
 } from "./limits.ts";
 
@@ -48,13 +47,10 @@ export const FAILURES = {
     404,
     "This game has no puzzle for that day. Pick a day from the Past days list.",
   ),
-  too_few_entries: failure(
-    409,
-    `Add at least ${MIN_ENTRIES} entries (one for a Blur or Quiz game) before submitting.`,
-  ),
+  too_few_entries: failure(409, "Add an entry before submitting."),
   not_enough_entries: failure(
     409,
-    `This game cannot be played yet: it needs at least ${MIN_ENTRIES} entries (one for a Blur or Quiz game) to pick a daily answer. Use the Edit link to add entries.`,
+    "This game cannot be played yet: it needs an entry to pick a daily answer. Use the Edit link to add entries.",
   ),
   incomplete_entries: failure(
     409,

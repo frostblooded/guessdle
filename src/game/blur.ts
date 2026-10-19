@@ -1,7 +1,7 @@
 // Blur games (ADR 0019): players guess an entry from its square image split into a 3x3 grid.
 // At first only one square is clear; each wrong guess clears the next one, in the order the
 // owner picked. Pure, so the server, the editor and Play share it.
-import { MAX_BLUR_TRIES, MIN_ENTRIES } from "./limits.ts";
+import { MAX_BLUR_TRIES } from "./limits.ts";
 
 export type GameKind = "classic" | "blur" | "sequence" | "quiz";
 
@@ -15,11 +15,6 @@ export const isGameKind = (value: unknown): value is GameKind =>
 // (`blurTries`), and entry photos kept secret until the day is over
 export const isImageGame = (kind: GameKind): boolean =>
   kind === "blur" || kind === "sequence";
-
-// The fewest active entries a game plays with. A Blur game plays with one: guessing it is still
-// a matter of reading the picture. A Quiz game plays with one question.
-export const minEntriesOf = (kind: GameKind): number =>
-  kind === "blur" || kind === "quiz" ? 1 : MIN_ENTRIES;
 
 // Whether `guesses` (skips included) used up a Blur game's tries without the answer. `tries` is
 // absent for a classic game, whose guesses are unlimited. Solo play, Past days and party rounds

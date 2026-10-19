@@ -1,7 +1,6 @@
 // The line above the editor's entry list: what an entry is in this kind of game, and what it
 // needs.
 import type { GameKind } from "../../game/blur.ts";
-import { MIN_ENTRIES } from "../../game/limits.ts";
 
 export function EntriesLede({
   kind,
@@ -17,8 +16,7 @@ export function EntriesLede({
         <>
           Each entry is one possible answer, shown to players as {tries} photos,
           one at a time. An entry missing photos can still be guessed but is
-          never a day&apos;s answer. A game needs at least {MIN_ENTRIES} entries
-          before anyone can play it.
+          never a day&apos;s answer.
         </>
       ) : kind === "blur" ? (
         <>
@@ -28,9 +26,8 @@ export function EntriesLede({
         </>
       ) : (
         <>
-          Each entry is a row on the board. A game needs at least {MIN_ENTRIES}{" "}
-          entries before anyone can play it, and every entry needs a value for
-          every attribute except pictures, which may stay empty.
+          Each entry is a row on the board. Every entry needs a value for every
+          attribute except pictures, which may stay empty.
         </>
       )}
     </p>

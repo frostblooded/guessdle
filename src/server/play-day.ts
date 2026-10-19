@@ -91,7 +91,7 @@ export async function openDay(
     return { refusal: "invalid", day };
   }
   // Only the owner and admins reach a game too small to draw an answer from
-  const blocker = playBlocker(game, roster);
+  const blocker = playBlocker(roster);
   if (blocker) {
     return { refusal: blocker, day };
   }

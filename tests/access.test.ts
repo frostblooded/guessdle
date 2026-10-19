@@ -31,9 +31,9 @@ const rows: Row[] = [
   ["draft", 2, "anon", "play", "not_found"],
   ["draft", 2, "anon", "edit", "not_found"],
   ["draft", 2, "stranger", "edit", "not_found"],
-  ["approved", 1, "stranger", "play", "not_found"],
+  ["approved", 0, "stranger", "play", "not_found"],
   ["draft", 0, "owner", "play", null],
-  ["approved", 1, "admin", "play", null],
+  ["approved", 0, "admin", "play", null],
   // A visible game: 401 to anonymous, 403 to a stranger, the owner and admin edit
   ["approved", 2, "anon", "edit", "unauthorized"],
   ["approved", 2, "stranger", "edit", "forbidden"],
@@ -94,20 +94,17 @@ describe("canApprove", () => {
 });
 
 describe("playBlocker", () => {
-  const of = (kind: string, entries: number, incomplete = 0) =>
-    playBlocker(
-      { kind, status: "approved" } as GameRow,
-      { entries: new Array(entries).fill({}), incomplete } as unknown as Roster,
-    );
-  it("a classic game needs two active entries, a Blur game one", () => {
-    assert.equal(of("classic", 1), "not_enough_entries");
-    assert.equal(of("classic", 2), null);
-    assert.equal(of("blur", 0), "not_enough_entries");
-    assert.equal(of("blur", 1), null);
+  const of = (entries: number, incomplete = 0) =>
+    playBlocker({
+      entries: new Array(entries).fill({}),
+      incomplete,
+    } as unknown as Roster);
+  it("a game of any kind needs one active entry", () => {
+    assert.equal(of(0), "not_enough_entries");
+    assert.equal(of(1), null);
   });
   it("an entry missing a value pauses the game; too few entries is said first", () => {
-    assert.equal(of("classic", 3, 1), "game_paused");
-    assert.equal(of("blur", 1, 1), "game_paused");
-    assert.equal(of("classic", 1, 1), "not_enough_entries");
+    assert.equal(of(3, 1), "game_paused");
+    assert.equal(of(0, 1), "not_enough_entries");
   });
 });

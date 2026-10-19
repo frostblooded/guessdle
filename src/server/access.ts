@@ -1,10 +1,10 @@
 // Who may see or change a game: the one place that orders 404, 401 and 403.
-// A hidden game (a draft, fewer than 2 active entries, or a banned owner's) is a 404 for everyone
+// A hidden game (a draft, no active entry, or a banned owner's) is a 404 for everyone
 // but its owner and admins, before any 401/403 can reveal it exists.
 import type { Request } from "express";
 import type pg from "pg";
 import { requestUser, type SessionUser } from "./auth.ts";
-import { minEntriesOf } from "../game/blur.ts";
+import { MIN_ENTRIES } from "../game/limits.ts";
 import { findGame, loadRoster, type GameRow, type Roster } from "./games.ts";
 
 export type Need = "play" | "edit" | "admin";
@@ -18,20 +18,19 @@ export interface LoadedGame {
 }
 
 // Whether the game has enough active entries to draw a Daily Answer or a Round from
-const hasEnoughEntries = (game: GameRow, roster: Roster): boolean =>
-  roster.entries.length >= minEntriesOf(game.kind);
+const hasEnoughEntries = (roster: Roster): boolean =>
+  roster.entries.length >= MIN_ENTRIES;
 
 export const isPlayable = (game: GameRow, roster: Roster): boolean =>
-  game.status !== "draft" && hasEnoughEntries(game, roster);
+  game.status !== "draft" && hasEnoughEntries(roster);
 
 // Why nobody can play the game for now, whoever may see it: too few active entries, or Paused
 // (an active entry missing a value). Play, opening a Party, starting a Round and submitting for
 // approval all ask this one rule. Null when it plays.
 export const playBlocker = (
-  game: GameRow,
   roster: Roster,
 ): "not_enough_entries" | "game_paused" | null =>
-  !hasEnoughEntries(game, roster)
+  !hasEnoughEntries(roster)
     ? "not_enough_entries"
     : roster.incomplete > 0
       ? "game_paused"

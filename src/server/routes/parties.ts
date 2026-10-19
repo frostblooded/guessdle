@@ -40,7 +40,7 @@ export function partyRoutes(
     if (!loaded) {
       return;
     }
-    const blocker = playBlocker(loaded.game, loaded.roster);
+    const blocker = playBlocker(loaded.roster);
     if (blocker) {
       fail(res, blocker);
       return;

@@ -384,9 +384,8 @@ describe("game entries", () => {
     assert.notEqual(rows[1]!.entry_id, a);
   });
 
-  it("dropping below two active entries makes the game a 404 for players", async () => {
+  it("deleting the last active entry makes the game a 404 for players", async () => {
     await add({ name: "A" });
-    await add({ name: "B" });
     await db.pool.query("update games set status = 'approved'");
     assert.equal((await request("GET", "/api/games/ann-game")).status, 200);
     await request("DELETE", `${E}/${(await one("A")).id}`, ann);
