@@ -13,6 +13,7 @@ const picture = (background: string): Promise<Buffer> =>
 
 // Adds an entry through the editor: its name and `colors.length` cropped photos
 async function addEntry(page: Page, name: string, colors: string[]) {
+  await page.locator("#entry-new").click();
   await page.locator("#entry-name").fill(name);
   for (const [slot, color] of colors.entries()) {
     await page

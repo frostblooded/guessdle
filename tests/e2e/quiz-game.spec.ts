@@ -22,6 +22,7 @@ test("a Quiz game is written in the editor, then taken and scored", async ({
   await page.locator("#tab-entries").click();
   await expect(page.locator("#tab-entries")).toHaveText("Questions");
 
+  await page.locator("#question-new").click();
   await page.locator("#question-prompt").fill("Which planet is largest?");
   await page.locator("#question-option-0").fill("Mars");
   await page.locator("#question-option-1").fill("Jupiter");
@@ -31,6 +32,7 @@ test("a Quiz game is written in the editor, then taken and scored", async ({
   await page.locator("#question-submit").click();
   await expect(page.locator("#question-list li")).toHaveCount(1);
 
+  await page.locator("#question-new").click();
   await page.locator("#question-prompt").fill("When did the Berlin Wall fall?");
   await page.locator("#question-type-number").check();
   await page.locator("#question-answer").fill("1989");

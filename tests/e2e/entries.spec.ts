@@ -45,6 +45,9 @@ test("the Entries tab adds, edits and deletes entries and counts what is missing
   await expect(page.locator("#panel-entries")).toBeVisible();
   await expect(page.locator("#details-form")).toBeHidden();
 
+  // Adding happens in a popup
+  await page.getByRole("button", { name: "New entry" }).click();
+  await expect(page.locator("#entry-dialog")).toBeVisible();
   await page.locator("#entry-name").fill("Rex");
   await page.locator("#entry-fields input[type=file]").setInputFiles({
     name: "rex.png",
@@ -64,11 +67,13 @@ test("the Entries tab adds, edits and deletes entries and counts what is missing
   await page.unroute("**/entries");
   await expect(page.locator("#entry-name")).toHaveValue("Rex");
   await page.getByRole("button", { name: "Add entry" }).click();
+  await expect(page.locator("#entry-dialog")).toBeHidden();
   await expect(page.locator("#entry-list li")).toHaveCount(1);
   await expect(page.locator("#entry-list img")).toBeVisible();
   await expect(page.locator("#status-notice")).not.toContainText("needs");
 
-  // A name clash is refused with a readable error
+  // A name clash is refused with a readable error, and the popup stays open
+  await page.getByRole("button", { name: "New entry" }).click();
   await page.locator("#entry-name").fill("rex");
   await page.getByRole("button", { name: "Add entry" }).click();
   await expect(page.locator("#entry-error")).toContainText(
@@ -87,14 +92,16 @@ test("the Entries tab adds, edits and deletes entries and counts what is missing
   await expect(page.locator("#entry-list img")).toHaveCount(1);
   await expect(page.locator("#status-notice")).not.toContainText("needs");
 
-  // Editing loads the saved values back into the form
+  // Editing opens the popup with the saved values
   await page.getByRole("button", { name: "Edit Rex" }).click();
+  await expect(page.locator("#entry-dialog")).toContainText("Edit Rex");
   await expect(page.getByLabel("Color (one per line)")).toHaveValue(
     "Red\nBlue",
   );
   await expect(page.locator(".entry-image-preview")).toBeVisible();
   await page.locator("#entry-name").fill("Rexy");
   await page.getByRole("button", { name: "Save entry" }).click();
+  await expect(page.locator("#entry-dialog")).toBeHidden();
   await expect(page.locator("#entry-list")).toContainText("Rexy");
 
   // It survives a reload

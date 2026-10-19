@@ -57,6 +57,10 @@ test("the gallery, Create, My games and the editor fit a 320px phone", async ({
   await onScreen(page.locator("#attr-name"), page.locator("#attr-type"));
   await page.locator("#tab-entries").click();
   await noSidewaysScroll(page);
+  await page.locator("#entry-new").click();
+  await onScreen(page.locator("#entry-submit"));
+  await noSidewaysScroll(page);
+  await page.locator("#entry-cancel").click();
 
   await page.goto("/my-games");
   await expect(page.locator("#mine-loading")).toBeHidden();

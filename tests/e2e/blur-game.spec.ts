@@ -16,6 +16,7 @@ const ORDER = [4, 0, 1, 2, 3, 5, 6, 7, 8];
 
 // Adds an entry through the editor: name, a cropped image, then the squares clicked in ORDER
 async function addEntry(page: Page, name: string, color: string) {
+  await page.locator("#entry-new").click();
   await page.locator("#entry-name").fill(name);
   await page.locator("#entry-photo").setInputFiles({
     name: `${name}.png`,
@@ -56,6 +57,7 @@ test("a Blur game is made in the editor and played square by square", async ({
 
   await page.locator("#tab-entries").click();
   // An unfinished order is refused before it is sent
+  await page.locator("#entry-new").click();
   await page.locator("#entry-name").fill("Half");
   await page.locator("#entry-photo").setInputFiles({
     name: "half.png",
@@ -71,7 +73,7 @@ test("a Blur game is made in the editor and played square by square", async ({
   await page.locator("#blur-order-clear").click();
   await expect(page.locator('.blur-cell[data-cell="0"]')).toHaveText("");
 
-  await page.locator("#entry-name").fill("");
+  await page.locator("#entry-cancel").click();
   await addEntry(page, "Red", "#c00");
   await addEntry(page, "Green", "#0a0");
   await addEntry(page, "Blue", "#00c");

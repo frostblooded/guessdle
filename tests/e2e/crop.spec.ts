@@ -55,6 +55,7 @@ async function openEditor(page: Page): Promise<{ uploads: () => number }> {
 
 const pickPhoto = async (page: Page, buffer: Buffer): Promise<void> => {
   await page.locator("#tab-entries").click();
+  await page.locator("#entry-new").click();
   await page
     .locator("#entry-fields input[type=file]")
     .setInputFiles({ name: "pet.png", mimeType: "image/png", buffer });

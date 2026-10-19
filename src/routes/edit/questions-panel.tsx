@@ -1,8 +1,15 @@
 // A Quiz game's Questions tab (ADR 0021): list, add, change and delete questions. Each is
 // multiple choice (options with one right) or a number scored by how close the answer is.
+// Adding and editing happen in a popup, like the Entries tab.
 import { useState, type FormEvent } from "react";
+import { Plus } from "lucide-react";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "../../components/ui/dialog.tsx";
 import { Input, Label, Textarea } from "../../components/ui/input.tsx";
 import {
   MAX_OPTION,
@@ -73,12 +80,21 @@ export function QuestionsPanel({
 }) {
   const [questions, setQuestions] = useState(initial);
   const [draft, setDraft] = useState<Draft>(() => draftOf(null));
+  // The add/edit popup is open
+  const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const { upload, dialog } = usePhotoUpload(setError);
   const set = (patch: Partial<Draft>): void =>
     setDraft((d) => ({ ...d, ...patch }));
 
-  // Runs a call that answers with the question list; a save also empties the form
+  const edit = (question: Entry | null): void => {
+    setError("");
+    setDraft(draftOf(question));
+    setOpen(true);
+  };
+
+  // Runs a call that answers with the question list; a save also empties the form and closes
+  // the popup
   const run = async (
     method: "POST" | "PATCH" | "DELETE",
     path: string,
@@ -91,6 +107,9 @@ export function QuestionsPanel({
       return;
     }
     setQuestions(out.data);
+    if (body !== undefined) {
+      setOpen(false);
+    }
     setDraft((d) =>
       body !== undefined ||
       (d.editing && !out.data.some((q) => q.id === d.editing?.id))
@@ -130,6 +149,15 @@ export function QuestionsPanel({
         guess is, and none at the range or beyond. Changing only a question's
         right answer or range does not send the game back for review.
       </p>
+      <Button id="question-new" onClick={() => edit(null)}>
+        <Plus aria-hidden="true" />
+        New question
+      </Button>
+      {!open && (
+        <Alert id="question-error" variant="error" role="alert">
+          {error}
+        </Alert>
+      )}
       <ol
         id="question-list"
         className="attr-list divide-y rounded-lg border empty:hidden"
@@ -156,7 +184,7 @@ export function QuestionsPanel({
               variant="outline"
               size="sm"
               aria-label={`Edit question ${i + 1}`}
-              onClick={() => setDraft(draftOf(question))}
+              onClick={() => edit(question)}
             >
               Edit
             </Button>
@@ -175,172 +203,180 @@ export function QuestionsPanel({
           </li>
         ))}
       </ol>
-      <form
-        id="question-form"
-        className="space-y-4 rounded-lg border bg-muted/40 p-4"
-        noValidate
-        onSubmit={submit}
-      >
-        <h3 className="font-semibold">
-          {draft.editing ? "Edit question" : "New question"}
-        </h3>
-        <div className="space-y-2">
-          <Label htmlFor="question-prompt">Question</Label>
-          <Textarea
-            id="question-prompt"
-            rows={2}
-            maxLength={MAX_QUESTION}
-            value={draft.prompt}
-            onChange={(event) => set({ prompt: event.target.value })}
-          />
-        </div>
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Picture (optional)</p>
-          {draft.photo && (
-            <img
-              id="question-photo-preview"
-              className="entry-image-preview size-24 rounded-lg object-cover"
-              src={draft.photo}
-              alt=""
-            />
-          )}
-          <div className="flex flex-wrap gap-2">
-            <ImagePicker
-              id="question-photo"
-              onPick={(input) => void upload(input, (photo) => set({ photo }))}
-            />
-            {draft.photo && (
-              <Button
-                id="question-photo-remove"
-                variant="ghost"
-                size="sm"
-                onClick={() => set({ photo: "" })}
-              >
-                Remove
-              </Button>
-            )}
-          </div>
-        </div>
-        <fieldset className="space-y-2">
-          <legend className="mb-2 text-sm font-medium">Answer type</legend>
-          <div className="flex flex-wrap gap-4">
-            {(
-              [
-                ["choice", "Multiple choice"],
-                ["number", "Number"],
-              ] as const
-            ).map(([type, label]) => (
-              <label key={type} className="flex items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="question-type"
-                  id={`question-type-${type}`}
-                  className="accent-primary"
-                  checked={draft.type === type}
-                  onChange={() => set({ type })}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent
+          id="question-dialog"
+          className="max-w-lg"
+          aria-describedby={undefined}
+        >
+          <DialogTitle className="pr-8 text-xl">
+            {draft.editing ? "Edit question" : "New question"}
+          </DialogTitle>
+          <form
+            id="question-form"
+            className="space-y-4"
+            noValidate
+            onSubmit={submit}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="question-prompt">Question</Label>
+              <Textarea
+                id="question-prompt"
+                rows={2}
+                maxLength={MAX_QUESTION}
+                value={draft.prompt}
+                onChange={(event) => set({ prompt: event.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Picture (optional)</p>
+              {draft.photo && (
+                <img
+                  id="question-photo-preview"
+                  className="entry-image-preview size-24 rounded-lg object-cover"
+                  src={draft.photo}
+                  alt=""
                 />
-                {label}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-        {draft.type === "choice" ? (
-          <fieldset id="question-options" className="space-y-2">
-            <legend className="mb-2 text-sm font-medium">
-              Options (mark the right one)
-            </legend>
-            {draft.options.map((option, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="question-correct"
-                  id={`question-correct-${i}`}
-                  aria-label={`Option ${i + 1} is right`}
-                  className="accent-primary"
-                  checked={draft.correct === i}
-                  onChange={() => set({ correct: i })}
-                />
-                <Input
-                  id={`question-option-${i}`}
-                  aria-label={`Option ${i + 1}`}
-                  maxLength={MAX_OPTION}
-                  autoComplete="off"
-                  value={option}
-                  onChange={(event) =>
-                    set({
-                      options: draft.options.map((o, j) =>
-                        j === i ? event.target.value : o,
-                      ),
-                    })
+              )}
+              <div className="flex flex-wrap gap-2">
+                <ImagePicker
+                  id="question-photo"
+                  onPick={(input) =>
+                    void upload(input, (photo) => set({ photo }))
                   }
                 />
-                {draft.options.length > MIN_OPTIONS && (
+                {draft.photo && (
                   <Button
+                    id="question-photo-remove"
                     variant="ghost"
                     size="sm"
-                    aria-label={`Remove option ${i + 1}`}
-                    onClick={() => removeOption(i)}
+                    onClick={() => set({ photo: "" })}
                   >
                     Remove
                   </Button>
                 )}
               </div>
-            ))}
-            {draft.options.length < MAX_OPTIONS && (
-              <Button
-                id="question-add-option"
-                variant="outline"
-                size="sm"
-                onClick={() => set({ options: [...draft.options, ""] })}
-              >
-                Add option
-              </Button>
+            </div>
+            <fieldset className="space-y-2">
+              <legend className="mb-2 text-sm font-medium">Answer type</legend>
+              <div className="flex flex-wrap gap-4">
+                {(
+                  [
+                    ["choice", "Multiple choice"],
+                    ["number", "Number"],
+                  ] as const
+                ).map(([type, label]) => (
+                  <label key={type} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="question-type"
+                      id={`question-type-${type}`}
+                      className="accent-primary"
+                      checked={draft.type === type}
+                      onChange={() => set({ type })}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            {draft.type === "choice" ? (
+              <fieldset id="question-options" className="space-y-2">
+                <legend className="mb-2 text-sm font-medium">
+                  Options (mark the right one)
+                </legend>
+                {draft.options.map((option, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="question-correct"
+                      id={`question-correct-${i}`}
+                      aria-label={`Option ${i + 1} is right`}
+                      className="accent-primary"
+                      checked={draft.correct === i}
+                      onChange={() => set({ correct: i })}
+                    />
+                    <Input
+                      id={`question-option-${i}`}
+                      aria-label={`Option ${i + 1}`}
+                      maxLength={MAX_OPTION}
+                      autoComplete="off"
+                      value={option}
+                      onChange={(event) =>
+                        set({
+                          options: draft.options.map((o, j) =>
+                            j === i ? event.target.value : o,
+                          ),
+                        })
+                      }
+                    />
+                    {draft.options.length > MIN_OPTIONS && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Remove option ${i + 1}`}
+                        onClick={() => removeOption(i)}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                {draft.options.length < MAX_OPTIONS && (
+                  <Button
+                    id="question-add-option"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => set({ options: [...draft.options, ""] })}
+                  >
+                    Add option
+                  </Button>
+                )}
+              </fieldset>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="question-answer">Answer</Label>
+                  <Input
+                    id="question-answer"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    value={draft.answer}
+                    onChange={(event) => set({ answer: event.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="question-range">
+                    Range (this far off scores 0)
+                  </Label>
+                  <Input
+                    id="question-range"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    value={draft.range}
+                    onChange={(event) => set({ range: event.target.value })}
+                  />
+                </div>
+              </div>
             )}
-          </fieldset>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="question-answer">Answer</Label>
-              <Input
-                id="question-answer"
-                inputMode="decimal"
-                autoComplete="off"
-                value={draft.answer}
-                onChange={(event) => set({ answer: event.target.value })}
-              />
+            <Alert id="question-error" variant="error" role="alert">
+              {error}
+            </Alert>
+            <div className="flex flex-wrap gap-2">
+              <Button id="question-submit" type="submit">
+                {draft.editing ? "Save question" : "Add question"}
+              </Button>
+              <Button
+                id="question-cancel"
+                variant="ghost"
+                onClick={() => setOpen(false)}
+              >
+                Cancel
+              </Button>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="question-range">
-                Range (this far off scores 0)
-              </Label>
-              <Input
-                id="question-range"
-                inputMode="decimal"
-                autoComplete="off"
-                value={draft.range}
-                onChange={(event) => set({ range: event.target.value })}
-              />
-            </div>
-          </div>
-        )}
-        <Alert id="question-error" variant="error" role="alert">
-          {error}
-        </Alert>
-        <div className="flex flex-wrap gap-2">
-          <Button id="question-submit" type="submit">
-            {draft.editing ? "Save question" : "Add question"}
-          </Button>
-          {draft.editing && (
-            <Button
-              id="question-cancel"
-              variant="ghost"
-              onClick={() => setDraft(draftOf(null))}
-            >
-              Cancel
-            </Button>
-          )}
-        </div>
-      </form>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
