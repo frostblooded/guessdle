@@ -131,8 +131,8 @@ describe("approval flow", () => {
       assert.match(sent[0]!.text, /https:\/\/guess\.test\/g\/zoo/);
     });
 
-    it("refuses fewer than 2 active entries", async () => {
-      await makeGame("draft", 1);
+    it("refuses a game with no active entry", async () => {
+      await makeGame("draft", 0);
       const res = await request("POST", `/api/games/${SLUG}/submit`, ann, {});
       assert.deepEqual([res.status, res.body.error], [409, "too_few_entries"]);
       assert.equal(await statusOf(), "draft");
@@ -140,7 +140,7 @@ describe("approval flow", () => {
     });
 
     it("does not count soft-deleted entries", async () => {
-      await makeGame("draft", 2);
+      await makeGame("draft", 1);
       await db.pool.query(
         "update entries set deleted_at = now() where id = (select min(id) from entries where game_id = (select id from games where slug = 'zoo'))",
       );

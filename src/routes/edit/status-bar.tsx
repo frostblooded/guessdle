@@ -5,7 +5,7 @@ import { ReviewButtons } from "../../components/review-buttons.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { statusNotice, type Details } from "../../game/editor.ts";
-import { minEntriesOf } from "../../game/blur.ts";
+import { MIN_ENTRIES } from "../../game/limits.ts";
 import { api, errorText } from "../../manage-client.ts";
 
 export function StatusBar({
@@ -60,8 +60,7 @@ export function StatusBar({
           <Button
             id="submit-button"
             disabled={
-              details.entryCount < minEntriesOf(details.kind) ||
-              details.incompleteCount > 0
+              details.entryCount < MIN_ENTRIES || details.incompleteCount > 0
             }
             onClick={() => void flow("submit")}
           >

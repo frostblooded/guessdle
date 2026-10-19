@@ -249,14 +249,14 @@ describe("games in the database", () => {
       assert.deepEqual(plain.photos, []);
     });
 
-    it("hides drafts, pending, rejected, and games under 2 active entries", async () => {
+    it("hides drafts, pending, rejected, and games with no active entry", async () => {
       await addGame("gal-draft", "draft", 3, "2026-01-01");
       await addGame("gal-pending", "pending", 3, "2026-01-01");
       await addGame("gal-rejected", "rejected", 3, "2026-01-01");
-      await addGame("gal-small", "approved", 1, "2026-01-01");
+      await addGame("gal-small", "approved", 0, "2026-01-01");
       await addGame("gal-gone", "approved", 3, "2026-01-01");
       await db.pool.query(
-        "update entries set deleted_at = now() where id in (select id from entries where game_id = (select id from games where slug = 'gal-gone') limit 2)",
+        "update entries set deleted_at = now() where id in (select id from entries where game_id = (select id from games where slug = 'gal-gone'))",
       );
       const { body } = await request("GET", "/api/games");
       assert.deepEqual(
@@ -316,12 +316,12 @@ describe("games in the database", () => {
       }
     });
 
-    it("hides a draft and a game with fewer than 2 entries from players, not from an admin", async () => {
+    it("hides a draft and a game with no entries from players, not from an admin", async () => {
       const admin = await login("admin@x.test", true);
       const player = await login("a@x.test");
       for (const [status, entries] of [
         ["draft", 3],
-        ["approved", 1],
+        ["approved", 0],
         ["pending", 0],
       ] as const) {
         await makeGame(status, entries);
@@ -347,9 +347,9 @@ describe("games in the database", () => {
       );
     });
 
-    it("plays a pending, rejected or approved game with 2 entries by link", async () => {
+    it("plays a pending, rejected or approved game with 1 entry by link", async () => {
       for (const status of ["pending", "rejected", "approved"]) {
-        await makeGame(status, 2);
+        await makeGame(status, 1);
         assert.equal(
           (await request("GET", `/api/games/${SLUG}`)).status,
           200,

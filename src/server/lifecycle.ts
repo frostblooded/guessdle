@@ -187,7 +187,7 @@ export function gameLifecycle(pool: pg.Pool, mail?: MailConfig) {
           }
           if (move === "submit") {
             // The roster as of the lock, so a concurrent edit cannot slip past
-            const blocker = playBlocker(game, await loadRoster(tx, game));
+            const blocker = playBlocker(await loadRoster(tx, game));
             if (blocker) {
               return {
                 result:

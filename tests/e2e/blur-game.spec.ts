@@ -118,6 +118,11 @@ test("a Blur game is made in the editor and played square by square", async ({
     "Skipped",
   ]);
   await expect(page.locator("#new-guess-input")).toHaveValue(wrong[1]!);
+  // Newest first, each numbered
+  await expect(page.locator(".guess-number")).toHaveText([
+    "Guess 2",
+    "Guess 1",
+  ]);
 
   await page.locator("#new-guess-input").fill(wrong[1]!);
   await page.locator("#submit-new-guess-button").click();

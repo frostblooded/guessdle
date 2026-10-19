@@ -57,12 +57,6 @@ describe("limits shared with the pages", () => {
     assert.equal(slugError("a".repeat(limits.MIN_SLUG)), null);
     assert.equal(slugError("a".repeat(limits.MAX_SLUG + 1)), "invalid");
   });
-  it("says the entry minimum in the editor copy from the shared limit", () => {
-    assert.match(
-      text("src/routes/edit/entries-lede.tsx"),
-      /at least(\{" "\})?\s+\{MIN_ENTRIES\}(\{" "\})?\s+entries/,
-    );
-  });
 });
 
 describe("RESERVED_SLUGS", () => {

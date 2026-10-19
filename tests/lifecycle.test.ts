@@ -300,7 +300,7 @@ describe("gameLifecycle.move", () => {
     });
   }
   it("refuses to submit with too few entries", async () => {
-    const f = fake("draft", 1);
+    const f = fake("draft", 0);
     assert.equal(
       await gameLifecycle(f.pool, f.mail).move(game, "submit"),
       "too_few_entries",

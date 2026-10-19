@@ -154,7 +154,7 @@ export async function act(
           if (live) {
             return "round_live";
           }
-          const blocker = playBlocker(data.game, data.roster);
+          const blocker = playBlocker(data.roster);
           if (blocker) {
             return blocker;
           }

@@ -2,8 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import {
   GUESS_MODE_STORAGE_KEY,
-  listEntries,
-  nextSort,
+  filterByName,
   readGuessMode,
   writeGuessMode,
   type GuessModeStorage,
@@ -51,72 +50,25 @@ describe("guess mode storage", () => {
   });
 });
 
-const ENTRIES = [
-  { name: "bela", values: ["Black", "12", ["Ann", "Bo"]] },
-  { name: "Dido", values: ["White", "3", ["Cy"]] },
-  { name: "Abby", values: ["White", "100", ["Ann"]] },
-];
-const TYPES = ["text", "number", "list"] as const;
+const ENTRIES = [{ name: "bela" }, { name: "Dido" }, { name: "Abby" }];
 const names = (list: readonly { name: string }[]): string[] =>
   list.map((e) => e.name);
 
-describe("listEntries", () => {
-  it("sorts by name by default, any letter case", () => {
-    assert.deepEqual(
-      names(listEntries(ENTRIES, TYPES, "", { column: -1, descending: false })),
-      ["Abby", "bela", "Dido"],
-    );
+describe("filterByName", () => {
+  it("sorts by name, any letter case", () => {
+    assert.deepEqual(names(filterByName(ENTRIES, "")), [
+      "Abby",
+      "bela",
+      "Dido",
+    ]);
   });
 
   it("keeps names containing the filter text, any letter case", () => {
-    assert.deepEqual(
-      names(
-        listEntries(ENTRIES, TYPES, " B ", { column: -1, descending: false }),
-      ),
-      ["Abby", "bela"],
-    );
-  });
-
-  it("sorts a text column, ties by name, and flips when descending", () => {
-    assert.deepEqual(
-      names(listEntries(ENTRIES, TYPES, "", { column: 0, descending: false })),
-      ["bela", "Abby", "Dido"],
-    );
-    assert.deepEqual(
-      names(listEntries(ENTRIES, TYPES, "", { column: 0, descending: true })),
-      ["Abby", "Dido", "bela"],
-    );
-  });
-
-  it("sorts a Number column by value, not as text", () => {
-    assert.deepEqual(
-      names(listEntries(ENTRIES, TYPES, "", { column: 1, descending: false })),
-      ["Dido", "bela", "Abby"],
-    );
-  });
-
-  it("sorts a List column by its joined values", () => {
-    assert.deepEqual(
-      names(listEntries(ENTRIES, TYPES, "", { column: 2, descending: false })),
-      ["Abby", "bela", "Dido"],
-    );
+    assert.deepEqual(names(filterByName(ENTRIES, " B ")), ["Abby", "bela"]);
   });
 
   it("leaves the input untouched", () => {
-    listEntries(ENTRIES, TYPES, "", { column: 1, descending: true });
+    filterByName(ENTRIES, "");
     assert.deepEqual(names(ENTRIES), ["bela", "Dido", "Abby"]);
-  });
-});
-
-describe("nextSort", () => {
-  it("flips the sorted column and starts a new one ascending", () => {
-    assert.deepEqual(nextSort({ column: 1, descending: false }, 1), {
-      column: 1,
-      descending: true,
-    });
-    assert.deepEqual(nextSort({ column: 1, descending: true }, 0), {
-      column: 0,
-      descending: false,
-    });
   });
 });

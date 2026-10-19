@@ -452,6 +452,29 @@ test("the practice game offers every pet of the pet game and fits a phone screen
   expect(await fits()).toBe(true);
 });
 
+test("every game kind has a practice round, one open at a time, that fits a phone screen", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  await page.goto("/how-to-play");
+  const fits = (): Promise<boolean> =>
+    page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    );
+  const step = page.locator(".practice-step");
+  for (const kind of ["Blur", "Sequence", "Quiz"]) {
+    await page.getByRole("button", { name: new RegExp(`^${kind}`) }).click();
+    await expect(step).toHaveCount(1);
+    await expect(step).toContainText(`${kind} practice`);
+    expect(await fits()).toBe(true);
+  }
+  await page.getByRole("radio").first().click();
+  await page.getByRole("button", { name: "Check my answer" }).click();
+  await expect(page.locator(".practice-feedback")).toHaveText(
+    /^(Right|Not this time)/,
+  );
+});
+
 const giveUpButton = (page: Page): Locator => page.locator("#give-up-button");
 const resetButton = (page: Page): Locator => page.locator("#reset-button");
 const giveUpTitle = (page: Page): Locator => page.locator("#give-up-title");
@@ -775,9 +798,11 @@ test("selection mode: pick a guess from the list, and the mode is remembered", a
   await list
     .getByRole("button", { name: `Guess ${wrongName}`, exact: true })
     .click();
-  await expect(list).toBeHidden();
+  // The list stays open above the board, without the guessed name
   await expect(rows(page)).toHaveCount(1);
   await expect(rows(page).first()).toContainText(wrongName);
+  await list.locator("#select-filter").fill("");
+  await expect(list.locator(".select-option")).toHaveCount(names.length - 1);
 
   await page.reload();
   await expect(page.locator("#guess-mode-select")).toHaveAttribute(

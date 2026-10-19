@@ -10,7 +10,7 @@ import { Card } from "../../components/ui/card.tsx";
 import { FAILURES } from "../../game/failures.ts";
 import { findEntryId, SKIP } from "../../game/game.ts";
 import { ANSWER_CHANGED } from "../../game/play.ts";
-import { minEntriesOf } from "../../game/blur.ts";
+import { MIN_ENTRIES } from "../../game/limits.ts";
 import { gameKey, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { FreeHintCard } from "./free-hint.tsx";
@@ -55,8 +55,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const gameFailure =
     typeof game === "string" && game !== "missing" ? game : null;
   const roster = playable?.entries ?? [];
-  const tooSmall =
-    playable !== null && roster.length < minEntriesOf(playable.kind);
+  const tooSmall = playable !== null && roster.length < MIN_ENTRIES;
   // Not playable for now: too few entries, or paused
   const closed = tooSmall || playable?.paused === true;
   // A past day the game has; today's and later Day Numbers are handled below
@@ -99,7 +98,6 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
       if (id !== SKIP) {
         setGuess("");
       }
-      modes.setSelecting(false);
     }
   }
 
@@ -279,21 +277,19 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
             onTake={(kind) => void freeHint.take(kind)}
           />
         )}
-        {modes.selecting && !finished && !cannotPlay ? (
+        {modes.selecting && !finished && !cannotPlay && (
           <SelectList
             entries={unguessed}
-            attributes={titles && (playable?.attributes ?? [])}
             onPick={(name) => void submit(name)}
           />
-        ) : (
-          <PlayResults
-            rows={rows}
-            titles={titles}
-            loading={isPending || loading}
-            loadingText={past ? "Loading the game…" : "Loading today's game…"}
-            empty={ready && rows.length === 0}
-          />
         )}
+        <PlayResults
+          rows={rows}
+          titles={titles}
+          loading={isPending || loading}
+          loadingText={past ? "Loading the game…" : "Loading today's game…"}
+          empty={ready && rows.length === 0}
+        />
       </section>
     </>
   );

@@ -89,7 +89,8 @@ export function gameEdits(ctx: EditContext, uploadsDir: string) {
     },
 
     // Creates (no `id`) or changes an entry; replaced pictures are freed. A Sequence game's
-    // future days follow which entries may be the answer (ADR 0020).
+    // future days follow which entries may be the answer (ADR 0020). Changing only a Quiz
+    // question's right answer keeps the status.
     async saveEntry(
       game: GameRow,
       editor: SessionUser,
@@ -131,7 +132,7 @@ export function gameEdits(ctx: EditContext, uploadsDir: string) {
           }
           return saved;
         },
-        (r) => typeof r !== "string",
+        (r) => typeof r !== "string" && !r.answerOnly,
       );
       if (typeof out !== "string") {
         await refs.release(out.replaced);

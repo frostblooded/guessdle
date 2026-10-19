@@ -146,7 +146,8 @@ export function QuestionsPanel({
         Players answer every question in this order, then see their score and
         the right answers. A quiz plays with a single question. A number
         question gives a full point for the exact answer, less the further off a
-        guess is, and none at the range or beyond.
+        guess is, and none at the range or beyond. Changing only a question's
+        right answer or range does not send the game back for review.
       </p>
       <Button id="question-new" onClick={() => edit(null)}>
         <Plus aria-hidden="true" />

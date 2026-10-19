@@ -1,4 +1,4 @@
-// The guess controls, shared by Play and party rounds: the Type / Select switch, then the guess box
+// The guess controls, shared by Play and party rounds: the Typing / Selecting switch, then the guess box
 // and its Guess button, or in selection mode the button that opens the list of every entry; with
 // a Skip button under them for games that allow skipping (Blur games, ADR 0019).
 import { useState } from "react";
@@ -12,7 +12,7 @@ import {
 import { cn } from "../../lib/utils.ts";
 import { GuessBox } from "./guess-box.tsx";
 
-// The remembered guess mode, and whether selection mode's list is open in place of the board.
+// The remembered guess mode, and whether selection mode's list is open above the board.
 // A party passes the mode its host picked: then it is fixed and there is no switch.
 export function useGuessMode(fixed?: GuessMode) {
   const [remembered, setMode] = useState<GuessMode>(() =>
@@ -37,8 +37,8 @@ export function useGuessMode(fixed?: GuessMode) {
 export type GuessModeState = ReturnType<typeof useGuessMode>;
 
 const MODES: readonly { mode: GuessMode; label: string }[] = [
-  { mode: "type", label: "Type" },
-  { mode: "select", label: "Select" },
+  { mode: "type", label: "Typing" },
+  { mode: "select", label: "Selecting" },
 ];
 
 export function ModeSwitch({
@@ -140,7 +140,7 @@ export function GuessForm({
             disabled={disabled || busy}
             onClick={() => modes.setSelecting(!modes.selecting)}
           >
-            {modes.selecting ? "Back to my guesses" : "Select next guess"}
+            {modes.selecting ? "Hide the list" : "Select next guess"}
           </Button>
         )}
       </div>
