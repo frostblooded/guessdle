@@ -1,6 +1,7 @@
 // Every failure code the server sends: its HTTP status and the text the browser shows.
 // One table so a new code cannot reach one side without the other.
 
+import { FREE_HINT_AFTER } from "./free-hint.ts";
 import {
   MAX_OPEN_PARTIES,
   MAX_PLAYLIST_GAMES,
@@ -37,6 +38,10 @@ export const FAILURES = {
   reserved: failure(400, "That address is reserved. Pick another one."),
   unauthorized: failure(401, "Your session ended. Sign in again."),
   forbidden: failure(403, "You cannot change this game."),
+  banned: failure(
+    403,
+    "Your account is banned, so you cannot create or change games or playlists. You can still play.",
+  ),
   quota_exceeded: failure(403, "You have used all your upload space."),
   not_found: failure(404, "This game no longer exists."),
   no_such_day: failure(
@@ -57,7 +62,7 @@ export const FAILURES = {
   ),
   game_paused: failure(
     409,
-    "This game is paused while some of its entries are missing values (in a Blur game, an image or its square order). It comes back once they are filled in.",
+    "This game is paused while some of its entries are missing values (in a Blur game, an image or its square order; in a Sequence game, until one entry has all its photos). It comes back once they are filled in.",
   ),
   invalid_state: failure(
     409,
@@ -69,6 +74,15 @@ export const FAILURES = {
   self_deletion: failure(409, "You cannot delete your own account here."),
   last_admin: failure(409, "At least one admin must remain."),
   self_demotion: failure(409, "You cannot remove your own admin rights."),
+  self_ban: failure(409, "You cannot ban yourself."),
+  admin_ban: failure(
+    409,
+    "Admins cannot be banned. Remove their admin rights first.",
+  ),
+  promote_banned: failure(
+    409,
+    "A banned player cannot be made an admin. Unban them first.",
+  ),
   party_not_found: failure(
     404,
     "There is no party with this code. Check the code and try again.",
@@ -130,6 +144,10 @@ export const FAILURES = {
   answer_missing: failure(
     500,
     "Today's answer could not be found for this game. Reload the page; if it keeps happening, ask the game owner or an admin to check the entries.",
+  ),
+  no_hint: failure(
+    409,
+    `No free hint is available right now. It opens after ${FREE_HINT_AFTER} wrong guesses, once per game.`,
   ),
   rate_limited: failure(
     429,

@@ -1,19 +1,19 @@
 // Game, attribute and entry data: the one seam between routes and the tables.
-import { MIN_ENTRIES } from "../game/limits.ts";
+import { DEFAULT_SHOTS, MAX_BLUR_TRIES } from "../game/limits.ts";
 import type pg from "pg";
 import type { AttributeValue } from "../game/correctness.ts";
 import {
   firstImage,
-  hasAllValues,
   type AttributeType,
   type Entry,
   type GameAttribute,
 } from "../game/game.ts";
-import { MAX_TILES } from "../game/banner.ts";
 import { slugError } from "../game/slug.ts";
 import type { GameKind } from "../game/blur.ts";
 import type { QuizSpec } from "../game/quiz.ts";
+import { isAnswerable, isIncomplete } from "./completeness.ts";
 import type { EditKind } from "./lifecycle.ts";
+import { OWNER_BANNED } from "./users.ts";
 
 type Q = Pick<pg.Pool, "query">;
 
@@ -34,8 +34,10 @@ export interface GameRow {
   startDate: string;
   skipPeriod: number | null;
   kind: GameKind;
-  // Blur games: the number of tries
+  // Blur and Sequence games: the number of tries (a Sequence game's photos per entry)
   blurTries: number;
+  // Its owner is banned: hidden from all but the owner and admins
+  ownerBanned: boolean;
 }
 
 // A game plays with at least this many active entries
@@ -52,8 +54,9 @@ const gameWhere = async (
     `select id::int, slug, name, description, cover_url as "coverUrl",
        owner_id::int as "ownerId", status, reject_reason as "rejectReason",
        to_char(start_date, 'YYYY-MM-DD') as "startDate",
-       skip_period as "skipPeriod", kind, blur_tries as "blurTries"
-     from games where ${where} = $1`,
+       skip_period as "skipPeriod", kind, blur_tries as "blurTries",
+       ${OWNER_BANNED} as "ownerBanned"
+     from games g where ${where} = $1`,
     [value],
   );
   return rows[0] ?? null;
@@ -72,40 +75,13 @@ export interface Roster {
   entries: Entry[];
   // Every entry including soft-deleted ones, so past guesses still resolve
   all: Entry[];
-  // Active entries missing a value: while any are, the game is paused
+  // Active entries missing a value: while any are, the game is paused. A Sequence game counts
+  // its entries only while none of them may be the answer.
   incomplete: number;
+  // Active entries a day's answer is drawn from: all of them, but in a Sequence game only
+  // those with every photo
+  answerIds: number[];
 }
-
-// SQL true when the game aliased `g` has an active entry missing a value (no value rows for a
-// non-Image attribute; blanks are never stored), or, in a Blur game, missing its photo or its
-// square order, or a Quiz question missing its answer. Such a game is paused.
-export const HAS_MISSING_VALUES = `(case when g.kind = 'quiz' then exists (
-  select 1 from entries e where e.game_id = g.id and e.deleted_at is null and e.quiz is null)
-when g.kind = 'blur' then exists (
-  select 1 from entries e
-  where e.game_id = g.id and e.deleted_at is null and (e.photo_url = '' or e.blur_order is null))
-else exists (
-  select 1 from entries e join attributes a on a.game_id = e.game_id
-  where e.game_id = g.id and e.deleted_at is null and a.type <> 'image' and not exists (
-    select 1 from entry_values v where v.entry_id = e.id and v.attribute_id = a.id)) end)`;
-
-// SQL true when the game aliased `g` is one the gallery shows: approved, with enough active
-// entries (MIN_ENTRIES for a classic game, one otherwise) and none missing a value
-export const IN_GALLERY = `(g.status = 'approved' and not ${HAS_MISSING_VALUES}
-  and (select count(*) from entries n where n.game_id = g.id and n.deleted_at is null)
-    >= case when g.kind = 'classic' then ${MIN_ENTRIES} else 1 end)`;
-
-// An entry that pauses its game: a value missing, or in a Blur game its photo or square order
-export const isIncomplete = (
-  game: GameRow,
-  roster: readonly GameAttribute[],
-  entry: Entry,
-): boolean =>
-  game.kind === "quiz"
-    ? entry.quiz === undefined
-    : game.kind === "blur"
-      ? entry.photo === "" || entry.blurOrder === undefined
-      : !hasAllValues(roster, entry.values);
 
 // A game's attributes and entries with their values
 export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
@@ -123,10 +99,12 @@ export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
     photo: string;
     deleted: boolean;
     blurOrder: number[] | null;
+    shots: string[];
+    description: string;
     quiz: QuizSpec | null;
   }>(
     `select id::int, name, photo_url as photo, deleted_at is not null as deleted,
-       blur_order::int[] as "blurOrder", quiz
+       blur_order::int[] as "blurOrder", shots, description, quiz
      from entries where game_id = $1 order by id`,
     [game.id],
   );
@@ -151,97 +129,40 @@ export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
   };
   const attrs = attributes.rows.map(({ name, type }) => ({ name, type }));
   const all = entries.rows.map(
-    ({ id, name, photo, blurOrder, quiz }): Entry => {
+    ({ id, name, photo, description, blurOrder, shots, quiz }): Entry => {
       const values = attributes.rows.map((attr) => cell(id, attr));
       return {
         id,
         name,
-        photo: game.kind === "classic" ? firstImage(attrs, values) : photo,
+        photo:
+          game.kind === "blur" || game.kind === "quiz"
+            ? photo
+            : firstImage(attrs, values),
         values,
+        description,
         ...(game.kind === "blur" && blurOrder && { blurOrder }),
+        ...(game.kind === "sequence" && { shots }),
         ...(game.kind === "quiz" && quiz && { quiz }),
       };
     },
   );
   const active = all.filter((_, i) => !entries.rows[i]!.deleted);
+  const answerIds = active
+    .filter((entry) => isAnswerable(game, entry))
+    .map((entry) => entry.id);
   return {
     attributes: attrs,
     entries: active,
     all,
-    incomplete: active.filter((entry) => isIncomplete(game, attrs, entry))
-      .length,
+    incomplete:
+      game.kind === "sequence"
+        ? answerIds.length === 0
+          ? active.length
+          : 0
+        : active.filter((entry) => isIncomplete(game, attrs, entry)).length,
+    answerIds,
   };
 }
-
-export interface GalleryCard {
-  slug: string;
-  name: string;
-  description: string;
-  cover: string;
-  // Banner collage photos of active entries, by id; only for a game without a cover. A Blur
-  // game's photos are its answers, so it gets blurred tiles instead (`blurTileUrl`).
-  photos: string[];
-  entryCount: number;
-  kind: GameKind;
-}
-
-// SQL for the first Image value of the entry aliased `alias` (null when it has none)
-const FIRST_IMAGE = (alias: string): string =>
-  `(select v.value from entry_values v join attributes a on a.id = v.attribute_id
-     where v.entry_id = ${alias}.id and a.type = 'image' order by a.position, a.id limit 1)`;
-
-// Which gallery games a list shows: all of them, one owner's, or one playlist's in its order
-export type GalleryScope =
-  | { ownerId: number; playlistId?: never }
-  | { playlistId: number; ownerId?: never }
-  | Record<string, never>;
-
-// Approved games with enough active entries (MIN_ENTRIES, one for a Blur game) and none missing
-// a value: the original first, then newest first. A scope narrows them to an owner's (newest first) or a playlist's.
-export async function listGallery(
-  q: Q,
-  scope: GalleryScope = {},
-): Promise<GalleryCard[]> {
-  const inPlaylist = scope.playlistId !== undefined;
-  const narrowedBy = [scope.playlistId ?? scope.ownerId].filter(
-    (id) => id !== undefined,
-  );
-  const { rows } = await q.query<GalleryCard>(
-    `select g.slug, g.name, g.description, g.cover_url as cover,
-       case when g.cover_url = '' then array(
-         select x.photo from (
-           select p.id, coalesce(nullif(p.photo_url, ''), ${FIRST_IMAGE("p")}) as photo
-           from entries p where p.game_id = g.id and p.deleted_at is null) x
-         where x.photo is not null order by x.id limit $2
-       ) else '{}'::text[] end as photos,
-       count(e.id)::int as "entryCount", g.kind
-     from games g join entries e on e.game_id = g.id and e.deleted_at is null
-     ${inPlaylist ? "join playlist_games pl on pl.game_id = g.id and pl.playlist_id = $3" : ""}
-     where g.status = 'approved' and not ${HAS_MISSING_VALUES}
-       ${scope.ownerId !== undefined ? "and g.owner_id = $3" : ""}
-     group by g.id${inPlaylist ? ", pl.position" : ""} having count(e.id) >= case when g.kind = 'classic' then $1 else 1 end
-     order by ${
-       inPlaylist
-         ? "pl.position"
-         : scope.ownerId !== undefined
-           ? "g.created_at desc, g.id desc"
-           : "g.slug = 'petdle' desc, g.created_at desc, g.id desc"
-     }`,
-    [MIN_ENTRIES, MAX_TILES, ...narrowedBy],
-  );
-  return rows.map((card) =>
-    card.kind === "blur"
-      ? {
-          ...card,
-          photos: card.photos.map((_, i) => blurTileUrl(card.slug, i)),
-        }
-      : card,
-  );
-}
-
-// Tile n of a Blur game's banner collage: its nth entry photo with a photo, blurred (ADR 0019)
-export const blurTileUrl = (slug: string, n: number): string =>
-  `/api/games/${encodeURIComponent(slug)}/tile/${n}`;
 
 export interface MyGame {
   slug: string;
@@ -276,9 +197,16 @@ export async function createGame(
   const insert = async (candidate: string): Promise<boolean> =>
     (
       await q.query(
-        `insert into games (slug, name, owner_id, start_date, kind) values ($1, $2, $3, $4, $5)
-         on conflict (slug) do nothing`,
-        [candidate, name, ownerId, startDate, kind],
+        `insert into games (slug, name, owner_id, start_date, kind, blur_tries)
+         values ($1, $2, $3, $4, $5, $6) on conflict (slug) do nothing`,
+        [
+          candidate,
+          name,
+          ownerId,
+          startDate,
+          kind,
+          kind === "sequence" ? DEFAULT_SHOTS : MAX_BLUR_TRIES,
+        ],
       )
     ).rowCount === 1;
   if ("typed" in slug) {
@@ -299,7 +227,7 @@ export interface GamePatch {
   description?: string;
   coverUrl?: string;
   skipPeriod?: number | null;
-  // Blur games only
+  // Blur and Sequence games only
   blurTries?: number;
 }
 

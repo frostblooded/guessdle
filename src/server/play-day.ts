@@ -3,7 +3,8 @@
 // the day is over and what that reveals, and records a first win in the day's stats. Routes
 // only read the request and turn these outcomes into HTTP replies.
 import type pg from "pg";
-import { outOfTries } from "../game/blur.ts";
+import { isImageGame, outOfTries } from "../game/blur.ts";
+import { hintChoices, type HintChoices } from "../game/free-hint.ts";
 import { gradeIds, type Entry, type GradedAttribute } from "../game/game.ts";
 import { MAX_SECONDS, type DayStats } from "../game/stats.ts";
 import { playBlocker, type LoadedGame } from "./access.ts";
@@ -81,7 +82,7 @@ export async function openDay(
   accepts: () => boolean = () => true,
 ): Promise<PlayDay | DayRefusal> {
   const played = dayOf(clock, game, raw);
-  // A Quiz game has no days: it is taken whole, any time (ADR 0020)
+  // A Quiz game has no days: it is taken whole, any time (ADR 0021)
   if (!played || game.kind === "quiz") {
     return { refusal: "no_such_day" };
   }
@@ -94,35 +95,34 @@ export async function openDay(
   if (blocker) {
     return { refusal: blocker, day };
   }
-  const stored = await ensureAnswer(
-    pool,
-    game,
-    roster.entries.map((entry) => entry.id),
-    date,
-    random,
-  );
+  const stored = await ensureAnswer(pool, game, roster.answerIds, date, random);
   const answer = roster.all.find((entry) => entry.id === stored?.entryId);
   return answer
     ? { game, roster, answer, revision: stored!.revision, ...played }
     : { refusal: "answer_missing", day };
 }
 
-// A Blur game's tries, null for a classic game with unlimited guesses
+// A Blur or Sequence game's tries, null for a classic game with unlimited guesses
 export const triesOf = (game: GameRow): number | null =>
-  game.kind === "blur" ? game.blurTries : null;
+  isImageGame(game.kind) ? game.blurTries : null;
 
-// The answer as a finished day reveals it: its name, and a Blur game's whole image
+// The answer as a finished day reveals it: its name, its description when it has one, and a
+// Blur game's whole image or a Sequence game's first photo
 export interface Reveal {
   answer: string;
   answerPhoto?: string;
+  answerDescription?: string;
 }
 
 export const revealOf = (game: GameRow, answer: Entry): Reveal => ({
   answer: answer.name,
   ...(game.kind === "blur" && { answerPhoto: answer.photo }),
+  ...(game.kind === "sequence" &&
+    answer.shots?.[0] && { answerPhoto: answer.shots[0] }),
+  ...(answer.description && { answerDescription: answer.description }),
 });
 
-// Whether `ids` used up a Blur game's tries without the answer
+// Whether `ids` used up a Blur or Sequence game's tries without the answer
 export const isLost = (
   game: GameRow,
   ids: readonly number[],
@@ -130,12 +130,15 @@ export const isLost = (
 ): boolean => outOfTries(triesOf(game), ids.length, victory);
 
 // A list of guesses graded against the day's answer. `reveal` is set once the day is over:
-// won, given up, or (Blur games) every try used.
+// won, given up, or (Blur and Sequence games) every try used.
 export interface Board {
   rows: GradedAttribute[][];
   victory: boolean;
   lost: boolean;
   reveal: Reveal | null;
+  // Classic games, while the day is on: the Free Hint kinds these guesses earn (whether one
+  // was already used is the caller's to know)
+  hints: HintChoices | null;
 }
 
 // Grades guesses by entry id (soft-deleted entries still resolve, so old guesses keep their
@@ -156,11 +159,16 @@ export function boardOf(
     return graded.kind;
   }
   const lost = isLost(game, ids, graded.victory);
+  const over = graded.victory || gaveUp || lost;
   return {
     rows: graded.rows,
     victory: graded.victory,
     lost,
-    reveal: graded.victory || gaveUp || lost ? revealOf(game, answer) : null,
+    reveal: over ? revealOf(game, answer) : null,
+    hints:
+      game.kind === "classic" && !over
+        ? hintChoices(roster.attributes, answer, graded.rows)
+        : null,
   };
 }
 

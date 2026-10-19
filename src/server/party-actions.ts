@@ -1,5 +1,8 @@
 // What a player's socket message does to a party (ADR 0016), under the party lock.
 import type pg from "pg";
+import { isImageGame } from "../game/blur.ts";
+import { pickHint } from "../game/free-hint.ts";
+import { gradeGuess } from "../game/game.ts";
 import { playBlocker } from "./access.ts";
 import { SKIP } from "../game/game.ts";
 import { isAnswerTo } from "../game/quiz.ts";
@@ -53,6 +56,44 @@ export async function act(
     const quiz = data.game.kind === "quiz";
     const refusal = await (async (): Promise<PartyRefusal | null> => {
       switch (msg.type) {
+        case "hint": {
+          if (!live) {
+            return "no_round";
+          }
+          if (
+            !participants(data.players, live).includes(me) ||
+            isDone(progressOf(live, me.id))
+          ) {
+            return "finished";
+          }
+          const { attributes, all } = data.roster;
+          const answer = all.find((e) => e.id === live.answerId);
+          if (
+            !answer ||
+            data.game.kind !== "classic" ||
+            live.hints?.some((h) => h.playerId === me.id)
+          ) {
+            return "no_hint";
+          }
+          const rows = live.guesses
+            .filter((g) => g.playerId === me.id)
+            .flatMap((g) => all.filter((e) => e.id === g.entryId))
+            .map((guess) => gradeGuess(attributes, answer, guess));
+          const pick = pickHint(attributes, answer, rows, msg.kind, random);
+          if (!pick) {
+            return "no_hint";
+          }
+          await tx.query(
+            "insert into party_hints (round_id, player_id, kind, attribute) values ($1, $2, $3, $4)",
+            [
+              live.id,
+              me.id,
+              pick.kind,
+              pick.kind === "attribute" ? pick.attribute : null,
+            ],
+          );
+          return null;
+        }
         case "answer":
         case "guess":
         case "give-up": {
@@ -84,7 +125,7 @@ export async function act(
               [live.id, me.id, now],
             );
           } else {
-            const skip = msg.entryId === SKIP && data.game.kind === "blur";
+            const skip = msg.entryId === SKIP && isImageGame(data.game.kind);
             if (
               !skip &&
               !data.roster.entries.some((e) => e.id === msg.entryId)
@@ -122,7 +163,7 @@ export async function act(
           if (blocker) {
             return blocker;
           }
-          const active = data.roster.entries.map((e) => e.id);
+          const active = data.roster.answerIds;
           const used = data.rounds.map((r) => r.answerId);
           // A quiz plays its questions in order, each once
           const next = quiz

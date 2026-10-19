@@ -2,13 +2,15 @@
 import express from "express";
 import type { Express, Request, Response } from "express";
 import type pg from "pg";
+import { isImageGame } from "../../game/blur.ts";
+import { isHintKind, pickHint, revealHint } from "../../game/free-hint.ts";
 import type { DaysResponse } from "../../game/days.ts";
 import { listDays } from "../days.ts";
-import { isPlayerToken } from "../../game/stats.ts";
-import { listGallery } from "../games.ts";
 import { quizQuestions } from "../quiz.ts";
+import { listGallery } from "../gallery.ts";
 import { canApprove, canManage } from "../access.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
+import { playerOf, recordFailure } from "../results.ts";
 import {
   boardOf,
   openDay,
@@ -24,6 +26,7 @@ import {
   mergeLocal,
   resetGame,
   REFUSAL_STATUS,
+  takeHint,
   view,
   type GameContext,
   type GameView,
@@ -47,9 +50,9 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
     res.json(await listGallery(pool));
   });
 
-  // What a player needs to render the game: its attributes and active entries. A Blur game's
-  // entries go without photos: those are its answers (ADR 0019). A classic game's carry their values
-  // for the selection list.
+  // What a player needs to render the game: its attributes and active entries. A Blur or
+  // Sequence game's entries go without photos: those are its answers (ADR 0019, 0020). A classic
+  // game's carry their values for the selection list.
   app.get(base, async (req, res) => {
     res.set("Cache-Control", "no-store");
     const loaded = await loadGame(ctx, req, res);
@@ -68,7 +71,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       description: game.description,
       cover: game.coverUrl,
       kind: game.kind,
-      ...(game.kind === "blur" && { blurTries: game.blurTries }),
+      ...(isImageGame(game.kind) && { blurTries: game.blurTries }),
       // Today's Day Number: past days are 0 up to it
       today: todayOf(ctx, game).day,
       startDate: game.startDate,
@@ -79,7 +82,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         game.kind === "quiz"
           ? []
           : roster.entries.map(({ id, name, photo, values }) =>
-              game.kind === "blur"
+              isImageGame(game.kind)
                 ? { id, name, photo: "" }
                 : { id, name, photo, values },
             ),
@@ -136,6 +139,15 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         res.status(REFUSAL_STATUS[board]).json({ error: board, day: day.day });
         return;
       }
+      // Out of tries on the browser's first attempt: no later win that day counts
+      const player = playerOf(null, bodyOf(req));
+      if (board.lost && player !== null) {
+        await recordFailure(
+          pool,
+          { gameId: day.game.id, date: day.date, player },
+          ids.length,
+        );
+      }
       res.json({
         day: day.day,
         revision: day.revision,
@@ -143,27 +155,82 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         victory: board.victory,
         ...(board.lost && { lost: true }),
         ...board.reveal,
+        // The browser knows whether it already used its hint, and hides these then
+        ...(board.hints && { hints: board.hints }),
       });
     },
   );
 
-  // Stateless and open to anyone by decision (spec #38): reveals the day's answer
-  app.post(`${base}/give-up`, async (req, res) => {
-    const loaded = await loadGame(ctx, req, res);
-    if (!loaded) {
-      return;
-    }
-    const day = await playDayOf(ctx, req, res, loaded);
-    if (day) {
+  // Stateless Free Hint for anonymous players: draws one of the offered kind for these
+  // guesses. Like give-up it is open to anyone; the browser keeps it and asks only once.
+  app.post(
+    `${base}/hint`,
+    express.json({ limit: "10kb" }),
+    async (req, res) => {
+      const loaded = await loadGame(ctx, req, res);
+      if (!loaded) {
+        return;
+      }
+      const { ids, kind } = bodyOf(req);
+      const day = await playDayOf(
+        ctx,
+        req,
+        res,
+        loaded,
+        () => isIdList(loaded.game, loaded.roster, ids) && isHintKind(kind),
+      );
+      if (!day || !isHintKind(kind)) {
+        return;
+      }
+      const board = boardOf(day, ids as number[]);
+      if (typeof board === "string") {
+        res.status(400).json({ error: "invalid", day: day.day });
+        return;
+      }
+      const { attributes } = day.roster;
+      const pick =
+        board.hints &&
+        pickHint(attributes, day.answer, board.rows, kind, ctx.random);
+      const hint = pick && revealHint(attributes, day.answer, pick);
+      if (!hint) {
+        res.status(409).json({ error: "no_hint", day: day.day });
+        return;
+      }
+      res.json({ day: day.day, revision: day.revision, hint });
+    },
+  );
+
+  // Stateless and open to anyone by decision (spec #38): reveals the day's answer. With the
+  // browser's player token, a give-up on its first attempt keeps any later win out of the stats.
+  app.post(
+    `${base}/give-up`,
+    express.json({ limit: "10kb" }),
+    async (req, res) => {
+      const loaded = await loadGame(ctx, req, res);
+      if (!loaded) {
+        return;
+      }
+      const day = await playDayOf(ctx, req, res, loaded);
+      if (!day) {
+        return;
+      }
+      const player = playerOf(null, bodyOf(req));
+      if (player !== null) {
+        await recordFailure(
+          pool,
+          { gameId: day.game.id, date: day.date, player },
+          0,
+        );
+      }
       res.json({
         day: day.day,
         revision: day.revision,
         ...revealOf(day.game, day.answer),
       });
-    }
-  });
+    },
+  );
 
-  // Records the player's first win of the day (today, or a past day named by ?day=N) and
+  // Records the player's first attempt of the day if it is a win (today, or a past day named by ?day=N) and
   // answers with that day's stats. Signed-in
   // players are known by their session and their stored guesses; anonymous ones by
   // the browser's token and the ids they send, which must end with the answer.
@@ -178,11 +245,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         return;
       }
       const body = bodyOf(req);
-      const player = user
-        ? `user:${user.id}`
-        : isPlayerToken(body["player"])
-          ? `anon:${body["player"]}`
-          : null;
+      const player = playerOf(user?.id ?? null, body);
       const ids = body["ids"];
       const day = await playDayOf(
         ctx,
@@ -286,6 +349,13 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
     // Only today's browser guesses are adopted; past days stay where they were played
     changeRoute(async ({ body, ...game }, current, q) =>
       game.past ? "stale_day" : mergeLocal(q, game, current, body),
+    ),
+  );
+  app.post(
+    `${base}/state/hint`,
+    json,
+    changeRoute(({ body, ...game }, current, q) =>
+      takeHint(q, game, current, body["kind"], ctx.random),
     ),
   );
   app.post(

@@ -1,4 +1,4 @@
-// Quiz games (ADR 0020): a quiz's questions, and each player's first score with the spread of
+// Quiz games (ADR 0021): a quiz's questions, and each player's first score with the spread of
 // everyone's first scores.
 import type pg from "pg";
 import {

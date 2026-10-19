@@ -1,8 +1,10 @@
 // The viewer's own board in a live party round: the guess box, their graded rows (a Blur game's
-// image and guessed names) and, once they solved it, gave up or ran out of tries, the answer.
+// image or a Sequence game's photos, and guessed names) and, once they solved it, gave up or ran out of tries, the answer.
 import { useState } from "react";
 import { GuessRow, TitleRow } from "../../components/board.tsx";
-import { BlurGuesses, BlurView } from "../../components/blur-view.tsx";
+import { BlurGuesses } from "../../components/blur-view.tsx";
+import { AnswerImage } from "../play/play-results.tsx";
+import { isImageGame } from "../../game/blur.ts";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
 import {
@@ -15,6 +17,9 @@ import {
 import type { LiveRound, PartyView } from "../../game/party.ts";
 import { GuessForm, useGuessMode } from "../play/guess-form.tsx";
 import { SelectList } from "../play/select-list.tsx";
+import type { HintKind } from "../../game/free-hint.ts";
+import { FreeHintCard } from "../play/free-hint.tsx";
+import { AnswerDescription } from "../play/result-banner.tsx";
 
 type Board = NonNullable<LiveRound["yours"]>;
 
@@ -24,6 +29,7 @@ export function PartyRound({
   mine,
   onGuess,
   onGiveUp,
+  onHint,
   onNotice,
 }: {
   view: PartyView;
@@ -32,6 +38,7 @@ export function PartyRound({
   // False when the socket is down and the guess was not sent
   onGuess: (entryId: number) => boolean;
   onGiveUp: () => void;
+  onHint: (kind: HintKind) => void;
   onNotice: (text: string | null) => void;
 }) {
   const [guess, setGuess] = useState("");
@@ -41,7 +48,8 @@ export function PartyRound({
   const listing = modes.selecting && !done;
   const entries = view.game.entries;
   const used = guessedNames(mine.rows);
-  const blur = view.game.kind === "blur" ? (view.game.blurTries ?? 1) : null;
+  // A Blur or Sequence game's tries
+  const blur = isImageGame(view.game.kind) ? (view.game.blurTries ?? 1) : null;
   const newestFirst = [...mine.rows].reverse();
   const unguessed = entries.filter((e) => !used.has(e.name));
   const names = unguessed.map((e) => e.name);
@@ -93,14 +101,18 @@ export function PartyRound({
                 The answer is {mine.answer.name}. Waiting for the others to
                 finish.
               </span>
+              {mine.answer.description && (
+                <AnswerDescription text={mine.answer.description} />
+              )}
             </div>
           </div>
         )}
       </div>
       {blur !== null && (
-        <BlurView
-          boardUrl={(n) =>
-            `/api/parties/${encodeURIComponent(view.code)}/blur/${round.number}/${n}`
+        <AnswerImage
+          kind={view.game.kind}
+          url={(path, n) =>
+            `/api/parties/${encodeURIComponent(view.code)}/${path}/${round.number}/${n}`
           }
           tries={blur}
           wrong={mine.rows.filter((row) => !isAnswerRow(row)).length}
@@ -129,6 +141,13 @@ export function PartyRound({
             </Button>
           </div>
         </Card>
+      )}
+      {blur === null && (
+        <FreeHintCard
+          hint={mine.hint}
+          hints={done ? undefined : mine.hints}
+          onTake={onHint}
+        />
       )}
       {listing && (
         <SelectList

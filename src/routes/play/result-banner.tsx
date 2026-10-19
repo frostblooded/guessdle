@@ -7,13 +7,20 @@ export type Result = {
   answer: string;
   // A Blur game's answer image, which its roster does not carry
   photo?: string | undefined;
+  // The answer's description, when it has one
+  description?: string | undefined;
 } | null;
 
 // The result a finished day's response reveals
 export const resultOf = (
   kind: NonNullable<Result>["kind"],
   reveal: Reveal,
-): Result => ({ kind, answer: reveal.answer!, photo: reveal.answerPhoto });
+): Result => ({
+  kind,
+  answer: reveal.answer!,
+  photo: reveal.answerPhoto,
+  description: reveal.answerDescription,
+});
 
 const TITLES = {
   victory: "You did it!",
@@ -21,7 +28,19 @@ const TITLES = {
   lost: "Out of tries",
 } as const;
 
-// The result card above the guesses: the answer's photo and name
+// An entry's description under its name once it is revealed, line breaks kept
+export function AnswerDescription({ text }: { text: string }) {
+  return (
+    <p
+      id="answer-description"
+      className="text-sm whitespace-pre-line break-words text-foreground"
+    >
+      {text}
+    </p>
+  );
+}
+
+// The result card above the guesses: the answer's photo, name and description
 export function ResultBanner({
   result,
   roster,
@@ -59,6 +78,7 @@ export function ResultBanner({
             {result.answer}
           </span>
         </span>
+        {result.description && <AnswerDescription text={result.description} />}
       </div>
     </div>
   );

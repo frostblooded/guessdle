@@ -7,12 +7,14 @@ export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 // Entry photos are square (guess cells, result card); covers are the gallery banner's 16:7
 export const UPLOAD_SHAPES = {
   photo: { aspect: 1, maxSide: 800 },
+  // Sequence games: the wide photos players see one at a time (ADR 0020)
+  shot: { aspect: 16 / 9, maxSide: 1280 },
   cover: { aspect: 16 / 7, maxSide: 1200 },
 } as const;
 
 export type ImageKind = keyof typeof UPLOAD_SHAPES;
 export const isImageKind = (value: unknown): value is ImageKind =>
-  value === "photo" || value === "cover";
+  value === "photo" || value === "shot" || value === "cover";
 
 export interface Size {
   width: number;

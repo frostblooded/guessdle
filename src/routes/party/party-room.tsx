@@ -16,11 +16,8 @@ import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
 import { Input, Label } from "../../components/ui/input.tsx";
 import { MAX_NICKNAME } from "../../game/limits.ts";
-import {
-  REFUSAL_TEXT,
-  type ClientMessage,
-  type PartyView,
-} from "../../game/party.ts";
+import type { ClientMessage, PartyView } from "../../game/party.ts";
+import { REFUSAL_TEXT } from "../../game/party-text.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { cn } from "../../lib/utils.ts";
 import { api, errorText } from "../../manage-client.ts";
@@ -315,6 +312,7 @@ export function PartyRoom({ code }: { code: string }) {
             mine={mine}
             onGuess={(entryId) => send({ type: "guess", entryId })}
             onGiveUp={() => send({ type: "give-up" })}
+            onHint={(kind) => send({ type: "hint", kind })}
             onNotice={setNotice}
           />
         )}

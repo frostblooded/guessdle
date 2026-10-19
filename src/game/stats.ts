@@ -37,6 +37,9 @@ export interface DayStats {
   // Percent of the other winners who took more guesses / longer; null with no one to compare to
   fewerGuessesThan: number | null;
   fasterThan: number | null;
+  // The player's first attempt today ended without a win (a give-up or out of tries), so
+  // no later win that day counts; `you` is then null
+  firstTryFailed?: true;
 }
 
 export const guessBar = (guesses: number): number =>

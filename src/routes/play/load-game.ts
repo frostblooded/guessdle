@@ -15,10 +15,10 @@ export type PlayableGame = {
   // Some entries miss values, so the game cannot be played for now
   paused: boolean;
   kind: GameKind;
-  // Blur games: tries per day
+  // Blur and Sequence games: tries per day
   blurTries?: number;
   attributes: GameAttribute[];
-  // A Blur game's entries come without photos; a Quiz game has none
+  // A Blur or Sequence game's entries come without photos; a Quiz game has none
   entries: EntryRef[];
   // Quiz games: the questions, without their answers
   questions?: QuizQuestion[];

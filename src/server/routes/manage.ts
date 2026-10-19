@@ -23,7 +23,7 @@ import {
 } from "../attributes.ts";
 import { createGame, listOwned } from "../games.ts";
 import { rateLimit, type RateLimit } from "../rate-limit.ts";
-import { isGameKind } from "../../game/blur.ts";
+import { isGameKind, isImageGame } from "../../game/blur.ts";
 import {
   bodyOf,
   fail,
@@ -96,6 +96,10 @@ export function manageRoutes(
   app.post("/api/games", writes, json, async (req, res) => {
     const user = await needUser(req, res);
     if (!user) {
+      return;
+    }
+    if (user.banned) {
+      fail(res, "banned");
       return;
     }
     const { name, slug, kind = "classic" } = bodyOf(req);
@@ -307,7 +311,7 @@ export function manageRoutes(
       const patch = parseGamePatch(
         body,
         Math.max(0, roster.entries.length - 1),
-        game.kind === "blur",
+        isImageGame(game.kind),
       );
       if (!patch || (await edits.patch(game, user, patch)) !== "ok") {
         fail(res, "invalid");

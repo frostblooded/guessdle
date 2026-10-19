@@ -1,15 +1,25 @@
-// Admin Users tab: every account, with promote/demote and delete.
+// Admin Users tab: every account, with promote/demote, ban/unban and delete.
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogTitle,
+} from "../../components/ui/alert-dialog.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Badge } from "../../components/ui/badge.tsx";
 import { Button } from "../../components/ui/button.tsx";
+import { Label, Textarea } from "../../components/ui/input.tsx";
 import {
   Table,
   TableCell,
   TableHead,
   TableRow,
 } from "../../components/ui/table.tsx";
+import { MAX_REASON } from "../../game/limits.ts";
 import { getJson } from "../../lib/api.ts";
 import { useDelayed } from "../../lib/use-delayed.ts";
 import { api } from "../../manage-client.ts";
@@ -20,12 +30,16 @@ interface AdminUser {
   email: string;
   lastSeen: string;
   admin: boolean;
+  banned: boolean;
+  banReason: string;
 }
 
 const LOAD_FAILED =
   "Could not load the users. Your connection or the server may be failing, or your admin session may have ended. Reload the page and try again.";
 const ROLE_FAILED =
   "Could not change that role. The server refused it (you cannot remove your own admin rights or the last admin) or failed. Reload the list to see the current roles.";
+const BAN_FAILED =
+  "Could not change that ban. The server refused it (you cannot ban yourself or an admin) or failed. Reload the list to check, then try again.";
 const DELETE_FAILED =
   "Could not delete that user. The server refused it (you cannot delete your own account) or failed. Reload the list to check, then try again.";
 
@@ -50,8 +64,9 @@ export function UsersPanel({ active }: { active: boolean }) {
     user: AdminUser,
     failed: string,
     body?: unknown,
+    path = "",
   ): Promise<void> => {
-    const out = await api(method, `/api/admin/users/${user.id}`, body);
+    const out = await api(method, `/api/admin/users/${user.id}${path}`, body);
     if (out?.status !== 200) {
       setFailed(failed);
       return;
@@ -100,6 +115,16 @@ export function UsersPanel({ active }: { active: boolean }) {
                 >
                   {user.admin ? "admin" : "player"}
                 </Badge>
+                {user.banned && (
+                  <Badge
+                    className="tag ml-1"
+                    data-tag="banned"
+                    variant="error"
+                    title={user.banReason}
+                  >
+                    banned
+                  </Badge>
+                )}
               </TableCell>
               <TableCell>
                 <span className="flex justify-end gap-2">
@@ -109,7 +134,9 @@ export function UsersPanel({ active }: { active: boolean }) {
                     variant="outline"
                     size="sm"
                     disabled={
-                      user.admin && (user.id === data.self || admins <= 1)
+                      user.admin
+                        ? user.id === data.self || admins <= 1
+                        : user.banned
                     }
                     onClick={() =>
                       void act("PUT", user, ROLE_FAILED, {
@@ -119,6 +146,26 @@ export function UsersPanel({ active }: { active: boolean }) {
                   >
                     {user.admin ? "DEMOTE" : "PROMOTE"}
                   </Button>
+                  {user.banned ? (
+                    <Button
+                      className="user-unban"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        void act("DELETE", user, BAN_FAILED, {}, "/ban")
+                      }
+                    >
+                      UNBAN
+                    </Button>
+                  ) : (
+                    <BanButton
+                      user={user}
+                      disabled={user.admin}
+                      onBan={(reason) =>
+                        act("PUT", user, BAN_FAILED, { reason }, "/ban")
+                      }
+                    />
+                  )}
                   <Button
                     className="user-delete"
                     variant="destructive"
@@ -143,5 +190,76 @@ export function UsersPanel({ active }: { active: boolean }) {
         </tbody>
       </Table>
     </div>
+  );
+}
+
+// Ban asks for the reason the player will see on every page; it cannot be left empty
+function BanButton({
+  user,
+  disabled,
+  onBan,
+}: {
+  user: AdminUser;
+  disabled: boolean;
+  onBan: (reason: string) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const ban = async (event: FormEvent): Promise<void> => {
+    event.preventDefault();
+    const text = reason.trim();
+    if (text === "") {
+      return;
+    }
+    setOpen(false);
+    await onBan(text);
+    setReason("");
+  };
+  return (
+    <>
+      <Button
+        className="user-ban"
+        variant="outline"
+        size="sm"
+        disabled={disabled}
+        onClick={() => setOpen(true)}
+      >
+        BAN
+      </Button>
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <form className="grid gap-4" onSubmit={(e) => void ban(e)}>
+            <AlertDialogTitle>{`Ban ${user.email}?`}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Their games are hidden from other players and they cannot create
+              or change games, but they can still sign in and play. They see
+              this reason on every page. Unban restores everything.
+            </AlertDialogDescription>
+            <div className="grid gap-2">
+              <Label htmlFor={`ban-reason-${user.id}`}>Reason</Label>
+              <Textarea
+                id={`ban-reason-${user.id}`}
+                className="ban-reason"
+                required
+                maxLength={MAX_REASON}
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+              />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+              <Button
+                type="submit"
+                variant="destructive"
+                className="ban-confirm"
+                disabled={reason.trim() === ""}
+              >
+                Ban player
+              </Button>
+            </AlertDialogFooter>
+          </form>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

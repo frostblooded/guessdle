@@ -10,12 +10,16 @@ export interface EntryRow {
   name: string;
   // Blur games only: the entry's image (a classic entry's pictures are Image values)
   photo: string;
+  // Optional text shown once the entry is revealed as the answer
+  description: string;
   // Attribute id to its items (Text has at most one; empty means no value)
   values: Record<string, string[]>;
   // Blur games only: the order the grid's squares clear in, once picked
   blurOrder?: number[] | null;
   // Quiz games only: the question's answer (its text is the name, its picture the photo)
   quiz?: QuizSpec | null;
+  // Sequence games only: the photos in order, "" for a slot not uploaded yet
+  shots?: string[];
 }
 
 export async function listEntries(
@@ -26,21 +30,24 @@ export async function listEntries(
     id: number;
     name: string;
     photo: string;
+    description: string;
     values: Record<string, string[]> | null;
     blurOrder: number[] | null;
+    shots: string[];
     quiz: QuizSpec | null;
   }>(
-    `select e.id::int, e.name, e.photo_url as photo, e.blur_order::int[] as "blurOrder", e.quiz,
+    `select e.id::int, e.name, e.photo_url as photo, e.description, e.blur_order::int[] as "blurOrder", e.shots, e.quiz,
        (select jsonb_object_agg(attribute_id, items) from (
           select attribute_id, jsonb_agg(value order by position) as items
           from entry_values where entry_id = e.id group by attribute_id) v) as values
      from entries e where e.game_id = $1 and e.deleted_at is null order by e.id`,
     [game.id],
   );
-  return rows.map(({ blurOrder, quiz, ...r }) => ({
+  return rows.map(({ blurOrder, shots, quiz, ...r }) => ({
     ...r,
     values: r.values ?? {},
     ...(game.kind === "blur" && { blurOrder }),
+    ...(game.kind === "sequence" && { shots }),
     ...(game.kind === "quiz" && { quiz }),
   }));
 }
@@ -48,16 +55,19 @@ export async function listEntries(
 export interface EntryInput {
   name?: string;
   photo?: string;
+  description?: string;
   values?: Record<string, string[]>;
   blurOrder?: number[];
   quiz?: QuizSpec;
+  shots?: string[];
 }
 
 // Creates the entry (`id` undefined) or changes it. Every attribute but Image needs a value once
 // saved, from the input or already stored; Number values are stored as parseNumberValue gives
 // them, an Image value is one upload URL. A Blur game's entry instead needs its photo and a
-// complete square order, sent or stored. A Quiz question needs its answer (quiz), sent or stored,
-// may share its text with another and may have a picture; only Blur and Quiz entries have a photo.
+// complete square order, sent or stored; only Blur and Quiz entries have a photo. A Sequence entry needs
+// only its name: one missing photos just cannot be the answer. A Quiz question needs its answer
+// (quiz), sent or stored, may share its text with another and may have a photo.
 // Runs in the caller's game transaction (lifecycle.edit), which applies the status rule.
 // `replaced` lists the files the edit stopped using, for the caller to release.
 export async function saveEntry(
@@ -79,10 +89,12 @@ export async function saveEntry(
     await tx.query<{
       name: string;
       photo: string;
+      description: string;
       blurOrder: number[] | null;
+      shots: string[];
       quiz: QuizSpec | null;
     }>(
-      `select name, photo_url as photo, blur_order::int[] as "blurOrder", quiz from entries
+      `select name, photo_url as photo, description, blur_order::int[] as "blurOrder", shots, quiz from entries
        where id = $1 and game_id = $2 and deleted_at is null`,
       [id ?? 0, game.id],
     )
@@ -92,6 +104,7 @@ export async function saveEntry(
   }
   const name = input.name ?? current?.name ?? "";
   const photo = input.photo ?? current?.photo ?? "";
+  const description = input.description ?? current?.description ?? "";
   const clash = await tx.query(
     `select 1 from entries where game_id = $1 and deleted_at is null and id <> $2
        and lower(name) = lower($3)`,
@@ -126,7 +139,11 @@ export async function saveEntry(
   if (!attrs.every((a) => a.type === "image" || filled(String(a.id)))) {
     return "missing_values";
   }
-  if (game.kind === "classic" && input.photo !== undefined) {
+  if (
+    game.kind !== "blur" &&
+    game.kind !== "quiz" &&
+    input.photo !== undefined
+  ) {
     return "invalid";
   }
   if (game.kind !== "quiz" && input.quiz !== undefined) {
@@ -144,18 +161,22 @@ export async function saveEntry(
   } else if (input.blurOrder !== undefined) {
     return "invalid";
   }
+  if (input.shots !== undefined && game.kind !== "sequence") {
+    return "invalid";
+  }
+  const shots = input.shots ?? current?.shots ?? [];
   let entryId = id;
   if (entryId === undefined) {
     entryId = (
       await tx.query<{ id: number }>(
-        "insert into entries (game_id, name, photo_url) values ($1, $2, $3) returning id::int",
-        [game.id, name, photo],
+        "insert into entries (game_id, name, photo_url, description, shots) values ($1, $2, $3, $4, $5) returning id::int",
+        [game.id, name, photo, description, shots],
       )
     ).rows[0]!.id;
   } else {
     await tx.query(
-      "update entries set name = $2, photo_url = $3 where id = $1",
-      [entryId, name, photo],
+      "update entries set name = $2, photo_url = $3, description = $4, shots = $5 where id = $1",
+      [entryId, name, photo, description, shots],
     );
   }
   if (input.quiz !== undefined) {
@@ -192,11 +213,13 @@ export async function saveEntry(
       [entryId, attrId, items],
     );
   }
+  const before = current ? [current.photo, ...current.shots] : [];
+  const after = new Set([photo, ...shots]);
   return {
     id: entryId,
     replaced: [
       ...replaced,
-      ...(current && current.photo !== photo ? [current.photo] : []),
+      ...before.filter((url) => url !== "" && !after.has(url)),
     ],
   };
 }

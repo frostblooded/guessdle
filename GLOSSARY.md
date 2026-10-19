@@ -14,16 +14,19 @@ An Admin's sign-off that lets a Game appear in the front-page gallery. Unapprove
 The signed-in user who created a Game. Owners and Admins edit the Game, set its Overrides, submit, unpublish and delete it. Deleting a user deletes their Games.
 
 **Kind**:
-A Game is **Classic** (guessed by comparing Attributes), **Blur** (guessed from a blurred image) or **Quiz** (questions answered for a score, no daily answer; ADR 0020). Chosen when the Game is created; it never changes.
+A Game is **Classic** (guessed by comparing Attributes), **Blur** (guessed from a blurred image), **Sequence** (guessed from a series of photos shown one at a time) or **Quiz** (questions answered for a score, no daily answer; ADR 0021). Chosen when the Game is created; it never changes.
 
 **Square Order**:
 The order a Blur Game Entry's nine image squares clear in, picked by the Owner. Only the first square is clear at first; each wrong Guess clears the next. The Game sets the tries (1 to 9): a wrong Guess on the last one loses the day.
+
+**Shots**:
+A Sequence Game Entry's photos, in the order players see them; the Game sets how many (1 to 9, 6 at first). The first shows at the start and each wrong Guess or skip shows the next. An Entry missing some can be guessed but is never a Daily Answer.
 
 **Draft**:
 A Game's first status. Only its Owner and Admins can see it (everyone else gets a 404) until it is submitted. Statuses: draft, pending, approved, rejected.
 
 **Entry**:
-One item in a Game's Roster: a name and a value per Attribute (a Blur game's Entry: a name, an image and a square order; a Quiz game's Entry is a Question). Pictures are Image Attribute values; an Entry's photo, where one picture stands for it (guess suggestions, the result card, party rounds), is its first non-blank Image value. Replaces "Pet" (the old Petdle word). Entry ids are numeric and never reused. Deleting an Entry is soft: it leaves autocomplete and future draws, but past Guesses and Daily Answers still resolve.
+One item in a Game's Roster: a name, a value per Attribute and an optional **Description** (a Blur game's Entry: a name, an image, a square order and the Description; a Quiz game's Entry is a Question). The Description (up to 500 characters, any Kind) shows with the answer once it is revealed (a win, a give-up, or a Blur Game's last try); a missing one never pauses a Game. Pictures are Image Attribute values; an Entry's photo, where one picture stands for it (guess suggestions, the result card, party rounds), is its first non-blank Image value. Replaces "Pet" (the old Petdle word). Entry ids are numeric and never reused. Deleting an Entry is soft: it leaves autocomplete and future draws, but past Guesses and Daily Answers still resolve.
 
 **Roster**:
 The list of a Game's active Entries. A Game is playable with at least 2.
@@ -49,20 +52,26 @@ A compared property of an Entry, such as colors or owners, defined per Game. Typ
 **Correctness**:
 How well one attribute of a guess matches the Daily Answer: correct, partially correct, or incorrect. Text: correct only on an exact match. List: correct on the same set, partially correct when at least one value is shared, otherwise incorrect. Number: correct on the same value, otherwise incorrect with a **Hint** (↑ the answer is higher, ↓ lower). Empty equals empty. Grades are never stored, so a schema edit regrades live.
 
+**Free Hint**:
+In a Classic Game, after 3 wrong Guesses a player may reveal one thing about the answer, once per day (or Party Round): either the answer's value for one Attribute drawn at random from those no Guess has matched yet (an Attribute the answer has no value for is never drawn), or the answer's Description, when it has one. It is free: stats and Placement Points ignore it. It is part of the Game State and is forgotten on reset. Not the same as a Number column's **Hint** arrow.
+
 **Game State**:
-What is remembered about today: the Guesses made (as Entry ids), whether the player gave up, and the day last played. Anonymous players keep it in the browser (`localStorage`). Signed-in players keep it on the server, so it follows them across devices. Victory is never stored: it is derived from the Guesses and the current Daily Answer. It resets on a new calendar day, or when the player resets at any time once they have made a Guess (the Daily Answer stays the same). On first login, leftover browser guesses are merged into the account only if the account has no progress that day; otherwise the server state wins.
+What is remembered about today: the Guesses made (as Entry ids), whether the player gave up, the Free Hint used, and the day last played. Anonymous players keep it in the browser (`localStorage`). Signed-in players keep it on the server, so it follows them across devices. Victory is never stored: it is derived from the Guesses and the current Daily Answer. It resets on a new calendar day, or when the player resets at any time once they have made a Guess (the Daily Answer stays the same). On first login, leftover browser guesses are merged into the account only if the account has no progress that day; otherwise the server state wins.
 
 **Day of play**:
 One Game on one day, today or a Past Day, together with that day's Daily Answer: what Guesses are graded against, what a finished day reveals, and whose stats a first win counts in.
 
 **Past Day**:
-An earlier day of a Game (Day Number 0 up to yesterday), played from the Past days list at `/g/<slug>/day/<n>` against that day's stored Daily Answer. Each Past Day keeps its own Game State, which never expires: signed in on the server, anonymous in the browser. A finished Past Day can be reset like today. The first win on a Past Day counts in that day's stats, as if played on the day (decided 2026-10-18); later wins after a reset change nothing. Browser guesses of a Past Day are never merged into the account.
+An earlier day of a Game (Day Number 0 up to yesterday), played from the Past days list at `/g/<slug>/day/<n>` against that day's stored Daily Answer. Each Past Day keeps its own Game State, which never expires: signed in on the server, anonymous in the browser. A finished Past Day can be reset like today. The first win on a Past Day counts in that day's stats, as if played on the day (decided 2026-10-18); later wins after a reset change nothing, and so do wins after a first attempt that failed (a give-up or used-up tries). Browser guesses of a Past Day are never merged into the account.
 
 **Override**:
 An Owner's or Admin's choice of Daily Answer for today or a future day, replacing the generated one. Past days cannot be overridden. Setting or clearing an Override re-draws every later generated day; overridden days are never re-drawn. When it changes today's answer, every player starts today over and today's stats are wiped.
 
 **Admin**:
 A signed-in user with the admin flag. Admins get an Admin link in the account menu and use the admin page (`/admin`): the approval queue, all Games, users (promote or demote, never oneself or the last Admin) and backups. They can also edit any Game. Emails in `ADMIN_EMAILS` become Admins on login.
+
+**Ban**:
+An Admin's block on a player, set with a reason from the Users tab and lifted by Unban, which restores everything. A banned player still signs in and plays, sees the reason in a banner on every page, and keeps seeing their own Games and Playlists, but cannot create or change any. Everyone else (Admins aside) sees neither, and their wins leave other players' stats. Admins cannot be banned, and a banned player cannot be promoted.
 
 **Day Number**:
 Whole calendar days since the game's start date. The start date itself is day 0. Each Day Number maps to exactly one Daily Answer.

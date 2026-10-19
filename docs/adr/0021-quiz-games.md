@@ -1,10 +1,10 @@
-# 0020: Quiz games
+# 0021: Quiz games
 
 Status: accepted.
 
 A third kind of game: a normal quiz the owner writes on the site and players take. Unlike the other kinds there is no daily answer to guess. Settled with the maintainer one question at a time (2026-10-18).
 
-- **Kind**: `games.kind = 'quiz'`, picked on the create page and never changed (migration 018). A Quiz game has no attributes, no daily answers and no skip period; the editor shows a Questions tab instead of Attributes, Entries and Answers.
+- **Kind**: `games.kind = 'quiz'`, picked on the create page and never changed (migration 022). A Quiz game has no attributes, no daily answers and no skip period; the editor shows a Questions tab instead of Attributes, Entries and Answers.
 - **Questions**: each question is an entry (its text in `name`, up to 300 characters and not unique; an optional picture in `photo_url`, uploaded like an entry photo) with its answer in `entries.quiz`. Questions play in the order they were added (by id). A quiz plays with one question (`minEntriesOf`). A question cannot be saved without its answer (`missing_answer`), so a quiz never pauses.
 - **Answers**: multiple choice (`{"options": [...], "correct": n}`, 2 to 6 options that differ ignoring case, one right) or a number (`{"answer": "1989", "range": "10"}`). A choice scores 1 or 0. A number scores 1 when exact, falling in a straight line to 0 at `range` away (0: exact only), in hundredths (`scoreAnswer`, `src/game/quiz.ts`).
 - **Solo play**: no days and no past days (every day route is a 404 `no_such_day`). The player answers every question, going back and forth freely, then sees the score and a review with the right answers; nothing shows right or wrong before the end. `GET /api/games/:slug` sends `questions` without their answers; `POST /api/games/:slug/quiz {answers, seconds, player}` grades everything on the server (ADR 0010), so the answers never reach the browser before the quiz is finished. A question left blank scores 0.

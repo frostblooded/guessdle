@@ -1,8 +1,8 @@
--- Quiz games (ADR 0020): the owner writes questions, each one an entry (its text in name, an
+-- Quiz games (ADR 0021): the owner writes questions, each one an entry (its text in name, an
 -- optional picture in photo_url) with a spec in quiz: {"options": [...], "correct": n} for
 -- multiple choice, or {"answer": "12.5", "range": "5"} for a number scored by closeness.
 alter table games drop constraint games_kind_check;
-alter table games add constraint games_kind_check check (kind in ('classic', 'blur', 'quiz'));
+alter table games add constraint games_kind_check check (kind in ('classic', 'blur', 'sequence', 'quiz'));
 alter table entries add column quiz jsonb;
 
 -- Each player's first score on a quiz, the one its stats count. `player` is "user:<id>" or

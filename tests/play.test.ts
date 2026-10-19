@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { FAILURES, UNREACHABLE } from "../src/game/failures.ts";
 import { beforeEach, describe, it } from "vitest";
+import { hintChoices } from "../src/game/free-hint.ts";
 import { gradeIds } from "../src/game/game.ts";
 import type { StateStorage } from "../src/game/game-state.ts";
 import { createPlay, type Loaded, type LoadFailure } from "../src/game/play.ts";
@@ -32,10 +33,13 @@ class FakeServer {
   requests: number[][] = [];
 
   giveUps: number = 0;
+  hints: { ids: number[]; kind: string }[] = [];
   urls: string[] = [];
+  bodies: unknown[] = [];
 
   fetch: Fetch = async (fullUrl, init) => {
     this.urls.push(fullUrl);
+    this.bodies.push(JSON.parse(init!.body));
     // A past day's query; this fake grades every day the same
     const url = fullUrl.replace(/\?day=\d+$/, "");
     assert.equal(init?.method, "POST");
@@ -52,6 +56,20 @@ class FakeServer {
           day: this.day,
           revision: this.revision,
           answer: answer.name,
+        }),
+      };
+    }
+    if (url === `/api/games/${SLUG}/hint`) {
+      this.hints.push(
+        JSON.parse(init!.body) as { ids: number[]; kind: string },
+      );
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          day: this.day,
+          revision: this.revision,
+          hint: { kind: "attribute", attribute: "Owner", value: "Niki" },
         }),
       };
     }
@@ -75,6 +93,9 @@ class FakeServer {
         rows: graded.rows,
         victory: graded.victory,
         ...(graded.victory && { answer: answer.name }),
+        ...(!graded.victory && {
+          hints: hintChoices(ATTRIBUTES, answer, graded.rows) ?? undefined,
+        }),
       }),
     };
   };
@@ -396,6 +417,34 @@ describe("giveUp", () => {
   });
 });
 
+describe("player token", () => {
+  it("goes with every grade and give-up, so a failed first try is recorded", async () => {
+    const play = createPlay({
+      slug: SLUG,
+      roster: GUESS_DATA,
+      storage,
+      now: () => MONDAY,
+      fetch: server.fetch,
+      player: "token-0000-0000-0000",
+    });
+    await play.submit(one!.id);
+    await play.giveUp();
+    await loadedOf(play);
+    assert.ok(server.bodies.length >= 3);
+    for (const body of server.bodies) {
+      assert.equal(
+        (body as { player?: string }).player,
+        "token-0000-0000-0000",
+      );
+    }
+  });
+
+  it("is left out when the page has none", async () => {
+    await open().giveUp();
+    assert.deepEqual(server.bodies, [{}]);
+  });
+});
+
 describe("reset", () => {
   it("after a win clears guesses and allows replay", async () => {
     const play = open();
@@ -518,5 +567,55 @@ describe("a past day", () => {
     assert.equal(storage.getItem("victory"), "true");
     play.reset();
     assert.equal(storage.getItem("victory"), null);
+  });
+});
+
+describe("takeHint", () => {
+  const OWNER = { kind: "attribute", attribute: "Owner", value: "Niki" };
+
+  it("is offered after 3 wrong guesses", async () => {
+    const play = open();
+    await play.submit(one!.id);
+    const second = await play.submit(two!.id);
+    assert.ok(second.kind === "accepted" && second.hints === undefined);
+    const third = await play.submit(three!.id);
+    assert.ok(third.kind === "accepted");
+    assert.deepEqual(third.hints, { attribute: true, description: false });
+  });
+
+  it("sends the guesses and the kind, keeps the hint and stops the offer", async () => {
+    const play = open();
+    for (const entry of [one!, two!, three!]) {
+      await play.submit(entry.id);
+    }
+    const res = await play.takeHint("attribute");
+    assert.deepEqual(res, { kind: "hint", hint: OWNER });
+    assert.deepEqual(server.hints, [
+      { ids: [one!.id, two!.id, three!.id], kind: "attribute" },
+    ]);
+    assert.deepEqual(JSON.parse(storage.getItem("hint")!), OWNER);
+    const next = await play.submit(GUESS_DATA[4]!.id);
+    assert.ok(next.kind === "accepted" && next.hints === undefined);
+  });
+
+  it("is restored on load without the offer", async () => {
+    const play = open();
+    for (const entry of [one!, two!, three!]) {
+      await play.submit(entry.id);
+    }
+    await play.takeHint("attribute");
+    const loaded = await loadedOf(open());
+    assert.deepEqual(loaded.hint, OWNER);
+    assert.equal(loaded.hints, undefined);
+  });
+
+  it("is forgotten on reset", async () => {
+    const play = open();
+    for (const entry of [one!, two!, three!]) {
+      await play.submit(entry.id);
+    }
+    await play.takeHint("attribute");
+    play.reset();
+    assert.equal(storage.getItem("hint"), null);
   });
 });

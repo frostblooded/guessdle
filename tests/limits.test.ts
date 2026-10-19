@@ -43,6 +43,10 @@ describe("limits shared with the pages", () => {
       maxlengthOf("src/routes/edit/entries-panel.tsx", "entry-name"),
       limits.MAX_ENTRY_NAME,
     );
+    assert.equal(
+      maxlengthOf("src/routes/edit/entries-panel.tsx", "entry-description"),
+      limits.MAX_DESCRIPTION,
+    );
   });
   it("derives the slug rules from the limits", () => {
     assert.equal(
@@ -55,7 +59,7 @@ describe("limits shared with the pages", () => {
   });
   it("says the entry minimum in the editor copy from the shared limit", () => {
     assert.match(
-      text("src/routes/edit/entries-panel.tsx"),
+      text("src/routes/edit/entries-lede.tsx"),
       /at least(\{" "\})?\s+\{MIN_ENTRIES\}(\{" "\})?\s+entries/,
     );
   });

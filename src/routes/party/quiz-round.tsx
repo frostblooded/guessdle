@@ -1,4 +1,4 @@
-// A live party round of a Quiz game (ADR 0020): the question, and the viewer's one answer.
+// A live party round of a Quiz game (ADR 0021): the question, and the viewer's one answer.
 // Whether it was right shows once the round ends.
 import { useState } from "react";
 import { Button } from "../../components/ui/button.tsx";

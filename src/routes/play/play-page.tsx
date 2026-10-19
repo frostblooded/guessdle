@@ -3,7 +3,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { Navigate, useParams } from "react-router";
-import { BlurView } from "../../components/blur-view.tsx";
 import { PageHead } from "../../components/page.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
@@ -23,13 +22,16 @@ import {
   RATE_LIMITED,
   refusalText,
   type GiveUpResult,
+  type HintResult,
   type Loaded,
   type Play,
   type SubmitResult,
 } from "../../game/play.ts";
-import { minEntriesOf } from "../../game/blur.ts";
+import { isImageGame, minEntriesOf } from "../../game/blur.ts";
 import { browserFetch, gameKey, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
+import { FreeHintCard } from "./free-hint.tsx";
+import { useFreeHint } from "./use-free-hint.ts";
 import { GuessForm, useGuessMode } from "./guess-form.tsx";
 import {
   GameNotFound,
@@ -37,7 +39,7 @@ import {
   PastDayLede,
   PastDaysLink,
 } from "./past-day.tsx";
-import { boardUrl, PlayResults } from "./play-results.tsx";
+import { AnswerImage, answerImageUrl, PlayResults } from "./play-results.tsx";
 import { loadGame } from "./load-game.ts";
 import { PlayActions, PlayStatus } from "./play-status.tsx";
 import { ResetDialog } from "./reset-dialog.tsx";
@@ -60,7 +62,9 @@ const finishedResult = (loaded: Loaded): Result =>
     : null;
 
 // The notice a guess or give-up leaves: why it was refused, or none
-const noticeOf = (res: SubmitResult | GiveUpResult): string | null =>
+const noticeOf = (
+  res: SubmitResult | GiveUpResult | HintResult,
+): string | null =>
   res.kind === "rate_limited" || res.kind === "error" ? refusalText(res) : null;
 
 // `day`: a past day's Day Number from the address, or null for today
@@ -103,6 +107,8 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const pastDay = past ? day : undefined;
   // A past day's first win counts in that day's stats, like today's
   const victory = useVictoryStats(slug, play, pastDay);
+  const freeHint = useFreeHint(play, board, (res) => setNotice(noticeOf(res)));
+  const adoptHint = freeHint.adopt;
 
   useTitle(
     game === "missing"
@@ -128,6 +134,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
       return;
     }
     setRows([...loaded.rows].reverse());
+    adoptHint(loaded);
     setResult(finishedResult(loaded));
     setReady(true);
   }
@@ -163,7 +170,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
       play.current = current;
       await showBoard(current);
     })();
-  }, [playable, closed, me.isPending, me.data, slug, day, pastDay]);
+  }, [playable, closed, me.isPending, me.data, slug, day, pastDay, adoptHint]);
 
   async function submit(name: string): Promise<void> {
     const id = findEntryId(roster, name);
@@ -200,6 +207,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
     if (rows.length === 0) {
       victory.startClock();
     }
+    freeHint.offer(res.hints);
     if (res.answer !== undefined && (res.isAnswer || res.lost)) {
       setResult(resultOf(res.isAnswer ? "victory" : "lost", res));
       if (res.isAnswer) {
@@ -236,13 +244,8 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   if (game === "missing") {
     return <GameNotFound />;
   }
-  // A quiz has no days: its own page, whatever day the address names
   if (playable?.kind === "quiz") {
-    return day === null ? (
-      <QuizPlay slug={slug} game={playable} />
-    ) : (
-      <Navigate replace to={`/g/${encodeURIComponent(slug)}`} />
-    );
+    return <QuizPlay slug={slug} game={playable} day={day} />;
   }
 
   if (playable && day !== null && !past) {
@@ -267,7 +270,9 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const finished = result !== null;
   // Each row names its guess; those names leave the suggestions
   const used = guessedNames(rows);
-  const blur = playable?.kind === "blur" ? (playable.blurTries ?? 1) : null;
+  // A Blur or Sequence game's tries
+  const blur =
+    playable && isImageGame(playable.kind) ? (playable.blurTries ?? 1) : null;
   const wrong = rows.filter((row) => !isAnswerRow(row)).length;
   const unguessed = roster.filter((entry) => !used.has(entry.name));
   const names = unguessed.map((entry) => entry.name);
@@ -334,9 +339,10 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
         aria-label="Game board"
         aria-busy={isPending || loading ? true : undefined}
       >
-        {blur !== null && ready && (
-          <BlurView
-            boardUrl={(n) => boardUrl(slug, n, board, pastDay)}
+        {blur !== null && ready && playable && (
+          <AnswerImage
+            kind={playable.kind}
+            url={(path, n) => answerImageUrl(path, slug, n, board, pastDay)}
             tries={blur}
             wrong={wrong}
             finished={finished}
@@ -395,6 +401,13 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
           opener={opener}
           past={past}
         />
+        {blur === null && (
+          <FreeHintCard
+            {...freeHint}
+            hints={finished || cannotPlay ? undefined : freeHint.hints}
+            onTake={(kind) => void freeHint.take(kind)}
+          />
+        )}
         {modes.selecting && !finished && !cannotPlay ? (
           <SelectList
             entries={unguessed}

@@ -1,7 +1,8 @@
-// A Quiz game's Play page (ADR 0020): one question at a time, then the score, the review with
+// A Quiz game's Play page (ADR 0021): one question at a time, then the score, the review with
 // the right answers and how everyone's first scores spread. A retake starts over; only the
 // first score counts.
 import { useRef, useState } from "react";
+import { Navigate } from "react-router";
 import { PageHead } from "../../components/page.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
@@ -159,7 +160,16 @@ function Review({
   );
 }
 
-export function QuizPlay({ slug, game }: { slug: string; game: PlayableGame }) {
+// A quiz has no days: its own page, whatever day the address names
+export function QuizPlay({
+  slug,
+  game,
+  day,
+}: {
+  slug: string;
+  game: PlayableGame;
+  day: number | null;
+}) {
   const questions = game.questions ?? [];
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, QuizAnswer>>({});
@@ -170,6 +180,10 @@ export function QuizPlay({ slug, game }: { slug: string; game: PlayableGame }) {
   const started = useRef<number | null>(null);
   const question = questions[index];
   const last = index === questions.length - 1;
+
+  if (day !== null) {
+    return <Navigate replace to={`/g/${encodeURIComponent(slug)}`} />;
+  }
 
   const finish = async (): Promise<void> => {
     setError("");

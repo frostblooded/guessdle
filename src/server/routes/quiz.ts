@@ -1,4 +1,4 @@
-// Taking a Quiz game (ADR 0020): one request grades the whole quiz, records the player's first
+// Taking a Quiz game (ADR 0021): one request grades the whole quiz, records the player's first
 // score and answers with the review and the score spread.
 import express from "express";
 import type { Express } from "express";

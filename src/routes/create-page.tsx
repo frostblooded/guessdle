@@ -23,6 +23,11 @@ const KINDS: { kind: GameKind; title: string; text: string }[] = [
     text: "Players guess from an image split into nine blurred squares that clear one by one.",
   },
   {
+    kind: "sequence",
+    title: "Sequence",
+    text: "Players guess from a series of photos, one more shown after each wrong guess.",
+  },
+  {
     kind: "quiz",
     title: "Quiz",
     text: "Players answer your questions, multiple choice or a number, and get a score at the end.",
@@ -158,7 +163,7 @@ export function CreatePage() {
         title="Create a game"
         lede="Name it now. It starts as a draft only you can see, and you add the rest in the editor."
       />
-      {user && <CreateForm />}
+      {user && !user.banned && <CreateForm />}
     </div>
   );
 }

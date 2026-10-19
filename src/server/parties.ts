@@ -1,8 +1,10 @@
 // Party mode storage and rules (ADR 0016): the one seam between the party routes, the socket hub and the tables.
 import { randomBytes } from "node:crypto";
+import type { HintKind } from "../game/free-hint.ts";
 import type pg from "pg";
 import { MAX_OPEN_PARTIES, MAX_PARTY_PLAYERS } from "../game/limits.ts";
 import { partyView } from "../game/party-view.ts";
+import { isImageGame } from "../game/blur.ts";
 import {
   randomCode,
   type PartyPlayer,
@@ -290,13 +292,24 @@ export async function loadData(q: Q, party: PartyRow): Promise<PartyData> {
     const quiz = quizOf(r);
     return quiz ? { quiz } : {};
   };
+  const hints = await q.query<{
+    roundId: number;
+    playerId: number;
+    kind: HintKind;
+    attribute: string | null;
+  }>(
+    `select h.round_id::int as "roundId", h.player_id::int as "playerId", h.kind, h.attribute
+     from party_hints h join party_rounds r on r.id = h.round_id
+     where r.party_id = $1`,
+    [party.id],
+  );
   return {
     game,
     roster,
     players: players.rows,
     rounds: rounds.rows.map((r) => ({
       ...r,
-      ...(game.kind === "blur" && { tries: game.blurTries }),
+      ...(isImageGame(game.kind) && { tries: game.blurTries }),
       ...(game.kind === "quiz" && quizRound(r)),
       guesses: guesses.rows
         .filter((g) => g.roundId === r.id)
@@ -304,6 +317,15 @@ export async function loadData(q: Q, party: PartyRow): Promise<PartyData> {
       giveUps: giveUps.rows
         .filter((g) => g.roundId === r.id)
         .map(({ playerId, at }) => ({ playerId, at })),
+      hints: hints.rows
+        .filter((h) => h.roundId === r.id)
+        .map(({ playerId, kind, attribute }) => ({
+          playerId,
+          pick:
+            kind === "attribute"
+              ? { kind, attribute: attribute ?? "" }
+              : { kind: "description" as const },
+        })),
     })),
   };
 }
@@ -331,7 +353,7 @@ export async function viewsOf(
           slug: game.slug,
           name: game.name,
           kind: game.kind,
-          ...(game.kind === "blur" && { blurTries: game.blurTries }),
+          ...(isImageGame(game.kind) && { blurTries: game.blurTries }),
           ...(game.kind === "quiz" && { questions: roster.entries.length }),
           guessMode: party.guessMode,
         },

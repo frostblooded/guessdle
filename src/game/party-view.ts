@@ -1,6 +1,12 @@
 // Party mode (ADR 0016): what each phone is sent of a party, built from its players and rounds.
 // A live round shows only counts, a finished round everything.
-import type { GameKind } from "./blur.ts";
+import { isImageGame, type GameKind } from "./blur.ts";
+import {
+  hintChoices,
+  revealHint,
+  type FreeHint,
+  type HintChoices,
+} from "./free-hint.ts";
 import type { GuessMode } from "./guess-mode.ts";
 import type { Correctness } from "./correctness.ts";
 import {
@@ -34,14 +40,14 @@ export interface PartyView {
     slug: string;
     name: string;
     kind: GameKind;
-    // Blur games: tries per round
+    // Blur and Sequence games: tries per round
     blurTries?: number;
     // Quiz games: how many questions there are, one per round
     questions?: number;
     attributes: GameAttribute[];
     // How every player picks a guess, set by the host when opening the party
     guessMode: GuessMode;
-    // A Blur game's entries come without photos
+    // A Blur or Sequence game's entries come without photos; a Quiz game has none
     entries: EntryRef[];
   };
   ended: boolean;
@@ -67,16 +73,24 @@ export interface LiveRound {
     solved: boolean;
     gaveUp: boolean;
     lost: boolean;
-    answer?: EntryRef;
+    answer?: RevealedEntry;
+    // Classic games: the Free Hint the viewer used, or the kinds on offer while unused
+    hint?: FreeHint;
+    hints?: HintChoices;
     // Quiz games: the viewer's answer as text, null before answering
     quizAnswer?: string | null;
   } | null;
 }
 
+// An answer once revealed: the entry and its description, when it has one
+export interface RevealedEntry extends EntryRef {
+  description?: string;
+}
+
 export interface FinishedRound {
   number: number;
   // A Quiz round's question: its text as the name, its picture as the photo
-  answer: EntryRef;
+  answer: RevealedEntry;
   // Quiz games: the right answer
   right?: string;
   results: (RoundResult & {
@@ -107,6 +121,12 @@ export interface ViewInput {
 }
 
 const ref = ({ id, name, photo }: Entry): EntryRef => ({ id, name, photo });
+const revealed = (entry: Entry): RevealedEntry => ({
+  ...ref(entry),
+  // A Sequence entry shows its first photo
+  photo: entry.photo || (entry.shots?.[0] ?? ""),
+  ...(entry.description && { description: entry.description }),
+});
 
 export function partyView(input: ViewInput): PartyView {
   const { attributes, all, players, rounds, viewer } = input;
@@ -122,7 +142,7 @@ export function partyView(input: ViewInput): PartyView {
     round.guesses
       .filter((g) => g.playerId === playerId)
       .map((g) =>
-        g.entryId === SKIP && kind === "blur"
+        g.entryId === SKIP && isImageGame(kind)
           ? skippedRow()
           : gradeGuess(
               attributes,
@@ -136,6 +156,19 @@ export function partyView(input: ViewInput): PartyView {
   let round: LiveRound | null = null;
   if (latest) {
     const mine = me && progressOf(latest, me.id);
+    const answer = entry(latest.answerId);
+    // The Free Hint the viewer used this round, shown against its answer
+    const used =
+      mine && latest.hints?.find((h) => h.playerId === mine.playerId);
+    const hint = used && revealHint(attributes, answer, used.pick);
+    const hints =
+      mine &&
+      kind === "classic" &&
+      latest.endedAt === null &&
+      !isDone(mine) &&
+      !hint
+        ? hintChoices(attributes, answer, graded(latest, mine.playerId))
+        : null;
     // A live Quiz round keeps everyone's points secret
     const quiz = latest.quiz;
     const hide = quiz !== undefined && latest.endedAt === null;
@@ -176,7 +209,9 @@ export function partyView(input: ViewInput): PartyView {
               solved: mine.solved,
               gaveUp: mine.gaveUp,
               lost: mine.lost,
-              ...(isDone(mine) && { answer: ref(entry(latest.answerId)) }),
+              ...(isDone(mine) && { answer: revealed(answer) }),
+              ...(hint && { hint }),
+              ...(hints && { hints }),
             },
     };
   }
@@ -184,7 +219,7 @@ export function partyView(input: ViewInput): PartyView {
     .filter((r) => r.endedAt !== null)
     .map((r): FinishedRound => ({
       number: r.number,
-      answer: ref(entry(r.answerId)),
+      answer: revealed(entry(r.answerId)),
       ...(r.quiz && { right: r.quiz.right }),
       results: roundResults(players, r).map((res) => {
         const answer = r.quiz?.answers.find((a) => a.playerId === res.playerId);

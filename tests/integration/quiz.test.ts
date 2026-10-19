@@ -23,7 +23,7 @@ const NOW = new Date("2026-10-18T10:00:00Z");
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Body = any;
 
-// Quiz games (ADR 0020): questions as entries, the whole quiz graded at once, first scores
+// Quiz games (ADR 0021): questions as entries, the whole quiz graded at once, first scores
 // counted, and one question per party round
 describe("quiz games", () => {
   let db: TestDb;

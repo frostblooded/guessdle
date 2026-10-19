@@ -1,4 +1,4 @@
-// Quiz games (ADR 0020): the owner writes questions in order, each multiple choice or a number
+// Quiz games (ADR 0021): the owner writes questions in order, each multiple choice or a number
 // answer scored by closeness. A player takes the whole quiz and sees the right answers only at
 // the end; a party plays one question per round. Pure, so the server, the editor and Play share it.
 import { MAX_OPTION, MAX_OPTIONS, MIN_OPTIONS } from "./limits.ts";

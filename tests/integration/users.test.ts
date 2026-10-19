@@ -101,6 +101,8 @@ describe("admin Users: list, promote, demote", () => {
     const ann = body.users[0];
     assert.deepEqual(Object.keys(ann).sort(), [
       "admin",
+      "banReason",
+      "banned",
       "email",
       "id",
       "lastSeen",

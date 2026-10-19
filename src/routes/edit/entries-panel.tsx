@@ -1,38 +1,46 @@
 // The editor's Entries tab: list, add, change and delete entries with their values (a Blur
-// entry: its image and square order).
+// entry: its image and square order; a Sequence entry: its photos).
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { CELLS } from "../../game/blur.ts";
+import { CELLS, type GameKind } from "../../game/blur.ts";
 import { FAILURES } from "../../game/failures.ts";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Input, Label, Textarea } from "../../components/ui/input.tsx";
 import {
+  MAX_DESCRIPTION,
   MAX_ENTRY_NAME,
   MAX_LIST_ITEMS,
   MAX_VALUE_LENGTH,
-  MIN_ENTRIES,
 } from "../../game/limits.ts";
 import { api, errorText, type Reply } from "../../manage-client.ts";
-import type { Attribute, Entry } from "./types.ts";
+import { cn } from "../../lib/utils.ts";
+import { isIncomplete, thumbOf, type Attribute, type Entry } from "./types.ts";
 import { ImagePicker, ImageValue, usePhotoUpload } from "./image-value.tsx";
 import { BlurOrderEditor } from "./blur-order-editor.tsx";
+import { EntriesLede } from "./entries-lede.tsx";
+import { ShotsEditor } from "./shots-editor.tsx";
 
-// What the form holds: the entry being edited (null: adding), its name, Blur image URL and
-// values (an Image value is its URL)
+// What the form holds: the entry being edited (null: adding), its name, Blur image URL,
+// description and values (an Image value is its URL)
 interface Draft {
   editing: Entry | null;
   name: string;
   photo: string;
+  description: string;
   values: Record<string, string>;
   // Blur games: the squares picked so far, in the order they clear
   blurOrder: number[];
+  // Sequence games: the photos, "" for an empty slot
+  shots: string[];
 }
 
 const draftOf = (entry: Entry | null): Draft => ({
   editing: entry,
   name: entry?.name ?? "",
   photo: entry?.photo ?? "",
+  description: entry?.description ?? "",
   blurOrder: entry?.blurOrder ?? [],
+  shots: entry?.shots ?? [],
   values: Object.fromEntries(
     Object.entries(entry?.values ?? {}).map(([id, items]) => [
       id,
@@ -45,12 +53,15 @@ export function EntriesPanel({
   base,
   initial,
   active,
-  blur = false,
+  kind = "classic",
+  tries = 0,
   onChange,
 }: {
   base: string;
-  // A Blur game: entries have an image and a square order instead of values
-  blur?: boolean;
+  // A Blur game's entries have an image and a square order instead of values, a Sequence
+  // game's its `tries` photos
+  kind?: GameKind;
+  tries?: number;
   initial: { attributes: Attribute[]; entries: Entry[] };
   // The tab is open: refresh the lists, since attributes may have changed
   active: boolean;
@@ -63,7 +74,9 @@ export function EntriesPanel({
   // The attributes the form was built for; the ref lets the refresh compare without re-running
   const [formAttributes, setFormAttributes] = useState(initial.attributes);
   const built = useRef(initial.attributes);
-  const { upload, dialog } = usePhotoUpload(setError);
+  const { upload, uploadFile, dialog } = usePhotoUpload(setError);
+  const blur = kind === "blur";
+  const sequence = kind === "sequence";
 
   useEffect(() => {
     if (!active) {
@@ -125,55 +138,27 @@ export function EntriesPanel({
       setError(FAILURES.missing_order.text);
       return;
     }
-    const body = blur
-      ? {
-          name: draft.name,
-          photo: draft.photo,
-          ...(draft.blurOrder.length === CELLS && {
-            blurOrder: draft.blurOrder,
-          }),
-        }
-      : { name: draft.name, values };
+    const body = sequence
+      ? { name: draft.name, description: draft.description, shots: draft.shots }
+      : blur
+        ? {
+            name: draft.name,
+            photo: draft.photo,
+            description: draft.description,
+            ...(draft.blurOrder.length === CELLS && {
+              blurOrder: draft.blurOrder,
+            }),
+          }
+        : { name: draft.name, description: draft.description, values };
     await (draft.editing
       ? run("PATCH", `${base}/entries/${draft.editing.id}`, body, true)
       : run("POST", `${base}/entries`, body, true));
   };
 
-  const incomplete = (entry: Entry): boolean =>
-    blur
-      ? !entry.photo || !entry.blurOrder
-      : formAttributes.some(
-          (attr) =>
-            attr.type !== "image" && !entry.values[String(attr.id)]?.length,
-        );
-  // The list's thumbnail: a Blur entry's image, a classic entry's first Image value
-  const thumbOf = (entry: Entry): string =>
-    blur
-      ? entry.photo
-      : (formAttributes
-          .filter((attr) => attr.type === "image")
-          .map((attr) => entry.values[String(attr.id)]?.[0])
-          .find(Boolean) ?? "");
-
   return (
     <div className="space-y-5">
       {dialog}
-      <p className="lede text-sm text-muted-foreground">
-        {blur ? (
-          <>
-            Each entry is one possible answer. A Blur game plays with a single
-            entry, and every entry needs an image and the order its nine squares
-            clear in.
-          </>
-        ) : (
-          <>
-            Each entry is a row on the board. A game needs at least{" "}
-            {MIN_ENTRIES} entries before anyone can play it, and every entry
-            needs a value for every attribute except pictures, which may stay
-            empty.
-          </>
-        )}
-      </p>
+      <EntriesLede kind={kind} tries={tries} />
       <ul
         id="entry-list"
         className="attr-list divide-y rounded-lg border empty:hidden"
@@ -183,10 +168,13 @@ export function EntriesPanel({
             key={entry.id}
             className="attr-row flex items-center gap-3 px-3 py-2"
           >
-            {thumbOf(entry) ? (
+            {thumbOf(entry, formAttributes) ? (
               <img
-                className="entry-thumb size-10 shrink-0 rounded-md object-cover"
-                src={thumbOf(entry)}
+                className={cn(
+                  "entry-thumb h-10 shrink-0 rounded-md object-cover",
+                  sequence ? "aspect-video" : "w-10",
+                )}
+                src={thumbOf(entry, formAttributes)}
                 alt=""
               />
             ) : (
@@ -198,9 +186,18 @@ export function EntriesPanel({
             <span className="entry-name min-w-0 flex-1 truncate font-medium">
               {entry.name}
             </span>
-            {incomplete(entry) && (
-              <span className="entry-missing shrink-0 text-sm font-medium text-error">
-                {blur ? "Missing image or order" : "Missing values"}
+            {isIncomplete(entry, kind, tries, formAttributes) && (
+              <span
+                className={cn(
+                  "entry-missing shrink-0 text-sm font-medium",
+                  sequence ? "text-muted-foreground" : "text-error",
+                )}
+              >
+                {sequence
+                  ? "Missing photos: guess only"
+                  : blur
+                    ? "Missing image or order"
+                    : "Missing values"}
               </span>
             )}
             <Button
@@ -251,6 +248,14 @@ export function EntriesPanel({
             }
           />
         </div>
+        {sequence && (
+          <ShotsEditor
+            shots={draft.shots}
+            count={tries}
+            onUpload={(file) => uploadFile(file, "shot")}
+            onChange={(shots) => setDraft((d) => ({ ...d, shots }))}
+          />
+        )}
         {blur && (
           <div className="space-y-2">
             <p className="text-sm font-medium">Image</p>
@@ -326,6 +331,27 @@ export function EntriesPanel({
               </div>
             );
           })}
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="entry-description">Description (optional)</Label>
+          <Textarea
+            id="entry-description"
+            rows={3}
+            maxLength={MAX_DESCRIPTION}
+            aria-describedby="entry-description-help"
+            value={draft.description}
+            onChange={(event) =>
+              setDraft((d) => ({ ...d, description: event.target.value }))
+            }
+          />
+          <p
+            id="entry-description-help"
+            className="text-sm text-muted-foreground"
+          >
+            {blur
+              ? "Shown with the answer once a player finds it or the day is over."
+              : "Shown with the answer once a player finds it or the day is over. Players can also reveal it as their free hint."}
+          </p>
         </div>
         <Alert id="entry-error" variant="error" role="alert">
           {error}

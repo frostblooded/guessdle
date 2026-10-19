@@ -3,10 +3,8 @@ import { Badge } from "../../components/ui/badge.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
 import { correctnessClass } from "../../game/correctness.ts";
+import { clockTime, ordinal, progressLabel } from "../../game/party-text.ts";
 import {
-  clockTime,
-  ordinal,
-  progressLabel,
   type FinishedRound,
   type PartyView,
   type Standing,

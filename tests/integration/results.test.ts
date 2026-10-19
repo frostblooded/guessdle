@@ -164,6 +164,139 @@ describe("victory stats", () => {
     assert.match(rows[0]!.player, /^user:\d+$/);
   });
 
+  describe("a first attempt that failed", () => {
+    it("an anonymous give-up keeps a win after a reset out of the stats", async () => {
+      const gave = await post(`${G}/give-up`, { player: TOKEN_A });
+      assert.equal(gave.status, 200);
+      const { status, body } = await post(`${G}/result`, {
+        ids: [ANSWER],
+        seconds: 5,
+        player: TOKEN_A,
+      });
+      assert.equal(status, 200);
+      assert.equal(body.you, null);
+      assert.equal(body.firstTryFailed, true);
+      assert.equal(body.players, 0);
+      assert.equal(body.guesses[0], 0);
+    });
+
+    it("a give-up after a counted win changes nothing", async () => {
+      await post(`${G}/result`, { ids: [ANSWER], seconds: 5, player: TOKEN_A });
+      await post(`${G}/give-up`, { player: TOKEN_A });
+      const { body } = await post(`${G}/result`, {
+        ids: [ANSWER],
+        player: TOKEN_A,
+      });
+      assert.deepEqual(body.you, { guesses: 1, seconds: 5 });
+      assert.equal(body.firstTryFailed, undefined);
+    });
+
+    it("leaves failed players out of everyone else's stats", async () => {
+      await post(`${G}/give-up`, { player: TOKEN_B });
+      const { body } = await post(`${G}/result`, {
+        ids: [OTHERS[0], ANSWER],
+        seconds: 20,
+        player: TOKEN_A,
+      });
+      assert.equal(body.players, 1);
+      assert.equal(body.fewerGuessesThan, null);
+    });
+
+    it("a give-up with no token records nothing", async () => {
+      await post(`${G}/give-up`, {});
+      const { rows } = await db.pool.query("select 1 from game_results");
+      assert.equal(rows.length, 0);
+    });
+
+    it("a signed-in give-up, reset and win is not counted", async () => {
+      const cookie = await login("a@x.test");
+      await post(`${G}/state/guess`, { id: OTHERS[0] }, cookie);
+      await post(`${G}/state/give-up`, {}, cookie);
+      await post(`${G}/state/reset`, {}, cookie);
+      await post(`${G}/state/guess`, { id: ANSWER }, cookie);
+      const { status, body } = await post(
+        `${G}/result`,
+        { seconds: 3 },
+        cookie,
+      );
+      assert.equal(status, 200);
+      assert.equal(body.you, null);
+      assert.equal(body.firstTryFailed, true);
+    });
+
+    it("a past day's give-up only blocks that day", async () => {
+      // 2026-10-15, Day Number 426: the backfill stores "ati"
+      await post(`${G}/give-up?day=426`, { player: TOKEN_A });
+      const past = await post(`${G}/result?day=426`, {
+        ids: [pid("ati")],
+        player: TOKEN_A,
+      });
+      assert.equal(past.body.firstTryFailed, true);
+      const today = await post(`${G}/result`, {
+        ids: [ANSWER],
+        player: TOKEN_A,
+      });
+      assert.deepEqual(today.body.you, { guesses: 1, seconds: null });
+    });
+
+    describe("in a Blur game", () => {
+      beforeAll(async () => {
+        await db.pool.query(
+          "update games set kind = 'blur', blur_tries = 2 where slug = $1",
+          [GAME],
+        );
+        // A Blur entry needs a photo and a clearing order to be playable
+        await db.pool.query(
+          "update entries set blur_order = '{0,1,2,3,4,5,6,7,8}', photo_url = '/uploads/x.webp' where game_id = (select id from games where slug = $1)",
+          [GAME],
+        );
+      });
+      afterAll(async () => {
+        await db.pool.query(
+          "update games set kind = 'classic', blur_tries = 9 where slug = $1",
+          [GAME],
+        );
+        await db.pool.query(
+          "update entries set blur_order = null, photo_url = '' where game_id = (select id from games where slug = $1)",
+          [GAME],
+        );
+      });
+
+      it("running out of tries anonymously keeps a later win out", async () => {
+        const lost = await post(`${G}/grade`, {
+          ids: [OTHERS[0], OTHERS[1]],
+          player: TOKEN_A,
+        });
+        assert.equal(lost.body.lost, true);
+        const { body } = await post(`${G}/result`, {
+          ids: [ANSWER],
+          player: TOKEN_A,
+        });
+        assert.equal(body.firstTryFailed, true);
+      });
+
+      it("running out of tries signed in keeps a later win out", async () => {
+        const cookie = await login("a@x.test");
+        await post(`${G}/state/guess`, { id: OTHERS[0] }, cookie);
+        const last = await post(`${G}/state/guess`, { id: OTHERS[1] }, cookie);
+        assert.equal(last.body.lost, true);
+        await post(`${G}/state/reset`, {}, cookie);
+        await post(`${G}/state/guess`, { id: ANSWER }, cookie);
+        const { body } = await post(`${G}/result`, {}, cookie);
+        assert.equal(body.firstTryFailed, true);
+        assert.equal(body.you, null);
+      });
+
+      it("a win within the tries still counts", async () => {
+        const { body } = await post(`${G}/result`, {
+          ids: [OTHERS[0], ANSWER],
+          player: TOKEN_A,
+        });
+        assert.deepEqual(body.you, { guesses: 2, seconds: null });
+      });
+    });
+  });
+
   describe("a past day", () => {
     // 2026-10-15, Day Number 426: the backfill stores "ati"
     const PAST_ANSWER = pid("ati");

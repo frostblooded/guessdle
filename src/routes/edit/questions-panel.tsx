@@ -1,4 +1,4 @@
-// A Quiz game's Questions tab (ADR 0020): list, add, change and delete questions. Each is
+// A Quiz game's Questions tab (ADR 0021): list, add, change and delete questions. Each is
 // multiple choice (options with one right) or a number scored by how close the answer is.
 import { useState, type FormEvent } from "react";
 import { Alert } from "../../components/ui/alert.tsx";

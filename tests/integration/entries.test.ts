@@ -140,6 +140,24 @@ describe("game entries", () => {
     });
   });
 
+  it("keeps an optional description, which never pauses the game", async () => {
+    await add({ name: "Rex", description: " Barks at the mail. " });
+    const rex = await one("Rex");
+    assert.equal(rex.description, "Barks at the mail.");
+    await add({ name: "Ace" });
+    assert.equal((await one("Ace")).description, "");
+    await request("PATCH", `${E}/${rex.id}`, ann, { name: "Rexy" });
+    assert.equal((await one("Rexy")).description, "Barks at the mail.");
+    await request("PATCH", `${E}/${rex.id}`, ann, { description: "" });
+    assert.equal((await one("Rexy")).description, "");
+    const game = await request("GET", "/api/games/ann-game", ann);
+    assert.equal(game.body.paused, false);
+    const long = await request("PATCH", `${E}/${rex.id}`, ann, {
+      description: "a".repeat(501),
+    });
+    assert.equal(long.status, 400);
+  });
+
   it("refuses an entry missing a value, new or edited", async () => {
     const missing = await request("POST", E, ann, {
       name: "Rex",
