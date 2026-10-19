@@ -1,27 +1,20 @@
 // The viewer's own board in a live party round: the guess box, their graded rows (a Blur game's
 // image or a Sequence game's photos, and guessed names) and, once they solved it, gave up or ran out of tries, the answer.
 import { useState } from "react";
-import { GuessRow, TitleRow } from "../../components/board.tsx";
-import { BlurGuesses } from "../../components/blur-view.tsx";
-import { AnswerImage } from "../play/play-results.tsx";
-import { isImageGame } from "../../game/blur.ts";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
-import {
-  boardColumns,
-  findEntryId,
-  guessedNames,
-  isAnswerRow,
-  SKIP,
-} from "../../game/game.ts";
+import { findEntryId, SKIP } from "../../game/game.ts";
 import type { LiveRound, PartyView } from "../../game/party.ts";
 import { GuessForm, useGuessMode } from "../play/guess-form.tsx";
 import { SelectList } from "../play/select-list.tsx";
 import type { HintKind } from "../../game/free-hint.ts";
 import { FreeHintCard } from "../play/free-hint.tsx";
-import { AnswerDescription } from "../play/result-banner.tsx";
+import { AnswerImage, boardOf, PlayResults } from "../play/play-results.tsx";
+import { ResultBanner } from "../play/result-banner.tsx";
 
 type Board = NonNullable<LiveRound["yours"]>;
+
+const guesses = (n: number): string => `${n} ${n === 1 ? "guess" : "guesses"}`;
 
 export function PartyRound({
   view,
@@ -47,13 +40,12 @@ export function PartyRound({
   // Selection mode's list, in place of the board
   const listing = modes.selecting && !done;
   const entries = view.game.entries;
-  const used = guessedNames(mine.rows);
-  // A Blur or Sequence game's tries
-  const blur = isImageGame(view.game.kind) ? (view.game.blurTries ?? 1) : null;
   const newestFirst = [...mine.rows].reverse();
-  const unguessed = entries.filter((e) => !used.has(e.name));
-  const names = unguessed.map((e) => e.name);
-  const titles = boardColumns(view.game.attributes);
+  const { tries, wrong, unguessed, names, titles } = boardOf(
+    view.game,
+    entries,
+    mine.rows,
+  );
 
   const submit = (name: string): void => {
     const id = findEntryId(entries, name);
@@ -75,47 +67,34 @@ export function PartyRound({
       </h2>
       <div id="result-banner" aria-live="polite">
         {done && mine.answer && (
-          <div
-            className={`banner banner-${mine.solved ? "victory" : "give-up"} animate-in mb-6 flex items-center gap-4 rounded-xl border p-4 shadow-sm ${
+          <ResultBanner
+            result={{
+              kind: mine.solved ? "victory" : mine.lost ? "lost" : "give-up",
+              answer: mine.answer.name,
+              photo: mine.answer.photo || undefined,
+              description: mine.answer.description,
+            }}
+            roster={entries}
+            title={
               mine.solved
-                ? "bg-success-bg text-success"
-                : "bg-card text-foreground"
-            }`}
+                ? `Solved in ${guesses(mine.rows.length)}!`
+                : mine.lost
+                  ? "Out of tries"
+                  : "You gave up"
+            }
           >
-            {mine.answer.photo && (
-              <img
-                className="size-16 shrink-0 rounded-lg object-cover"
-                src={mine.answer.photo}
-                alt=""
-              />
-            )}
-            <div className="flex min-w-0 flex-col gap-1">
-              <strong className="text-xl font-bold">
-                {mine.solved
-                  ? `Solved in ${mine.rows.length} ${mine.rows.length === 1 ? "guess" : "guesses"}!`
-                  : mine.lost
-                    ? "Out of tries"
-                    : "You gave up"}
-              </strong>
-              <span className="break-words">
-                The answer is {mine.answer.name}. Waiting for the others to
-                finish.
-              </span>
-              {mine.answer.description && (
-                <AnswerDescription text={mine.answer.description} />
-              )}
-            </div>
-          </div>
+            <span>Waiting for the others to finish.</span>
+          </ResultBanner>
         )}
       </div>
-      {blur !== null && (
+      {tries !== null && (
         <AnswerImage
           kind={view.game.kind}
           url={(path, n) =>
             `/api/parties/${encodeURIComponent(view.code)}/${path}/${round.number}/${n}`
           }
-          tries={blur}
-          wrong={mine.rows.filter((row) => !isAnswerRow(row)).length}
+          tries={tries}
+          wrong={wrong}
           finished={done}
           reveal={done ? mine.answer?.photo : undefined}
         />
@@ -128,7 +107,7 @@ export function PartyRound({
             value={guess}
             onChange={setGuess}
             onSubmit={submit}
-            onSkip={blur === null ? undefined : () => onGuess(SKIP)}
+            onSkip={tries === null ? undefined : () => onGuess(SKIP)}
           />
           <div className="game-actions flex justify-end">
             <Button
@@ -142,7 +121,7 @@ export function PartyRound({
           </div>
         </Card>
       )}
-      {blur === null && (
+      {titles && (
         <FreeHintCard
           hint={mine.hint}
           hints={done ? undefined : mine.hints}
@@ -152,19 +131,19 @@ export function PartyRound({
       {listing && (
         <SelectList
           entries={unguessed}
-          attributes={blur === null ? view.game.attributes : null}
+          attributes={titles && view.game.attributes}
           onPick={submit}
         />
       )}
-      {!listing && blur !== null && <BlurGuesses rows={newestFirst} />}
-      {!listing && blur === null && mine.rows.length > 0 && (
-        <div id="board" className="results flex flex-col gap-2 sm:gap-2.5">
-          <TitleRow columns={titles} />
-          <div id="guess-results-container" className="flex flex-col gap-2">
-            {newestFirst.map((row, i) => (
-              <GuessRow key={mine.rows.length - i} row={row} />
-            ))}
-          </div>
+      {!listing && (tries !== null || mine.rows.length > 0) && (
+        <div id="board">
+          <PlayResults
+            rows={newestFirst}
+            titles={titles}
+            loading={false}
+            loadingText=""
+            empty={false}
+          />
         </div>
       )}
     </section>
