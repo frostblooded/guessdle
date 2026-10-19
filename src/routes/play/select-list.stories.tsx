@@ -1,8 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { fn } from "storybook/test";
+import ati from "../../../howto/ati.jpg";
+import cookie from "../../../howto/cookie.jpg";
+import eddie from "../../../howto/eddie.jpg";
 import { SelectList } from "./select-list.tsx";
 
-const COLORS = ["Black", "White", "Ginger", "Grey"];
+const PHOTOS = [ati, cookie, eddie, ""];
 const NAMES = [
   "Ati",
   "Bela",
@@ -12,21 +15,22 @@ const NAMES = [
   "Abby",
   "Mochi",
   "Pip",
+  "Oreo",
+  "Sunny",
+  "Kiara",
+  "Jaro",
+  "Todorka",
+  "Murlin",
 ];
 
 const meta = {
   component: SelectList,
   args: {
     entries: NAMES.map((name, i) => ({
+      id: i + 1,
       name,
-      values: ["", COLORS[i % COLORS.length]!, String(i + 1), ["Ann", "Bo"]],
+      photo: PHOTOS[i % PHOTOS.length]!,
     })),
-    attributes: [
-      { name: "Photo", type: "image" },
-      { name: "Color", type: "text" },
-      { name: "Age", type: "number" },
-      { name: "Owners", type: "list" },
-    ],
     onPick: fn(),
   },
 } satisfies Meta<typeof SelectList>;
@@ -34,11 +38,11 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+// More than three rows: the window scrolls
 export const Classic: Story = {};
-// A Blur game: names only, several to a line
-export const Blur: Story = {
+// A Blur or Sequence game: no pictures, names only
+export const NamesOnly: Story = {
   args: {
-    entries: NAMES.map((name) => ({ name, values: [] })),
-    attributes: null,
+    entries: NAMES.map((name, i) => ({ id: i + 1, name, photo: "" })),
   },
 };

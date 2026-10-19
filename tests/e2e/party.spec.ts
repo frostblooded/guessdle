@@ -169,7 +169,9 @@ test("every player guesses the way the host picked, with no switch of their own"
   await guest
     .getByRole("button", { name: `Guess ${name}`, exact: true })
     .click();
-  await expect(guest.locator("#select-list")).toHaveCount(0);
+  await expect(
+    guest.getByRole("button", { name: `Guess ${name}`, exact: true }),
+  ).toHaveCount(0);
   await expect(guest.locator("#guess-results-container")).toContainText(name);
 });
 

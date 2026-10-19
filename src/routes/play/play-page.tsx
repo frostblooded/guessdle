@@ -99,7 +99,6 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
       if (id !== SKIP) {
         setGuess("");
       }
-      modes.setSelecting(false);
     }
   }
 
@@ -278,21 +277,19 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
             onTake={(kind) => void freeHint.take(kind)}
           />
         )}
-        {modes.selecting && !finished && !cannotPlay ? (
+        {modes.selecting && !finished && !cannotPlay && (
           <SelectList
             entries={unguessed}
-            attributes={titles && (playable?.attributes ?? [])}
             onPick={(name) => void submit(name)}
           />
-        ) : (
-          <PlayResults
-            rows={rows}
-            titles={titles}
-            loading={isPending || loading}
-            loadingText={past ? "Loading the game…" : "Loading today's game…"}
-            empty={ready && rows.length === 0}
-          />
         )}
+        <PlayResults
+          rows={rows}
+          titles={titles}
+          loading={isPending || loading}
+          loadingText={past ? "Loading the game…" : "Loading today's game…"}
+          empty={ready && rows.length === 0}
+        />
       </section>
     </>
   );

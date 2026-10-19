@@ -777,9 +777,11 @@ test("selection mode: pick a guess from the list, and the mode is remembered", a
   await list
     .getByRole("button", { name: `Guess ${wrongName}`, exact: true })
     .click();
-  await expect(list).toBeHidden();
+  // The list stays open above the board, without the guessed name
   await expect(rows(page)).toHaveCount(1);
   await expect(rows(page).first()).toContainText(wrongName);
+  await list.locator("#select-filter").fill("");
+  await expect(list.locator(".select-option")).toHaveCount(names.length - 1);
 
   await page.reload();
   await expect(page.locator("#guess-mode-select")).toHaveAttribute(

@@ -511,7 +511,7 @@ describe("PlayPage selection mode", () => {
     assert.equal(input().placeholder, "Enter your guess here");
   });
 
-  it("lists every entry with its values in place of the board, and a tap guesses it", async () => {
+  it("lists every entry above the board, and a tap guesses it with the list left open", async () => {
     vi.stubGlobal("fetch", fakeServer());
     renderPlay();
     await screen.findByText(/No guesses yet/);
@@ -520,24 +520,15 @@ describe("PlayPage selection mode", () => {
     await userEvent.click(
       screen.getByRole("button", { name: "Select next guess" }),
     );
-    assert.equal(screen.queryByText(/No guesses yet/), null);
+    // The board stays in view under the list
+    assert.ok(screen.getByText(/No guesses yet/));
     assert.deepEqual(listNames(), ["Abby", "Bela", "Dido"]);
-    assert.ok(
-      screen
-        .getByRole("button", { name: "Guess Bela" })
-        .textContent!.includes("Black"),
-    );
     await userEvent.click(screen.getByRole("button", { name: "Guess Bela" }));
-    // The list closes on the board with the new row
     await waitFor(() => assert.equal(guessRows().length, 1));
-    assert.equal(document.querySelector("#select-list"), null);
-    await userEvent.click(
-      screen.getByRole("button", { name: "Select next guess" }),
-    );
     assert.deepEqual(listNames(), ["Abby", "Dido"]);
   });
 
-  it("filters by name and sorts by a tapped column", async () => {
+  it("filters by name, and hides the list", async () => {
     vi.stubGlobal("fetch", fakeServer());
     renderPlay();
     await screen.findByText(/No guesses yet/);
@@ -545,24 +536,16 @@ describe("PlayPage selection mode", () => {
     await userEvent.click(
       screen.getByRole("button", { name: "Select next guess" }),
     );
-    await userEvent.click(
-      screen.getByRole("button", { name: "Sort by Color" }),
-    );
-    assert.deepEqual(listNames(), ["Bela", "Abby", "Dido"]);
-    await userEvent.click(
-      screen.getByRole("button", { name: "Sort by Color" }),
-    );
-    assert.deepEqual(listNames(), ["Abby", "Dido", "Bela"]);
     await userEvent.type(
       screen.getByRole("textbox", { name: "Filter by name" }),
       "D",
     );
     assert.deepEqual(listNames(), ["Dido"]);
-    // Back to the board without guessing
     await userEvent.click(
-      screen.getByRole("button", { name: "Back to my guesses" }),
+      screen.getByRole("button", { name: "Hide the list" }),
     );
-    await screen.findByText(/No guesses yet/);
+    assert.equal(document.querySelector("#select-list"), null);
+    assert.ok(screen.getByRole("button", { name: "Select next guess" }));
   });
 
   it("remembers the mode for the next visit", async () => {
