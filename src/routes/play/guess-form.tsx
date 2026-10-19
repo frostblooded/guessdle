@@ -12,7 +12,7 @@ import {
 import { cn } from "../../lib/utils.ts";
 import { GuessBox } from "./guess-box.tsx";
 
-// The remembered guess mode, and whether selection mode's list is open in place of the board.
+// The remembered guess mode, and whether selection mode's list is open above the board.
 // A party passes the mode its host picked: then it is fixed and there is no switch.
 export function useGuessMode(fixed?: GuessMode) {
   const [remembered, setMode] = useState<GuessMode>(() =>
@@ -140,7 +140,7 @@ export function GuessForm({
             disabled={disabled || busy}
             onClick={() => modes.setSelecting(!modes.selecting)}
           >
-            {modes.selecting ? "Back to my guesses" : "Select next guess"}
+            {modes.selecting ? "Hide the list" : "Select next guess"}
           </Button>
         )}
       </div>

@@ -37,7 +37,7 @@ export function PartyRound({
   const [guess, setGuess] = useState("");
   const modes = useGuessMode(view.game.guessMode);
   const done = mine.solved || mine.gaveUp || mine.lost;
-  // Selection mode's list, in place of the board
+  // Selection mode's list, above the board
   const listing = modes.selecting && !done;
   const entries = view.game.entries;
   const newestFirst = [...mine.rows].reverse();
@@ -56,7 +56,6 @@ export function PartyRound({
     if (onGuess(id)) {
       onNotice(null);
       setGuess("");
-      modes.setSelecting(false);
     }
   };
 
@@ -128,14 +127,8 @@ export function PartyRound({
       {titles && !done && (
         <FreeHintCard hint={mine.hint} hints={mine.hints} onTake={onHint} />
       )}
-      {listing && (
-        <SelectList
-          entries={unguessed}
-          attributes={titles && view.game.attributes}
-          onPick={submit}
-        />
-      )}
-      {!listing && (tries !== null || mine.rows.length > 0) && (
+      {listing && <SelectList entries={unguessed} onPick={submit} />}
+      {(tries !== null || mine.rows.length > 0) && (
         <div id="board">
           <PlayResults
             rows={newestFirst}
