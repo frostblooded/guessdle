@@ -238,7 +238,10 @@ export function QuizPlay({
         <Review result={result} onRetake={retake} />
       ) : (
         question && (
-          <Card id="quiz" className="play-card mb-6 gap-5 p-4 sm:p-6">
+          <Card
+            id="quiz"
+            className="play-card mb-6 flex flex-col gap-5 p-4 sm:p-6"
+          >
             <p id="quiz-progress" className="text-sm text-muted-foreground">
               Question {index + 1} of {questions.length}
             </p>
