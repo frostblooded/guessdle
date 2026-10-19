@@ -1,5 +1,5 @@
 // The editor's Answers tab: Answer History and Overrides by real calendar date.
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 import { Alert } from "../../components/ui/alert.tsx";
 import {
   AlertDialog,
@@ -12,7 +12,7 @@ import {
 } from "../../components/ui/alert-dialog.tsx";
 import { Badge } from "../../components/ui/badge.tsx";
 import { Button } from "../../components/ui/button.tsx";
-import { Input, Label, NativeSelect } from "../../components/ui/input.tsx";
+import { Input, Label } from "../../components/ui/input.tsx";
 import {
   Table,
   TableCell,
@@ -21,6 +21,8 @@ import {
 } from "../../components/ui/table.tsx";
 import { useDelayed } from "../../lib/use-delayed.ts";
 import { api, errorText } from "../../manage-client.ts";
+import { OverrideDialog, type Choice } from "./override-dialog.tsx";
+import { thumbOf, type Attribute, type Entry } from "./types.ts";
 
 interface AnswerDay {
   date: string;
@@ -77,7 +79,7 @@ export function AnswersPanel({
   // The first load of the days; its notice waits in case the days arrive at once
   const [loading, setLoading] = useState(false);
   const slow = useDelayed(loading);
-  const [entries, setEntries] = useState<{ id: number; name: string }[]>([]);
+  const [entries, setEntries] = useState<Choice[]>([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [days, setDays] = useState<AnswerDay[]>([]);
@@ -86,7 +88,7 @@ export function AnswersPanel({
     (entry) => answerIds === null || answerIds.includes(entry.id),
   );
   const [editing, setEditing] = useState<AnswerDay | null>(null);
-  const [pick, setPick] = useState("");
+  const [pick, setPick] = useState<number | null>(null);
   // A change to today's answer waiting for the owner to confirm the restart
   const [confirming, setConfirming] = useState<"PUT" | "DELETE" | null>(null);
 
@@ -121,11 +123,18 @@ export function AnswersPanel({
       return;
     }
     void (async () => {
-      const roster = await api<{ entries?: { id: number; name: string }[] }>(
-        "GET",
-        base,
-      );
-      const list = roster?.data.entries ?? [];
+      const [roster, attributes] = await Promise.all([
+        api<Entry[]>("GET", `${base}/entries`),
+        api<Attribute[]>("GET", `${base}/attributes`),
+      ]);
+      const list = (roster?.status === 200 ? roster.data : []).map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        thumb: thumbOf(
+          entry,
+          attributes?.status === 200 ? attributes.data : [],
+        ),
+      }));
       setEntries(list);
       if (list.length === 0) {
         setMessage("Add entries first: answers are drawn from them.");
@@ -152,7 +161,8 @@ export function AnswersPanel({
 
   const openEditor = (day: AnswerDay): void => {
     setEditing(day);
-    setPick(String(day.missing ? (choices[0]?.id ?? "") : day.entryId));
+    setMessage(null);
+    setPick(day.missing ? null : day.entryId);
   };
 
   const apply = async (
@@ -168,23 +178,17 @@ export function AnswersPanel({
   };
 
   const save = (method: "PUT" | "DELETE"): void => {
-    void apply(method, method === "PUT" ? { entryId: Number(pick) } : {});
+    void apply(method, method === "PUT" ? { entryId: pick } : {});
   };
   // Changing today's answer restarts the day for every player, so it asks first
   const saveOrAsk = (method: "PUT" | "DELETE"): void => {
     const changesToday =
-      editing!.today &&
-      (method === "DELETE" || Number(pick) !== editing!.entryId);
+      editing!.today && (method === "DELETE" || pick !== editing!.entryId);
     if (changesToday) {
       setConfirming(method);
     } else {
       save(method);
     }
-  };
-
-  const saveOverride = (event: FormEvent): void => {
-    event.preventDefault();
-    saveOrAsk("PUT");
   };
 
   return (
@@ -289,61 +293,18 @@ export function AnswersPanel({
           </tbody>
         </Table>
         {editing && (
-          <form
-            id="override-form"
-            className="override-form space-y-3 rounded-lg border bg-muted/40 p-4"
-            onSubmit={saveOverride}
-          >
-            <h3 id="override-title" className="font-semibold">
-              Override {editing.date}
-            </h3>
-            <div className="space-y-2">
-              <Label htmlFor="override-entry">Answer</Label>
-              <NativeSelect
-                id="override-entry"
-                value={pick}
-                onChange={(event) => setPick(event.target.value)}
-              >
-                {choices.map((entry) => (
-                  <option key={entry.id} value={entry.id}>
-                    {entry.name}
-                  </option>
-                ))}
-              </NativeSelect>
-            </div>
-            <p
-              id="override-warning"
-              className="fine-print text-xs text-muted-foreground"
-            >
-              Saving re-draws every later autogenerated day. Overrides stay.
-            </p>
-            {editing.previous.includes(Number(pick)) && (
-              <Alert id="override-notice" variant="warn">
-                This entry appeared in the days just before.
-              </Alert>
-            )}
-            <div className="flex flex-wrap gap-2">
-              <Button type="submit" id="override-save">
-                Save override
-              </Button>
-              {editing.source === "override" && (
-                <Button
-                  id="override-clear"
-                  variant="secondary"
-                  onClick={() => saveOrAsk("DELETE")}
-                >
-                  Clear override
-                </Button>
-              )}
-              <Button
-                id="override-cancel"
-                variant="ghost"
-                onClick={() => setEditing(null)}
-              >
-                Cancel
-              </Button>
-            </div>
-          </form>
+          <OverrideDialog
+            date={editing.date}
+            isOverride={editing.source === "override"}
+            choices={choices}
+            pick={pick}
+            onPick={setPick}
+            recent={editing.previous}
+            error={message}
+            onSave={() => saveOrAsk("PUT")}
+            onClear={() => saveOrAsk("DELETE")}
+            onClose={() => setEditing(null)}
+          />
         )}
       </div>
       <AlertDialog
