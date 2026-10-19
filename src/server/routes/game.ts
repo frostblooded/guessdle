@@ -6,7 +6,7 @@ import { isHintKind, pickHint, revealHint } from "../../game/free-hint.ts";
 import type { DaysResponse } from "../../game/days.ts";
 import { listDays } from "../days.ts";
 import { isPlayerToken } from "../../game/stats.ts";
-import { listGallery } from "../games.ts";
+import { listGallery } from "../gallery.ts";
 import { canApprove, canManage } from "../access.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
 import {

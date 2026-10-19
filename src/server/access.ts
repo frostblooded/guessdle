@@ -1,6 +1,6 @@
 // Who may see or change a game: the one place that orders 404, 401 and 403.
-// A hidden game (a draft, or fewer than 2 active entries) is a 404 for everyone but its owner
-// and admins, before any 401/403 can reveal it exists.
+// A hidden game (a draft, fewer than 2 active entries, or a banned owner's) is a 404 for everyone
+// but its owner and admins, before any 401/403 can reveal it exists.
 import type { Request } from "express";
 import type pg from "pg";
 import { requestUser, type SessionUser } from "./auth.ts";
@@ -8,7 +8,7 @@ import { minEntriesOf } from "../game/blur.ts";
 import { findGame, loadRoster, type GameRow, type Roster } from "./games.ts";
 
 export type Need = "play" | "edit" | "admin";
-export type Denial = "not_found" | "unauthorized" | "forbidden";
+export type Denial = "not_found" | "unauthorized" | "forbidden" | "banned";
 
 export interface LoadedGame {
   game: GameRow;
@@ -37,8 +37,20 @@ export const playBlocker = (
       ? "game_paused"
       : null;
 
+// Open to everyone: playable, and its owner is not banned
+export const isPublic = (game: GameRow, roster: Roster): boolean =>
+  isPlayable(game, roster) && !game.ownerBanned;
+
+const owns = (game: GameRow, user: SessionUser | null): boolean =>
+  user !== null && game.ownerId === user.id;
+
+// Sees a hidden game: its owner (banned or not) and admins
+const canSee = (game: GameRow, user: SessionUser | null): boolean =>
+  user?.admin === true || owns(game, user);
+
+// A banned owner still sees their game but cannot change it
 export const canManage = (game: GameRow, user: SessionUser | null): boolean =>
-  user !== null && (user.admin || game.ownerId === user.id);
+  user?.admin === true || (owns(game, user) && user?.banned !== true);
 
 // An admin may approve a pending game right from its Play page (issue #88)
 export const canApprove = (game: GameRow, user: SessionUser | null): boolean =>
@@ -63,7 +75,7 @@ export function decide(
   if (need === "admin") {
     return null;
   }
-  if (!isPlayable(game, roster) && !canManage(game, user)) {
+  if (!isPublic(game, roster) && !canSee(game, user)) {
     return "not_found";
   }
   if (need === "play") {
@@ -72,7 +84,10 @@ export function decide(
   if (!user) {
     return "unauthorized";
   }
-  return canManage(game, user) ? null : "forbidden";
+  if (canManage(game, user)) {
+    return null;
+  }
+  return owns(game, user) ? "banned" : "forbidden";
 }
 
 // The signed-in admin, or the denial (for admin routes that name no game)
@@ -103,7 +118,7 @@ export async function resolveGame<N extends Need>(
   const user =
     need === "play" &&
     found &&
-    isPlayable(found.game, found.roster) &&
+    isPublic(found.game, found.roster) &&
     !req.headers.cookie
       ? null
       : await requestUser(pool, req, now());

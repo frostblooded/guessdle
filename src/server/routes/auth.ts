@@ -45,6 +45,8 @@ export function authRoutes(
         // The public name on the profile and playlists; null until picked
         username: await usernameOf(pool, user.id),
         admin: user.admin,
+        // The banner on every page
+        ...(user.banned && { banned: true, banReason: user.banReason }),
         // The Admin link's badge
         ...(user.admin && { pending: await pendingCount(pool) }),
       },

@@ -93,6 +93,10 @@ export function manageRoutes(
     if (!user) {
       return;
     }
+    if (user.banned) {
+      fail(res, "banned");
+      return;
+    }
     const { name, slug, kind = "classic" } = bodyOf(req);
     const title = nameIn(name, MAX_NAME);
     if (title === undefined || !isGameKind(kind)) {

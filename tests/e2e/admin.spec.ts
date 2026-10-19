@@ -109,3 +109,36 @@ test("an admin promotes and demotes a user; self-demotion is disabled and refuse
 
   await playerPage.close();
 });
+
+test("an admin bans a player with a reason, the player sees it, and unban clears it", async ({
+  page,
+  browser,
+  baseURL,
+}) => {
+  const stamp = Date.now();
+  const player = `banned-${stamp}@example.test`;
+  const playerPage = await browser.newPage({ baseURL: baseURL! });
+  await playerPage.request.post("/api/test/login", { data: { email: player } });
+  await page.request.post("/api/test/login", {
+    data: { email: `banner-${stamp}@example.test`, admin: true },
+  });
+  await page.goto("/admin");
+  const row = page.locator(`#admin-users tr[data-email="${player}"]`);
+  await row.locator(".user-ban").click();
+  await page.locator(".ban-reason").fill("Offensive game names");
+  await page.locator(".ban-confirm").click();
+  await expect(row.locator('[data-tag="banned"]')).toBeVisible();
+  await expect(row.locator(".role-toggle")).toBeDisabled();
+
+  await playerPage.goto("/create");
+  await expect(playerPage.locator("#ban-notice")).toContainText(
+    "Offensive game names",
+  );
+  await expect(playerPage.locator("#create-form")).toHaveCount(0);
+
+  await row.locator(".user-unban").click();
+  await expect(row.locator('[data-tag="banned"]')).toHaveCount(0);
+  await playerPage.reload();
+  await expect(playerPage.locator("#ban-notice")).toHaveCount(0);
+  await playerPage.close();
+});

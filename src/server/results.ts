@@ -28,9 +28,13 @@ export async function dayStats(
   { gameId, date, player }: ResultKey,
   day: number,
 ): Promise<DayStats> {
+  // A banned player's wins leave the stats while the ban lasts, except in their own view
   const { rows } = await q.query<WinResult & { player: string }>(
-    "select player, guesses, seconds from game_results where game_id = $1 and day = $2",
-    [gameId, date],
+    `select r.player, r.guesses, r.seconds from game_results r
+     where r.game_id = $1 and r.day = $2 and (r.player = $3 or not exists (
+       select 1 from users u where r.player = 'user:' || u.id and u.banned_at is not null
+     ))`,
+    [gameId, date, player],
   );
   const mine = rows.find((row) => row.player === player);
   const results = rows.map(({ guesses, seconds }) => ({ guesses, seconds }));

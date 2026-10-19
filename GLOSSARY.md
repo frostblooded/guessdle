@@ -67,6 +67,9 @@ An Owner's or Admin's choice of Daily Answer for today or a future day, replacin
 **Admin**:
 A signed-in user with the admin flag. Admins get an Admin link in the account menu and use the admin page (`/admin`): the approval queue, all Games, users (promote or demote, never oneself or the last Admin) and backups. They can also edit any Game. Emails in `ADMIN_EMAILS` become Admins on login.
 
+**Ban**:
+An Admin's block on a player, set with a reason from the Users tab and lifted by Unban, which restores everything. A banned player still signs in and plays, sees the reason in a banner on every page, and keeps seeing their own Games and Playlists, but cannot create or change any. Everyone else (Admins aside) sees neither, and their wins leave other players' stats. Admins cannot be banned, and a banned player cannot be promoted.
+
 **Day Number**:
 Whole calendar days since the game's start date. The start date itself is day 0. Each Day Number maps to exactly one Daily Answer.
 

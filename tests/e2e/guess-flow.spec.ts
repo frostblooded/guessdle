@@ -68,7 +68,12 @@ test("a free hint opens after 3 wrong guesses and stays after a reload", async (
   await page.locator("#hint-attribute-button").click();
   await expect(hint).toContainText("Free hint");
   const text = await page.locator("#free-hint-text").textContent();
-  expect(text).toMatch(/^.+: .+$/);
+  // The drawn attribute may be the Photo, an Image attribute shown as a picture
+  if (text!.endsWith(":")) {
+    await expect(page.locator("#free-hint-image")).toBeVisible();
+  } else {
+    expect(text).toMatch(/^.+: .+$/);
+  }
   await page.reload();
   await expect(page.locator("#free-hint-text")).toHaveText(text!);
   await expect(page.locator("#hint-attribute-button")).toHaveCount(0);
