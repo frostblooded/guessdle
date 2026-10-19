@@ -54,7 +54,10 @@ test("the gallery, Create, My games and the editor fit a 320px phone", async ({
     await noSidewaysScroll(page);
   }
   await page.locator("#tab-attributes").click();
+  await page.locator("#attr-new").click();
   await onScreen(page.locator("#attr-name"), page.locator("#attr-type"));
+  await noSidewaysScroll(page);
+  await page.locator("#attr-cancel").click();
   await page.locator("#tab-entries").click();
   await noSidewaysScroll(page);
   await page.locator("#entry-new").click();

@@ -2,7 +2,7 @@
 import express from "express";
 import type { Express, Request, Response } from "express";
 import { MAX_REASON } from "../../game/limits.ts";
-import { listAllGames, listQueue } from "../approval.ts";
+import { changesSinceApproval, listAllGames, listQueue } from "../approval.ts";
 import { gameLifecycle, type MoveResult } from "../lifecycle.ts";
 import { readBackupStatus } from "../backup.ts";
 import type { GameRow } from "../games.ts";
@@ -89,6 +89,21 @@ export function adminRoutes(
         fail(res, out);
       }
     });
+  // What changed since the last approval (ADR 0022); null changes when never approved
+  app.get(
+    "/api/admin/games/:slug/changes",
+    adminRoute(async ({ req, res }) => {
+      const loaded = await guardGame(ctx, req, res, "admin");
+      if (loaded) {
+        res.json(
+          (await changesSinceApproval(pool, loaded.game)) ?? {
+            since: null,
+            changes: null,
+          },
+        );
+      }
+    }),
+  );
   const lifecycle = gameLifecycle(pool, ctx.mail);
   const json = express.json({ limit: "2kb" });
   app.post(

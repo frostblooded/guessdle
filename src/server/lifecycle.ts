@@ -1,8 +1,9 @@
 // The game status lifecycle (spec #66): which edits send a game back to pending, the guarded
-// moves (submit, unpublish, approve, reject), the admin email on entering pending and the
+// moves (submit, unpublish, approve, reject), the delayed admin email on entering pending and the
 // owner's approval emails (owner-mail.ts).
 import type pg from "pg";
 import { playBlocker } from "./access.ts";
+import { saveSnapshot } from "./approval.ts";
 import { loadRoster, type GameRow, type GameStatus } from "./games.ts";
 import type { OwnerMailKind } from "../mail-settings.ts";
 import type { MailConfig } from "./mailer.ts";
@@ -70,21 +71,36 @@ export const enteredPending = (
   after: GameStatus,
 ): boolean => after === "pending" && before !== "pending";
 
-// Mails every admin that `game` entered pending. Never throws: a mail problem must not fail the edit.
-async function mailAdminsPending(
+// How long a game waits in pending before the admins get an email about it
+export const ADMIN_MAIL_DELAY = "5 minutes";
+
+// Mails every admin about each game still pending past its admin_mail_at, once (the column is
+// cleared first). The due time lives in the database, so a restart never loses an email.
+// Never throws: a mail problem must not stop the next round.
+export async function mailDueAdmins(
   q: Q,
   mail: MailConfig,
-  game: { slug: string; name: string },
+  at: Date = new Date(),
 ): Promise<void> {
   try {
+    const { rows: games } = await q.query<{ slug: string; name: string }>(
+      `update games set admin_mail_at = null
+       where status = 'pending' and admin_mail_at <= $1 returning slug, name`,
+      [at],
+    );
+    if (games.length === 0) {
+      return;
+    }
     const { rows } = await q.query<{ email: string }>(
       "select email from users where admin",
     );
-    const text = `The game "${game.name}" is waiting for approval.\n\nPlay it: ${mail.publicUrl}/g/${game.slug}\nReview it: ${mail.publicUrl}/admin\n`;
-    const subject = `Guessdle: "${game.name}" is waiting for approval`;
-    await Promise.all(
-      rows.map(({ email }) => mail.mailer.send({ to: email, subject, text })),
-    );
+    for (const game of games) {
+      const text = `The game "${game.name}" is waiting for approval.\n\nPlay it: ${mail.publicUrl}/g/${game.slug}\nReview it: ${mail.publicUrl}/admin\n`;
+      const subject = `Guessdle: "${game.name}" is waiting for approval`;
+      await Promise.all(
+        rows.map(({ email }) => mail.mailer.send({ to: email, subject, text })),
+      );
+    }
   } catch (err) {
     console.error("Could not mail the admins", err);
   }
@@ -92,18 +108,18 @@ async function mailAdminsPending(
 
 export type MoveResult =
   "ok" | "invalid_state" | "too_few_entries" | "incomplete_entries";
-// What to mail once the transaction commits
+// What to mail the owner once the transaction commits
 interface Mails {
-  admins: { slug: string; name: string } | undefined;
   owner: OwnerNotice | undefined;
 }
-const NO_MAILS: Mails = { admins: undefined, owner: undefined };
+const NO_MAILS: Mails = { owner: undefined };
 interface Settled {
   result: MoveResult;
   mails: Mails;
 }
 
 // Every status change goes through here, so none can forget the admin or owner email.
+// The admin email is only scheduled here (admin_mail_at); mailDueAdmins sends it.
 export function gameLifecycle(pool: pg.Pool, mail?: MailConfig) {
   // Runs under the game lock; sets the new status and returns what to mail about
   const settle = async (
@@ -119,32 +135,27 @@ export function gameLifecycle(pool: pg.Pool, mail?: MailConfig) {
       name: string;
       reason: string;
     }>(
-      `update games set status = $2, reject_reason = coalesce($3, reject_reason), updated_at = now()
+      `update games set status = $2, reject_reason = coalesce($3, reject_reason), updated_at = now(),
+         admin_mail_at = case when $4 then now() + interval '${ADMIN_MAIL_DELAY}'
+                              when $2 = 'pending' then admin_mail_at end
        where id = $1 returning slug, name, reject_reason as reason`,
-      [game.id, after, reason],
+      [game.id, after, reason, enteredPending(before, after)],
     );
     const row = rows[0];
     const kind = ownerMailFor(move, before, after);
     return {
-      admins: row && enteredPending(before, after) ? row : undefined,
       owner: row && kind ? { kind, gameId: game.id, ...row } : undefined,
     };
   };
-  const mailIf = async ({ admins, owner }: Mails) => {
-    if (!mail) {
-      return;
-    }
-    if (admins) {
-      await mailAdminsPending(pool, mail, admins);
-    }
-    if (owner) {
+  const mailIf = async ({ owner }: Mails) => {
+    if (mail && owner) {
       await mailOwner(pool, mail, owner);
     }
   };
 
   return {
     // Runs `work` (the data change) in the game's transaction; when `isEdit(result)`, applies
-    // the kind's status rule and mails the admins if that put the game into pending.
+    // the kind's status rule and schedules the admin email if that put the game into pending.
     async edit<T>(
       game: GameRow,
       kind: EditKind,
@@ -155,6 +166,9 @@ export function gameLifecycle(pool: pg.Pool, mail?: MailConfig) {
         pool,
         game.id,
         async (tx, before) => {
+          if (before === "approved") {
+            await saveSnapshot(tx, game.id, true);
+          }
           const result = await work(tx);
           const mails = isEdit(result)
             ? await settle(
@@ -198,6 +212,9 @@ export function gameLifecycle(pool: pg.Pool, mail?: MailConfig) {
               };
             }
           }
+          if (before === "approved") {
+            await saveSnapshot(tx, game.id, true);
+          }
           // Submit keeps the last rejection reason; the others set it (cleared unless rejecting)
           const mails = await settle(
             tx,
@@ -207,6 +224,9 @@ export function gameLifecycle(pool: pg.Pool, mail?: MailConfig) {
             after,
             move === "submit" ? null : reason,
           );
+          if (after === "approved") {
+            await saveSnapshot(tx, game.id);
+          }
           return { result: "ok", mails };
         },
       );

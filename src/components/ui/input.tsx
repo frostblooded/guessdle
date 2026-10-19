@@ -31,7 +31,7 @@ export function NativeSelect({
 }: ComponentProps<"select">) {
   return (
     <select
-      className={cn(fieldClass, "h-10 w-auto pr-8", className)}
+      className={cn(fieldClass, "select-chevron h-10 w-auto pr-10", className)}
       {...props}
     />
   );

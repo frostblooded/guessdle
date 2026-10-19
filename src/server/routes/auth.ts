@@ -18,6 +18,7 @@ import {
   normalizeEmail,
   requestLoginLink,
 } from "../email-login.ts";
+import { mailDueAdmins } from "../lifecycle.ts";
 import { usernameOf } from "../playlists.ts";
 import { incomingCount } from "../friends.ts";
 import { bodyOf, type AppContext } from "./context.ts";
@@ -135,5 +136,12 @@ export function authRoutes(
         res.json({ ok: true });
       },
     );
+    // Sends every scheduled admin email now, so e2e need not wait 5 minutes
+    app.post("/api/test/admin-mails", async (_req, res) => {
+      if (mail) {
+        await mailDueAdmins(pool, mail, new Date(Date.now() + 3600_000));
+      }
+      res.json({ ok: true });
+    });
   }
 }

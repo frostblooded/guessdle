@@ -1,5 +1,6 @@
 // The editor's Attributes tab: each attribute is a column on the board. Edits stay here until
-// Save sends the whole list at once. Rows reorder by drag handle or the up and down arrows.
+// Save sends the whole list at once. Rows reorder by drag handle or the up and down arrows. A new
+// attribute is named in a popup, like a new entry.
 import {
   closestCenter,
   DndContext,
@@ -17,11 +18,17 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowDown, ArrowUp, GripVertical } from "lucide-react";
+import { ArrowDown, ArrowUp, GripVertical, Plus } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
-import { Input, NativeSelect } from "../../components/ui/input.tsx";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "../../components/ui/dialog.tsx";
+import { Input, Label, NativeSelect } from "../../components/ui/input.tsx";
 import { erasedBy } from "../../game/editor.ts";
 import { FAILURES } from "../../game/failures.ts";
 import { MAX_ATTRIBUTE_NAME } from "../../game/limits.ts";
@@ -110,6 +117,8 @@ export function AttributesPanel({
   const [error, setError] = useState("");
   const [newName, setNewName] = useState("");
   const [newType, setNewType] = useState<Attribute["type"]>("text");
+  // The new-attribute popup is open
+  const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const dirty =
@@ -153,7 +162,7 @@ export function AttributesPanel({
       ...list,
       { key: `new-${nextKey++}`, name: newName.trim(), type: newType },
     ]);
-    setNewName("");
+    setAdding(false);
   };
 
   const save = async (): Promise<void> => {
@@ -190,6 +199,18 @@ export function AttributesPanel({
         every entry. Drag a row or use its arrows to change the column order;
         reordering alone does not send the game back for review.
       </p>
+      <Button
+        id="attr-new"
+        onClick={() => {
+          setError("");
+          setNewName("");
+          setNewType("text");
+          setAdding(true);
+        }}
+      >
+        <Plus aria-hidden="true" />
+        New attribute
+      </Button>
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -259,43 +280,63 @@ export function AttributesPanel({
           </ul>
         </SortableContext>
       </DndContext>
-      <form
-        id="attr-form"
-        className="attr-row flex flex-wrap items-center gap-2"
-        noValidate
-        onSubmit={add}
-      >
-        <Input
-          id="attr-name"
-          className="min-w-40 flex-1"
-          maxLength={MAX_ATTRIBUTE_NAME}
-          placeholder="New attribute"
-          aria-label="New attribute name"
-          autoComplete="off"
-          value={newName}
-          onChange={(event) => setNewName(event.target.value)}
-        />
-        <NativeSelect
-          id="attr-type"
-          aria-label="New attribute type"
-          value={newType}
-          onChange={(event) =>
-            setNewType(event.target.value as Attribute["type"])
-          }
-        >
-          {TYPES.map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </NativeSelect>
-        <Button type="submit" variant="outline">
-          Add
-        </Button>
-      </form>
-      <Alert id="attr-error" variant="error" role="alert">
-        {error}
-      </Alert>
+      <Dialog open={adding} onOpenChange={setAdding}>
+        <DialogContent id="attr-dialog" className="max-w-lg">
+          <DialogTitle className="pr-8 text-xl">New attribute</DialogTitle>
+          <DialogDescription>
+            It joins the list below; press Save to apply it.
+          </DialogDescription>
+          <form id="attr-form" className="space-y-4" noValidate onSubmit={add}>
+            <div className="space-y-2">
+              <Label htmlFor="attr-name">Name</Label>
+              <Input
+                id="attr-name"
+                maxLength={MAX_ATTRIBUTE_NAME}
+                autoComplete="off"
+                value={newName}
+                onChange={(event) => setNewName(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="attr-type">Type</Label>
+              <NativeSelect
+                id="attr-type"
+                className="block"
+                value={newType}
+                onChange={(event) =>
+                  setNewType(event.target.value as Attribute["type"])
+                }
+              >
+                {TYPES.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+            <Alert id="attr-error" variant="error" role="alert">
+              {error}
+            </Alert>
+            <div className="flex flex-wrap gap-2">
+              <Button id="attr-add" type="submit">
+                Add attribute
+              </Button>
+              <Button
+                id="attr-cancel"
+                variant="ghost"
+                onClick={() => setAdding(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+      {!adding && (
+        <Alert id="attr-error" variant="error" role="alert">
+          {error}
+        </Alert>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <Button
           id="attr-save"

@@ -63,10 +63,17 @@ if (process.env.DATABASE_URL) {
   const { adminEmailsFromEnv } = await import("../src/server/auth.ts");
   const { mailConfigFromEnv } = await import("../src/server/mailer.ts");
   const { rateLimitFromEnv } = await import("../src/server/rate-limit.ts");
+  const { mailDueAdmins } = await import("../src/server/lifecycle.ts");
+  const pool = await connect(process.env.DATABASE_URL);
+  const mail = mailConfigFromEnv(process.env);
+  // Sends the admin email for games still pending 5 minutes after they were sent for approval
+  if (mail) {
+    setInterval(() => void mailDueAdmins(pool, mail), 60_000).unref();
+  }
   const app = createApp({
-    pool: await connect(process.env.DATABASE_URL),
+    pool,
     timeZone: process.env.SERVER_TIMEZONE || undefined,
-    mail: mailConfigFromEnv(process.env),
+    mail,
     limit: rateLimitFromEnv(process.env),
     backupDir: process.env.BACKUP_DIR || undefined,
     uploadsDir: process.env.UPLOADS_DIR || join(ROOT, "uploads"),

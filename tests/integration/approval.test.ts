@@ -3,6 +3,8 @@ import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import { createApp } from "../../src/server/app.ts";
+import { mailDueAdmins } from "../../src/server/lifecycle.ts";
+import type { MailConfig } from "../../src/server/mailer.ts";
 import { MIGRATIONS_DIR } from "../../src/server/main.ts";
 import { migrate } from "../../src/server/migrate.ts";
 import { startDb } from "./postgres.ts";
@@ -21,6 +23,20 @@ describe("approval flow", () => {
   let url: string;
   let sent: Mail[];
   let mailFails = false;
+  const mail: MailConfig = {
+    publicUrl: "https://guess.test",
+    mailer: {
+      async send(message: Mail): Promise<void> {
+        if (mailFails) {
+          throw new Error("smtp down");
+        }
+        sent.push(message);
+      },
+    },
+  };
+  // Runs the admin email round as if `minutes` had passed
+  const after = (minutes: number): Promise<void> =>
+    mailDueAdmins(db.pool, mail, new Date(Date.now() + minutes * 60_000));
 
   const request = async (
     method: string,
@@ -84,17 +100,7 @@ describe("approval flow", () => {
         now: () => NOW,
         testLogin: true,
         writeLimit: { max: 1000, windowMs: 60_000 },
-        mail: {
-          publicUrl: "https://guess.test",
-          mailer: {
-            async send(message: Mail): Promise<void> {
-              if (mailFails) {
-                throw new Error("smtp down");
-              }
-              sent.push(message);
-            },
-          },
-        },
+        mail,
       }).listen(0, "127.0.0.1", () => resolve(s));
     });
     url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -115,13 +121,17 @@ describe("approval flow", () => {
   });
 
   describe("submit for approval", () => {
-    it("moves a draft with 2 entries to pending and emails the admins once", async () => {
+    it("moves a draft with 2 entries to pending and emails the admins once after 5 minutes", async () => {
       await makeGame("draft");
       await login("root2@example.test", true);
       const res = await request("POST", `/api/games/${SLUG}/submit`, ann, {});
       assert.equal(res.status, 200);
       assert.equal(res.body.status, "pending");
       assert.equal(await statusOf(), "pending");
+      await after(4);
+      assert.equal(sent.length, 0);
+      await after(6);
+      await after(7);
       assert.deepEqual(sent.map((m) => m.to).sort(), [
         "root2@example.test",
         "root@example.test",
@@ -129,6 +139,27 @@ describe("approval flow", () => {
       assert.match(sent[0]!.subject, /Game zoo/);
       assert.match(sent[0]!.text, /https:\/\/guess\.test\/admin/);
       assert.match(sent[0]!.text, /https:\/\/guess\.test\/g\/zoo/);
+    });
+
+    for (const verdict of ["approve", "reject"]) {
+      it(`sends no admin email when an admin ${verdict}s within 5 minutes`, async () => {
+        await makeGame("draft");
+        await request("POST", `/api/games/${SLUG}/submit`, ann, {});
+        await request("POST", `/api/admin/games/${SLUG}/${verdict}`, admin, {
+          reason: "No",
+        });
+        await after(6);
+        assert.equal(adminMails().length, 0);
+      });
+    }
+
+    it("restarts the 5 minutes when the game enters pending again", async () => {
+      await makeGame("draft");
+      await request("POST", `/api/games/${SLUG}/submit`, ann, {});
+      await request("POST", `/api/admin/games/${SLUG}/approve`, admin, {});
+      await request("POST", `/api/games/${SLUG}/unpublish`, ann, {});
+      await after(6);
+      assert.equal(adminMails().length, 1);
     });
 
     it("refuses a game with no active entry", async () => {
@@ -214,6 +245,7 @@ describe("approval flow", () => {
       );
       assert.equal(res.status, 200);
       assert.equal(await statusOf(), "pending");
+      await after(6);
       assert.equal(sent.length, 1);
     });
 
@@ -258,6 +290,7 @@ describe("approval flow", () => {
       await makeGame("pending");
       await addEntry();
       await patchName();
+      await after(6);
       assert.equal(sent.length, 0);
     });
 
@@ -269,6 +302,7 @@ describe("approval flow", () => {
         await patchName();
         await patchName();
         assert.equal(await statusOf(), "pending", from);
+        await after(6);
         assert.equal(adminMails().length, 1, from);
       }
     });
@@ -279,9 +313,11 @@ describe("approval flow", () => {
         name: "Color",
         type: "text",
       });
+      await after(6);
       assert.equal(adminMails().length, 1);
       await db.pool.query("update games set status = 'approved'");
       await addEntry();
+      await after(6);
       assert.equal(adminMails().length, 2);
       await db.pool.query("update games set status = 'rejected'");
       const id = (
@@ -290,6 +326,7 @@ describe("approval flow", () => {
         )
       ).rows[0].id;
       await request("DELETE", `/api/games/${SLUG}/entries/${id}`, ann);
+      await after(6);
       assert.equal(adminMails().length, 3);
     });
   });
@@ -573,7 +610,91 @@ describe("approval flow", () => {
       await makeGame("rejected");
       const res = await request("POST", `/api/games/${SLUG}/submit`, ann, {});
       assert.equal(res.status, 200);
+      await after(6);
       assert.equal(sent.length, 1);
+    });
+  });
+
+  describe("changes since the last approval", () => {
+    const changes = (cookie = admin) =>
+      request("GET", `/api/admin/games/${SLUG}/changes`, cookie);
+    const entryId = async (name: string): Promise<number> =>
+      (
+        await db.pool.query("select id::int from entries where name = $1", [
+          name,
+        ])
+      ).rows[0].id;
+
+    it("lists what changed since an admin approved the game", async () => {
+      await makeGame("pending");
+      assert.deepEqual((await changes()).body, { since: null, changes: null });
+      await request("POST", `/api/admin/games/${SLUG}/approve`, admin, {});
+      await request("PATCH", `/api/games/${SLUG}`, ann, { name: "Renamed" });
+      await request(
+        "PATCH",
+        `/api/games/${SLUG}/entries/${await entryId("E0")}`,
+        ann,
+        { name: "E0b" },
+      );
+      await request("POST", `/api/games/${SLUG}/entries`, ann, { name: "E9" });
+      await request(
+        "DELETE",
+        `/api/games/${SLUG}/entries/${await entryId("E1")}`,
+        ann,
+      );
+      const res = await changes();
+      assert.equal(res.status, 200);
+      assert.equal(typeof res.body.since, "string");
+      assert.deepEqual(
+        res.body.changes.map((c: Body) => [c.section, c.kind, c.subject]),
+        [
+          ["Details", "changed", "Renamed"],
+          ["Entries", "changed", "E0b"],
+          ["Entries", "added", "E9"],
+          ["Entries", "removed", "E1"],
+        ],
+      );
+      assert.deepEqual(res.body.changes[1].fields[0], {
+        label: "Name",
+        before: ["E0"],
+        after: ["E0b"],
+        image: false,
+      });
+      // Approving again starts over
+      await request("POST", `/api/admin/games/${SLUG}/approve`, admin, {});
+      assert.deepEqual((await changes()).body.changes, []);
+    });
+
+    it("compares a resubmitted rejected game with its last approval", async () => {
+      await makeGame("pending");
+      await request("POST", `/api/admin/games/${SLUG}/approve`, admin, {});
+      await request("PATCH", `/api/games/${SLUG}`, ann, { name: "One" });
+      await request("POST", `/api/admin/games/${SLUG}/reject`, admin, {
+        reason: "no",
+      });
+      await request("PATCH", `/api/games/${SLUG}`, ann, { name: "Two" });
+      await request("POST", `/api/games/${SLUG}/submit`, ann, {});
+      const [change] = (await changes()).body.changes;
+      assert.deepEqual(
+        [change.fields[0].before, change.fields[0].after],
+        [["Game zoo"], ["Two"]],
+      );
+    });
+
+    it("keeps a game approved before snapshots as it was before its first edit", async () => {
+      await makeGame("approved");
+      await request("PATCH", `/api/games/${SLUG}`, ann, { name: "Renamed" });
+      const [change] = (await changes()).body.changes;
+      assert.deepEqual(
+        [change.fields[0].before, change.fields[0].after],
+        [["Game zoo"], ["Renamed"]],
+      );
+    });
+
+    it("is for admins only", async () => {
+      await makeGame("pending");
+      assert.equal((await changes(ann)).status, 403);
+      assert.equal((await changes("")).status, 401);
     });
   });
 });
