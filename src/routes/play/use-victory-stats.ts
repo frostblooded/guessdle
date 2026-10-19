@@ -2,7 +2,12 @@
 import { useState, type RefObject } from "react";
 import { gameStorage, pastDayStorage } from "../../game/game-state.ts";
 import type { Play } from "../../game/play.ts";
-import { fetchStats, playerToken, type DayStats } from "../../game/stats.ts";
+import {
+  fetchStats,
+  playerToken,
+  type DayStats,
+  type WinResult,
+} from "../../game/stats.ts";
 import { browserFetch } from "../../lib/api.ts";
 
 // When the current board's first guess was made on this browser: [Day Number, ms since the epoch]
@@ -13,10 +18,13 @@ export interface VictoryStats {
   setOpen: (open: boolean) => void;
   stats: DayStats | null;
   failed: boolean;
+  // The board on screen: its guesses, and its time when the popup opened on the win itself
+  thisTry: WinResult | null;
   // Call on a fresh board's first guess
   startClock(): void;
-  // Records the win (the first one of the day counts) and opens the popup
-  show(): Promise<void>;
+  // Records the win (the first one of the day counts) and opens the popup; `won`: called
+  // on the winning guess, not from See stats
+  show(won?: boolean): Promise<void>;
 }
 
 // `day`: a past day's Day Number; today when absent
@@ -33,6 +41,7 @@ export function useVictoryStats(
   const [open, setOpen] = useState(false);
   const [stats, setStats] = useState<DayStats | null>(null);
   const [failed, setFailed] = useState(false);
+  const [thisTry, setThisTry] = useState<WinResult | null>(null);
 
   // Whole seconds since the first guess, or null when this browser did not see this day's
   const seconds = (): number | null => {
@@ -53,6 +62,7 @@ export function useVictoryStats(
     setOpen,
     stats,
     failed,
+    thisTry,
     startClock(): void {
       try {
         board().setItem(
@@ -63,15 +73,22 @@ export function useVictoryStats(
         // Blocked storage: the time stays unknown
       }
     },
-    async show(): Promise<void> {
+    async show(won: boolean = false): Promise<void> {
       setOpen(true);
       setFailed(false);
+      const ids = play.current?.getUsedGuesses() ?? [];
+      const time: number | null = seconds();
+      // Only the win itself knows the time; See stats later would count the time since
+      setThisTry((old) => ({
+        guesses: ids.length,
+        seconds: won ? time : old?.guesses === ids.length ? old.seconds : null,
+      }));
       const fresh = await fetchStats(
         browserFetch,
         slug,
         {
-          ids: play.current?.getUsedGuesses() ?? [],
-          seconds: seconds(),
+          ids,
+          seconds: time,
           player: playerToken(localStorage),
         },
         day,

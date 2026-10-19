@@ -146,7 +146,7 @@ export function usePlayBoard({
     if (res.answer !== undefined && (res.isAnswer || res.lost)) {
       setResult(resultOf(res.isAnswer ? "victory" : "lost", res));
       if (res.isAnswer) {
-        void victory.show();
+        void victory.show(true);
       }
     }
     setRows((old) => [res.row, ...old]);

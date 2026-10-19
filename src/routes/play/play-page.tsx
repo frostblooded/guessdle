@@ -259,6 +259,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
             answer={result.answer}
             stats={victory.stats}
             failed={victory.failed}
+            thisTry={victory.thisTry}
           />
         )}
         <ResetDialog

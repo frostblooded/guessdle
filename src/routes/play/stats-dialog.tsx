@@ -1,4 +1,5 @@
 // The victory popup: congratulations, the player's guesses and time, and how the day's winners did.
+import type { ReactNode } from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +13,7 @@ import {
   TIME_BUCKETS,
   timeBucket,
   type DayStats,
+  type WinResult,
 } from "../../game/stats.ts";
 
 export interface Bar {
@@ -104,18 +106,89 @@ function comparison(percent: number | null, better: string): string | null {
   return percent === null ? null : `${better} than ${percent}% of players`;
 }
 
-// `past`: the stats of a past day (anyone who won it, then or later), not today
+// Guesses and time side by side, with how they compare when `stats` is given
+function Scores({
+  result,
+  id,
+  stats,
+}: {
+  result: WinResult;
+  id: string;
+  stats?: DayStats;
+}) {
+  return (
+    <dl className="grid grid-cols-2 gap-3 text-center">
+      <div className="rounded-lg bg-muted p-3">
+        <dt className="text-xs font-bold uppercase">Guesses</dt>
+        <dd id={`${id}-guesses`} className="text-3xl font-bold tabular-nums">
+          {result.guesses}
+        </dd>
+        {stats && (
+          <dd className="text-xs text-muted-foreground">
+            {comparison(stats.fewerGuessesThan, "Fewer guesses") ?? " "}
+          </dd>
+        )}
+      </div>
+      <div className="rounded-lg bg-muted p-3">
+        <dt className="text-xs font-bold uppercase">Time</dt>
+        <dd id={`${id}-time`} className="text-3xl font-bold tabular-nums">
+          {result.seconds === null ? "-" : formatSeconds(result.seconds)}
+        </dd>
+        {stats && (
+          <dd className="text-xs text-muted-foreground">
+            {comparison(stats.fasterThan, "Faster") ?? " "}
+          </dd>
+        )}
+      </div>
+    </dl>
+  );
+}
+
+// A labelled group of the popup
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="text-sm font-bold uppercase">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+// The board on screen is not the win in the stats: a later try, or the first one failed
+export function isReplay(stats: DayStats, thisTry: WinResult | null): boolean {
+  const { you } = stats;
+  if (thisTry === null) {
+    return false;
+  }
+  if (you === null) {
+    return stats.firstTryFailed === true;
+  }
+  return (
+    you.guesses !== thisTry.guesses ||
+    // A time too long to record is stored as unknown
+    (thisTry.seconds !== null &&
+      you.seconds !== null &&
+      you.seconds !== thisTry.seconds)
+  );
+}
+
+// `past`: the stats of a past day (anyone who won it, then or later), not today.
+// `thisTry`: the board on screen, shown apart when it is not the win the stats count.
 export function StatsPanel({
   stats,
   past = false,
+  thisTry = null,
 }: {
   stats: DayStats;
   past?: boolean;
+  thisTry?: WinResult | null;
 }) {
   const when = past ? "" : " today";
+  const day = past ? "that day" : "today";
   const { you } = stats;
   const others = stats.players - (you === null ? 0 : 1);
   const hasTimes = stats.times.some((n) => n > 0);
+  const replay = isReplay(stats, thisTry);
   return (
     <div className="flex flex-col gap-5">
       {stats.firstTryFailed && (
@@ -127,28 +200,28 @@ export function StatsPanel({
           win, so this one is not in the stats.
         </p>
       )}
-      {you && (
-        <dl className="grid grid-cols-2 gap-3 text-center">
-          <div className="rounded-lg bg-muted p-3">
-            <dt className="text-xs font-bold uppercase">Guesses</dt>
-            <dd id="stats-guesses" className="text-3xl font-bold tabular-nums">
-              {you.guesses}
-            </dd>
-            <dd className="text-xs text-muted-foreground">
-              {comparison(stats.fewerGuessesThan, "Fewer guesses") ?? " "}
-            </dd>
-          </div>
-          <div className="rounded-lg bg-muted p-3">
-            <dt className="text-xs font-bold uppercase">Time</dt>
-            <dd id="stats-time" className="text-3xl font-bold tabular-nums">
-              {you.seconds === null ? "-" : formatSeconds(you.seconds)}
-            </dd>
-            <dd className="text-xs text-muted-foreground">
-              {comparison(stats.fasterThan, "Faster") ?? " "}
-            </dd>
-          </div>
-        </dl>
+      {replay && you && (
+        <p
+          id="stats-replay"
+          className="rounded-lg bg-warn-bg p-3 text-sm text-warn"
+        >
+          This was not your first win {day}. Only the first win counts, so the
+          stats below use it: {guessesWord(you.guesses)}.
+        </p>
       )}
+      {replay && thisTry && (
+        <Section title="This try">
+          <Scores id="stats-this" result={thisTry} />
+        </Section>
+      )}
+      {you &&
+        (replay ? (
+          <Section title={`Counted: your first win ${day}`}>
+            <Scores id="stats" result={you} stats={stats} />
+          </Section>
+        ) : (
+          <Scores id="stats" result={you} stats={stats} />
+        ))}
       <p id="stats-players" className="text-center text-sm">
         {stats.players === 0
           ? `Nobody has solved it${when} yet.`
@@ -176,6 +249,7 @@ export function StatsDialog({
   stats,
   failed,
   past = false,
+  thisTry = null,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -183,9 +257,11 @@ export function StatsDialog({
   stats: DayStats | null;
   failed: boolean;
   past?: boolean;
+  thisTry?: WinResult | null;
 }) {
   const which = past ? "this day's" : "today's";
-  const you = stats?.you;
+  // The headline is the board on screen; the stats may count an earlier win
+  const you = thisTry ?? stats?.you;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -208,7 +284,7 @@ export function StatsDialog({
           </DialogDescription>
         </div>
         {stats ? (
-          <StatsPanel stats={stats} past={past} />
+          <StatsPanel stats={stats} past={past} thisTry={thisTry} />
         ) : (
           <p id="stats-status" className="text-sm text-muted-foreground">
             {failed
