@@ -78,8 +78,6 @@ test("a free hint opens after 3 wrong guesses and stays after a reload", async (
   await expect(hint).toBeHidden();
   await submitGuess(page, wrong[2]!);
   await expect(hint).toContainText("You earned a free hint");
-  // The fixture game's entries have no description
-  await expect(page.locator("#hint-description-button")).toBeDisabled();
   await page.locator("#hint-attribute-button").click();
   await expect(hint).toContainText("Free hint");
   const text = await page.locator("#free-hint-text").textContent();

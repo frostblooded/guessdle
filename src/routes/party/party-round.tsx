@@ -123,12 +123,9 @@ export function PartyRound({
           </div>
         </Card>
       )}
-      {titles && (
-        <FreeHintCard
-          hint={mine.hint}
-          hints={done ? undefined : mine.hints}
-          onTake={onHint}
-        />
+      {/* The hint goes once the answer is revealed */}
+      {titles && !done && (
+        <FreeHintCard hint={mine.hint} hints={mine.hints} onTake={onHint} />
       )}
       {listing && <SelectList entries={unguessed} onPick={submit} />}
       {(tries !== null || mine.rows.length > 0) && (
