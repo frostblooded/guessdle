@@ -57,7 +57,7 @@ export function Question({
           id="quiz-options"
           role="group"
           aria-labelledby="quiz-prompt"
-          className="grid gap-2 sm:grid-cols-2"
+          className="mx-auto grid w-full max-w-md gap-2"
         >
           {question.options.map((option, i) => (
             <Button
