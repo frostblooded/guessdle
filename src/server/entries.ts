@@ -3,7 +3,7 @@ import type pg from "pg";
 import { parseNumberValue } from "../game/number.ts";
 import { listAttributes } from "./attributes.ts";
 import type { GameRow } from "./games.ts";
-import type { QuizSpec } from "../game/quiz.ts";
+import { sameQuestion, type QuizSpec } from "../game/quiz.ts";
 
 export interface EntryRow {
   id: number;
@@ -69,14 +69,15 @@ export interface EntryInput {
 // only its name: one missing photos just cannot be the answer. A Quiz question needs its answer
 // (quiz), sent or stored, may share its text with another and may have a photo.
 // Runs in the caller's game transaction (lifecycle.edit), which applies the status rule.
-// `replaced` lists the files the edit stopped using, for the caller to release.
+// `replaced` lists the files the edit stopped using, for the caller to release. `answerOnly`: the
+// edit changed at most a Quiz question's right answer, so the status stays.
 export async function saveEntry(
   tx: pg.PoolClient,
   game: GameRow,
   id: number | undefined,
   input: EntryInput,
 ): Promise<
-  | { id: number; replaced: string[] }
+  | { id: number; replaced: string[]; answerOnly: boolean }
   | "invalid"
   | "entry_exists"
   | "not_found"
@@ -217,6 +218,13 @@ export async function saveEntry(
   const after = new Set([photo, ...shots]);
   return {
     id: entryId,
+    answerOnly:
+      current?.quiz != null &&
+      quiz !== null &&
+      name === current.name &&
+      photo === current.photo &&
+      description === current.description &&
+      sameQuestion(current.quiz, quiz),
     replaced: [
       ...replaced,
       ...before.filter((url) => url !== "" && !after.has(url)),
