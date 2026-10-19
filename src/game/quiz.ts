@@ -22,7 +22,7 @@ export interface QuizQuestion {
 // A player's answer: a choice question's option index as text ("0", "1", ...), or the number typed
 export type QuizAnswer = string;
 
-const isChoice = (
+export const isChoice = (
   spec: QuizSpec,
 ): spec is { options: string[]; correct: number } => "options" in spec;
 

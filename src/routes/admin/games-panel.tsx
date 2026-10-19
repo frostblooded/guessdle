@@ -177,7 +177,7 @@ export function GamesPanel({ active }: { active: boolean }) {
               </TableCell>
               <TableCell>{game.entryCount}</TableCell>
               <TableCell>
-                <span className="flex justify-end gap-2">
+                <span className="flex flex-wrap justify-end gap-2">
                   {game.status === "pending" && (
                     <ReviewButtons
                       slug={game.slug}

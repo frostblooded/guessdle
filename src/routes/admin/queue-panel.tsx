@@ -99,7 +99,7 @@ export function QueuePanel({ active }: { active: boolean }) {
                   {new Date(game.since).toLocaleString()}
                 </TableCell>
                 <TableCell>
-                  <span className="flex justify-end gap-2">
+                  <span className="flex flex-wrap justify-end gap-2">
                     <ReviewButtons
                       slug={game.slug}
                       name={game.name}

@@ -3,6 +3,7 @@
 // owner's approval emails (owner-mail.ts).
 import type pg from "pg";
 import { playBlocker } from "./access.ts";
+import { saveSnapshot } from "./approval.ts";
 import { loadRoster, type GameRow, type GameStatus } from "./games.ts";
 import type { OwnerMailKind } from "../mail-settings.ts";
 import type { MailConfig } from "./mailer.ts";
@@ -155,6 +156,9 @@ export function gameLifecycle(pool: pg.Pool, mail?: MailConfig) {
         pool,
         game.id,
         async (tx, before) => {
+          if (before === "approved") {
+            await saveSnapshot(tx, game.id, true);
+          }
           const result = await work(tx);
           const mails = isEdit(result)
             ? await settle(
@@ -198,6 +202,9 @@ export function gameLifecycle(pool: pg.Pool, mail?: MailConfig) {
               };
             }
           }
+          if (before === "approved") {
+            await saveSnapshot(tx, game.id, true);
+          }
           // Submit keeps the last rejection reason; the others set it (cleared unless rejecting)
           const mails = await settle(
             tx,
@@ -207,6 +214,9 @@ export function gameLifecycle(pool: pg.Pool, mail?: MailConfig) {
             after,
             move === "submit" ? null : reason,
           );
+          if (after === "approved") {
+            await saveSnapshot(tx, game.id);
+          }
           return { result: "ok", mails };
         },
       );

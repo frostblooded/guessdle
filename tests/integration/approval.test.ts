@@ -570,4 +570,87 @@ describe("approval flow", () => {
       assert.equal(sent.length, 1);
     });
   });
+
+  describe("changes since the last approval", () => {
+    const changes = (cookie = admin) =>
+      request("GET", `/api/admin/games/${SLUG}/changes`, cookie);
+    const entryId = async (name: string): Promise<number> =>
+      (
+        await db.pool.query("select id::int from entries where name = $1", [
+          name,
+        ])
+      ).rows[0].id;
+
+    it("lists what changed since an admin approved the game", async () => {
+      await makeGame("pending");
+      assert.deepEqual((await changes()).body, { since: null, changes: null });
+      await request("POST", `/api/admin/games/${SLUG}/approve`, admin, {});
+      await request("PATCH", `/api/games/${SLUG}`, ann, { name: "Renamed" });
+      await request(
+        "PATCH",
+        `/api/games/${SLUG}/entries/${await entryId("E0")}`,
+        ann,
+        { name: "E0b" },
+      );
+      await request("POST", `/api/games/${SLUG}/entries`, ann, { name: "E9" });
+      await request(
+        "DELETE",
+        `/api/games/${SLUG}/entries/${await entryId("E1")}`,
+        ann,
+      );
+      const res = await changes();
+      assert.equal(res.status, 200);
+      assert.equal(typeof res.body.since, "string");
+      assert.deepEqual(
+        res.body.changes.map((c: Body) => [c.section, c.kind, c.subject]),
+        [
+          ["Details", "changed", "Renamed"],
+          ["Entries", "changed", "E0b"],
+          ["Entries", "added", "E9"],
+          ["Entries", "removed", "E1"],
+        ],
+      );
+      assert.deepEqual(res.body.changes[1].fields[0], {
+        label: "Name",
+        before: ["E0"],
+        after: ["E0b"],
+        image: false,
+      });
+      // Approving again starts over
+      await request("POST", `/api/admin/games/${SLUG}/approve`, admin, {});
+      assert.deepEqual((await changes()).body.changes, []);
+    });
+
+    it("compares a resubmitted rejected game with its last approval", async () => {
+      await makeGame("pending");
+      await request("POST", `/api/admin/games/${SLUG}/approve`, admin, {});
+      await request("PATCH", `/api/games/${SLUG}`, ann, { name: "One" });
+      await request("POST", `/api/admin/games/${SLUG}/reject`, admin, {
+        reason: "no",
+      });
+      await request("PATCH", `/api/games/${SLUG}`, ann, { name: "Two" });
+      await request("POST", `/api/games/${SLUG}/submit`, ann, {});
+      const [change] = (await changes()).body.changes;
+      assert.deepEqual(
+        [change.fields[0].before, change.fields[0].after],
+        [["Game zoo"], ["Two"]],
+      );
+    });
+
+    it("keeps a game approved before snapshots as it was before its first edit", async () => {
+      await makeGame("approved");
+      await request("PATCH", `/api/games/${SLUG}`, ann, { name: "Renamed" });
+      const [change] = (await changes()).body.changes;
+      assert.deepEqual(
+        [change.fields[0].before, change.fields[0].after],
+        [["Game zoo"], ["Renamed"]],
+      );
+    });
+
+    it("is for admins only", async () => {
+      await makeGame("pending");
+      assert.equal((await changes(ann)).status, 403);
+      assert.equal((await changes("")).status, 401);
+    });
+  });
 });
