@@ -90,7 +90,8 @@ describe("changing today's answer restarts the day", () => {
     assert.equal(await count("user_guesses"), 1);
     assert.equal(await count("user_give_ups"), 1);
     assert.equal(await count("user_hints"), 1);
-    assert.equal(await count("game_results"), 1);
+    // The win and the quitter's failed first attempt
+    assert.equal(await count("game_results"), 2);
 
     const put = await send(
       "PUT",

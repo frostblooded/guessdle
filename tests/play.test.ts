@@ -35,9 +35,11 @@ class FakeServer {
   giveUps: number = 0;
   hints: { ids: number[]; kind: string }[] = [];
   urls: string[] = [];
+  bodies: unknown[] = [];
 
   fetch: Fetch = async (fullUrl, init) => {
     this.urls.push(fullUrl);
+    this.bodies.push(JSON.parse(init!.body));
     // A past day's query; this fake grades every day the same
     const url = fullUrl.replace(/\?day=\d+$/, "");
     assert.equal(init?.method, "POST");
@@ -412,6 +414,34 @@ describe("giveUp", () => {
     server.down = true;
     assert.deepEqual(await open().load(), { failure: UNREACHABLE });
     assert.equal(storage.getItem("gaveUp"), "true");
+  });
+});
+
+describe("player token", () => {
+  it("goes with every grade and give-up, so a failed first try is recorded", async () => {
+    const play = createPlay({
+      slug: SLUG,
+      roster: GUESS_DATA,
+      storage,
+      now: () => MONDAY,
+      fetch: server.fetch,
+      player: "token-0000-0000-0000",
+    });
+    await play.submit(one!.id);
+    await play.giveUp();
+    await loadedOf(play);
+    assert.ok(server.bodies.length >= 3);
+    for (const body of server.bodies) {
+      assert.equal(
+        (body as { player?: string }).player,
+        "token-0000-0000-0000",
+      );
+    }
+  });
+
+  it("is left out when the page has none", async () => {
+    await open().giveUp();
+    assert.deepEqual(server.bodies, [{}]);
   });
 });
 

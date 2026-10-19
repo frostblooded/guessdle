@@ -48,6 +48,21 @@ test("a correct guess shows the victory banner with the answer", async ({
   await expect(rows(page).first().locator(".cell.incorrect")).toHaveCount(0);
 });
 
+test("a win after giving up and resetting is not counted in the stats", async ({
+  page,
+}) => {
+  await page.locator("#give-up-button").click();
+  await page.locator("#reset-button").click();
+  await confirmReset(page);
+  await submitGuess(page, answerName);
+  const dialog = page.locator("#stats-dialog");
+  await expect(dialog.locator("#stats-not-counted")).toContainText(
+    "Only the first try counts",
+  );
+  await expect(dialog.locator("#stats-guesses")).toHaveCount(0);
+  await expect(dialog.locator("[data-mine]")).toHaveCount(0);
+});
+
 test("a free hint opens after 3 wrong guesses and stays after a reload", async ({
   page,
 }) => {

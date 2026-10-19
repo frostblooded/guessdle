@@ -5,10 +5,10 @@ import type pg from "pg";
 import { isHintKind, pickHint, revealHint } from "../../game/free-hint.ts";
 import type { DaysResponse } from "../../game/days.ts";
 import { listDays } from "../days.ts";
-import { isPlayerToken } from "../../game/stats.ts";
 import { listGallery } from "../gallery.ts";
 import { canApprove, canManage } from "../access.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
+import { playerOf, recordFailure } from "../results.ts";
 import {
   boardOf,
   openDay,
@@ -132,6 +132,15 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         res.status(REFUSAL_STATUS[board]).json({ error: board, day: day.day });
         return;
       }
+      // Out of tries on the browser's first attempt: no later win that day counts
+      const player = playerOf(null, bodyOf(req));
+      if (board.lost && player !== null) {
+        await recordFailure(
+          pool,
+          { gameId: day.game.id, date: day.date, player },
+          ids.length,
+        );
+      }
       res.json({
         day: day.day,
         revision: day.revision,
@@ -184,23 +193,37 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
     },
   );
 
-  // Stateless and open to anyone by decision (spec #38): reveals the day's answer
-  app.post(`${base}/give-up`, async (req, res) => {
-    const loaded = await loadGame(ctx, req, res);
-    if (!loaded) {
-      return;
-    }
-    const day = await playDayOf(ctx, req, res, loaded);
-    if (day) {
+  // Stateless and open to anyone by decision (spec #38): reveals the day's answer. With the
+  // browser's player token, a give-up on its first attempt keeps any later win out of the stats.
+  app.post(
+    `${base}/give-up`,
+    express.json({ limit: "10kb" }),
+    async (req, res) => {
+      const loaded = await loadGame(ctx, req, res);
+      if (!loaded) {
+        return;
+      }
+      const day = await playDayOf(ctx, req, res, loaded);
+      if (!day) {
+        return;
+      }
+      const player = playerOf(null, bodyOf(req));
+      if (player !== null) {
+        await recordFailure(
+          pool,
+          { gameId: day.game.id, date: day.date, player },
+          0,
+        );
+      }
       res.json({
         day: day.day,
         revision: day.revision,
         ...revealOf(day.game, day.answer),
       });
-    }
-  });
+    },
+  );
 
-  // Records the player's first win of the day (today, or a past day named by ?day=N) and
+  // Records the player's first attempt of the day if it is a win (today, or a past day named by ?day=N) and
   // answers with that day's stats. Signed-in
   // players are known by their session and their stored guesses; anonymous ones by
   // the browser's token and the ids they send, which must end with the answer.
@@ -215,11 +238,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         return;
       }
       const body = bodyOf(req);
-      const player = user
-        ? `user:${user.id}`
-        : isPlayerToken(body["player"])
-          ? `anon:${body["player"]}`
-          : null;
+      const player = playerOf(user?.id ?? null, body);
       const ids = body["ids"];
       const day = await playDayOf(
         ctx,

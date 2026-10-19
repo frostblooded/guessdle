@@ -51,5 +51,19 @@ export const UnknownTime: Story = {
     },
   },
 };
+export const FirstTryFailed: Story = {
+  args: {
+    stats: {
+      day: 427,
+      you: null,
+      players: 5,
+      guesses: [0, 2, 2, 1, 0, 0, 0, 0, 0, 0],
+      times: [1, 2, 1, 1, 0, 0],
+      fewerGuessesThan: null,
+      fasterThan: null,
+      firstTryFailed: true,
+    },
+  },
+};
 export const Loading: Story = { args: { stats: null } };
 export const Failed: Story = { args: { stats: null, failed: true } };
