@@ -57,6 +57,14 @@ export function parseQuizSpec(value: unknown): QuizSpec | undefined {
     : undefined;
 }
 
+// True when `b` asks what `a` asks: the same options, or both a number. Only the right answer
+// (the right option, or a number's answer and range) may differ; such an edit skips reapproval.
+export const sameQuestion = (a: QuizSpec, b: QuizSpec): boolean =>
+  isChoice(a) && isChoice(b)
+    ? a.options.length === b.options.length &&
+      a.options.every((o, i) => o === b.options[i])
+    : !isChoice(a) && !isChoice(b);
+
 export const questionOf = (
   { id, name, photo }: { id: number; name: string; photo: string },
   spec: QuizSpec,

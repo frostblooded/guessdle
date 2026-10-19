@@ -226,6 +226,41 @@ describe("quiz games", () => {
     assert.equal(card.entryCount, 1);
   });
 
+  it("keeps the status when only a right answer or range changes", async () => {
+    const [choice, number] = await addBoth();
+    const statusOf = async (): Promise<string> =>
+      (
+        await db.pool.query<{ status: string }>(
+          "select status from games where slug = 'trivia'",
+        )
+      ).rows[0]!.status;
+    const edit = (id: number, body: object) =>
+      request("PATCH", `${G}/entries/${id}`, ann, body);
+    for (const status of ["approved", "rejected"]) {
+      await db.pool.query("update games set status = $1", [status]);
+      await edit(choice, { ...CHOICE, quiz: { ...CHOICE.quiz, correct: 2 } });
+      await edit(number, { ...NUMBER, quiz: { answer: "1990", range: "5" } });
+      assert.equal(await statusOf(), status);
+    }
+    const changes = [
+      [choice, { ...CHOICE, name: "Which planet is smallest?" }],
+      [
+        choice,
+        {
+          ...CHOICE,
+          quiz: { options: ["Mars", "Jupiter", "Pluto"], correct: 1 },
+        },
+      ],
+      [choice, { ...CHOICE, quiz: { answer: "1", range: "1" } }],
+      [number, { ...NUMBER, quiz: { options: ["1989", "1990"], correct: 0 } }],
+    ] as const;
+    for (const [id, body] of changes) {
+      await db.pool.query("update games set status = 'approved'");
+      assert.equal((await edit(id, body)).status, 200);
+      assert.equal(await statusOf(), "pending", JSON.stringify(body));
+    }
+  });
+
   describe("a party", () => {
     const open = async (): Promise<{
       party: PartyRow;
