@@ -73,7 +73,7 @@ ADR 0016. Pure rules in `src/game/party.ts` (codes, nicknames, ranking, Placemen
 
 ## Tests
 
-- Unit, component and integration tests run on Vitest (`vitest.config.ts`: a `unit` project for `tests/*.test.ts`, a `ui` project for React components in `tests/ui/*.test.tsx` (jsdom, Testing Library; `npm test` runs both) and an `integration` project that runs one file at a time). `tsc -p tsconfig.test.json` type-checks them first. Assertions use `node:assert/strict`.
-- `npm run test:integration` runs the HTTP API against Testcontainers Postgres (needs Docker).
+- Unit, component and integration tests run on Vitest (`vitest.config.ts`: a `unit` project for `tests/*.test.ts`, a `ui` project for React components in `tests/ui/*.test.tsx` (jsdom, Testing Library; `npm test` runs both) and an `integration` project whose files run in parallel). `npm test` type-checks them all first with `tsc -p tsconfig.test.json`. Assertions use `node:assert/strict`.
+- `npm run test:integration` runs the HTTP API against Testcontainers Postgres (needs Docker): `tests/integration/global-setup.ts` starts one container per run and `startDb()` gives each file its own empty database in it.
 - Page URLs are served by `scripts/server.mjs` (dev) and `location /` `try_files` in `deploy/nginx.conf` (prod); `tests/e2e/server.spec.ts` and `tests/build-wiring.test.ts` cover both lists.
 - `npm run test:e2e` starts a Testcontainers Postgres and Mailpit via `tests/e2e/serve.ts` (needs Docker); sign-in mail is read back through Mailpit's API. One integration test delivers through real nodemailer to Mailpit. The Daily Answer is random there; tests learn it through the API.
