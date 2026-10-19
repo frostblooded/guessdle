@@ -100,7 +100,10 @@ export function PartyRound({
         />
       )}
       {!done && (
-        <Card id="guess-card" className="play-card mb-6 gap-3 p-4 sm:p-5">
+        <Card
+          id="guess-card"
+          className="play-card mb-6 flex flex-col gap-4 p-4 sm:p-5"
+        >
           <GuessForm
             modes={modes}
             names={names}
