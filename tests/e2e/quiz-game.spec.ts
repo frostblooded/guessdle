@@ -42,6 +42,15 @@ test("a Quiz game is written in the editor, then taken and scored", async ({
 
   await page.goto(`/g/${slug}`);
   await expect(page.locator("#quiz-progress")).toHaveText("Question 1 of 2");
+  // Options stack one per row, in a column narrower than the card
+  const mars = await page.getByRole("button", { name: "Mars" }).boundingBox();
+  const jupiter = await page
+    .getByRole("button", { name: "Jupiter" })
+    .boundingBox();
+  const card = await page.locator("#quiz").boundingBox();
+  expect(jupiter!.y).toBeGreaterThanOrEqual(mars!.y + mars!.height);
+  expect(jupiter!.x).toBe(mars!.x);
+  expect(mars!.width).toBeLessThan(card!.width - 64);
   await page.getByRole("button", { name: "Jupiter", exact: true }).click();
   await page.locator("#quiz-next").click();
   await page.locator("#quiz-number").fill("1994");
