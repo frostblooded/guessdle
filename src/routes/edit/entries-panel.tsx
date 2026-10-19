@@ -385,9 +385,7 @@ export function EntriesPanel({
                 id="entry-description-help"
                 className="text-sm text-muted-foreground"
               >
-                {blur
-                  ? "Shown with the answer once a player finds it or the day is over."
-                  : "Shown with the answer once a player finds it or the day is over. Players can also reveal it as their free hint."}
+                Shown with the answer once a player finds it or the day is over.
               </p>
             </div>
             <Alert id="entry-error" variant="error" role="alert">
