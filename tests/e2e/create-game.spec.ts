@@ -76,7 +76,7 @@ test("creating a game opens its editor as a draft, and Details saves", async ({
 
   await expect(page.locator("#status-notice")).toContainText("Draft");
   await expect(page.locator("#status-notice")).toContainText(
-    "needs 2 more entries",
+    "needs 1 more entry",
   );
   await expect(page.getByText("Web address")).toHaveCount(0);
   await expect(page.getByRole("tab", { name: "Details" })).toHaveAttribute(
@@ -198,9 +198,7 @@ test("the owner of an empty draft sees why it cannot be played, not a connection
   const slug = await createViaForm(page, "Empty draft");
   await page.goto(`/g/${slug}`);
   await expect(page.locator("#loading-state")).toBeHidden();
-  await expect(page.locator("#notice")).toContainText(
-    "needs at least 2 entries",
-  );
+  await expect(page.locator("#notice")).toContainText("needs an entry");
   await expect(page.locator("#notice")).not.toContainText("connection");
   await expect(page.locator("#edit-link")).toBeVisible();
   await expectPlayDisabled(page);

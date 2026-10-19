@@ -11,7 +11,7 @@ import type { TestDb } from "./postgres.ts";
 const NOW = new Date("2026-10-16T10:00:00Z");
 const G = "/api/games/tiny";
 
-// The owner of a game with fewer than 2 entries may open it, but no Daily Answer can be drawn
+// The owner of a game with no entries may open it, but no Daily Answer can be drawn
 describe("a game with too few entries, opened by its owner", () => {
   let db: TestDb;
   let server: Server;
@@ -69,7 +69,7 @@ describe("a game with too few entries, opened by its owner", () => {
     await db.pool.query("delete from games where slug = 'tiny'");
   });
 
-  for (const entries of [0, 1]) {
+  for (const entries of [0]) {
     it(`answers 409 not_enough_entries, never a 500, with ${entries} entries`, async () => {
       await makeGame(entries);
       assert.equal((await send("GET", G)).status, 200);

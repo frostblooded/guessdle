@@ -1,6 +1,5 @@
 // Party mode's words for the page (issue #90, ADR 0016): places, solve times, progress and
 // why an action was refused.
-import { MIN_ENTRIES } from "./limits.ts";
 import type { LiveRound, PartyRefusal } from "./party.ts";
 
 // "1st", "2nd", "3rd", "4th", ... "11th", "21st"
@@ -47,7 +46,7 @@ export const REFUSAL_TEXT: Record<PartyRefusal, string> = {
   finished: "You are done with this round. Wait for the next one.",
   duplicate: "You already guessed that one.",
   party_ended: "This party has ended.",
-  not_enough_entries: `This game needs at least ${MIN_ENTRIES} entries (one for a Blur or Quiz game) before a round can start.`,
+  not_enough_entries: "This game needs an entry before a round can start.",
   game_paused:
     "This game is paused while some of its entries are missing values.",
   no_hint: "No free hint is available right now.",

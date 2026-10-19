@@ -139,8 +139,8 @@ describe("game shell with link-preview meta", () => {
     assert.match(html, /<meta name="robots" content="noindex" \/>/);
   });
 
-  it("answers 404 with noindex and no game text for a draft, an under-2 game and an unknown slug", async () => {
-    await makeGame("draft", 2, { name: "SecretName" });
+  it("answers 404 with noindex and no game text for a draft, a game with no entries and an unknown slug", async () => {
+    await makeGame("draft", 1, { name: "SecretName" });
     for (const path of [`/g/${SLUG}`, "/g/no-such-game"]) {
       const { status, html, cache } = await page(path);
       assert.equal(status, 404);
@@ -199,7 +199,7 @@ describe("game shell with link-preview meta", () => {
       for (const entries of [0, 1, 2]) {
         await db.pool.query("delete from games where slug = $1", [SLUG]);
         await makeGame(status, entries, {}, "owner@example.com");
-        const playable = status !== "draft" && entries >= 2;
+        const playable = status !== "draft" && entries >= 1;
         for (const who of ["anon", "stranger", "owner", "admin"] as const) {
           const manager = who === "owner" || who === "admin";
           const tag = `${status}/${entries}/${who}`;

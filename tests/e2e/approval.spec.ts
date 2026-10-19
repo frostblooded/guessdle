@@ -26,16 +26,12 @@ test("submit, admin reject, resubmit, approve, unpublish", async ({
   const { slug } = (await (
     await page.request.post("/api/games", { data: { name } })
   ).json()) as { slug: string };
-  await page.request.post(`/api/games/${slug}/entries`, {
-    data: { name: "One" },
-  });
-
   await page.goto(`/g/${slug}/edit`);
   await expect(page.locator("#loading-state")).toBeHidden();
-  // One entry is not enough
+  // A game with no entry cannot be submitted; one is enough
   await expect(page.locator("#submit-button")).toBeDisabled();
   await page.request.post(`/api/games/${slug}/entries`, {
-    data: { name: "Two" },
+    data: { name: "One" },
   });
   await page.reload();
   await expect(page.locator("#loading-state")).toBeHidden();

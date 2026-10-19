@@ -269,9 +269,8 @@ describe("blur games", () => {
         (c: Body) => c.slug === "blurry",
       ),
     );
-    // A classic game still needs two
+    // A game with no entry cannot be submitted
     await request("POST", "/api/games", ann, { name: "Classic" });
-    await request("POST", "/api/games/classic/entries", ann, { name: "One" });
     assert.equal(
       (await request("POST", "/api/games/classic/submit", ann)).body.error,
       "too_few_entries",

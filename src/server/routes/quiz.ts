@@ -28,7 +28,7 @@ export function quizRoutes(app: Express, ctx: AppContext): void {
         fail(res, "not_found");
         return;
       }
-      const blocker = playBlocker(game, roster);
+      const blocker = playBlocker(roster);
       if (blocker) {
         fail(res, blocker);
         return;

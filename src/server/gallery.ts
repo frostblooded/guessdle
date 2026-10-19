@@ -9,10 +9,10 @@ import { OWNER_BANNED } from "./users.ts";
 type Q = Pick<pg.Pool, "query">;
 
 // SQL true when the game aliased `g` is one the gallery shows: approved, with enough active
-// entries (one for a Blur or Quiz game, MIN_ENTRIES otherwise), none missing a value, and an owner not banned
+// entries (MIN_ENTRIES), none missing a value, and an owner not banned
 export const IN_GALLERY = `(g.status = 'approved' and not ${HAS_MISSING_VALUES} and not ${OWNER_BANNED}
   and (select count(*) from entries n where n.game_id = g.id and n.deleted_at is null)
-    >= case when g.kind in ('blur', 'quiz') then 1 else ${MIN_ENTRIES} end)`;
+    >= ${MIN_ENTRIES})`;
 
 export interface GalleryCard {
   slug: string;
@@ -38,7 +38,7 @@ export type GalleryScope =
   | { playlistId: number; ownerId?: never }
   | Record<string, never>;
 
-// Approved games with enough active entries (MIN_ENTRIES, one for a Blur or Quiz game) and none missing
+// Approved games with enough active entries (MIN_ENTRIES) and none missing
 // a value: the original first, then newest first. A scope narrows them to an owner's (newest first) or a playlist's.
 export async function listGallery(
   q: Q,
@@ -61,7 +61,7 @@ export async function listGallery(
      ${inPlaylist ? "join playlist_games pl on pl.game_id = g.id and pl.playlist_id = $3" : ""}
      where g.status = 'approved' and not ${HAS_MISSING_VALUES} and not ${OWNER_BANNED}
        ${scope.ownerId !== undefined ? "and g.owner_id = $3" : ""}
-     group by g.id${inPlaylist ? ", pl.position" : ""} having count(e.id) >= case when g.kind in ('blur', 'quiz') then 1 else $1 end
+     group by g.id${inPlaylist ? ", pl.position" : ""} having count(e.id) >= $1
      order by ${
        inPlaylist
          ? "pl.position"

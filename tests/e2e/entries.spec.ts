@@ -29,7 +29,7 @@ test("the Entries tab adds, edits and deletes entries and counts what is missing
   await page.goto(`/g/${slug}/edit`);
   await expect(page.locator("#loading-state")).toBeHidden();
   await expect(page.locator("#status-notice")).toContainText(
-    "needs 2 more entries",
+    "needs 1 more entry",
   );
 
   // Opening the tab refreshes the lists. Hold that refresh back so it lands while the form is filled in (the old flake: it wiped the form)
@@ -66,9 +66,7 @@ test("the Entries tab adds, edits and deletes entries and counts what is missing
   await page.getByRole("button", { name: "Add entry" }).click();
   await expect(page.locator("#entry-list li")).toHaveCount(1);
   await expect(page.locator("#entry-list img")).toBeVisible();
-  await expect(page.locator("#status-notice")).toContainText(
-    "needs 1 more entry",
-  );
+  await expect(page.locator("#status-notice")).not.toContainText("needs");
 
   // A name clash is refused with a readable error
   await page.locator("#entry-name").fill("rex");
@@ -108,7 +106,5 @@ test("the Entries tab adds, edits and deletes entries and counts what is missing
   page.once("dialog", (dialog) => void dialog.accept());
   await page.getByRole("button", { name: "Delete Fido" }).click();
   await expect(page.locator("#entry-list li")).toHaveCount(1);
-  await expect(page.locator("#status-notice")).toContainText(
-    "needs 1 more entry",
-  );
+  await expect(page.locator("#status-notice")).not.toContainText("needs");
 });
