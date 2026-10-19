@@ -186,21 +186,21 @@ function fake(
 const game = { id: 1, slug: "pets", name: "Pets" } as GameRow;
 
 describe("gameLifecycle.edit", () => {
-  it("mails every admin and the owner once when an approved game is reset to pending", async () => {
+  it("mails only the owner when an approved game is reset to pending (admins later)", async () => {
     const f = fake("approved");
     await gameLifecycle(f.pool, f.mail).edit(game, "entries", async () => "x");
-    assert.deepEqual(f.sent, ["a@x.test", "b@x.test", "o@x.test"]);
+    assert.deepEqual(f.sent, ["o@x.test"]);
     assert.ok(f.log.includes("commit"));
   });
-  it("mails the admins but not the owner when a rejected game is edited", async () => {
+  it("mails nobody right away when a rejected game is edited", async () => {
     const f = fake("rejected");
     await gameLifecycle(f.pool, f.mail).edit(game, "details", async () => 1);
-    assert.deepEqual(f.sent, ["a@x.test", "b@x.test"]);
+    assert.deepEqual(f.sent, []);
   });
   it("skips the owner who turned review mails off", async () => {
     const f = fake("approved", 2, { ...ALL_ON, review: false });
     await gameLifecycle(f.pool, f.mail).edit(game, "entries", async () => 1);
-    assert.deepEqual(f.sent, ["a@x.test", "b@x.test"]);
+    assert.deepEqual(f.sent, []);
   });
   for (const status of ["draft", "pending"] as const) {
     it(`does not mail for an edit of a ${status} game`, async () => {
@@ -274,10 +274,9 @@ describe("gameLifecycle.move", () => {
     const out = await gameLifecycle(f.pool, f.mail).move(game, move, "why");
     return [out, f.sent] as const;
   };
-  it("submit and unpublish mail the admins, approve and reject the owner", async () => {
-    const admins = ["a@x.test", "b@x.test"];
-    assert.deepEqual(await mailed("draft", "submit"), ["ok", admins]);
-    assert.deepEqual(await mailed("approved", "unpublish"), ["ok", admins]);
+  it("submit and unpublish mail nobody right away, approve and reject the owner", async () => {
+    assert.deepEqual(await mailed("draft", "submit"), ["ok", []]);
+    assert.deepEqual(await mailed("approved", "unpublish"), ["ok", []]);
     assert.deepEqual(await mailed("pending", "approve"), ["ok", ["o@x.test"]]);
     assert.deepEqual(await mailed("pending", "reject"), ["ok", ["o@x.test"]]);
   });

@@ -3,6 +3,8 @@ import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import { createApp } from "../../src/server/app.ts";
+import { mailDueAdmins } from "../../src/server/lifecycle.ts";
+import type { MailConfig } from "../../src/server/mailer.ts";
 import { MIGRATIONS_DIR } from "../../src/server/main.ts";
 import { migrate } from "../../src/server/migrate.ts";
 import { startDb } from "./postgres.ts";
@@ -21,6 +23,20 @@ describe("approval flow", () => {
   let url: string;
   let sent: Mail[];
   let mailFails = false;
+  const mail: MailConfig = {
+    publicUrl: "https://guess.test",
+    mailer: {
+      async send(message: Mail): Promise<void> {
+        if (mailFails) {
+          throw new Error("smtp down");
+        }
+        sent.push(message);
+      },
+    },
+  };
+  // Runs the admin email round as if `minutes` had passed
+  const after = (minutes: number): Promise<void> =>
+    mailDueAdmins(db.pool, mail, new Date(Date.now() + minutes * 60_000));
 
   const request = async (
     method: string,
@@ -84,17 +100,7 @@ describe("approval flow", () => {
         now: () => NOW,
         testLogin: true,
         writeLimit: { max: 1000, windowMs: 60_000 },
-        mail: {
-          publicUrl: "https://guess.test",
-          mailer: {
-            async send(message: Mail): Promise<void> {
-              if (mailFails) {
-                throw new Error("smtp down");
-              }
-              sent.push(message);
-            },
-          },
-        },
+        mail,
       }).listen(0, "127.0.0.1", () => resolve(s));
     });
     url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -115,13 +121,17 @@ describe("approval flow", () => {
   });
 
   describe("submit for approval", () => {
-    it("moves a draft with 2 entries to pending and emails the admins once", async () => {
+    it("moves a draft with 2 entries to pending and emails the admins once after 5 minutes", async () => {
       await makeGame("draft");
       await login("root2@example.test", true);
       const res = await request("POST", `/api/games/${SLUG}/submit`, ann, {});
       assert.equal(res.status, 200);
       assert.equal(res.body.status, "pending");
       assert.equal(await statusOf(), "pending");
+      await after(4);
+      assert.equal(sent.length, 0);
+      await after(6);
+      await after(7);
       assert.deepEqual(sent.map((m) => m.to).sort(), [
         "root2@example.test",
         "root@example.test",
@@ -129,6 +139,27 @@ describe("approval flow", () => {
       assert.match(sent[0]!.subject, /Game zoo/);
       assert.match(sent[0]!.text, /https:\/\/guess\.test\/admin/);
       assert.match(sent[0]!.text, /https:\/\/guess\.test\/g\/zoo/);
+    });
+
+    for (const verdict of ["approve", "reject"]) {
+      it(`sends no admin email when an admin ${verdict}s within 5 minutes`, async () => {
+        await makeGame("draft");
+        await request("POST", `/api/games/${SLUG}/submit`, ann, {});
+        await request("POST", `/api/admin/games/${SLUG}/${verdict}`, admin, {
+          reason: "No",
+        });
+        await after(6);
+        assert.equal(adminMails().length, 0);
+      });
+    }
+
+    it("restarts the 5 minutes when the game enters pending again", async () => {
+      await makeGame("draft");
+      await request("POST", `/api/games/${SLUG}/submit`, ann, {});
+      await request("POST", `/api/admin/games/${SLUG}/approve`, admin, {});
+      await request("POST", `/api/games/${SLUG}/unpublish`, ann, {});
+      await after(6);
+      assert.equal(adminMails().length, 1);
     });
 
     it("refuses a game with no active entry", async () => {
@@ -214,6 +245,7 @@ describe("approval flow", () => {
       );
       assert.equal(res.status, 200);
       assert.equal(await statusOf(), "pending");
+      await after(6);
       assert.equal(sent.length, 1);
     });
 
@@ -258,6 +290,7 @@ describe("approval flow", () => {
       await makeGame("pending");
       await addEntry();
       await patchName();
+      await after(6);
       assert.equal(sent.length, 0);
     });
 
@@ -269,6 +302,7 @@ describe("approval flow", () => {
         await patchName();
         await patchName();
         assert.equal(await statusOf(), "pending", from);
+        await after(6);
         assert.equal(adminMails().length, 1, from);
       }
     });
@@ -279,9 +313,11 @@ describe("approval flow", () => {
         name: "Color",
         type: "text",
       });
+      await after(6);
       assert.equal(adminMails().length, 1);
       await db.pool.query("update games set status = 'approved'");
       await addEntry();
+      await after(6);
       assert.equal(adminMails().length, 2);
       await db.pool.query("update games set status = 'rejected'");
       const id = (
@@ -290,6 +326,7 @@ describe("approval flow", () => {
         )
       ).rows[0].id;
       await request("DELETE", `/api/games/${SLUG}/entries/${id}`, ann);
+      await after(6);
       assert.equal(adminMails().length, 3);
     });
   });
@@ -567,6 +604,7 @@ describe("approval flow", () => {
       await makeGame("rejected");
       const res = await request("POST", `/api/games/${SLUG}/submit`, ann, {});
       assert.equal(res.status, 200);
+      await after(6);
       assert.equal(sent.length, 1);
     });
   });
