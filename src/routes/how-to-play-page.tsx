@@ -1,11 +1,52 @@
 import { useQuery } from "@tanstack/react-query";
+import type { ComponentType } from "react";
+import { KIND_LABELS } from "../components/game-kind.tsx";
 import { PageHead } from "../components/page.tsx";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "../components/ui/accordion.tsx";
 import { Alert } from "../components/ui/alert.tsx";
-import { Card } from "../components/ui/card.tsx";
+import type { GameKind } from "../game/blur.ts";
 import type { Tutorial } from "../game/tutorial.ts";
 import { getJson } from "../lib/api.ts";
 import { useTitle } from "../lib/use-title.ts";
+import {
+  BlurPractice,
+  SequencePractice,
+} from "./how-to-play/picture-practice.tsx";
 import { PracticeGame } from "./how-to-play/practice-game.tsx";
+import { QuizPractice } from "./how-to-play/quiz-practice.tsx";
+
+// One item per game kind, Classic first and open; opening one closes the others
+const MODES: {
+  kind: GameKind;
+  blurb: string;
+  Practice: ComponentType<{ tutorial: Tutorial }>;
+}[] = [
+  {
+    kind: "classic",
+    blurb: "Guess from a table of clues",
+    Practice: PracticeGame,
+  },
+  {
+    kind: "blur",
+    blurb: "Guess from a picture that clears up",
+    Practice: BlurPractice,
+  },
+  {
+    kind: "sequence",
+    blurb: "Guess from a series of photos",
+    Practice: SequencePractice,
+  },
+  {
+    kind: "quiz",
+    blurb: "Answer questions for points",
+    Practice: QuizPractice,
+  },
+];
 
 export function HowToPlayPage() {
   useTitle("How to play - Guessdle");
@@ -18,37 +59,52 @@ export function HowToPlayPage() {
     <div className="mx-auto max-w-3xl">
       <PageHead
         title="How to play"
-        lede="Never played a guessing game like this? Try a practice round with real pets. It takes a minute."
+        lede="Never played a guessing game like this? Pick a kind of game and try a practice round with real pets. Each takes a minute."
       />
-      {tutorial.data ? (
-        <PracticeGame tutorial={tutorial.data} />
-      ) : tutorial.isError ? (
-        <Alert id="practice-error" variant="error">
-          The practice game could not load. Refresh the page to try again.
+      {tutorial.isError && (
+        <Alert id="practice-error" variant="error" className="mb-4">
+          The practice games could not load. Refresh the page to try again.
         </Alert>
-      ) : (
-        <p id="practice-loading" className="text-muted-foreground">
-          Loading the practice game…
-        </p>
       )}
-      <Card id="help-blur" className="mt-4 p-5 sm:p-6">
-        <h2 className="mb-2 text-lg font-semibold">Blur games</h2>
-        <p className="text-muted-foreground">
-          Some games show a picture instead of a table. The secret answer&apos;s
-          image is split into nine squares, and only one of them is clear at
-          first. Every wrong guess clears one more. The game says how many tries
-          you have: miss on the last one and the day is over.
-        </p>
-      </Card>
-      <Card id="help-sequence" className="mt-4 p-5 sm:p-6">
-        <h2 className="mb-2 text-lg font-semibold">Sequence games</h2>
-        <p className="text-muted-foreground">
-          Other games show the answer as a series of photos. You start with the
-          first one, and every wrong guess or skip unlocks the next, usually a
-          little easier. Tap a number to look back at a photo you already have.
-          Name the answer before you run out of photos.
-        </p>
-      </Card>
+      <Accordion
+        type="single"
+        collapsible
+        defaultValue="classic"
+        className="flex flex-col gap-3"
+      >
+        {MODES.map(({ kind, blurb, Practice }) => {
+          const { label, icon: Icon } = KIND_LABELS[kind];
+          return (
+            <AccordionItem key={kind} value={kind} id={`help-${kind}`}>
+              <AccordionTrigger>
+                <span className="flex items-center gap-3">
+                  <Icon
+                    className="size-5 shrink-0 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <span>
+                    {label}
+                    <span className="block text-sm font-normal text-muted-foreground">
+                      {blurb}
+                    </span>
+                  </span>
+                </span>
+              </AccordionTrigger>
+              <AccordionContent>
+                {tutorial.data ? (
+                  <Practice tutorial={tutorial.data} />
+                ) : (
+                  !tutorial.isError && (
+                    <p className="practice-loading text-muted-foreground">
+                      Loading the practice round…
+                    </p>
+                  )
+                )}
+              </AccordionContent>
+            </AccordionItem>
+          );
+        })}
+      </Accordion>
     </div>
   );
 }
