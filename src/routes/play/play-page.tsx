@@ -19,9 +19,11 @@ import {
 } from "../../game/game.ts";
 import { openPlay } from "../../game/open-play.ts";
 import {
+  ANSWER_CHANGED,
   RATE_LIMITED,
   refusalText,
   type GiveUpResult,
+  type HintResult,
   type Loaded,
   type Play,
   type SubmitResult,
@@ -29,6 +31,8 @@ import {
 import { minEntriesOf } from "../../game/blur.ts";
 import { browserFetch, gameKey, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
+import { FreeHintCard } from "./free-hint.tsx";
+import { useFreeHint } from "./use-free-hint.ts";
 import { GuessForm, useGuessMode } from "./guess-form.tsx";
 import {
   GameNotFound,
@@ -58,7 +62,9 @@ const finishedResult = (loaded: Loaded): Result =>
     : null;
 
 // The notice a guess or give-up leaves: why it was refused, or none
-const noticeOf = (res: SubmitResult | GiveUpResult): string | null =>
+const noticeOf = (
+  res: SubmitResult | GiveUpResult | HintResult,
+): string | null =>
   res.kind === "rate_limited" || res.kind === "error" ? refusalText(res) : null;
 
 // `day`: a past day's Day Number from the address, or null for today
@@ -74,6 +80,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const [rows, setRows] = useState<GradedAttribute[][]>([]);
   const [result, setResult] = useState<Result>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [restarted, setRestarted] = useState(false);
   const [ready, setReady] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [guess, setGuess] = useState("");
@@ -100,6 +107,8 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const pastDay = past ? day : undefined;
   // A past day's first win counts in that day's stats, like today's
   const victory = useVictoryStats(slug, play, pastDay);
+  const freeHint = useFreeHint(play, board, (res) => setNotice(noticeOf(res)));
+  const adoptHint = freeHint.adopt;
 
   useTitle(
     game === "missing"
@@ -125,6 +134,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
       return;
     }
     setRows([...loaded.rows].reverse());
+    adoptHint(loaded);
     setResult(finishedResult(loaded));
     setReady(true);
   }
@@ -152,6 +162,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
         now,
         fetch: browserFetch,
         onNewDay: clearBoard,
+        onAnswerChanged: () => setRestarted(true),
       });
       if (rateLimited) {
         setNotice(RATE_LIMITED);
@@ -159,7 +170,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
       play.current = current;
       await showBoard(current);
     })();
-  }, [playable, closed, me.isPending, me.data, slug, day, pastDay]);
+  }, [playable, closed, me.isPending, me.data, slug, day, pastDay, adoptHint]);
 
   async function submit(name: string): Promise<void> {
     const id = findEntryId(roster, name);
@@ -196,6 +207,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
     if (rows.length === 0) {
       victory.startClock();
     }
+    freeHint.offer(res.hints);
     if (res.answer !== undefined && (res.isAnswer || res.lost)) {
       setResult(resultOf(res.isAnswer ? "victory" : "lost", res));
       if (res.isAnswer) {
@@ -250,7 +262,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
         ? `${FAILURES.not_enough_entries.text} It has ${roster.length} now.`
         : closed
           ? FAILURES.game_paused.text
-          : notice;
+          : (notice ?? (restarted ? ANSWER_CHANGED : null));
   const loading = !cannotPlay && !ready;
   const finished = result !== null;
   // Each row names its guess; those names leave the suggestions
@@ -383,6 +395,13 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
           opener={opener}
           past={past}
         />
+        {blur === null && (
+          <FreeHintCard
+            {...freeHint}
+            hints={finished || cannotPlay ? undefined : freeHint.hints}
+            onTake={(kind) => void freeHint.take(kind)}
+          />
+        )}
         {modes.selecting && !finished && !cannotPlay ? (
           <SelectList
             entries={unguessed}

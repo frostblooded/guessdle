@@ -4,20 +4,18 @@ import { Correctness } from "../src/game/correctness.ts";
 import { SKIP, type Entry } from "../src/game/game.ts";
 import {
   cleanNickname,
-  clockTime,
   drawAnswer,
   everyoneDone,
   normalizeCode,
-  ordinal,
   parseClientMessage,
   partyView,
-  progressLabel,
   randomCode,
   roundResults,
   standings,
   type PartyPlayer,
   type RoundData,
 } from "../src/game/party.ts";
+import { clockTime, ordinal, progressLabel } from "../src/game/party-text.ts";
 
 const player = (id: number, nickname: string, joinedAt = 0): PartyPlayer => ({
   id,
@@ -266,6 +264,74 @@ describe("partyView", () => {
   });
 });
 
+describe("Free Hints in a round", () => {
+  const entry = (id: number, name: string, color: string): Entry => ({
+    id,
+    name,
+    photo: `/p/${id}.webp`,
+    values: [color],
+  });
+  const all = [
+    entry(3, "Cookie", "Black"),
+    entry(4, "Dido", "Grey"),
+    entry(5, "Eli", "Brown"),
+    { ...entry(10, "Bela", "White"), description: "Sleeps all day." },
+  ];
+  const view = (rounds: RoundData[], viewer: number | null) =>
+    partyView({
+      code: "KWZP",
+      game: { slug: "pets", name: "Pets" },
+      attributes: [{ name: "Color", type: "text" }],
+      entries: all,
+      all,
+      ended: false,
+      players: [ANA, BO],
+      rounds,
+      viewer,
+    });
+  const three = [g(1, 3, 1100), g(1, 4, 1200), g(1, 5, 1300)];
+
+  it("offers a hint after 3 wrong guesses, to that player only", () => {
+    const live = round({ endedAt: null, guesses: three });
+    assert.deepEqual(view([live], 1).round!.yours!.hints, {
+      attribute: true,
+      description: true,
+    });
+    assert.equal(view([live], 2).round!.yours!.hints, undefined);
+    const two = round({ endedAt: null, guesses: three.slice(0, 2) });
+    assert.equal(view([two], 1).round!.yours!.hints, undefined);
+  });
+
+  it("shows the hint used instead of the offer, and keeps it out of others' views", () => {
+    const live = round({
+      endedAt: null,
+      guesses: three,
+      hints: [{ playerId: 1, pick: { kind: "attribute", attribute: "Color" } }],
+    });
+    const ana = view([live], 1).round!.yours!;
+    assert.deepEqual(ana.hint, {
+      kind: "attribute",
+      attribute: "Color",
+      value: "White",
+    });
+    assert.equal(ana.hints, undefined);
+    assert.equal(view([live], 2).round!.yours!.hint, undefined);
+    // Entries carry their values for Select mode, so look for the hint itself
+    assert.ok(!JSON.stringify(view([live], null).round).includes('"hint"'));
+  });
+
+  it("reveals the answer's description once the player is done", () => {
+    const live = round({
+      endedAt: null,
+      guesses: [...three, g(1, 10, 1400)],
+    });
+    const ana = view([live], 1).round!.yours!;
+    assert.equal(ana.answer!.description, "Sleeps all day.");
+    assert.equal(ana.hints, undefined);
+    assert.equal(view([live], 2).round!.yours!.answer, undefined);
+  });
+});
+
 describe("Blur game rounds", () => {
   const entry = (id: number, name: string): Entry => ({
     id,
@@ -366,6 +432,10 @@ describe("parseClientMessage", () => {
       parseClientMessage('{"type":"remove-player","playerId":2}'),
       { type: "remove-player", playerId: 2 },
     );
+    assert.deepEqual(
+      parseClientMessage('{"type":"hint","kind":"description"}'),
+      { type: "hint", kind: "description" },
+    );
     for (const type of ["give-up", "start-round", "end-round", "end-party"]) {
       assert.deepEqual(parseClientMessage(JSON.stringify({ type })), { type });
     }
@@ -381,6 +451,8 @@ describe("parseClientMessage", () => {
       '{"type":"hello","token":5}',
       `{"type":"hello","token":"${"x".repeat(101)}"}`,
       '{"type":"toString"}',
+      '{"type":"hint"}',
+      '{"type":"hint","kind":"name"}',
     ]) {
       assert.equal(parseClientMessage(raw), null, raw);
     }

@@ -32,6 +32,8 @@ export interface Entry extends EntryRef {
   values: AttributeValue[];
   // Blur games only: the order the grid's squares clear in (cells 0-8), once picked
   blurOrder?: number[];
+  // Optional text about the entry, shown once it is revealed as the answer; "" or absent for none
+  description?: string;
 }
 
 // One column of a guessed entry, graded against the Daily Answer, in boardColumns order. A

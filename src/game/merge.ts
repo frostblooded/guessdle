@@ -5,8 +5,8 @@ import { call, type Fetch } from "./transport.ts";
 // The server refused the payload: invalid, or it conflicts with the account's day
 const REFUSED = [400, 409];
 
-// merged: adopted; discarded: the server's state wins or the local day is
-// stale; error: could not decide, local state kept for the next load
+// merged: adopted; discarded: the server's state wins, or the local day or
+// answer is stale; error: could not decide, local state kept for the next load
 export type MergeOutcome =
   "nothing" | "merged" | "discarded" | "rate_limited" | "error";
 
@@ -30,7 +30,7 @@ export async function mergeLocalGame(
   const res = await call(
     fetch,
     `/api/games/${slug}/state/merge`,
-    { day, ids, gaveUp },
+    { day, revision: state.getRevision(), ids, gaveUp },
     false,
   );
   if (res?.status === 200) {
