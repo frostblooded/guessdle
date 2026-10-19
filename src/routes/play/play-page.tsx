@@ -1,30 +1,19 @@
 // /g/:slug: play today's game; /g/:slug/day/:day: play or review a past day. Anonymous players keep
 // guesses in the browser, signed-in ones on the server.
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useRef, useState, type MouseEvent } from "react";
 import { Navigate, useParams } from "react-router";
 import { PageHead } from "../../components/page.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
 import { FAILURES } from "../../game/failures.ts";
-import { findEntryId, SKIP, type GradedAttribute } from "../../game/game.ts";
-import { openPlay } from "../../game/open-play.ts";
-import {
-  ANSWER_CHANGED,
-  RATE_LIMITED,
-  refusalText,
-  type GiveUpResult,
-  type HintResult,
-  type Loaded,
-  type Play,
-  type SubmitResult,
-} from "../../game/play.ts";
+import { findEntryId, SKIP } from "../../game/game.ts";
+import { ANSWER_CHANGED } from "../../game/play.ts";
 import { minEntriesOf } from "../../game/blur.ts";
-import { browserFetch, gameKey, useMe } from "../../lib/api.ts";
+import { gameKey, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { FreeHintCard } from "./free-hint.tsx";
-import { useFreeHint } from "./use-free-hint.ts";
 import { GuessForm, useGuessMode } from "./guess-form.tsx";
 import {
   GameNotFound,
@@ -41,29 +30,11 @@ import {
 import { loadGame } from "./load-game.ts";
 import { PlayActions, PlayStatus } from "./play-status.tsx";
 import { ResetDialog } from "./reset-dialog.tsx";
-import { ResultBanner, resultOf, type Result } from "./result-banner.tsx";
+import { ResultBanner } from "./result-banner.tsx";
 import { SelectList } from "./select-list.tsx";
 import { QuizPlay } from "./quiz-play.tsx";
 import { StatsDialog } from "./stats-dialog.tsx";
-import { useVictoryStats } from "./use-victory-stats.ts";
-
-const now = (): Date => new Date();
-
-// The banner for a loaded board, null while the day is still being played
-const finishedResult = (loaded: Loaded): Result =>
-  loaded.answer !== undefined &&
-  (loaded.victory || loaded.gaveUp || loaded.lost)
-    ? resultOf(
-        loaded.victory ? "victory" : loaded.lost ? "lost" : "give-up",
-        loaded,
-      )
-    : null;
-
-// The notice a guess or give-up leaves: why it was refused, or none
-const noticeOf = (
-  res: SubmitResult | GiveUpResult | HintResult,
-): string | null =>
-  res.kind === "rate_limited" || res.kind === "error" ? refusalText(res) : null;
+import { usePlayBoard } from "./use-play-board.ts";
 
 // `day`: a past day's Day Number from the address, or null for today
 function Game({ slug, day }: { slug: string; day: number | null }) {
@@ -74,20 +45,8 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   });
   const me = useMe();
 
-  // Newest first, as shown
-  const [rows, setRows] = useState<GradedAttribute[][]>([]);
-  const [result, setResult] = useState<Result>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [restarted, setRestarted] = useState(false);
-  const [ready, setReady] = useState(false);
-  const [blocked, setBlocked] = useState(false);
   const [guess, setGuess] = useState("");
   const [confirming, setConfirming] = useState(false);
-  // Bumped on every fresh board, so a Blur game's board image is fetched again
-  const [board, setBoard] = useState(0);
-  const play = useRef<Play | null>(null);
-  const started = useRef(false);
-  const submitting = useRef(false);
   const opener = useRef<HTMLButtonElement | null>(null);
   const modes = useGuessMode();
 
@@ -103,10 +62,28 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   // A past day the game has; today's and later Day Numbers are handled below
   const past = playable !== null && day !== null && day < playable.today;
   const pastDay = past ? day : undefined;
-  // A past day's first win counts in that day's stats, like today's
-  const victory = useVictoryStats(slug, play, pastDay);
-  const freeHint = useFreeHint(play, board, (res) => setNotice(noticeOf(res)));
-  const adoptHint = freeHint.adopt;
+  const {
+    rows,
+    result,
+    notice,
+    restarted,
+    ready,
+    blocked,
+    board,
+    victory,
+    freeHint,
+    ...session
+  } = usePlayBoard({
+    slug,
+    roster,
+    pastDay,
+    signedIn: me.data !== null && me.data !== undefined,
+    canOpen:
+      playable !== null &&
+      !closed &&
+      !me.isPending &&
+      (day === null || pastDay !== undefined),
+  });
 
   useTitle(
     game === "missing"
@@ -116,121 +93,20 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
         : "Guessdle",
   );
 
-  const clearBoard = (): void => {
-    setRows([]);
-    setResult(null);
-    setBoard((n) => n + 1);
-  };
-
-  // Loads the board as stored and shows it: on open, and when a guess or give-up finds the day
-  // already over (finished on another device)
-  async function showBoard(current: Play): Promise<void> {
-    const loaded = await current.load();
-    if ("failure" in loaded) {
-      setBlocked(true);
-      setNotice(loaded.failure);
-      return;
-    }
-    setRows([...loaded.rows].reverse());
-    adoptHint(loaded);
-    setResult(finishedResult(loaded));
-    setReady(true);
-  }
-
-  // Once the game and who is signed in are known: pick where the game lives, then load it.
-  // The ref keeps StrictMode's second effect run from merging twice.
-  useEffect(() => {
-    if (
-      !playable ||
-      closed ||
-      me.isPending ||
-      started.current ||
-      (day !== null && pastDay === undefined)
-    ) {
-      return;
-    }
-    started.current = true;
-    void (async () => {
-      const { play: current, rateLimited } = await openPlay({
-        slug,
-        roster: playable.entries,
-        storage: localStorage,
-        signedIn: me.data !== null && me.data !== undefined,
-        day: pastDay,
-        now,
-        fetch: browserFetch,
-        onNewDay: clearBoard,
-        onAnswerChanged: () => setRestarted(true),
-      });
-      if (rateLimited) {
-        setNotice(RATE_LIMITED);
+  // Sends a guess by entry id, or SKIP; a graded one clears the guess box
+  async function submitId(id: number): Promise<void> {
+    if (await session.submit(id)) {
+      if (id !== SKIP) {
+        setGuess("");
       }
-      play.current = current;
-      await showBoard(current);
-    })();
-  }, [playable, closed, me.isPending, me.data, slug, day, pastDay, adoptHint]);
+      modes.setSelecting(false);
+    }
+  }
 
   async function submit(name: string): Promise<void> {
     const id = findEntryId(roster, name);
     if (id !== null) {
       await submitId(id);
-    }
-  }
-
-  // Sends a guess by entry id, or SKIP
-  async function submitId(id: number): Promise<void> {
-    if (submitting.current || !play.current) {
-      return;
-    }
-    submitting.current = true;
-    const res = await play.current.submit(id).finally(() => {
-      submitting.current = false;
-    });
-    setNotice(noticeOf(res));
-    if (res.kind === "finished") {
-      await showBoard(play.current);
-      return;
-    }
-    // The typed guess stays when the server could not grade it, to retry, and on a skip
-    if (res.kind !== "accepted" && res.kind !== "duplicate") {
-      return;
-    }
-    if (id !== SKIP) {
-      setGuess("");
-    }
-    modes.setSelecting(false);
-    if (res.kind === "duplicate") {
-      return;
-    }
-    if (rows.length === 0) {
-      victory.startClock();
-    }
-    freeHint.offer(res.hints);
-    if (res.answer !== undefined && (res.isAnswer || res.lost)) {
-      setResult(resultOf(res.isAnswer ? "victory" : "lost", res));
-      if (res.isAnswer) {
-        void victory.show();
-      }
-    }
-    setRows((old) => [res.row, ...old]);
-  }
-
-  async function giveUp(): Promise<void> {
-    const res = await play.current?.giveUp();
-    if (!res) {
-      return;
-    }
-    setNotice(noticeOf(res));
-    if (res.kind === "gaveUp") {
-      setResult(resultOf("give-up", res));
-    } else if (res.kind === "finished" && play.current) {
-      await showBoard(play.current);
-    }
-  }
-
-  async function reset(): Promise<void> {
-    if (await play.current?.reset()) {
-      clearBoard();
     }
   }
 
@@ -297,7 +173,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
               size="sm"
               hidden={finished}
               disabled={cannotPlay || loading}
-              onClick={() => void giveUp()}
+              onClick={() => void session.giveUp()}
             >
               Give up
             </Button>
@@ -391,7 +267,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
         <ResetDialog
           open={confirming}
           onOpenChange={setConfirming}
-          onConfirm={() => void reset()}
+          onConfirm={() => void session.reset()}
           opener={opener}
           past={past}
         />
