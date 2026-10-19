@@ -106,13 +106,17 @@ export function playlistRoutes(
       return undefined;
     }
     const id = idParam(req);
-    const playlist = id === null ? null : await findPlaylist(pool, id, user.id);
+    const playlist = id === null ? null : await findPlaylist(pool, id, user);
     if (!playlist) {
       fail(res, "playlist_not_found");
       return undefined;
     }
     if (playlist.ownerId !== user.id) {
       fail(res, "forbidden");
+      return undefined;
+    }
+    if (user.banned) {
+      fail(res, "banned");
       return undefined;
     }
     return playlist.id;
@@ -142,7 +146,7 @@ export function playlistRoutes(
     const username = String(paramOf(req, "username"));
     const viewer = await requestUser(pool, req, now());
     const profile = isUsername(username)
-      ? await loadProfile(pool, username, viewer?.id ?? null)
+      ? await loadProfile(pool, username, viewer)
       : null;
     if (!profile) {
       fail(res, "not_found");
@@ -174,6 +178,10 @@ export function playlistRoutes(
   app.post("/api/playlists", writes, json, async (req, res) => {
     const user = await needUser(req, res);
     if (!user) {
+      return;
+    }
+    if (user.banned) {
+      fail(res, "banned");
       return;
     }
     const body = bodyOf(req);
@@ -215,8 +223,7 @@ export function playlistRoutes(
     res.set("Cache-Control", "no-store");
     const id = idParam(req);
     const viewer = await requestUser(pool, req, now());
-    const playlist =
-      id === null ? null : await findPlaylist(pool, id, viewer?.id ?? null);
+    const playlist = id === null ? null : await findPlaylist(pool, id, viewer);
     if (!playlist) {
       fail(res, "playlist_not_found");
       return;

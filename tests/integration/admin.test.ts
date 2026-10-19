@@ -394,33 +394,31 @@ describe("admin Answers: peek and overrides", () => {
       assert.equal(draws, 3);
     });
 
-    it("applies to today at once for mid-game players, deriving victory", async () => {
+    it("restarts today for mid-game players when today's answer changes", async () => {
       const player = await login("mid@x.test");
       const answer = await playerAnswer();
       const other = someOtherPet(answer);
-      const guessed = await send(
-        "POST",
-        `/api/games/${GAME}/state/guess`,
-        player,
-        {
-          id: other,
-        },
-      );
-      assert.equal(guessed.body.victory, false);
+      await send("POST", `/api/games/${GAME}/state/guess`, player, {
+        id: other,
+      });
 
-      // Overriding today to the guessed pet turns that guess into a win
+      // Overriding today to the guessed pet wipes the guess instead of turning it into a win
       assert.equal((await put(at(0), other)).status, 200);
       assert.equal(await playerAnswer(), other);
       const game = await send("GET", `/api/games/${GAME}/state`, player);
-      assert.equal(game.body.victory, true);
-      assert.equal(game.body.answer, petName(other));
+      assert.deepEqual(game.body.ids, []);
+      assert.equal(game.body.victory, false);
+      assert.equal(game.body.revision, 1);
 
-      // ...and away again: no stale win
-      assert.equal((await put(at(0), answer)).status, 200);
-      assert.equal(
-        (await send("GET", `/api/games/${GAME}/state`, player)).body.victory,
-        false,
-      );
+      // Clearing it re-draws today: a different answer restarts the day again
+      await send("POST", `/api/games/${GAME}/state/guess`, player, {
+        id: answer,
+      });
+      assert.equal((await clear(at(0))).status, 200);
+      const cleared = await send("GET", `/api/games/${GAME}/state`, player);
+      const changed = (await playerAnswer()) !== other;
+      assert.equal(cleared.body.revision, changed ? 2 : 1);
+      assert.equal(cleared.body.ids.length, changed ? 0 : 1);
     });
 
     it("rejects past days and leaves them untouched", async () => {

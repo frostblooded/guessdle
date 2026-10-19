@@ -1,5 +1,6 @@
 // Party mode storage and rules (ADR 0016): the one seam between the party routes, the socket hub and the tables.
 import { randomBytes } from "node:crypto";
+import type { HintKind } from "../game/free-hint.ts";
 import type pg from "pg";
 import { MAX_OPEN_PARTIES, MAX_PARTY_PLAYERS } from "../game/limits.ts";
 import {
@@ -9,6 +10,7 @@ import {
   type PartyView,
   type RoundData,
 } from "../game/party.ts";
+import type { GuessMode } from "../game/guess-mode.ts";
 import { hash } from "./auth.ts";
 import {
   findGameById,
@@ -30,6 +32,7 @@ export interface PartyRow {
   gameId: number;
   hostUserId: number;
   ended: boolean;
+  guessMode: GuessMode;
 }
 
 const newToken = (): string => randomBytes(24).toString("base64url");
@@ -69,7 +72,7 @@ export async function findParty(
   await sweepParties(q, now, code);
   const { rows } = await q.query<PartyRow>(
     `select id::int, code, game_id::int as "gameId", host_user_id::int as "hostUserId",
-       ended_at is not null as ended
+       ended_at is not null as ended, guess_mode as "guessMode"
      from parties where code = $1`,
     [code],
   );
@@ -92,6 +95,7 @@ export async function createParty(
   game: GameRow,
   hostUserId: number,
   nickname: string,
+  guessMode: GuessMode,
   now: Date,
   random: () => number,
 ): Promise<{ code: string; token: string } | CreateRefusal> {
@@ -102,9 +106,9 @@ export async function createParty(
   for (;;) {
     const code = randomCode(random);
     const { rows } = await q.query<{ id: number }>(
-      `insert into parties (code, game_id, host_user_id, created_at, last_activity)
-       values ($1, $2, $3, $4, $4) on conflict (code) do nothing returning id::int`,
-      [code, game.id, hostUserId, now],
+      `insert into parties (code, game_id, host_user_id, created_at, last_activity, guess_mode)
+       values ($1, $2, $3, $4, $4, $5) on conflict (code) do nothing returning id::int`,
+      [code, game.id, hostUserId, now, guessMode],
     );
     if (rows[0]) {
       const token = newToken();
@@ -237,6 +241,17 @@ export async function loadData(q: Q, party: PartyRow): Promise<PartyData> {
      where r.party_id = $1`,
     [party.id],
   );
+  const hints = await q.query<{
+    roundId: number;
+    playerId: number;
+    kind: HintKind;
+    attribute: string | null;
+  }>(
+    `select h.round_id::int as "roundId", h.player_id::int as "playerId", h.kind, h.attribute
+     from party_hints h join party_rounds r on r.id = h.round_id
+     where r.party_id = $1`,
+    [party.id],
+  );
   return {
     game,
     roster,
@@ -250,6 +265,15 @@ export async function loadData(q: Q, party: PartyRow): Promise<PartyData> {
       giveUps: giveUps.rows
         .filter((g) => g.roundId === r.id)
         .map(({ playerId, at }) => ({ playerId, at })),
+      hints: hints.rows
+        .filter((h) => h.roundId === r.id)
+        .map(({ playerId, kind, attribute }) => ({
+          playerId,
+          pick:
+            kind === "attribute"
+              ? { kind, attribute: attribute ?? "" }
+              : { kind: "description" as const },
+        })),
     })),
   };
 }
@@ -278,6 +302,7 @@ export async function viewsOf(
           name: game.name,
           kind: game.kind,
           ...(game.kind === "blur" && { blurTries: game.blurTries }),
+          guessMode: party.guessMode,
         },
         attributes: roster.attributes,
         entries: roster.entries,

@@ -19,7 +19,7 @@ function seeded(ids: number[], day: number | null, gaveUp: boolean = false) {
   const state = createGameState(storage, now);
   state.setUsedGuesses(ids);
   if (day !== null) {
-    state.setDay(day);
+    state.setDay(day, 3);
   }
   if (gaveUp) {
     state.setGaveUp();
@@ -61,7 +61,7 @@ describe("mergeLocalGame", () => {
     assert.equal(out, "merged");
     assert.deepEqual(sent, {
       url: "/api/games/pets/state/merge",
-      body: { day: 427, ids: [1, 2], gaveUp: true },
+      body: { day: 427, revision: 3, ids: [1, 2], gaveUp: true },
     });
     const state = createGameState(storage, now);
     assert.deepEqual(state.getUsedGuesses(), []);

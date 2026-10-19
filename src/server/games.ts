@@ -1,5 +1,4 @@
 // Game, attribute and entry data: the one seam between routes and the tables.
-import { MIN_ENTRIES } from "../game/limits.ts";
 import type pg from "pg";
 import type { AttributeValue } from "../game/correctness.ts";
 import {
@@ -9,10 +8,10 @@ import {
   type Entry,
   type GameAttribute,
 } from "../game/game.ts";
-import { MAX_TILES } from "../game/banner.ts";
 import { slugError } from "../game/slug.ts";
 import type { GameKind } from "../game/blur.ts";
 import type { EditKind } from "./lifecycle.ts";
+import { OWNER_BANNED } from "./users.ts";
 
 type Q = Pick<pg.Pool, "query">;
 
@@ -35,6 +34,8 @@ export interface GameRow {
   kind: GameKind;
   // Blur games: the number of tries
   blurTries: number;
+  // Its owner is banned: hidden from all but the owner and admins
+  ownerBanned: boolean;
 }
 
 // A game plays with at least this many active entries
@@ -51,8 +52,9 @@ const gameWhere = async (
     `select id::int, slug, name, description, cover_url as "coverUrl",
        owner_id::int as "ownerId", status, reject_reason as "rejectReason",
        to_char(start_date, 'YYYY-MM-DD') as "startDate",
-       skip_period as "skipPeriod", kind, blur_tries as "blurTries"
-     from games where ${where} = $1`,
+       skip_period as "skipPeriod", kind, blur_tries as "blurTries",
+       ${OWNER_BANNED} as "ownerBanned"
+     from games g where ${where} = $1`,
     [value],
   );
   return rows[0] ?? null;
@@ -86,12 +88,6 @@ else exists (
   where e.game_id = g.id and e.deleted_at is null and a.type <> 'image' and not exists (
     select 1 from entry_values v where v.entry_id = e.id and v.attribute_id = a.id)) end)`;
 
-// SQL true when the game aliased `g` is one the gallery shows: approved, with enough active
-// entries (one for a Blur game, MIN_ENTRIES otherwise) and none missing a value
-export const IN_GALLERY = `(g.status = 'approved' and not ${HAS_MISSING_VALUES}
-  and (select count(*) from entries n where n.game_id = g.id and n.deleted_at is null)
-    >= case when g.kind = 'blur' then 1 else ${MIN_ENTRIES} end)`;
-
 // An entry that pauses its game: a value missing, or in a Blur game its photo or square order
 export const isIncomplete = (
   game: GameRow,
@@ -118,9 +114,10 @@ export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
     photo: string;
     deleted: boolean;
     blurOrder: number[] | null;
+    description: string;
   }>(
     `select id::int, name, photo_url as photo, deleted_at is not null as deleted,
-       blur_order::int[] as "blurOrder"
+       blur_order::int[] as "blurOrder", description
      from entries where game_id = $1 order by id`,
     [game.id],
   );
@@ -144,16 +141,19 @@ export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
     return (attr.type === "list" ? list : (list[0] ?? "")) as AttributeValue;
   };
   const attrs = attributes.rows.map(({ name, type }) => ({ name, type }));
-  const all = entries.rows.map(({ id, name, photo, blurOrder }): Entry => {
-    const values = attributes.rows.map((attr) => cell(id, attr));
-    return {
-      id,
-      name,
-      photo: game.kind === "blur" ? photo : firstImage(attrs, values),
-      values,
-      ...(game.kind === "blur" && blurOrder && { blurOrder }),
-    };
-  });
+  const all = entries.rows.map(
+    ({ id, name, photo, description, blurOrder }): Entry => {
+      const values = attributes.rows.map((attr) => cell(id, attr));
+      return {
+        id,
+        name,
+        photo: game.kind === "blur" ? photo : firstImage(attrs, values),
+        values,
+        description,
+        ...(game.kind === "blur" && blurOrder && { blurOrder }),
+      };
+    },
+  );
   const active = all.filter((_, i) => !entries.rows[i]!.deleted);
   return {
     attributes: attrs,
@@ -163,76 +163,6 @@ export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
       .length,
   };
 }
-
-export interface GalleryCard {
-  slug: string;
-  name: string;
-  description: string;
-  cover: string;
-  // Banner collage photos of active entries, by id; only for a game without a cover. A Blur
-  // game's photos are its answers, so it gets blurred tiles instead (`blurTileUrl`).
-  photos: string[];
-  entryCount: number;
-  kind: GameKind;
-}
-
-// SQL for the first Image value of the entry aliased `alias` (null when it has none)
-const FIRST_IMAGE = (alias: string): string =>
-  `(select v.value from entry_values v join attributes a on a.id = v.attribute_id
-     where v.entry_id = ${alias}.id and a.type = 'image' order by a.position, a.id limit 1)`;
-
-// Which gallery games a list shows: all of them, one owner's, or one playlist's in its order
-export type GalleryScope =
-  | { ownerId: number; playlistId?: never }
-  | { playlistId: number; ownerId?: never }
-  | Record<string, never>;
-
-// Approved games with enough active entries (MIN_ENTRIES, one for a Blur game) and none missing
-// a value: the original first, then newest first. A scope narrows them to an owner's (newest first) or a playlist's.
-export async function listGallery(
-  q: Q,
-  scope: GalleryScope = {},
-): Promise<GalleryCard[]> {
-  const inPlaylist = scope.playlistId !== undefined;
-  const narrowedBy = [scope.playlistId ?? scope.ownerId].filter(
-    (id) => id !== undefined,
-  );
-  const { rows } = await q.query<GalleryCard>(
-    `select g.slug, g.name, g.description, g.cover_url as cover,
-       case when g.cover_url = '' then array(
-         select x.photo from (
-           select p.id, coalesce(nullif(p.photo_url, ''), ${FIRST_IMAGE("p")}) as photo
-           from entries p where p.game_id = g.id and p.deleted_at is null) x
-         where x.photo is not null order by x.id limit $2
-       ) else '{}'::text[] end as photos,
-       count(e.id)::int as "entryCount", g.kind
-     from games g join entries e on e.game_id = g.id and e.deleted_at is null
-     ${inPlaylist ? "join playlist_games pl on pl.game_id = g.id and pl.playlist_id = $3" : ""}
-     where g.status = 'approved' and not ${HAS_MISSING_VALUES}
-       ${scope.ownerId !== undefined ? "and g.owner_id = $3" : ""}
-     group by g.id${inPlaylist ? ", pl.position" : ""} having count(e.id) >= case when g.kind = 'blur' then 1 else $1 end
-     order by ${
-       inPlaylist
-         ? "pl.position"
-         : scope.ownerId !== undefined
-           ? "g.created_at desc, g.id desc"
-           : "g.slug = 'petdle' desc, g.created_at desc, g.id desc"
-     }`,
-    [MIN_ENTRIES, MAX_TILES, ...narrowedBy],
-  );
-  return rows.map((card) =>
-    card.kind === "blur"
-      ? {
-          ...card,
-          photos: card.photos.map((_, i) => blurTileUrl(card.slug, i)),
-        }
-      : card,
-  );
-}
-
-// Tile n of a Blur game's banner collage: its nth entry photo with a photo, blurred (ADR 0019)
-export const blurTileUrl = (slug: string, n: number): string =>
-  `/api/games/${encodeURIComponent(slug)}/tile/${n}`;
 
 export interface MyGame {
   slug: string;

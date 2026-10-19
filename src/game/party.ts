@@ -3,6 +3,15 @@
 // rounds add up by placement points.
 import type { Correctness } from "./correctness.ts";
 import {
+  hintChoices,
+  isHintKind,
+  revealHint,
+  type FreeHint,
+  type HintChoices,
+  type HintKind,
+  type HintPick,
+} from "./free-hint.ts";
+import {
   gradeGuess,
   nameCell,
   SKIP,
@@ -12,8 +21,9 @@ import {
   type GameAttribute,
   type GradedAttribute,
 } from "./game.ts";
-import { MAX_NICKNAME, MIN_ENTRIES } from "./limits.ts";
+import { MAX_NICKNAME } from "./limits.ts";
 import { outOfTries, type GameKind } from "./blur.ts";
+import type { GuessMode } from "./guess-mode.ts";
 
 // No I or O, so a code read aloud or off a screen is never mistaken for 1 or 0
 export const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -63,6 +73,8 @@ export interface RoundData {
   // In the order they were made
   guesses: { playerId: number; entryId: number; at: number }[];
   giveUps: { playerId: number; at: number }[];
+  // Classic games: the Free Hints players used, at most one each
+  hints?: { playerId: number; pick: HintPick }[];
   // Blur games: guesses each player gets (ADR 0019); unlimited when absent
   tries?: number;
 }
@@ -195,6 +207,8 @@ export interface PartyView {
     attributes: GameAttribute[];
     // A Blur game's entries come without photos
     entries: EntryRef[];
+    // How every player picks a guess, set by the host when opening the party
+    guessMode: GuessMode;
   };
   ended: boolean;
   // The viewer's own player, or null for a visitor who has not joined
@@ -216,13 +230,21 @@ export interface LiveRound {
     solved: boolean;
     gaveUp: boolean;
     lost: boolean;
-    answer?: EntryRef;
+    answer?: RevealedEntry;
+    // Classic games: the Free Hint the viewer used, or the kinds on offer while unused
+    hint?: FreeHint;
+    hints?: HintChoices;
   } | null;
+}
+
+// An answer once revealed: the entry and its description, when it has one
+export interface RevealedEntry extends EntryRef {
+  description?: string;
 }
 
 export interface FinishedRound {
   number: number;
-  answer: EntryRef;
+  answer: RevealedEntry;
   results: (RoundResult & {
     guessNames: string[];
     grades: Correctness[][];
@@ -231,7 +253,13 @@ export interface FinishedRound {
 
 export interface ViewInput {
   code: string;
-  game: { slug: string; name: string; kind?: GameKind; blurTries?: number };
+  game: {
+    slug: string;
+    name: string;
+    kind?: GameKind;
+    blurTries?: number;
+    guessMode?: GuessMode;
+  };
   attributes: readonly GameAttribute[];
   // Active entries (offered to guess) and every entry (so old guesses still resolve)
   entries: readonly Entry[];
@@ -244,6 +272,10 @@ export interface ViewInput {
 }
 
 const ref = ({ id, name, photo }: Entry): EntryRef => ({ id, name, photo });
+const revealed = (entry: Entry): RevealedEntry => ({
+  ...ref(entry),
+  ...(entry.description && { description: entry.description }),
+});
 
 export function partyView(input: ViewInput): PartyView {
   const { attributes, all, players, rounds, viewer } = input;
@@ -273,6 +305,19 @@ export function partyView(input: ViewInput): PartyView {
   let round: LiveRound | null = null;
   if (latest) {
     const mine = me && progressOf(latest, me.id);
+    const answer = entry(latest.answerId);
+    // The Free Hint the viewer used this round, shown against its answer
+    const used =
+      mine && latest.hints?.find((h) => h.playerId === mine.playerId);
+    const hint = used && revealHint(attributes, answer, used.pick);
+    const hints =
+      mine &&
+      kind === "classic" &&
+      latest.endedAt === null &&
+      !isDone(mine) &&
+      !hint
+        ? hintChoices(attributes, answer, graded(latest, mine.playerId))
+        : null;
     round = {
       number: latest.number,
       live: latest.endedAt === null,
@@ -289,7 +334,9 @@ export function partyView(input: ViewInput): PartyView {
             solved: mine.solved,
             gaveUp: mine.gaveUp,
             lost: mine.lost,
-            ...(isDone(mine) && { answer: ref(entry(latest.answerId)) }),
+            ...(isDone(mine) && { answer: revealed(answer) }),
+            ...(hint && { hint }),
+            ...(hints && { hints }),
           }
         : null,
     };
@@ -298,7 +345,7 @@ export function partyView(input: ViewInput): PartyView {
     .filter((r) => r.endedAt !== null)
     .map((r): FinishedRound => ({
       number: r.number,
-      answer: ref(entry(r.answerId)),
+      answer: revealed(entry(r.answerId)),
       results: roundResults(players, r).map((res) => {
         const rows = graded(r, res.playerId);
         return {
@@ -317,6 +364,7 @@ export function partyView(input: ViewInput): PartyView {
     game: {
       ...input.game,
       kind,
+      guessMode: input.game.guessMode ?? "type",
       attributes: [...attributes],
       entries: input.entries.map((e) =>
         kind === "blur"
@@ -348,6 +396,7 @@ export type ClientMessage =
   | { type: "hello"; token?: string }
   | { type: "guess"; entryId: number }
   | { type: "give-up" }
+  | { type: "hint"; kind: HintKind }
   | { type: "start-round" }
   | { type: "end-round" }
   | { type: "remove-player"; playerId: number }
@@ -370,6 +419,7 @@ export type PartyRefusal =
   | "party_ended"
   | "not_enough_entries"
   | "game_paused"
+  | "no_hint"
   | "server_error";
 
 const ACTIONS = new Set(["give-up", "start-round", "end-round", "end-party"]);
@@ -397,6 +447,10 @@ export function parseClientMessage(raw: string): ClientMessage | null {
       return Number.isInteger(msg["entryId"])
         ? { type: "guess", entryId: msg["entryId"] as number }
         : null;
+    case "hint":
+      return isHintKind(msg["kind"])
+        ? { type: "hint", kind: msg["kind"] }
+        : null;
     case "remove-player":
       return Number.isInteger(msg["playerId"])
         ? { type: "remove-player", playerId: msg["playerId"] as number }
@@ -407,52 +461,6 @@ export function parseClientMessage(raw: string): ClientMessage | null {
         : null;
   }
 }
-
-// "1st", "2nd", "3rd", "4th", ... "11th", "21st"
-export function ordinal(n: number): string {
-  const teen = n % 100 >= 11 && n % 100 <= 13;
-  const suffix = teen ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
-  return `${n}${suffix}`;
-}
-
-// A solve time as a clock: 0:07, 1:23, 1:02:03
-export function clockTime(ms: number): string {
-  const total = Math.floor(ms / 1000);
-  const [h, m, sec] = [
-    Math.floor(total / 3600),
-    Math.floor(total / 60) % 60,
-    total % 60,
-  ];
-  const pad = (n: number): string => String(n).padStart(2, "0");
-  return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
-}
-
-// How a player is doing in the live round, as the scoreboard says it
-export function progressLabel(p: Omit<Progress, "timeMs">): string {
-  const count = `${p.guesses} ${p.guesses === 1 ? "guess" : "guesses"}`;
-  return p.solved
-    ? `${count}, solved`
-    : p.gaveUp
-      ? `${count}, gave up`
-      : p.lost
-        ? `${count}, out of tries`
-        : count;
-}
-
-export const REFUSAL_TEXT: Record<PartyRefusal, string> = {
-  invalid: "That is not one of this game's entries.",
-  not_host: "Only the host can do that.",
-  not_player: "Join the party to play.",
-  no_round: "There is no round going on right now.",
-  round_live: "A round is already going on.",
-  finished: "You are done with this round. Wait for the next one.",
-  duplicate: "You already guessed that one.",
-  party_ended: "This party has ended.",
-  not_enough_entries: `This game needs at least ${MIN_ENTRIES} entries (one for a Blur game) before a round can start.`,
-  game_paused:
-    "This game is paused while some of its entries are missing values.",
-  server_error: "The server hit an unexpected problem. Try again in a moment.",
-};
 
 // The socket close code for a player the host removed
 export const CLOSE_REMOVED = 4001;

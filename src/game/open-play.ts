@@ -22,6 +22,8 @@ export interface OpenPlayDeps {
   now: () => Date;
   fetch: Fetch;
   onNewDay: () => void;
+  // After onNewDay, when the owner changed the day's answer
+  onAnswerChanged: () => void;
 }
 
 // The Play for the page, and whether moving today's browser guesses to the account was rate limited
@@ -34,6 +36,7 @@ export async function openPlay({
   now,
   fetch,
   onNewDay,
+  onAnswerChanged,
 }: OpenPlayDeps): Promise<{ play: Play; rateLimited: boolean }> {
   const past = day === undefined ? {} : { day };
   const local =
@@ -49,6 +52,7 @@ export async function openPlay({
         now,
         fetch,
         onNewDay,
+        onAnswerChanged,
         ...past,
         player: playerToken(storage),
       }),
@@ -59,7 +63,14 @@ export async function openPlay({
   const merged =
     day === undefined ? await mergeLocalGame(slug, local, now, fetch) : null;
   return {
-    play: createServerPlay({ slug, fetch, onNewDay, ...past }),
+    play: createServerPlay({
+      slug,
+      fetch,
+      onNewDay,
+      onAnswerChanged,
+      storage: local,
+      ...past,
+    }),
     rateLimited: merged === "rate_limited",
   };
 }

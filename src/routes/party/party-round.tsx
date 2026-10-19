@@ -15,6 +15,9 @@ import {
 import type { LiveRound, PartyView } from "../../game/party.ts";
 import { GuessForm, useGuessMode } from "../play/guess-form.tsx";
 import { SelectList } from "../play/select-list.tsx";
+import type { HintKind } from "../../game/free-hint.ts";
+import { FreeHintCard } from "../play/free-hint.tsx";
+import { AnswerDescription } from "../play/result-banner.tsx";
 
 type Board = NonNullable<LiveRound["yours"]>;
 
@@ -24,6 +27,7 @@ export function PartyRound({
   mine,
   onGuess,
   onGiveUp,
+  onHint,
   onNotice,
 }: {
   view: PartyView;
@@ -32,10 +36,11 @@ export function PartyRound({
   // False when the socket is down and the guess was not sent
   onGuess: (entryId: number) => boolean;
   onGiveUp: () => void;
+  onHint: (kind: HintKind) => void;
   onNotice: (text: string | null) => void;
 }) {
   const [guess, setGuess] = useState("");
-  const modes = useGuessMode();
+  const modes = useGuessMode(view.game.guessMode);
   const done = mine.solved || mine.gaveUp || mine.lost;
   // Selection mode's list, in place of the board
   const listing = modes.selecting && !done;
@@ -93,6 +98,9 @@ export function PartyRound({
                 The answer is {mine.answer.name}. Waiting for the others to
                 finish.
               </span>
+              {mine.answer.description && (
+                <AnswerDescription text={mine.answer.description} />
+              )}
             </div>
           </div>
         )}
@@ -129,6 +137,13 @@ export function PartyRound({
             </Button>
           </div>
         </Card>
+      )}
+      {blur === null && (
+        <FreeHintCard
+          hint={mine.hint}
+          hints={done ? undefined : mine.hints}
+          onTake={onHint}
+        />
       )}
       {listing && (
         <SelectList

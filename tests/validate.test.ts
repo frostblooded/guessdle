@@ -71,6 +71,14 @@ describe("parseEntryInput", () => {
     });
     assert.equal(parseEntryInput({ blurOrder: [0, 1] }), undefined);
   });
+  it("trims the description and bounds it to 500", () => {
+    assert.deepEqual(parseEntryInput({ description: " Shy. " }), {
+      description: "Shy.",
+    });
+    assert.deepEqual(parseEntryInput({ description: "" }), { description: "" });
+    assert.equal(parseEntryInput({ description: "a".repeat(501) }), undefined);
+    assert.equal(parseEntryInput({ description: 1 }), undefined);
+  });
   it("trims the name and bounds it to 60", () => {
     assert.deepEqual(parseEntryInput({ name: " Rex " }), { name: "Rex" });
     assert.equal(parseEntryInput({ name: "a".repeat(61) }), undefined);

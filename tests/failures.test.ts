@@ -33,6 +33,10 @@ const SERVER_CODES: FailureCode[] = [
   "self_deletion",
   "self_demotion",
   "last_admin",
+  "banned",
+  "self_ban",
+  "admin_ban",
+  "promote_banned",
 ];
 
 describe("failure table", () => {

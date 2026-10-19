@@ -1,5 +1,14 @@
 // A signed-in player's Game State for one day, stored in Postgres.
 import type pg from "pg";
+import {
+  isHintKind,
+  pickHint,
+  revealHint,
+  type FreeHint,
+  type HintChoices,
+  type HintKind,
+  type HintPick,
+} from "../game/free-hint.ts";
 import { SKIP, type GradedAttribute } from "../game/game.ts";
 import type { GameRow, Roster } from "./games.ts";
 import { boardOf, isLost, triesOf, type PlayDay } from "./play-day.ts";
@@ -7,6 +16,8 @@ import { recordFailure } from "./results.ts";
 
 export interface GameView {
   day: number;
+  // The answer's revision: a changed one means the day started over (migration 015)
+  revision: number;
   ids: number[];
   rows: GradedAttribute[][];
   victory: boolean;
@@ -17,6 +28,12 @@ export interface GameView {
   answer?: string;
   // Blur games, once the day is over: the answer's whole image
   answerPhoto?: string;
+  // Once the day is over, when the answer has one
+  answerDescription?: string;
+  // Classic games: the Free Hint the player used
+  hint?: FreeHint;
+  // Classic games: the hint kinds on offer, while the day is on and no hint was used
+  hints?: HintChoices;
 }
 
 // An id a player may guess: an active entry, or in a Blur game SKIP
@@ -31,8 +48,10 @@ export const REFUSAL_STATUS = {
   finished: 409,
   // merge: the account already has rows for the day
   has_progress: 409,
-  // merge: the payload is for another day
+  // merge: the payload is for another day, or for an answer since changed
   stale_day: 409,
+  // hint: none on offer (too few guesses, already used, finished, or nothing to reveal)
+  no_hint: 409,
 } as const;
 export type Refusal = keyof typeof REFUSAL_STATUS;
 export type GameOutcome = { kind: "ok"; view: GameView } | { kind: Refusal };
@@ -66,15 +85,38 @@ export async function view(q: Q, ctx: GameContext): Promise<GameView> {
     // Stored rows are never duplicated
     throw new Error("stored guesses are not gradable");
   }
+  const pick = await storedHint(q, userId, game.id, date);
+  const hint = pick && revealHint(ctx.roster.attributes, ctx.answer, pick);
   return {
     day,
+    revision: ctx.revision,
     ids,
     rows: board.rows,
     victory: board.victory,
     gaveUp,
     ...(board.lost && { lost: true as const }),
     ...board.reveal,
+    ...(hint && { hint }),
+    ...(!hint && board.hints && { hints: board.hints }),
   };
+}
+
+async function storedHint(
+  q: Q,
+  userId: number,
+  gameId: number,
+  date: string,
+): Promise<HintPick | null> {
+  const { rows } = await q.query<{ kind: HintKind; attribute: string | null }>(
+    "select kind, attribute from user_hints where user_id = $1 and game_id = $2 and day = $3",
+    [userId, gameId, date],
+  );
+  const row = rows[0];
+  return !row
+    ? null
+    : row.kind === "attribute"
+      ? { kind: "attribute", attribute: row.attribute ?? "" }
+      : { kind: "description" };
 }
 
 // Runs `action` in a transaction holding the user's row lock, so one player's
@@ -162,6 +204,37 @@ export async function giveUp(
   return null;
 }
 
+// Uses the day's Free Hint: draws it and stores the pick
+export async function takeHint(
+  q: Q,
+  { game, roster, answer, userId, date }: GameContext,
+  current: GameView,
+  kind: unknown,
+  random: () => number,
+): Promise<Refusal | null> {
+  if (!isHintKind(kind)) {
+    return "invalid";
+  }
+  if (!current.hints) {
+    return "no_hint";
+  }
+  const pick = pickHint(roster.attributes, answer, current.rows, kind, random);
+  if (!pick) {
+    return "no_hint";
+  }
+  await q.query(
+    "insert into user_hints (user_id, game_id, day, kind, attribute) values ($1, $2, $3, $4, $5)",
+    [
+      userId,
+      game.id,
+      date,
+      pick.kind,
+      pick.kind === "attribute" ? pick.attribute : null,
+    ],
+  );
+  return null;
+}
+
 // Adopts anonymous local history (POST /api/games/:slug/state/merge body); the user-row lock
 // in changeGame makes the "no rows yet" check and the inserts one atomic step.
 export async function mergeLocal(
@@ -170,7 +243,7 @@ export async function mergeLocal(
   current: GameView,
   body: Record<string, unknown>,
 ): Promise<Refusal | null> {
-  const { game, roster, answer, userId, date, day } = ctx;
+  const { game, roster, answer, userId, date, day, revision } = ctx;
   const { ids, gaveUp } = body;
   if (
     !Array.isArray(ids) ||
@@ -180,7 +253,8 @@ export async function mergeLocal(
   ) {
     return "invalid";
   }
-  if (body["day"] !== day) {
+  // Browsers from before revisions existed send none: they played revision 0
+  if (body["day"] !== day || (body["revision"] ?? 0) !== revision) {
     return "stale_day";
   }
   if (current.ids.length > 0 || current.gaveUp) {
@@ -220,7 +294,7 @@ export async function resetGame(
   { game, userId, date }: GameContext,
 ): Promise<Refusal | null> {
   // Any time, even with no rows: deleting nothing is fine
-  for (const table of ["user_guesses", "user_give_ups"]) {
+  for (const table of ["user_guesses", "user_give_ups", "user_hints"]) {
     await q.query(
       `delete from ${table} where user_id = $1 and game_id = $2 and day = $3`,
       [userId, game.id, date],

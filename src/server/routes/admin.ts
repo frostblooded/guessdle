@@ -9,7 +9,7 @@ import type { GameRow } from "../games.ts";
 import { resolveAdmin } from "../access.ts";
 import { uploadRefs } from "../upload-refs.ts";
 import type { SessionUser } from "../auth.ts";
-import { deleteUser, listUsers, setAdmin } from "../users.ts";
+import { deleteUser, listUsers, setAdmin, setBan } from "../users.ts";
 import {
   bodyOf,
   fail,
@@ -151,5 +151,38 @@ export function adminRoutes(
         fail(res, result);
       }
     }),
+  );
+  // Ban with a reason the player sees, or unban (DELETE), which restores everything
+  const banRoute = (reasonOf: (req: Request) => string | null | undefined) =>
+    adminRoute(async ({ req, res, actor }) => {
+      const id = String(paramOf(req, "id"));
+      const reason = reasonOf(req);
+      if (
+        !/^[1-9]\d{0,9}$/.test(id) ||
+        Number(id) > MAX_USER_ID ||
+        reason === undefined
+      ) {
+        fail(res, "invalid");
+        return;
+      }
+      const result = await setBan(pool, actor.id, Number(id), reason, now());
+      if (result === "ok") {
+        res.json({ ok: true });
+      } else {
+        fail(res, result);
+      }
+    });
+  app.put(
+    "/api/admin/users/:id/ban",
+    express.json({ limit: "2kb" }),
+    banRoute((req) => {
+      const reason = bodyOf(req)["reason"];
+      const text = typeof reason === "string" ? reason.trim() : "";
+      return text === "" || text.length > MAX_REASON ? undefined : text;
+    }),
+  );
+  app.delete(
+    "/api/admin/users/:id/ban",
+    banRoute(() => null),
   );
 }

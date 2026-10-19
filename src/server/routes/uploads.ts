@@ -34,10 +34,14 @@ export function uploadRoutes(
     next: NextFunction,
   ): Promise<void> => {
     try {
-      if (await requestUser(pool, req, now())) {
-        next();
-      } else {
+      const user = await requestUser(pool, req, now());
+      if (!user) {
         fail(res, "unauthorized");
+      } else if (user.banned) {
+        // Uploads only go into games, which a banned player cannot change
+        fail(res, "banned");
+      } else {
+        next();
       }
     } catch (err) {
       next(err);

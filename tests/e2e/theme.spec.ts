@@ -154,12 +154,18 @@ for (const scheme of ["light", "dark"] as const) {
     page,
   }) => {
     await page.emulateMedia({ colorScheme: scheme });
+    // Practice guesses that color every kind of cell: Eddie (red, orange), then Cookie (green)
     await page.goto("/how-to-play");
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+    await page.getByRole("button", { name: "Eddie", exact: true }).click();
+    await page.getByRole("button", { name: "Next guess" }).click();
+    await page.getByRole("button", { name: "Cookie", exact: true }).click();
     for (const selector of [
-      ".help-example .correct",
-      ".help-example .partially-correct",
-      ".help-example .incorrect",
-      ".help-head .cell",
+      ".practice-board .correct",
+      ".practice-board .partially-correct",
+      ".practice-board .incorrect",
+      ".practice-board > .row:first-child .cell",
+      ".pet-option",
     ]) {
       expect(
         await contrast(page.locator(selector).first()),
