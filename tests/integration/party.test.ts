@@ -386,7 +386,7 @@ describe("party mode", () => {
         bo.say({ type: "guess", entryId: pid(slug) });
       }
       const offered = await bo.view((v) => v.round?.yours?.rows.length === 3);
-      assert.equal(offered.round!.yours!.hints!.description, false);
+      assert.deepEqual(offered.round!.yours!.hints, { attribute: true });
       bo.say({ type: "hint", kind: "attribute" });
       const hinted = await bo.view((v) => v.round?.yours?.hint !== undefined);
       assert.equal(hinted.round!.yours!.hint!.kind, "attribute");

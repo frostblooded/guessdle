@@ -82,7 +82,7 @@ function fakeServer(game?: Response) {
         // This small fake offers the Free Hint after 2 wrong guesses
         ...(ids.length >= 2 &&
           !ids.includes(ANSWER) && {
-            hints: { attribute: true, description: false },
+            hints: { attribute: true },
           }),
       });
     }
@@ -253,12 +253,8 @@ describe("PlayPage", () => {
     await guess("Abby");
     await screen.findByText("You earned a free hint");
     assert.equal(
-      screen
-        .getByRole<HTMLButtonElement>("button", {
-          name: "Reveal the description",
-        })
-        .hasAttribute("disabled"),
-      true,
+      screen.queryByRole("button", { name: "Reveal the description" }),
+      null,
     );
     await userEvent.click(
       screen.getByRole("button", { name: "Reveal an attribute" }),
@@ -269,6 +265,10 @@ describe("PlayPage", () => {
       "Color: White",
     );
     assert.equal(screen.queryByText("You earned a free hint"), null);
+    // The hint goes once the answer is guessed
+    await guess("Dido");
+    await screen.findByText("Naps in the sun.");
+    assert.equal(document.querySelector("#free-hint"), null);
   });
 
   it("giving up shows no stats", async () => {
@@ -515,7 +515,7 @@ describe("PlayPage selection mode", () => {
     vi.stubGlobal("fetch", fakeServer());
     renderPlay();
     await screen.findByText(/No guesses yet/);
-    await userEvent.click(screen.getByRole("button", { name: "Select" }));
+    await userEvent.click(screen.getByRole("button", { name: "Selecting" }));
     assert.equal(screen.queryByRole("combobox", { name: "Name" }), null);
     await userEvent.click(
       screen.getByRole("button", { name: "Select next guess" }),
@@ -541,7 +541,7 @@ describe("PlayPage selection mode", () => {
     vi.stubGlobal("fetch", fakeServer());
     renderPlay();
     await screen.findByText(/No guesses yet/);
-    await userEvent.click(screen.getByRole("button", { name: "Select" }));
+    await userEvent.click(screen.getByRole("button", { name: "Selecting" }));
     await userEvent.click(
       screen.getByRole("button", { name: "Select next guess" }),
     );
@@ -569,14 +569,14 @@ describe("PlayPage selection mode", () => {
     vi.stubGlobal("fetch", fakeServer());
     renderPlay();
     await screen.findByText(/No guesses yet/);
-    await userEvent.click(screen.getByRole("button", { name: "Select" }));
+    await userEvent.click(screen.getByRole("button", { name: "Selecting" }));
     cleanup();
     renderPlay();
     await screen.findByText(/No guesses yet/);
     assert.ok(screen.getByRole("button", { name: "Select next guess" }));
     assert.equal(
       screen
-        .getByRole("button", { name: "Select" })
+        .getByRole("button", { name: "Selecting" })
         .getAttribute("aria-pressed"),
       "true",
     );

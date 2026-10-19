@@ -41,7 +41,7 @@ class FakeServer {
       ...(this.hinted
         ? { hint: { kind: "attribute", attribute: "Owner", value: "Niki" } }
         : this.ids.length >= 3 && {
-            hints: { attribute: true, description: false },
+            hints: { attribute: true },
           }),
     };
   }
@@ -355,7 +355,7 @@ describe("takeHint", () => {
     }
     const third = await play.submit(three[2]!.id);
     assert.ok(third.kind === "accepted");
-    assert.deepEqual(third.hints, { attribute: true, description: false });
+    assert.deepEqual(third.hints, { attribute: true });
     assert.deepEqual(await play.takeHint("attribute"), {
       kind: "hint",
       hint: { kind: "attribute", attribute: "Owner", value: "Niki" },

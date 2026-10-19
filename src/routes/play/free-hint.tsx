@@ -6,11 +6,7 @@ import { Card } from "../../components/ui/card.tsx";
 import type { FreeHint, HintChoices, HintKind } from "../../game/free-hint.ts";
 
 const shown = (hint: FreeHint): string =>
-  hint.kind === "description"
-    ? hint.description
-    : Array.isArray(hint.value)
-      ? hint.value.join(", ")
-      : hint.value;
+  Array.isArray(hint.value) ? hint.value.join(", ") : hint.value;
 
 export function FreeHintCard({
   hint,
@@ -41,27 +37,19 @@ export function FreeHintCard({
       {hint ? (
         <div className="min-w-0 flex-1">
           <p className="font-semibold">Free hint</p>
-          {hint.kind === "attribute" ? (
-            <>
-              <p id="free-hint-text" className="break-words">
-                {hint.attribute}:
-                {hint.image ? null : (
-                  <span className="font-semibold"> {shown(hint)}</span>
-                )}
-              </p>
-              {hint.image && (
-                <img
-                  id="free-hint-image"
-                  className="mt-2 aspect-square size-24 rounded-md bg-muted object-cover"
-                  src={hint.value as string}
-                  alt={`The answer's ${hint.attribute}`}
-                />
-              )}
-            </>
-          ) : (
-            <p id="free-hint-text" className="whitespace-pre-line break-words">
-              {shown(hint)}
-            </p>
+          <p id="free-hint-text" className="break-words">
+            {hint.attribute}:
+            {hint.image ? null : (
+              <span className="font-semibold"> {shown(hint)}</span>
+            )}
+          </p>
+          {hint.image && (
+            <img
+              id="free-hint-image"
+              className="mt-2 aspect-square size-24 rounded-md bg-muted object-cover"
+              src={hint.value as string}
+              alt={`The answer's ${hint.attribute}`}
+            />
           )}
         </div>
       ) : (
@@ -69,8 +57,8 @@ export function FreeHintCard({
           <div>
             <p className="font-semibold">You earned a free hint</p>
             <p className="text-sm text-muted-foreground">
-              Pick one: the answer's value for a random attribute you have not
-              matched yet, or the answer's description. You get one per game.
+              See the answer's value for a random attribute you have not matched
+              yet. You get one per game.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -82,20 +70,6 @@ export function FreeHintCard({
               onClick={() => onTake("attribute")}
             >
               Reveal an attribute
-            </Button>
-            <Button
-              id="hint-description-button"
-              variant="outline"
-              size="sm"
-              disabled={busy || !hints?.description}
-              title={
-                hints?.description
-                  ? undefined
-                  : "This answer has no description"
-              }
-              onClick={() => onTake("description")}
-            >
-              Reveal the description
             </Button>
           </div>
         </div>

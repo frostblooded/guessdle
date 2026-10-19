@@ -1,5 +1,6 @@
 // A Blur game's board (ADR 0019), shared by Play and party rounds: the answer's image in a
 // square frame with only the earned squares clear, and the whole image once it is over.
+import type { ReactNode } from "react";
 import { cn } from "../lib/utils.ts";
 import { Correctness } from "../game/correctness.ts";
 import { isSkipRow, nameCell, type GradedAttribute } from "../game/game.ts";
@@ -11,6 +12,7 @@ export function BlurView({
   wrong,
   finished,
   reveal,
+  children,
 }: {
   // The image with n squares clear
   boardUrl: (n: number) => string;
@@ -20,13 +22,15 @@ export function BlurView({
   finished: boolean;
   // The whole image, once the day or round is over
   reveal?: string | undefined;
+  // Drawn over the image, such as How to play's covered squares
+  children?: ReactNode;
 }) {
   const { shown, left } = blurProgress(wrong, tries, finished);
   const whole = finished && reveal ? reveal : null;
   const src = whole ?? boardUrl(shown);
   return (
     <div id="blur-view" className="mb-6 flex flex-col items-center gap-3">
-      <div className="aspect-square w-full max-w-sm overflow-hidden rounded-xl border bg-muted shadow-sm">
+      <div className="relative aspect-square w-full max-w-sm overflow-hidden rounded-xl border bg-muted shadow-sm">
         <img
           id="blur-current"
           key={src}
@@ -38,6 +42,7 @@ export function BlurView({
               : `The image, ${shown} of ${CELLS} squares clear`
           }
         />
+        {children}
       </div>
       <p id="blur-tries" className="text-sm font-medium text-muted-foreground">
         {finished
