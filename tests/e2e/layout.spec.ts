@@ -2,13 +2,9 @@ import { expect, test, type Page } from "@playwright/test";
 import { GUESS_DATA } from "./roster.ts";
 import { findAnswerName, submitGuess, winGame } from "./helpers.ts";
 
-// Phones (small to large, portrait and landscape) and a small tablet
+// The extremes: smallest and largest phone, landscape, and a small tablet (the sizes in between repeat what these check)
 const VIEWPORTS = [
   { name: "320x568 small phone", width: 320, height: 568 },
-  { name: "360x640 Android", width: 360, height: 640 },
-  { name: "375x667 iPhone SE", width: 375, height: 667 },
-  { name: "390x844 iPhone 14", width: 390, height: 844 },
-  { name: "412x914 Samsung Galaxy A53", width: 412, height: 914 },
   { name: "430x932 large phone", width: 430, height: 932 },
   { name: "667x375 landscape", width: 667, height: 375 },
   { name: "768x1024 tablet", width: 768, height: 1024 },

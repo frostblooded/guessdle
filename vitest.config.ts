@@ -1,7 +1,7 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
-// Unit tests run in parallel; integration tests share Testcontainers services, so they run one file at a time.
+// Unit tests run in parallel. Integration files share one Postgres container (global-setup.ts), each with its own database.
 // UI tests render React components in jsdom with Testing Library.
 export default defineConfig({
   plugins: [react()],
@@ -25,7 +25,7 @@ export default defineConfig({
         test: {
           name: "integration",
           include: ["tests/integration/*.test.ts"],
-          fileParallelism: false,
+          globalSetup: ["tests/integration/global-setup.ts"],
           testTimeout: 120_000,
           hookTimeout: 120_000,
         },
