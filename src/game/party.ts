@@ -1,29 +1,19 @@
 // Party mode (issue #90, ADR 0016): pure rules shared by the server and the party page.
 // A round is won with the fewest guesses, ties broken by time from the round's start;
-// rounds add up by placement points.
-import type { Correctness } from "./correctness.ts";
-import {
-  hintChoices,
-  isHintKind,
-  revealHint,
-  type FreeHint,
-  type HintChoices,
-  type HintKind,
-  type HintPick,
-} from "./free-hint.ts";
-import {
-  gradeGuess,
-  nameCell,
-  SKIP,
-  skippedRow,
-  type Entry,
-  type EntryRef,
-  type GameAttribute,
-  type GradedAttribute,
-} from "./game.ts";
+// rounds add up by placement points. A Quiz game's round is one question (ADR 0021): the most
+// quiz points win it, ties broken by time, and a wrong answer gets no placement points.
+import { isHintKind, type HintKind, type HintPick } from "./free-hint.ts";
 import { MAX_NICKNAME } from "./limits.ts";
-import { isImageGame, outOfTries, type GameKind } from "./blur.ts";
-import type { GuessMode } from "./guess-mode.ts";
+import { outOfTries } from "./blur.ts";
+import type { QuizRound } from "./quiz.ts";
+import type { PartyView } from "./party-view.ts";
+
+export type {
+  FinishedRound,
+  LiveRound,
+  PartyView,
+  ViewInput,
+} from "./party-view.ts";
 
 // No I or O, so a code read aloud or off a screen is never mistaken for 1 or 0
 export const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -77,6 +67,8 @@ export interface RoundData {
   hints?: { playerId: number; pick: HintPick }[];
   // Blur games: guesses each player gets (ADR 0019); unlimited when absent
   tries?: number;
+  // Quiz games: the round's question, its right answer and each player's one answer, graded
+  quiz?: QuizRound;
 }
 
 // Who plays a round: everyone in the party when it ended (or now, while live), late joiners too
@@ -95,9 +87,24 @@ export interface Progress {
   lost: boolean;
   // From the round's start to the solving guess
   timeMs: number | null;
+  // Quiz games: the answer's quiz points (0 to 1), absent before answering. An answer with
+  // points counts as solved, one without as lost.
+  score?: number;
 }
 
 export function progressOf(round: RoundData, playerId: number): Progress {
+  if (round.quiz) {
+    const answer = round.quiz.answers.find((a) => a.playerId === playerId);
+    return {
+      playerId,
+      guesses: answer ? 1 : 0,
+      solved: answer !== undefined && answer.points > 0,
+      gaveUp: false,
+      lost: answer !== undefined && answer.points === 0,
+      timeMs: answer ? answer.at - round.startedAt : null,
+      ...(answer && { score: answer.points }),
+    };
+  }
   const mine = round.guesses.filter((g) => g.playerId === playerId);
   const solving = mine.find((g) => g.entryId === round.answerId);
   return {
@@ -131,8 +138,12 @@ export interface RoundResult extends Progress {
   points: number;
 }
 
-const better = (a: Progress, b: Progress): boolean =>
-  a.guesses < b.guesses || (a.guesses === b.guesses && a.timeMs! < b.timeMs!);
+// Fewer guesses, or in a Quiz game more points, then less time
+const better = (a: Progress, b: Progress): boolean => {
+  const [mine, theirs] =
+    a.score === undefined ? [b.guesses, a.guesses] : [a.score, b.score!];
+  return mine > theirs || (mine === theirs && a.timeMs! < b.timeMs!);
+};
 
 // Placement points: with N players, 1st gets N, 2nd N - 1, and so on; unsolved gets 0
 export function roundResults(
@@ -195,193 +206,6 @@ export function standings(
     );
 }
 
-// What every phone is sent: the live round shows only counts, a finished round everything
-export interface PartyView {
-  code: string;
-  game: {
-    slug: string;
-    name: string;
-    kind: GameKind;
-    // Blur and Sequence games: tries per round
-    blurTries?: number;
-    attributes: GameAttribute[];
-    // A Blur or Sequence game's entries come without photos
-    entries: EntryRef[];
-    // How every player picks a guess, set by the host when opening the party
-    guessMode: GuessMode;
-  };
-  ended: boolean;
-  // The viewer's own player, or null for a visitor who has not joined
-  you: { playerId: number; host: boolean } | null;
-  players: Standing[];
-  // The latest round, live or finished; null before the first
-  round: LiveRound | null;
-  // Finished rounds, newest first
-  history: FinishedRound[];
-}
-
-export interface LiveRound {
-  number: number;
-  live: boolean;
-  progress: Omit<Progress, "timeMs">[];
-  // The viewer's own board; the answer once they solved it, gave up or ran out of tries
-  yours: {
-    rows: GradedAttribute[][];
-    solved: boolean;
-    gaveUp: boolean;
-    lost: boolean;
-    answer?: RevealedEntry;
-    // Classic games: the Free Hint the viewer used, or the kinds on offer while unused
-    hint?: FreeHint;
-    hints?: HintChoices;
-  } | null;
-}
-
-// An answer once revealed: the entry and its description, when it has one
-export interface RevealedEntry extends EntryRef {
-  description?: string;
-}
-
-export interface FinishedRound {
-  number: number;
-  answer: RevealedEntry;
-  results: (RoundResult & {
-    guessNames: string[];
-    grades: Correctness[][];
-  })[];
-}
-
-export interface ViewInput {
-  code: string;
-  game: {
-    slug: string;
-    name: string;
-    kind?: GameKind;
-    blurTries?: number;
-    guessMode?: GuessMode;
-  };
-  attributes: readonly GameAttribute[];
-  // Active entries (offered to guess) and every entry (so old guesses still resolve)
-  entries: readonly Entry[];
-  all: readonly Entry[];
-  ended: boolean;
-  players: readonly PartyPlayer[];
-  // Oldest first
-  rounds: readonly RoundData[];
-  viewer: number | null;
-}
-
-const ref = ({ id, name, photo }: Entry): EntryRef => ({ id, name, photo });
-const revealed = (entry: Entry): RevealedEntry => ({
-  ...ref(entry),
-  // A Sequence entry shows its first photo
-  photo: entry.photo || (entry.shots?.[0] ?? ""),
-  ...(entry.description && { description: entry.description }),
-});
-
-export function partyView(input: ViewInput): PartyView {
-  const { attributes, all, players, rounds, viewer } = input;
-  const kind = input.game.kind ?? "classic";
-  const entry = (id: number): Entry =>
-    all.find((e) => e.id === id) ?? {
-      id,
-      name: "?",
-      photo: "",
-      values: attributes.map(() => ""),
-    };
-  const graded = (round: RoundData, playerId: number): GradedAttribute[][] =>
-    round.guesses
-      .filter((g) => g.playerId === playerId)
-      .map((g) =>
-        g.entryId === SKIP && isImageGame(kind)
-          ? skippedRow()
-          : gradeGuess(
-              attributes,
-              entry(round.answerId),
-              entry(g.entryId),
-              kind,
-            ),
-      );
-  const latest = rounds.at(-1);
-  const me = players.find((p) => p.id === viewer);
-  let round: LiveRound | null = null;
-  if (latest) {
-    const mine = me && progressOf(latest, me.id);
-    const answer = entry(latest.answerId);
-    // The Free Hint the viewer used this round, shown against its answer
-    const used =
-      mine && latest.hints?.find((h) => h.playerId === mine.playerId);
-    const hint = used && revealHint(attributes, answer, used.pick);
-    const hints =
-      mine &&
-      kind === "classic" &&
-      latest.endedAt === null &&
-      !isDone(mine) &&
-      !hint
-        ? hintChoices(attributes, answer, graded(latest, mine.playerId))
-        : null;
-    round = {
-      number: latest.number,
-      live: latest.endedAt === null,
-      progress: participants(players, latest).map((p) => {
-        const { playerId, guesses, solved, gaveUp, lost } = progressOf(
-          latest,
-          p.id,
-        );
-        return { playerId, guesses, solved, gaveUp, lost };
-      }),
-      yours: mine
-        ? {
-            rows: graded(latest, mine.playerId),
-            solved: mine.solved,
-            gaveUp: mine.gaveUp,
-            lost: mine.lost,
-            ...(isDone(mine) && { answer: revealed(answer) }),
-            ...(hint && { hint }),
-            ...(hints && { hints }),
-          }
-        : null,
-    };
-  }
-  const history = rounds
-    .filter((r) => r.endedAt !== null)
-    .map((r): FinishedRound => ({
-      number: r.number,
-      answer: revealed(entry(r.answerId)),
-      results: roundResults(players, r).map((res) => {
-        const rows = graded(r, res.playerId);
-        return {
-          ...res,
-          guessNames: rows.map((row) => String(nameCell(row).value)),
-          // Image columns are never colored, so they get no square
-          grades: rows.map((row) =>
-            row.filter((cell) => !cell.image).map((cell) => cell.correctness),
-          ),
-        };
-      }),
-    }))
-    .reverse();
-  return {
-    code: input.code,
-    game: {
-      ...input.game,
-      kind,
-      guessMode: input.game.guessMode ?? "type",
-      attributes: [...attributes],
-      entries: input.entries.map((e) =>
-        isImageGame(kind)
-          ? { ...ref(e), photo: "" }
-          : { ...ref(e), values: e.values },
-      ),
-    },
-    ended: input.ended,
-    you: me ? { playerId: me.id, host: me.host } : null,
-    players: standings(players, rounds),
-    round,
-    history,
-  };
-}
-
 // The next secret entry: random among active entries this party has not had yet (all of them once used up)
 export function drawAnswer(
   activeIds: readonly number[],
@@ -397,6 +221,8 @@ export function drawAnswer(
 export type ClientMessage =
   | { type: "hello"; token?: string }
   | { type: "guess"; entryId: number }
+  // Quiz games: the one answer to the round's question
+  | { type: "answer"; answer: string }
   | { type: "give-up" }
   | { type: "hint"; kind: HintKind }
   | { type: "start-round" }
@@ -422,6 +248,7 @@ export type PartyRefusal =
   | "not_enough_entries"
   | "game_paused"
   | "no_hint"
+  | "no_questions_left"
   | "server_error";
 
 const ACTIONS = new Set(["give-up", "start-round", "end-round", "end-party"]);
@@ -448,6 +275,10 @@ export function parseClientMessage(raw: string): ClientMessage | null {
     case "guess":
       return Number.isInteger(msg["entryId"])
         ? { type: "guess", entryId: msg["entryId"] as number }
+        : null;
+    case "answer":
+      return typeof msg["answer"] === "string" && msg["answer"].length <= 40
+        ? { type: "answer", answer: msg["answer"] }
         : null;
     case "hint":
       return isHintKind(msg["kind"])

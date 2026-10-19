@@ -24,6 +24,7 @@ import { api, errorText } from "../../manage-client.ts";
 import { openPartySocket, type PartySocket } from "../../party-socket.ts";
 import { CodeForm, PartyForm, PartyHead } from "./party-forms.tsx";
 import { PartyRound } from "./party-round.tsx";
+import { QuizRound } from "./quiz-round.tsx";
 import { History, Players, Podium } from "./standings.tsx";
 import { getToken, setToken } from "./tokens.ts";
 
@@ -191,7 +192,16 @@ export function PartyRoom({ code }: { code: string }) {
   const live = round?.live === true;
   const host = view.you?.host === true && !view.ended;
   const mine = live ? round.yours : null;
-  const waiting = waitingText(view, host);
+  // A quiz plays each question once
+  const outOfQuestions =
+    view.game.questions !== undefined &&
+    (round?.number ?? 0) >= view.game.questions;
+  const waiting =
+    outOfQuestions && !live && !view.ended
+      ? host
+        ? "That was the last question. End the party to see the final standings."
+        : "That was the last question. Waiting for the host to end the party."
+      : waitingText(view, host);
   return (
     <>
       <PartyHead
@@ -204,7 +214,9 @@ export function PartyRoom({ code }: { code: string }) {
           view.ended
             ? "This party has ended. These results stay at this link for 30 days."
             : view.you
-              ? "Everyone guesses the same secret entry. Fewest guesses wins the round; ties go to whoever finished first."
+              ? view.game.kind === "quiz"
+                ? "Each round is one question. The most points win the round; ties go to whoever answered first."
+                : "Everyone guesses the same secret entry. Fewest guesses wins the round; ties go to whoever finished first."
               : "Pick a nickname to join. You can play the round that is going on right now."
         }
         error={error}
@@ -242,7 +254,7 @@ export function PartyRoom({ code }: { code: string }) {
               >
                 End round
               </Button>
-            ) : (
+            ) : outOfQuestions ? null : (
               <Button
                 id="start-round"
                 onClick={() => send({ type: "start-round" })}
@@ -283,7 +295,16 @@ export function PartyRoom({ code }: { code: string }) {
         <Alert id="notice" variant="warn" role="status" className="mb-4">
           {notice}
         </Alert>
-        {live && mine && (
+        {live && mine && round.question && (
+          <QuizRound
+            key={round.number}
+            round={round}
+            question={round.question}
+            answered={mine.quizAnswer ?? null}
+            onAnswer={(answer) => send({ type: "answer", answer })}
+          />
+        )}
+        {live && mine && !round.question && (
           <PartyRound
             key={round.number}
             view={view}

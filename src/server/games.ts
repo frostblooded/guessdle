@@ -10,6 +10,7 @@ import {
 } from "../game/game.ts";
 import { slugError } from "../game/slug.ts";
 import type { GameKind } from "../game/blur.ts";
+import type { QuizSpec } from "../game/quiz.ts";
 import { isAnswerable, isIncomplete } from "./completeness.ts";
 import type { EditKind } from "./lifecycle.ts";
 import { OWNER_BANNED } from "./users.ts";
@@ -100,9 +101,10 @@ export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
     blurOrder: number[] | null;
     shots: string[];
     description: string;
+    quiz: QuizSpec | null;
   }>(
     `select id::int, name, photo_url as photo, deleted_at is not null as deleted,
-       blur_order::int[] as "blurOrder", shots, description
+       blur_order::int[] as "blurOrder", shots, description, quiz
      from entries where game_id = $1 order by id`,
     [game.id],
   );
@@ -127,16 +129,20 @@ export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
   };
   const attrs = attributes.rows.map(({ name, type }) => ({ name, type }));
   const all = entries.rows.map(
-    ({ id, name, photo, description, blurOrder, shots }): Entry => {
+    ({ id, name, photo, description, blurOrder, shots, quiz }): Entry => {
       const values = attributes.rows.map((attr) => cell(id, attr));
       return {
         id,
         name,
-        photo: game.kind === "blur" ? photo : firstImage(attrs, values),
+        photo:
+          game.kind === "blur" || game.kind === "quiz"
+            ? photo
+            : firstImage(attrs, values),
         values,
         description,
         ...(game.kind === "blur" && blurOrder && { blurOrder }),
         ...(game.kind === "sequence" && { shots }),
+        ...(game.kind === "quiz" && quiz && { quiz }),
       };
     },
   );

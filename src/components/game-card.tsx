@@ -122,7 +122,9 @@ export function GameCardItem({
           <p className="fine-print mt-auto flex flex-wrap items-center gap-x-1.5 text-xs font-medium text-muted-foreground">
             <GameKindLabel kind={card.kind} />
             <span aria-hidden="true">·</span>
-            <span>{card.entryCount} entries</span>
+            <span>
+              {card.entryCount} {card.kind === "quiz" ? "questions" : "entries"}
+            </span>
           </p>
         </div>
       </Link>

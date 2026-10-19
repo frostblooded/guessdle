@@ -4,7 +4,12 @@ import express from "express";
 import type { Express, Request, Response } from "express";
 import { slugBase, slugError } from "../../game/slug.ts";
 import type { Move } from "../lifecycle.ts";
-import { MAX_ATTRIBUTE_NAME, MAX_NAME } from "../../game/limits.ts";
+import {
+  MAX_ATTRIBUTE_NAME,
+  MAX_ENTRY_NAME,
+  MAX_NAME,
+  MAX_QUESTION,
+} from "../../game/limits.ts";
 import { nameIn, parseEntryInput, parseGamePatch } from "../validate.ts";
 import { todayIn } from "../answers.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
@@ -231,7 +236,10 @@ export function manageRoutes(
   const entryRoute = manageRoute(async ({ game }, user, req, res) => {
     const raw = req.params["id"];
     const id = raw === undefined ? undefined : idOf(req);
-    const input = parseEntryInput(bodyOf(req));
+    const input = parseEntryInput(
+      bodyOf(req),
+      game.kind === "quiz" ? MAX_QUESTION : MAX_ENTRY_NAME,
+    );
     if (!input || (id === undefined && !input.name)) {
       fail(res, "invalid");
       return;

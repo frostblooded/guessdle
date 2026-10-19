@@ -133,7 +133,7 @@ describe("blur games", () => {
     assert.equal(details.kind, "blur");
     assert.equal(details.blurTries, 3);
     assert.equal(
-      (await request("POST", "/api/games", ann, { name: "X", kind: "quiz" }))
+      (await request("POST", "/api/games", ann, { name: "X", kind: "trivia" }))
         .status,
       400,
     );

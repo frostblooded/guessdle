@@ -27,6 +27,11 @@ const KINDS: { kind: GameKind; title: string; text: string }[] = [
     title: "Sequence",
     text: "Players guess from a series of photos, one more shown after each wrong guess.",
   },
+  {
+    kind: "quiz",
+    title: "Quiz",
+    text: "Players answer your questions, multiple choice or a number, and get a score at the end.",
+  },
 ];
 
 function CreateForm() {

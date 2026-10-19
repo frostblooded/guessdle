@@ -8,6 +8,7 @@ import {
   type Hint,
 } from "./correctness.ts";
 import { isImageGame, type GameKind } from "./blur.ts";
+import type { QuizSpec } from "./quiz.ts";
 
 export type AttributeType = "text" | "list" | "number" | "image";
 
@@ -32,6 +33,8 @@ export interface Entry extends EntryRef {
   values: AttributeValue[];
   // Blur games only: the order the grid's squares clear in (cells 0-8), once picked
   blurOrder?: number[];
+  // Quiz games only: what makes the question (the entry) gradable, once saved
+  quiz?: QuizSpec;
   // Sequence games only: the photos in the order players see them, "" for a missing one
   shots?: string[];
   // Optional text about the entry, shown once it is revealed as the answer; "" or absent for none

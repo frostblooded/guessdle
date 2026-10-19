@@ -14,7 +14,7 @@ An Admin's sign-off that lets a Game appear in the front-page gallery. Unapprove
 The signed-in user who created a Game. Owners and Admins edit the Game, set its Overrides, submit, unpublish and delete it. Deleting a user deletes their Games.
 
 **Kind**:
-A Game is **Classic** (guessed by comparing Attributes), **Blur** (guessed from a blurred image) or **Sequence** (guessed from a series of photos shown one at a time). Chosen when the Game is created; it never changes.
+A Game is **Classic** (guessed by comparing Attributes), **Blur** (guessed from a blurred image), **Sequence** (guessed from a series of photos shown one at a time) or **Quiz** (questions answered for a score, no daily answer; ADR 0021). Chosen when the Game is created; it never changes.
 
 **Square Order**:
 The order a Blur Game Entry's nine image squares clear in, picked by the Owner. Only the first square is clear at first; each wrong Guess clears the next. The Game sets the tries (1 to 9): a wrong Guess on the last one loses the day.
@@ -26,7 +26,7 @@ A Sequence Game Entry's photos, in the order players see them; the Game sets how
 A Game's first status. Only its Owner and Admins can see it (everyone else gets a 404) until it is submitted. Statuses: draft, pending, approved, rejected.
 
 **Entry**:
-One item in a Game's Roster: a name, a value per Attribute and an optional **Description** (a Blur game's Entry: a name, an image, a square order and the Description). The Description (up to 500 characters, any Kind) shows with the answer once it is revealed (a win, a give-up, or a Blur Game's last try); a missing one never pauses a Game. Pictures are Image Attribute values; an Entry's photo, where one picture stands for it (guess suggestions, the result card, party rounds), is its first non-blank Image value. Replaces "Pet" (the old Petdle word). Entry ids are numeric and never reused. Deleting an Entry is soft: it leaves autocomplete and future draws, but past Guesses and Daily Answers still resolve.
+One item in a Game's Roster: a name, a value per Attribute and an optional **Description** (a Blur game's Entry: a name, an image, a square order and the Description; a Quiz game's Entry is a Question). The Description (up to 500 characters, any Kind) shows with the answer once it is revealed (a win, a give-up, or a Blur Game's last try); a missing one never pauses a Game. Pictures are Image Attribute values; an Entry's photo, where one picture stands for it (guess suggestions, the result card, party rounds), is its first non-blank Image value. Replaces "Pet" (the old Petdle word). Entry ids are numeric and never reused. Deleting an Entry is soft: it leaves autocomplete and future draws, but past Guesses and Daily Answers still resolve.
 
 **Roster**:
 The list of a Game's active Entries. A Game is playable with at least 2.
@@ -81,6 +81,9 @@ A signed-in player's one public name, picked once (lowercase letters, digits, un
 
 **Playlist**:
 A player's named, ordered list of Games, public (anyone with the link, and on their Profile) or private (only them). Only Games the gallery shows can be added, and a Game that leaves the gallery drops out of view until it returns.
+
+**Question**:
+One Entry of a Quiz Game: its text, an optional picture and its answer, multiple choice (one right option) or a number with a range. A number answer scores 1 when exact, less the further off, and 0 at the range or beyond. A player's first Quiz score is the one its stats count.
 
 **Party**:
 A live competition on one Game, opened by a signed-in **Host**, that friends join from their phones with a 4-letter code (ADR 0016). It runs any number of **Rounds** and ends when the Host ends it or after 12 idle hours; its results stay at its link for 30 days.

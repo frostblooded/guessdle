@@ -3,6 +3,7 @@ import { failureText, UNREACHABLE } from "../../game/failures.ts";
 import type { GameKind } from "../../game/blur.ts";
 import type { EntryRef, GameAttribute } from "../../game/game.ts";
 import type { StatusView } from "./play-status.tsx";
+import type { QuizQuestion } from "../../game/quiz.ts";
 
 export type PlayableGame = {
   name: string;
@@ -17,8 +18,10 @@ export type PlayableGame = {
   // Blur and Sequence games: tries per day
   blurTries?: number;
   attributes: GameAttribute[];
-  // A Blur or Sequence game's entries come without photos
+  // A Blur or Sequence game's entries come without photos; a Quiz game has none
   entries: EntryRef[];
+  // Quiz games: the questions, without their answers
+  questions?: QuizQuestion[];
 } & StatusView;
 
 // The game's attributes and entries, "missing" for no such game, or the text of why it could not be loaded

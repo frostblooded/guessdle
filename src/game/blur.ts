@@ -3,10 +3,13 @@
 // owner picked. Pure, so the server, the editor and Play share it.
 import { MAX_BLUR_TRIES, MIN_ENTRIES } from "./limits.ts";
 
-export type GameKind = "classic" | "blur" | "sequence";
+export type GameKind = "classic" | "blur" | "sequence" | "quiz";
 
 export const isGameKind = (value: unknown): value is GameKind =>
-  value === "classic" || value === "blur" || value === "sequence";
+  value === "classic" ||
+  value === "blur" ||
+  value === "sequence" ||
+  value === "quiz";
 
 // Blur and Sequence games: no attributes, graded on the name only, a fixed number of tries
 // (`blurTries`), and entry photos kept secret until the day is over
@@ -14,9 +17,9 @@ export const isImageGame = (kind: GameKind): boolean =>
   kind === "blur" || kind === "sequence";
 
 // The fewest active entries a game plays with. A Blur game plays with one: guessing it is still
-// a matter of reading the picture.
+// a matter of reading the picture. A Quiz game plays with one question.
 export const minEntriesOf = (kind: GameKind): number =>
-  kind === "blur" ? 1 : MIN_ENTRIES;
+  kind === "blur" || kind === "quiz" ? 1 : MIN_ENTRIES;
 
 // Whether `guesses` (skips included) used up a Blur game's tries without the answer. `tries` is
 // absent for a classic game, whose guesses are unlimited. Solo play, Past days and party rounds

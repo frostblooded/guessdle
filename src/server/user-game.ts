@@ -17,7 +17,7 @@ import { recordFailure } from "./results.ts";
 
 export interface GameView {
   day: number;
-  // The answer's revision: a changed one means the day started over (migration 015)
+  // The answer's revision: a changed one means the day started over (migration 018)
   revision: number;
   ids: number[];
   rows: GradedAttribute[][];

@@ -5,6 +5,7 @@ import { pickHint } from "../game/free-hint.ts";
 import { gradeGuess } from "../game/game.ts";
 import { playBlocker } from "./access.ts";
 import { SKIP } from "../game/game.ts";
+import { isAnswerTo } from "../game/quiz.ts";
 import {
   drawAnswer,
   everyoneDone,
@@ -52,6 +53,7 @@ export async function act(
         await endRound(tx, round.id, now);
       }
     };
+    const quiz = data.game.kind === "quiz";
     const refusal = await (async (): Promise<PartyRefusal | null> => {
       switch (msg.type) {
         case "hint": {
@@ -92,16 +94,32 @@ export async function act(
           );
           return null;
         }
+        case "answer":
         case "guess":
         case "give-up": {
           if (!live) {
             return "no_round";
           }
+          // A quiz round takes one answer, and only an answer
+          if (quiz !== (msg.type === "answer")) {
+            return "invalid";
+          }
           const mine = progressOf(live, me.id);
           if (!participants(data.players, live).includes(me) || isDone(mine)) {
             return "finished";
           }
-          if (msg.type === "give-up") {
+          if (msg.type === "answer") {
+            const spec = data.roster.all.find(
+              (e) => e.id === live.answerId,
+            )?.quiz;
+            if (!spec || !isAnswerTo(spec, msg.answer)) {
+              return "invalid";
+            }
+            await tx.query(
+              "insert into party_quiz_answers (round_id, player_id, answer, answered_at) values ($1, $2, $3, $4)",
+              [live.id, me.id, msg.answer.trim(), now],
+            );
+          } else if (msg.type === "give-up") {
             await tx.query(
               "insert into party_give_ups (round_id, player_id, gave_up_at) values ($1, $2, $3)",
               [live.id, me.id, now],
@@ -145,19 +163,19 @@ export async function act(
           if (blocker) {
             return blocker;
           }
+          const active = data.roster.answerIds;
+          const used = data.rounds.map((r) => r.answerId);
+          // A quiz plays its questions in order, each once
+          const next = quiz
+            ? active.find((id) => !used.includes(id))
+            : drawAnswer(active, used, random);
+          if (next === undefined) {
+            return "no_questions_left";
+          }
           await tx.query(
             `insert into party_rounds (party_id, number, answer_entry_id, started_at)
              values ($1, $2, $3, $4)`,
-            [
-              party.id,
-              (latest?.number ?? 0) + 1,
-              drawAnswer(
-                data.roster.answerIds,
-                data.rounds.map((r) => r.answerId),
-                random,
-              ),
-              now,
-            ],
+            [party.id, (latest?.number ?? 0) + 1, next, now],
           );
           return null;
         }

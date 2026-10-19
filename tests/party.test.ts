@@ -8,13 +8,13 @@ import {
   everyoneDone,
   normalizeCode,
   parseClientMessage,
-  partyView,
   randomCode,
   roundResults,
   standings,
   type PartyPlayer,
   type RoundData,
 } from "../src/game/party.ts";
+import { partyView } from "../src/game/party-view.ts";
 import { clockTime, ordinal, progressLabel } from "../src/game/party-text.ts";
 
 const player = (id: number, nickname: string, joinedAt = 0): PartyPlayer => ({

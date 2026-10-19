@@ -1,4 +1,5 @@
 import {
+  CircleHelp,
   GalleryHorizontal,
   Grid3x3,
   Table2,
@@ -16,6 +17,7 @@ export const KIND_LABELS: Record<
   classic: { label: "Classic", icon: Table2 },
   blur: { label: "Blur", icon: Grid3x3 },
   sequence: { label: "Sequence", icon: GalleryHorizontal },
+  quiz: { label: "Quiz", icon: CircleHelp },
 };
 
 export function GameKindLabel({

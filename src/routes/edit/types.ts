@@ -1,4 +1,5 @@
 // What the editor's API calls answer with.
+import type { QuizSpec } from "../../game/quiz.ts";
 import type { GameKind } from "../../game/blur.ts";
 import { hasAllShots } from "../../game/sequence.ts";
 
@@ -17,6 +18,8 @@ export interface Entry {
   values: Record<string, string[]>;
   // Blur games only: the order the squares clear in, null until picked
   blurOrder?: number[] | null;
+  // Quiz games only: the question's answer
+  quiz?: QuizSpec | null;
   // Sequence games only: the photos in order, "" for an empty slot
   shots?: string[];
 }

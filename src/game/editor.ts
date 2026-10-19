@@ -33,7 +33,9 @@ export function statusNotice(
       : "";
   const needs =
     (missing > 0
-      ? ` It needs ${missing} more ${missing === 1 ? "entry" : "entries"} before anyone can play it.`
+      ? d.kind === "quiz"
+        ? " It needs a question before anyone can play it."
+        : ` It needs ${missing} more ${missing === 1 ? "entry" : "entries"} before anyone can play it.`
       : "") + paused;
   switch (d.status) {
     case "draft":

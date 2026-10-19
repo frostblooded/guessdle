@@ -30,6 +30,10 @@ export const FAILURES = {
     400,
     "Give the entry an image and pick the order of all nine squares before saving.",
   ),
+  missing_answer: failure(
+    400,
+    "Give the question its answer before saving: the right option, or the number and its range.",
+  ),
   slug_immutable: failure(400, "A game's address cannot be changed."),
   reserved: failure(400, "That address is reserved. Pick another one."),
   unauthorized: failure(401, "Your session ended. Sign in again."),
@@ -46,11 +50,11 @@ export const FAILURES = {
   ),
   too_few_entries: failure(
     409,
-    `Add at least ${MIN_ENTRIES} entries (one for a Blur game) before submitting.`,
+    `Add at least ${MIN_ENTRIES} entries (one for a Blur or Quiz game) before submitting.`,
   ),
   not_enough_entries: failure(
     409,
-    `This game cannot be played yet: it needs at least ${MIN_ENTRIES} entries (one for a Blur game) to pick a daily answer. Use the Edit link to add entries.`,
+    `This game cannot be played yet: it needs at least ${MIN_ENTRIES} entries (one for a Blur or Quiz game) to pick a daily answer. Use the Edit link to add entries.`,
   ),
   incomplete_entries: failure(
     409,

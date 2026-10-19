@@ -29,3 +29,8 @@ export const MIN_USERNAME = 3;
 export const MAX_USERNAME = 20;
 export const MAX_PLAYLISTS = 50;
 export const MAX_PLAYLIST_GAMES = 200;
+// Quiz games: a question's text, and how many options a multiple choice question has, each this long
+export const MAX_QUESTION = 300;
+export const MIN_OPTIONS = 2;
+export const MAX_OPTIONS = 6;
+export const MAX_OPTION = 100;

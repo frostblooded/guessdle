@@ -1,7 +1,7 @@
 // Party mode's words for the page (issue #90, ADR 0016): places, solve times, progress and
 // why an action was refused.
 import { MIN_ENTRIES } from "./limits.ts";
-import type { PartyRefusal, Progress } from "./party.ts";
+import type { LiveRound, PartyRefusal } from "./party.ts";
 
 // "1st", "2nd", "3rd", "4th", ... "11th", "21st"
 export function ordinal(n: number): string {
@@ -23,7 +23,10 @@ export function clockTime(ms: number): string {
 }
 
 // How a player is doing in the live round, as the scoreboard says it
-export function progressLabel(p: Omit<Progress, "timeMs">): string {
+export function progressLabel(p: LiveRound["progress"][number]): string {
+  if (p.answered !== undefined) {
+    return p.answered ? "Answered" : "Thinking…";
+  }
   const count = `${p.guesses} ${p.guesses === 1 ? "guess" : "guesses"}`;
   return p.solved
     ? `${count}, solved`
@@ -35,7 +38,8 @@ export function progressLabel(p: Omit<Progress, "timeMs">): string {
 }
 
 export const REFUSAL_TEXT: Record<PartyRefusal, string> = {
-  invalid: "That is not one of this game's entries.",
+  invalid:
+    "That is not one of this game's entries, or an answer this question takes.",
   not_host: "Only the host can do that.",
   not_player: "Join the party to play.",
   no_round: "There is no round going on right now.",
@@ -43,9 +47,10 @@ export const REFUSAL_TEXT: Record<PartyRefusal, string> = {
   finished: "You are done with this round. Wait for the next one.",
   duplicate: "You already guessed that one.",
   party_ended: "This party has ended.",
-  not_enough_entries: `This game needs at least ${MIN_ENTRIES} entries (one for a Blur game) before a round can start.`,
+  not_enough_entries: `This game needs at least ${MIN_ENTRIES} entries (one for a Blur or Quiz game) before a round can start.`,
   game_paused:
     "This game is paused while some of its entries are missing values.",
   no_hint: "No free hint is available right now.",
+  no_questions_left: "Every question of this quiz has been played.",
   server_error: "The server hit an unexpected problem. Try again in a moment.",
 };

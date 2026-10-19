@@ -1,9 +1,7 @@
 // The editor's Entries tab: list, add, change and delete entries with their values (a Blur
 // entry: its image and square order; a Sequence entry: its photos).
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useCrop } from "../../components/crop-dialog.tsx";
 import { CELLS, type GameKind } from "../../game/blur.ts";
-import type { ImageKind } from "../../game/crop.ts";
 import { FAILURES } from "../../game/failures.ts";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
@@ -17,7 +15,7 @@ import {
 import { api, errorText, type Reply } from "../../manage-client.ts";
 import { cn } from "../../lib/utils.ts";
 import { isIncomplete, thumbOf, type Attribute, type Entry } from "./types.ts";
-import { ImagePicker, ImageValue } from "./image-value.tsx";
+import { ImagePicker, ImageValue, usePhotoUpload } from "./image-value.tsx";
 import { BlurOrderEditor } from "./blur-order-editor.tsx";
 import { EntriesLede } from "./entries-lede.tsx";
 import { ShotsEditor } from "./shots-editor.tsx";
@@ -76,7 +74,7 @@ export function EntriesPanel({
   // The attributes the form was built for; the ref lets the refresh compare without re-running
   const [formAttributes, setFormAttributes] = useState(initial.attributes);
   const built = useRef(initial.attributes);
-  const { crop, dialog } = useCrop(setError);
+  const { upload, uploadFile, dialog } = usePhotoUpload(setError);
   const blur = kind === "blur";
   const sequence = kind === "sequence";
 
@@ -155,41 +153,6 @@ export function EntriesPanel({
     await (draft.editing
       ? run("PATCH", `${base}/entries/${draft.editing.id}`, body, true)
       : run("POST", `${base}/entries`, body, true));
-  };
-
-  // Crops and uploads the file; its URL, or null after a cancel or a failure
-  const uploadFile = async (
-    file: File,
-    shape: ImageKind,
-  ): Promise<string | null> => {
-    setError("");
-    const cropped = await crop(file, shape);
-    if (!cropped) {
-      return null;
-    }
-    const up = await api<{ url?: string }>(
-      "POST",
-      `/api/uploads?kind=${shape}`,
-      cropped,
-    );
-    const url = up?.status === 200 ? up.data.url : undefined;
-    if (!url) {
-      setError(errorText(up));
-    }
-    return url ?? null;
-  };
-
-  // Uploads the chosen picture, then hands its URL to `done`
-  const upload = async (
-    input: HTMLInputElement,
-    done: (url: string) => void,
-  ): Promise<void> => {
-    const file = input.files?.[0];
-    input.value = "";
-    const url = file && (await uploadFile(file, "photo"));
-    if (url) {
-      done(url);
-    }
   };
 
   return (

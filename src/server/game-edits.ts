@@ -4,7 +4,6 @@
 // it changes (answers.ts), and the uploads it frees (upload-refs.ts). The data change and the
 // answer re-draw commit together. Routes parse the request and turn the outcome into a reply.
 import type pg from "pg";
-import { isImageGame } from "../game/blur.ts";
 import {
   redrawFuture,
   releaseEntry,
@@ -70,12 +69,12 @@ export function gameEdits(ctx: EditContext, uploadsDir: string) {
 
   return {
     // One change, or the editor's whole list. Only a real change resets the status; a reorder
-    // does not. A Blur or Sequence game has no attributes.
+    // does not. Only a classic game has attributes.
     async attributes(
       game: GameRow,
       edit: AttributeEdit | AttributeDraft[],
     ): Promise<AttributeResult> {
-      if (isImageGame(game.kind)) {
+      if (game.kind !== "classic") {
         return "invalid";
       }
       return lifecycle.edit(

@@ -45,6 +45,7 @@ import { PlayActions, PlayStatus } from "./play-status.tsx";
 import { ResetDialog } from "./reset-dialog.tsx";
 import { ResultBanner, resultOf, type Result } from "./result-banner.tsx";
 import { SelectList } from "./select-list.tsx";
+import { QuizPlay } from "./quiz-play.tsx";
 import { StatsDialog } from "./stats-dialog.tsx";
 import { useVictoryStats } from "./use-victory-stats.ts";
 
@@ -242,6 +243,9 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
 
   if (game === "missing") {
     return <GameNotFound />;
+  }
+  if (playable?.kind === "quiz") {
+    return <QuizPlay slug={slug} game={playable} day={day} />;
   }
 
   if (playable && day !== null && !past) {
