@@ -12,6 +12,7 @@ import { slugError } from "../game/slug.ts";
 import type { GameKind } from "../game/blur.ts";
 import { isAnswerable, isIncomplete } from "./completeness.ts";
 import type { EditKind } from "./lifecycle.ts";
+import { OWNER_BANNED } from "./users.ts";
 
 type Q = Pick<pg.Pool, "query">;
 
@@ -34,6 +35,8 @@ export interface GameRow {
   kind: GameKind;
   // Blur and Sequence games: the number of tries (a Sequence game's photos per entry)
   blurTries: number;
+  // Its owner is banned: hidden from all but the owner and admins
+  ownerBanned: boolean;
 }
 
 // A game plays with at least this many active entries
@@ -50,8 +53,9 @@ const gameWhere = async (
     `select id::int, slug, name, description, cover_url as "coverUrl",
        owner_id::int as "ownerId", status, reject_reason as "rejectReason",
        to_char(start_date, 'YYYY-MM-DD') as "startDate",
-       skip_period as "skipPeriod", kind, blur_tries as "blurTries"
-     from games where ${where} = $1`,
+       skip_period as "skipPeriod", kind, blur_tries as "blurTries",
+       ${OWNER_BANNED} as "ownerBanned"
+     from games g where ${where} = $1`,
     [value],
   );
   return rows[0] ?? null;
@@ -95,9 +99,10 @@ export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
     deleted: boolean;
     blurOrder: number[] | null;
     shots: string[];
+    description: string;
   }>(
     `select id::int, name, photo_url as photo, deleted_at is not null as deleted,
-       blur_order::int[] as "blurOrder", shots
+       blur_order::int[] as "blurOrder", shots, description
      from entries where game_id = $1 order by id`,
     [game.id],
   );
@@ -122,13 +127,14 @@ export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
   };
   const attrs = attributes.rows.map(({ name, type }) => ({ name, type }));
   const all = entries.rows.map(
-    ({ id, name, photo, blurOrder, shots }): Entry => {
+    ({ id, name, photo, description, blurOrder, shots }): Entry => {
       const values = attributes.rows.map((attr) => cell(id, attr));
       return {
         id,
         name,
         photo: game.kind === "blur" ? photo : firstImage(attrs, values),
         values,
+        description,
         ...(game.kind === "blur" && blurOrder && { blurOrder }),
         ...(game.kind === "sequence" && { shots }),
       };

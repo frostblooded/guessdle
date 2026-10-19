@@ -1,6 +1,8 @@
 // What a player's socket message does to a party (ADR 0016), under the party lock.
 import type pg from "pg";
 import { isImageGame } from "../game/blur.ts";
+import { pickHint } from "../game/free-hint.ts";
+import { gradeGuess } from "../game/game.ts";
 import { playBlocker } from "./access.ts";
 import { SKIP } from "../game/game.ts";
 import {
@@ -52,6 +54,44 @@ export async function act(
     };
     const refusal = await (async (): Promise<PartyRefusal | null> => {
       switch (msg.type) {
+        case "hint": {
+          if (!live) {
+            return "no_round";
+          }
+          if (
+            !participants(data.players, live).includes(me) ||
+            isDone(progressOf(live, me.id))
+          ) {
+            return "finished";
+          }
+          const { attributes, all } = data.roster;
+          const answer = all.find((e) => e.id === live.answerId);
+          if (
+            !answer ||
+            data.game.kind !== "classic" ||
+            live.hints?.some((h) => h.playerId === me.id)
+          ) {
+            return "no_hint";
+          }
+          const rows = live.guesses
+            .filter((g) => g.playerId === me.id)
+            .flatMap((g) => all.filter((e) => e.id === g.entryId))
+            .map((guess) => gradeGuess(attributes, answer, guess));
+          const pick = pickHint(attributes, answer, rows, msg.kind, random);
+          if (!pick) {
+            return "no_hint";
+          }
+          await tx.query(
+            "insert into party_hints (round_id, player_id, kind, attribute) values ($1, $2, $3, $4)",
+            [
+              live.id,
+              me.id,
+              pick.kind,
+              pick.kind === "attribute" ? pick.attribute : null,
+            ],
+          );
+          return null;
+        }
         case "guess":
         case "give-up": {
           if (!live) {

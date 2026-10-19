@@ -9,11 +9,12 @@ import {
 import type { GameRow, Roster } from "../src/server/games.ts";
 import type { SessionUser } from "../src/server/auth.ts";
 
-const found = (status: string, entries: number) => ({
-  game: { status, ownerId: 7 } as GameRow,
+const found = (status: string, entries: number, ownerBanned = false) => ({
+  game: { status, ownerId: 7, ownerBanned } as GameRow,
   roster: { entries: new Array(entries).fill({}) } as unknown as Roster,
 });
-const user = (id: number, admin = false) => ({ id, admin }) as SessionUser;
+const user = (id: number, admin = false, banned = false) =>
+  ({ id, admin, banned }) as SessionUser;
 const VIEWERS = {
   anon: null,
   stranger: user(8),
@@ -54,6 +55,24 @@ describe("decide", () => {
     assert.equal(decide(undefined, VIEWERS.owner, "edit"), "not_found");
     assert.equal(decide(undefined, VIEWERS.owner, "admin"), "forbidden");
     assert.equal(decide(undefined, VIEWERS.admin, "admin"), "not_found");
+  });
+});
+
+describe("decide with a banned owner", () => {
+  const banned = found("approved", 2, true);
+  const owner = user(7, false, true);
+  it("hides the game from everyone but its owner and admins", () => {
+    assert.equal(decide(banned, null, "play"), "not_found");
+    assert.equal(decide(banned, VIEWERS.stranger, "play"), "not_found");
+    assert.equal(decide(banned, VIEWERS.stranger, "edit"), "not_found");
+    assert.equal(decide(banned, owner, "play"), null);
+    assert.equal(decide(banned, VIEWERS.admin, "play"), null);
+    assert.equal(decide(banned, VIEWERS.admin, "edit"), null);
+  });
+  it("lets the banned owner play but not edit", () => {
+    assert.equal(decide(banned, owner, "edit"), "banned");
+    assert.equal(decide(found("draft", 0), owner, "edit"), "banned");
+    assert.equal(decide(found("draft", 0), owner, "play"), null);
   });
 });
 

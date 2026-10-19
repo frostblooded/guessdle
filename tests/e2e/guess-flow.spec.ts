@@ -48,6 +48,52 @@ test("a correct guess shows the victory banner with the answer", async ({
   await expect(rows(page).first().locator(".cell.incorrect")).toHaveCount(0);
 });
 
+test("a win after giving up and resetting is not counted in the stats", async ({
+  page,
+}) => {
+  await page.locator("#give-up-button").click();
+  await page.locator("#reset-button").click();
+  await confirmReset(page);
+  await submitGuess(page, answerName);
+  const dialog = page.locator("#stats-dialog");
+  await expect(dialog.locator("#stats-not-counted")).toContainText(
+    "Only the first try counts",
+  );
+  await expect(dialog.locator("#stats-guesses")).toHaveCount(0);
+  await expect(dialog.locator("[data-mine]")).toHaveCount(0);
+});
+
+test("a free hint opens after 3 wrong guesses and stays after a reload", async ({
+  page,
+}) => {
+  // Pets whose colors differ from the answer's, so Colors stays unmatched and the hint has a draw
+  const colorsOf = (name: string): string =>
+    [...GUESS_DATA.find((pet) => pet.name === name)!.colors].sort().join();
+  const wrong = names
+    .filter((name) => colorsOf(name) !== colorsOf(answerName))
+    .slice(0, 3);
+  const hint = page.locator("#free-hint");
+  await submitGuess(page, wrong[0]!);
+  await submitGuess(page, wrong[1]!);
+  await expect(hint).toBeHidden();
+  await submitGuess(page, wrong[2]!);
+  await expect(hint).toContainText("You earned a free hint");
+  // The fixture game's entries have no description
+  await expect(page.locator("#hint-description-button")).toBeDisabled();
+  await page.locator("#hint-attribute-button").click();
+  await expect(hint).toContainText("Free hint");
+  const text = await page.locator("#free-hint-text").textContent();
+  // The drawn attribute may be the Photo, an Image attribute shown as a picture
+  if (text!.endsWith(":")) {
+    await expect(page.locator("#free-hint-image")).toBeVisible();
+  } else {
+    expect(text).toMatch(/^.+: .+$/);
+  }
+  await page.reload();
+  await expect(page.locator("#free-hint-text")).toHaveText(text!);
+  await expect(page.locator("#hint-attribute-button")).toHaveCount(0);
+});
+
 test("a win opens the stats popup; See stats brings it back after a reload", async ({
   page,
 }) => {
@@ -355,7 +401,7 @@ test.describe("state stored in the browser", () => {
   });
 });
 
-test("the how-to-play page is linked from the nav and shows five steps", async ({
+test("the how-to-play page is linked from the nav and plays a practice game to a win", async ({
   page,
 }) => {
   await openOnDay(page);
@@ -367,51 +413,45 @@ test("the how-to-play page is linked from the nav and shows five steps", async (
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "How to play",
   );
-  await expect(page.locator(".help-step")).toHaveCount(5);
-  await expect(
-    page.locator(
-      ".help-example .correct, .help-example .partially-correct, .help-example .incorrect",
-    ),
-  ).toHaveCount(12);
+  const step = page.locator(".practice-step");
+  await expect(step).toHaveAttribute("data-step", "secret");
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(step).toHaveAttribute("data-step", "first");
+  await page.getByRole("button", { name: "Eddie", exact: true }).click();
+  await expect(step).toHaveAttribute("data-step", "clues");
+  await expect(page.locator(".practice-clues li").first()).toHaveText(
+    "Name is red: Eddie is not the secret pet.",
+  );
+  await page.getByRole("button", { name: "Next guess" }).click();
+  await expect(step).toHaveAttribute("data-step", "narrow");
+  await expect(page.locator(".pet-option.ruled-out").first()).toBeVisible();
+  await page.getByRole("button", { name: "Ati", exact: true }).click();
+  await expect(step).toHaveAttribute("data-step", "won");
+  await expect(page.locator(".practice-result")).toHaveText(
+    "Ati was the secret pet. You got it in 2 guesses.",
+  );
+  await expect(rows(page)).toHaveCount(2);
   await page.getByRole("link", { name: "Start playing" }).click();
   await expect(page).toHaveURL(/\/$/);
 });
 
-test("how-to-play examples use real roster pets and fit a phone screen", async ({
+test("the practice game offers every pet of the pet game and fits a phone screen", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 667 });
   await page.goto("/how-to-play");
-
-  const shown: string[] = await page
-    .locator(".help-example .guess-result-cell:nth-child(2)")
-    .allTextContents();
-  for (const name of [...shown, "Ati"]) {
-    expect(names, name).toContain(name);
-  }
-  // The guide's green/orange/red claims must still hold for the roster data.
-  const pet = (n: string) => GUESS_DATA.find((p) => p.name === n)!;
-  const [ati, cookie, eddie] = [pet("Ati"), pet("Cookie"), pet("Eddie")];
-  expect(cookie.colors).toEqual(ati.colors);
-  expect(cookie.owners).toEqual(ati.owners);
-  expect(
-    ati.colors.filter((c) => eddie.colors.includes(c)).length,
-  ).toBeGreaterThan(0);
-  expect(ati.colors).not.toEqual(eddie.colors);
-  expect(ati.owners.some((o) => eddie.owners.includes(o))).toBe(false);
-  await expect(page.locator(".help-example img")).toHaveCount(4);
-  for (const img of await page.locator(".help-step img").all()) {
-    await img.scrollIntoViewIfNeeded();
-    await expect(img).toBeVisible();
-    expect(
-      await img.evaluate((el: HTMLImageElement) => el.naturalWidth),
-    ).toBeGreaterThan(0);
-  }
-  expect(
-    await page.evaluate(
+  const fits = (): Promise<boolean> =>
+    page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-  ).toBe(true);
+    );
+  expect(await fits()).toBe(true);
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  expect((await page.locator(".pet-option").allTextContents()).sort()).toEqual(
+    [...names].sort(),
+  );
+  await page.getByRole("button", { name: "Bela", exact: true }).click();
+  await page.getByRole("button", { name: "Next guess" }).click();
+  expect(await fits()).toBe(true);
 });
 
 const giveUpButton = (page: Page): Locator => page.locator("#give-up-button");

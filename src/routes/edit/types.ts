@@ -12,6 +12,8 @@ export interface Entry {
   id: number;
   name: string;
   photo: string;
+  // Optional, shown once the entry is revealed as the answer
+  description: string;
   values: Record<string, string[]>;
   // Blur games only: the order the squares clear in, null until picked
   blurOrder?: number[] | null;

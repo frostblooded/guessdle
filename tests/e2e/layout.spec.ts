@@ -51,7 +51,7 @@ function findLayoutProblems(): string[] {
   }
 
   const blocks = all(
-    ".brand, .nav, #theme-button, #signin-link, #user-menu-button, h1, #new-guess-input, #submit-new-guess-button, #guess-results-titles-row, .guess-result-row, #victory-title, #victory-answer-name, .auth-card, .help-step, .tabs",
+    ".brand, .nav, #theme-button, #signin-link, #user-menu-button, h1, #new-guess-input, #submit-new-guess-button, #guess-results-titles-row, .guess-result-row, #victory-title, #victory-answer-name, .auth-card, .practice-step, .pet-option, .tabs",
   );
   for (const el of blocks) {
     const r = el.getBoundingClientRect();

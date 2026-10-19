@@ -34,6 +34,8 @@ export interface Entry extends EntryRef {
   blurOrder?: number[];
   // Sequence games only: the photos in the order players see them, "" for a missing one
   shots?: string[];
+  // Optional text about the entry, shown once it is revealed as the answer; "" or absent for none
+  description?: string;
 }
 
 // One column of a guessed entry, graded against the Daily Answer, in boardColumns order. A

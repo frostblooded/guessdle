@@ -212,6 +212,23 @@ describe("party mode", () => {
       assert.equal((await send("/api/parties/bad!", undefined)).status, 404);
     });
 
+    it("keeps the guess mode the host picked: typing unless selection", async () => {
+      const cookie = await login("host@x.test");
+      const open = async (body: Body): Promise<Body> =>
+        send(
+          `/api/games/${GAME}/parties`,
+          { nickname: "Ana", ...body },
+          cookie,
+        );
+      const view = async (code: string): Promise<Body> =>
+        (await send(`/api/parties/${code}`, undefined)).body;
+      const typed = await open({});
+      assert.equal((await view(typed.body.code)).game.guessMode, "type");
+      const picked = await open({ guessMode: "select" });
+      assert.equal((await view(picked.body.code)).game.guessMode, "select");
+      assert.equal((await open({ guessMode: "list" })).status, 400);
+    });
+
     it("caps open parties per host", async () => {
       for (let i = 0; i < 5; i++) {
         await host();
@@ -350,6 +367,34 @@ describe("party mode", () => {
       assert.deepEqual(await bo.next((m) => m.type === "error"), {
         type: "error",
         error: "finished",
+      });
+    });
+
+    it("gives a player one Free Hint after 3 wrong guesses", async () => {
+      const { code, token } = await host();
+      const bo = await phone(code, await join(code, "Bo"));
+      const ana = await phone(code, token);
+      ana.say({ type: "start-round" });
+      await bo.view((v) => v.round?.live === true);
+      await setAnswer(code, pid("bela"));
+      bo.say({ type: "hint", kind: "attribute" });
+      assert.deepEqual(await bo.next((m) => m.type === "error"), {
+        type: "error",
+        error: "no_hint",
+      });
+      for (const slug of ["ati", "cookie", "dido"]) {
+        bo.say({ type: "guess", entryId: pid(slug) });
+      }
+      const offered = await bo.view((v) => v.round?.yours?.rows.length === 3);
+      assert.equal(offered.round!.yours!.hints!.description, false);
+      bo.say({ type: "hint", kind: "attribute" });
+      const hinted = await bo.view((v) => v.round?.yours?.hint !== undefined);
+      assert.equal(hinted.round!.yours!.hint!.kind, "attribute");
+      assert.equal(hinted.round!.yours!.hints, undefined);
+      bo.say({ type: "hint", kind: "attribute" });
+      assert.deepEqual(await bo.next((m) => m.type === "error"), {
+        type: "error",
+        error: "no_hint",
       });
     });
 

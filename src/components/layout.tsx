@@ -5,6 +5,7 @@ import { cn } from "../lib/utils.ts";
 import { useMe } from "../lib/api.ts";
 import { AccountArea } from "./account-area.tsx";
 import { ThemeButton } from "./theme-button.tsx";
+import { Alert } from "./ui/alert.tsx";
 import { Button } from "./ui/button.tsx";
 
 // The site icon's tiles (icons/favicon.svg) in shades of the theme colour
@@ -155,6 +156,21 @@ function ResetNotice() {
   );
 }
 
+// A banned player sees why on every page (the server refuses their game changes)
+function BanNotice() {
+  const { data: user } = useMe();
+  if (!user?.banned) {
+    return null;
+  }
+  return (
+    <Alert id="ban-notice" variant="error" role="status" className="mb-6">
+      Your account is banned, so your games and playlists are hidden from other
+      players and you cannot create or change games or playlists. You can still
+      play. Reason: {user.banReason}
+    </Alert>
+  );
+}
+
 export function Layout({
   legacyWiped,
   children,
@@ -169,6 +185,7 @@ export function Layout({
         id="main"
         className={cn("mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:py-10")}
       >
+        <BanNotice />
         {legacyWiped && <ResetNotice />}
         {children}
       </main>

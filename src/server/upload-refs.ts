@@ -1,7 +1,7 @@
 // Upload references (spec #66): who may attach an uploaded file, and when a file is deleted.
-// A file lives while a game cover, a Blur entry's photo, a Sequence shot or an Image value
-// (soft-deleted entries too) uses it; callers state
-// intent (attach, release, drop a game or user) and never unlink files themselves.
+// A file lives while a game cover, a Blur entry's photo, a Sequence shot, an Image value
+// (soft-deleted entries too) or a tutorial picture uses it; callers state intent (attach,
+// release, drop a game or user) and never unlink files themselves.
 import { readdir, stat, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import type pg from "pg";
@@ -31,7 +31,8 @@ export function uploadRefs(pool: pg.Pool, dir: string) {
       await pool.query(
         `select 1 from games where cover_url = $1
          union all select 1 from entries where photo_url = $1 or $1 = any(shots)
-         union all select 1 from (${IMAGE_VALUES}) i where i.url = $1`,
+         union all select 1 from (${IMAGE_VALUES}) i where i.url = $1
+         union all select 1 from tutorial_photos where url = $1`,
         [url],
       )
     ).rowCount! > 0;
@@ -41,7 +42,7 @@ export function uploadRefs(pool: pg.Pool, dir: string) {
     const { rows } = await pool.query<{ url: string }>(
       `select cover_url as url from games union select photo_url from entries
        union select unnest(shots) from entries
-       union select url from (${IMAGE_VALUES}) i`,
+       union select url from (${IMAGE_VALUES}) i union select url from tutorial_photos`,
     );
     return new Set(rows.map((r) => r.url));
   };

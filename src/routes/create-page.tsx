@@ -158,7 +158,7 @@ export function CreatePage() {
         title="Create a game"
         lede="Name it now. It starts as a draft only you can see, and you add the rest in the editor."
       />
-      {user && <CreateForm />}
+      {user && !user.banned && <CreateForm />}
     </div>
   );
 }

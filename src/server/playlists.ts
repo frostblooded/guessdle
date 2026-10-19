@@ -3,6 +3,9 @@ import type pg from "pg";
 import { MAX_PLAYLIST_GAMES, MAX_PLAYLISTS } from "../game/limits.ts";
 import { IN_GALLERY, listGallery, type GalleryCard } from "./gallery.ts";
 
+// Who is looking: a banned player's public playlists show only to them and admins
+export type Viewer = { id: number; admin: boolean } | null;
+
 export async function usernameOf(
   pool: pg.Pool,
   userId: number,
@@ -55,26 +58,28 @@ export interface Profile {
   games: GalleryCard[];
 }
 
-// A player's profile: their public playlists (every one when `viewerId` is theirs), newest
-// first, and their gallery games. null for an unknown username.
+// A player's profile: their public playlists (every one when `viewer` is them, none to others
+// but admins while they are banned), newest first, and their gallery games. null for an
+// unknown username.
 export async function loadProfile(
   pool: pg.Pool,
   username: string,
-  viewerId: number | null,
+  viewer: Viewer,
 ): Promise<(Profile & { ownerId: number }) | null> {
-  const user = await pool.query<{ id: number }>(
-    "select id::int from users where username = $1",
+  const user = await pool.query<{ id: number; banned: boolean }>(
+    "select id::int, banned_at is not null as banned from users where username = $1",
     [username],
   );
-  const ownerId = user.rows[0]?.id;
-  if (ownerId === undefined) {
+  const owner = user.rows[0];
+  if (owner === undefined) {
     return null;
   }
+  const ownerId = owner.id;
   const { rows } = await pool.query<PlaylistSummary>(
     `select p.id::int, p.name, p.description, p.public, ${SHOWN_COUNT} as "gameCount"
-     from playlists p where p.owner_id = $1 and (p.public or p.owner_id = $2)
+     from playlists p where p.owner_id = $1 and (p.owner_id = $2 or (p.public and $3))
      order by p.created_at desc, p.id desc`,
-    [ownerId, viewerId],
+    [ownerId, viewer?.id ?? null, !owner.banned || viewer?.admin === true],
   );
   return {
     ownerId,
@@ -93,20 +98,28 @@ interface PlaylistRow {
   public: boolean;
 }
 
-// A playlist as `viewerId` may see it: private ones only to their owner, else null
+// A playlist as `viewer` may see it: private ones only to their owner, a banned owner's only to
+// them and admins, else null
 export async function findPlaylist(
   pool: pg.Pool,
   id: number,
-  viewerId: number | null,
+  viewer: Viewer,
 ): Promise<PlaylistRow | null> {
-  const { rows } = await pool.query<PlaylistRow>(
+  const { rows } = await pool.query<PlaylistRow & { banned: boolean }>(
     `select p.id::int, p.owner_id::int as "ownerId", u.username as owner, p.name,
-       p.description, p.public
+       p.description, p.public, u.banned_at is not null as banned
      from playlists p join users u on u.id = p.owner_id where p.id = $1`,
     [id],
   );
   const row = rows[0];
-  return row && (row.public || row.ownerId === viewerId) ? row : null;
+  if (!row) {
+    return null;
+  }
+  const { banned, ...playlist } = row;
+  return row.ownerId === viewer?.id ||
+    (row.public && (!banned || viewer?.admin === true))
+    ? playlist
+    : null;
 }
 
 export const playlistGames = (

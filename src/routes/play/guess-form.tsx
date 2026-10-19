@@ -12,14 +12,17 @@ import {
 import { cn } from "../../lib/utils.ts";
 import { GuessBox } from "./guess-box.tsx";
 
-// The remembered guess mode, and whether selection mode's list is open in place of the board
-export function useGuessMode() {
-  const [mode, setMode] = useState<GuessMode>(() =>
+// The remembered guess mode, and whether selection mode's list is open in place of the board.
+// A party passes the mode its host picked: then it is fixed and there is no switch.
+export function useGuessMode(fixed?: GuessMode) {
+  const [remembered, setMode] = useState<GuessMode>(() =>
     readGuessMode(localStorage),
   );
+  const mode = fixed ?? remembered;
   const [listOpen, setListOpen] = useState(false);
   return {
     mode,
+    fixed: fixed !== undefined,
     setMode: (next: GuessMode): void => {
       writeGuessMode(localStorage, next);
       setMode(next);
@@ -38,16 +41,18 @@ const MODES: readonly { mode: GuessMode; label: string }[] = [
   { mode: "select", label: "Select" },
 ];
 
-function ModeSwitch({
+export function ModeSwitch({
   mode,
   onChange,
+  label = "Guess by",
 }: {
   mode: GuessMode;
   onChange: (mode: GuessMode) => void;
+  label?: string;
 }) {
   return (
     <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-      <span id="guess-mode-label">Guess by</span>
+      <span id="guess-mode-label">{label}</span>
       <div
         id="guess-mode"
         role="group"
@@ -103,7 +108,9 @@ export function GuessForm({
 }) {
   return (
     <>
-      {!hidden && <ModeSwitch mode={modes.mode} onChange={modes.setMode} />}
+      {!hidden && !modes.fixed && (
+        <ModeSwitch mode={modes.mode} onChange={modes.setMode} />
+      )}
       <div id="new-guess-row" className="guess-row flex gap-2" hidden={hidden}>
         {modes.mode === "type" ? (
           <>

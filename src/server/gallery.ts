@@ -1,15 +1,16 @@
-// The front-page gallery and the lists built on it (an owner's games, a playlist).
+// The gallery: the games it shows, as cards, on the front page, profiles and playlists.
 import type pg from "pg";
 import { MAX_TILES } from "../game/banner.ts";
 import type { GameKind } from "../game/blur.ts";
 import { MIN_ENTRIES } from "../game/limits.ts";
 import { HAS_MISSING_VALUES } from "./completeness.ts";
+import { OWNER_BANNED } from "./users.ts";
 
 type Q = Pick<pg.Pool, "query">;
 
 // SQL true when the game aliased `g` is one the gallery shows: approved, with enough active
-// entries (one for a Blur game, MIN_ENTRIES otherwise) and none missing a value
-export const IN_GALLERY = `(g.status = 'approved' and not ${HAS_MISSING_VALUES}
+// entries (one for a Blur game, MIN_ENTRIES otherwise), none missing a value, and an owner not banned
+export const IN_GALLERY = `(g.status = 'approved' and not ${HAS_MISSING_VALUES} and not ${OWNER_BANNED}
   and (select count(*) from entries n where n.game_id = g.id and n.deleted_at is null)
     >= case when g.kind = 'blur' then 1 else ${MIN_ENTRIES} end)`;
 
@@ -58,7 +59,7 @@ export async function listGallery(
        count(e.id)::int as "entryCount", g.kind
      from games g join entries e on e.game_id = g.id and e.deleted_at is null
      ${inPlaylist ? "join playlist_games pl on pl.game_id = g.id and pl.playlist_id = $3" : ""}
-     where g.status = 'approved' and not ${HAS_MISSING_VALUES}
+     where g.status = 'approved' and not ${HAS_MISSING_VALUES} and not ${OWNER_BANNED}
        ${scope.ownerId !== undefined ? "and g.owner_id = $3" : ""}
      group by g.id${inPlaylist ? ", pl.position" : ""} having count(e.id) >= case when g.kind = 'blur' then 1 else $1 end
      order by ${
