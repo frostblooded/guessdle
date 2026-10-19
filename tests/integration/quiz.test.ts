@@ -224,6 +224,25 @@ describe("quiz games", () => {
     );
     assert.equal(card.kind, "quiz");
     assert.equal(card.entryCount, 1);
+    // No question has a picture, so no banner collage
+    assert.deepEqual(card.photos, []);
+  });
+
+  it("makes its banner collage from the question pictures", async () => {
+    await request("POST", `${G}/entries`, ann, CHOICE);
+    await request("POST", `${G}/entries`, ann, NUMBER);
+    const pic = `/uploads/${"a".repeat(32)}.webp`;
+    await db.pool.query("update entries set photo_url = $1 where name = $2", [
+      pic,
+      NUMBER.name,
+    ]);
+    await db.pool.query(
+      "update games set status = 'approved' where slug = 'trivia'",
+    );
+    const card = (await request("GET", "/api/games")).body.find(
+      (g: Body) => g.slug === "trivia",
+    );
+    assert.deepEqual(card.photos, [pic]);
   });
 
   it("keeps the status when only a right answer or range changes", async () => {
