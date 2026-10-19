@@ -24,6 +24,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Victory: Story = {};
+export const LaterWin: Story = {
+  args: { thisTry: { guesses: 2, seconds: 30 } },
+};
 export const FirstSolver: Story = {
   args: {
     stats: {

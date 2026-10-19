@@ -63,6 +63,26 @@ test("a win after giving up and resetting is not counted in the stats", async ({
   await expect(dialog.locator("[data-mine]")).toHaveCount(0);
 });
 
+test("a later win shows this try apart from the first win the stats count", async ({
+  page,
+}) => {
+  await submitGuess(page, wrongName);
+  await submitGuess(page, answerName);
+  const dialog = page.locator("#stats-dialog");
+  await expect(dialog.locator("#stats-guesses")).toHaveText("2");
+  await expect(dialog.locator("#stats-replay")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await page.locator("#reset-button").click();
+  await confirmReset(page);
+  await submitGuess(page, answerName);
+  await expect(dialog).toContainText(`You found ${answerName} in 1 guess.`);
+  await expect(dialog.locator("#stats-replay")).toContainText(
+    "This was not your first win today",
+  );
+  await expect(dialog.locator("#stats-this-guesses")).toHaveText("1");
+  await expect(dialog.locator("#stats-guesses")).toHaveText("2");
+});
+
 test("a free hint opens after 3 wrong guesses and stays after a reload", async ({
   page,
 }) => {
