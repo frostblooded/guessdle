@@ -111,6 +111,7 @@ export function HostForm({ slug }: { slug: string }) {
   const navigate = useNavigate();
   const user = useSignedIn(`/party?host=${encodeURIComponent(slug)}`);
   const [game, setGame] = useState<string | null>(null);
+  const [quiz, setQuiz] = useState(false);
   const [nickname, setNickname] = useState<string | null>(null);
   // How every player will guess; starts as the host's own remembered mode
   const [guessMode, setGuessMode] = useState<GuessMode>(() =>
@@ -128,6 +129,7 @@ export function HostForm({ slug }: { slug: string }) {
       const reply = await api("GET", `/api/games/${encodeURIComponent(slug)}`);
       if (reply?.status === 200) {
         setGame(String(reply.data["name"]));
+        setQuiz(reply.data["kind"] === "quiz");
       } else {
         setError(errorText(reply));
       }
@@ -176,11 +178,14 @@ export function HostForm({ slug }: { slug: string }) {
             value={shown}
             onChange={(event) => setNickname(event.target.value)}
           />
-          <ModeSwitch
-            mode={guessMode}
-            onChange={setGuessMode}
-            label="Everyone guesses by"
-          />
+          {/* A quiz round brings its own answer box */}
+          {!quiz && (
+            <ModeSwitch
+              mode={guessMode}
+              onChange={setGuessMode}
+              label="Everyone guesses by"
+            />
+          )}
           <Button id="host-button" type="submit" disabled={busy}>
             Open party
           </Button>
