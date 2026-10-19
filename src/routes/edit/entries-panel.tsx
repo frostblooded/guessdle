@@ -1,10 +1,17 @@
 // The editor's Entries tab: list, add, change and delete entries with their values (a Blur
-// entry: its image and square order; a Sequence entry: its photos).
+// entry: its image and square order; a Sequence entry: its photos). Adding and editing happen
+// in a popup, so the form shows up where the user is looking however long the list is.
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Plus } from "lucide-react";
 import { CELLS, type GameKind } from "../../game/blur.ts";
 import { FAILURES } from "../../game/failures.ts";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "../../components/ui/dialog.tsx";
 import { Input, Label, Textarea } from "../../components/ui/input.tsx";
 import {
   MAX_DESCRIPTION,
@@ -70,6 +77,8 @@ export function EntriesPanel({
 }) {
   const [entries, setEntries] = useState(initial.entries);
   const [draft, setDraft] = useState<Draft>(() => draftOf(null));
+  // The add/edit popup is open
+  const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   // The attributes the form was built for; the ref lets the refresh compare without re-running
   const [formAttributes, setFormAttributes] = useState(initial.attributes);
@@ -102,8 +111,14 @@ export function EntriesPanel({
     })();
   }, [active, base]);
 
+  const edit = (entry: Entry | null): void => {
+    setError("");
+    setDraft(draftOf(entry));
+    setOpen(true);
+  };
+
   // Runs a call that answers with the entry list; false when it was refused. `clear` empties
-  // the form with the new list, before the page refresh, so nothing typed after it is lost.
+  // the form and closes the popup with the new list, before the page refresh.
   const run = async (
     method: "POST" | "PATCH" | "DELETE",
     path: string,
@@ -117,6 +132,9 @@ export function EntriesPanel({
       return false;
     }
     setEntries(out.data);
+    if (clear) {
+      setOpen(false);
+    }
     setDraft((d) =>
       clear || (d.editing && !out.data.some((e) => e.id === d.editing?.id))
         ? draftOf(null)
@@ -159,6 +177,15 @@ export function EntriesPanel({
     <div className="space-y-5">
       {dialog}
       <EntriesLede kind={kind} tries={tries} />
+      <Button id="entry-new" onClick={() => edit(null)}>
+        <Plus aria-hidden="true" />
+        New entry
+      </Button>
+      {!open && (
+        <Alert id="entry-error" variant="error" role="alert">
+          {error}
+        </Alert>
+      )}
       <ul
         id="entry-list"
         className="attr-list divide-y rounded-lg border empty:hidden"
@@ -204,7 +231,7 @@ export function EntriesPanel({
               variant="outline"
               size="sm"
               aria-label={`Edit ${entry.name}`}
-              onClick={() => setDraft(draftOf(entry))}
+              onClick={() => edit(entry)}
             >
               Edit
             </Button>
@@ -227,150 +254,160 @@ export function EntriesPanel({
           </li>
         ))}
       </ul>
-      <form
-        id="entry-form"
-        className="space-y-4 rounded-lg border bg-muted/40 p-4"
-        noValidate
-        onSubmit={(event) => void submit(event)}
-      >
-        <h3 className="font-semibold">
-          {draft.editing ? `Edit ${draft.editing.name}` : "New entry"}
-        </h3>
-        <div className="space-y-2">
-          <Label htmlFor="entry-name">Name</Label>
-          <Input
-            id="entry-name"
-            maxLength={MAX_ENTRY_NAME}
-            autoComplete="off"
-            value={draft.name}
-            onChange={(event) =>
-              setDraft((d) => ({ ...d, name: event.target.value }))
-            }
-          />
-        </div>
-        {sequence && (
-          <ShotsEditor
-            shots={draft.shots}
-            count={tries}
-            onUpload={(file) => uploadFile(file, "shot")}
-            onChange={(shots) => setDraft((d) => ({ ...d, shots }))}
-          />
-        )}
-        {blur && (
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Image</p>
-            {draft.photo ? (
-              <BlurOrderEditor
-                src={draft.photo}
-                order={draft.blurOrder}
-                onChange={(blurOrder) => setDraft((d) => ({ ...d, blurOrder }))}
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Players see this image split into nine squares, all blurred but
-                one, and the whole image once the day is over.
-              </p>
-            )}
-            <ImagePicker
-              id="entry-photo"
-              onPick={(input) =>
-                void upload(input, (url) =>
-                  setDraft((d) => ({ ...d, photo: url })),
-                )
-              }
-            />
-          </div>
-        )}
-        <div id="entry-fields" className="space-y-4 empty:hidden">
-          {formAttributes.map((attr) => {
-            const id = `entry-attr-${attr.id}`;
-            const value = draft.values[String(attr.id)] ?? "";
-            const set = (text: string): void =>
-              setDraft((d) => ({
-                ...d,
-                values: { ...d.values, [String(attr.id)]: text },
-              }));
-            return (
-              <div key={attr.id} className="space-y-2">
-                {attr.type === "image" ? (
-                  <ImageValue
-                    id={id}
-                    name={attr.name}
-                    src={value}
-                    onPick={(input) => void upload(input, set)}
-                    onRemove={() => set("")}
-                  />
-                ) : (
-                  <Label htmlFor={id}>
-                    {attr.type === "list"
-                      ? `${attr.name} (one per line)`
-                      : attr.type === "number"
-                        ? `${attr.name} (number)`
-                        : attr.name}
-                  </Label>
-                )}
-                {attr.type === "image" ? null : attr.type === "list" ? (
-                  <Textarea
-                    id={id}
-                    required
-                    rows={3}
-                    maxLength={MAX_VALUE_LENGTH * MAX_LIST_ITEMS}
-                    value={value}
-                    onChange={(event) => set(event.target.value)}
-                  />
-                ) : (
-                  <Input
-                    id={id}
-                    required
-                    inputMode={attr.type === "number" ? "decimal" : undefined}
-                    maxLength={MAX_VALUE_LENGTH}
-                    value={value.split("\n")[0]}
-                    onChange={(event) => set(event.target.value)}
-                  />
-                )}
-              </div>
-            );
-          })}
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="entry-description">Description (optional)</Label>
-          <Textarea
-            id="entry-description"
-            rows={3}
-            maxLength={MAX_DESCRIPTION}
-            aria-describedby="entry-description-help"
-            value={draft.description}
-            onChange={(event) =>
-              setDraft((d) => ({ ...d, description: event.target.value }))
-            }
-          />
-          <p
-            id="entry-description-help"
-            className="text-sm text-muted-foreground"
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent
+          id="entry-dialog"
+          className="max-w-lg"
+          aria-describedby={undefined}
+        >
+          <DialogTitle className="pr-8 text-xl">
+            {draft.editing ? `Edit ${draft.editing.name}` : "New entry"}
+          </DialogTitle>
+          <form
+            id="entry-form"
+            className="space-y-4"
+            noValidate
+            onSubmit={(event) => void submit(event)}
           >
-            {blur
-              ? "Shown with the answer once a player finds it or the day is over."
-              : "Shown with the answer once a player finds it or the day is over. Players can also reveal it as their free hint."}
-          </p>
-        </div>
-        <Alert id="entry-error" variant="error" role="alert">
-          {error}
-        </Alert>
-        <div className="flex flex-wrap gap-2">
-          <Button id="entry-submit" type="submit">
-            {draft.editing ? "Save entry" : "Add entry"}
-          </Button>
-          {draft.editing && (
-            <Button
-              id="entry-cancel"
-              variant="ghost"
-              onClick={() => setDraft(draftOf(null))}
-            >
-              Cancel
-            </Button>
-          )}
-        </div>
-      </form>
+            <div className="space-y-2">
+              <Label htmlFor="entry-name">Name</Label>
+              <Input
+                id="entry-name"
+                maxLength={MAX_ENTRY_NAME}
+                autoComplete="off"
+                value={draft.name}
+                onChange={(event) =>
+                  setDraft((d) => ({ ...d, name: event.target.value }))
+                }
+              />
+            </div>
+            {sequence && (
+              <ShotsEditor
+                shots={draft.shots}
+                count={tries}
+                onUpload={(file) => uploadFile(file, "shot")}
+                onChange={(shots) => setDraft((d) => ({ ...d, shots }))}
+              />
+            )}
+            {blur && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Image</p>
+                {draft.photo ? (
+                  <BlurOrderEditor
+                    src={draft.photo}
+                    order={draft.blurOrder}
+                    onChange={(blurOrder) =>
+                      setDraft((d) => ({ ...d, blurOrder }))
+                    }
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Players see this image split into nine squares, all blurred
+                    but one, and the whole image once the day is over.
+                  </p>
+                )}
+                <ImagePicker
+                  id="entry-photo"
+                  onPick={(input) =>
+                    void upload(input, (url) =>
+                      setDraft((d) => ({ ...d, photo: url })),
+                    )
+                  }
+                />
+              </div>
+            )}
+            <div id="entry-fields" className="space-y-4 empty:hidden">
+              {formAttributes.map((attr) => {
+                const id = `entry-attr-${attr.id}`;
+                const value = draft.values[String(attr.id)] ?? "";
+                const set = (text: string): void =>
+                  setDraft((d) => ({
+                    ...d,
+                    values: { ...d.values, [String(attr.id)]: text },
+                  }));
+                return (
+                  <div key={attr.id} className="space-y-2">
+                    {attr.type === "image" ? (
+                      <ImageValue
+                        id={id}
+                        name={attr.name}
+                        src={value}
+                        onPick={(input) => void upload(input, set)}
+                        onRemove={() => set("")}
+                      />
+                    ) : (
+                      <Label htmlFor={id}>
+                        {attr.type === "list"
+                          ? `${attr.name} (one per line)`
+                          : attr.type === "number"
+                            ? `${attr.name} (number)`
+                            : attr.name}
+                      </Label>
+                    )}
+                    {attr.type === "image" ? null : attr.type === "list" ? (
+                      <Textarea
+                        id={id}
+                        required
+                        rows={3}
+                        maxLength={MAX_VALUE_LENGTH * MAX_LIST_ITEMS}
+                        value={value}
+                        onChange={(event) => set(event.target.value)}
+                      />
+                    ) : (
+                      <Input
+                        id={id}
+                        required
+                        inputMode={
+                          attr.type === "number" ? "decimal" : undefined
+                        }
+                        maxLength={MAX_VALUE_LENGTH}
+                        value={value.split("\n")[0]}
+                        onChange={(event) => set(event.target.value)}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="entry-description">Description (optional)</Label>
+              <Textarea
+                id="entry-description"
+                rows={3}
+                maxLength={MAX_DESCRIPTION}
+                aria-describedby="entry-description-help"
+                value={draft.description}
+                onChange={(event) =>
+                  setDraft((d) => ({ ...d, description: event.target.value }))
+                }
+              />
+              <p
+                id="entry-description-help"
+                className="text-sm text-muted-foreground"
+              >
+                {blur
+                  ? "Shown with the answer once a player finds it or the day is over."
+                  : "Shown with the answer once a player finds it or the day is over. Players can also reveal it as their free hint."}
+              </p>
+            </div>
+            <Alert id="entry-error" variant="error" role="alert">
+              {error}
+            </Alert>
+            <div className="flex flex-wrap gap-2">
+              <Button id="entry-submit" type="submit">
+                {draft.editing ? "Save entry" : "Add entry"}
+              </Button>
+              <Button
+                id="entry-cancel"
+                variant="ghost"
+                onClick={() => setOpen(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
