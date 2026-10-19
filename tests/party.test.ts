@@ -295,7 +295,6 @@ describe("Free Hints in a round", () => {
     const live = round({ endedAt: null, guesses: three });
     assert.deepEqual(view([live], 1).round!.yours!.hints, {
       attribute: true,
-      description: true,
     });
     assert.equal(view([live], 2).round!.yours!.hints, undefined);
     const two = round({ endedAt: null, guesses: three.slice(0, 2) });
@@ -432,9 +431,13 @@ describe("parseClientMessage", () => {
       parseClientMessage('{"type":"remove-player","playerId":2}'),
       { type: "remove-player", playerId: 2 },
     );
-    assert.deepEqual(
+    assert.deepEqual(parseClientMessage('{"type":"hint","kind":"attribute"}'), {
+      type: "hint",
+      kind: "attribute",
+    });
+    assert.equal(
       parseClientMessage('{"type":"hint","kind":"description"}'),
-      { type: "hint", kind: "description" },
+      null,
     );
     for (const type of ["give-up", "start-round", "end-round", "end-party"]) {
       assert.deepEqual(parseClientMessage(JSON.stringify({ type })), { type });

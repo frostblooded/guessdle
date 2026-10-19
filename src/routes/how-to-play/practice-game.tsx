@@ -91,6 +91,38 @@ function Clues({ lines, grades }: { lines: string[]; grades: string[] }) {
   );
 }
 
+// One step of a practice round, shared by every game kind's round: a small label such as
+// "Step 2 of 4" over its title
+export function PracticeCard({
+  step,
+  label,
+  title,
+  children,
+}: {
+  step: string;
+  label?: string | undefined;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <Card
+      className="practice-step space-y-4 p-4 sm:p-6"
+      data-step={step}
+      aria-live="polite"
+    >
+      <div className="space-y-1">
+        {label && (
+          <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            {label}
+          </p>
+        )}
+        <h2 className="text-xl font-semibold">{title}</h2>
+      </div>
+      {children}
+    </Card>
+  );
+}
+
 function StepCard({
   step,
   title,
@@ -101,21 +133,33 @@ function StepCard({
   children: ReactNode;
 }) {
   return (
-    <Card
-      className="practice-step space-y-4 p-5 sm:p-6"
-      data-step={step}
-      aria-live="polite"
+    <PracticeCard
+      step={step}
+      label={step === "won" ? undefined : `Step ${STEP_NUMBER[step]} of 4`}
+      title={title}
     >
-      <div className="space-y-1">
-        {step !== "won" && (
-          <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-            Step {STEP_NUMBER[step]} of 4
-          </p>
-        )}
-        <h2 className="text-xl font-semibold">{title}</h2>
-      </div>
       {children}
-    </Card>
+    </PracticeCard>
+  );
+}
+
+// A finished practice round's way out: to the gallery, or another round
+export function PracticeEnd({ onRestart }: { onRestart: () => void }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Link
+        className={buttonVariants({
+          size: "lg",
+          className: "no-underline",
+        })}
+        to="/"
+      >
+        Start playing
+      </Link>
+      <Button size="lg" variant="outline" onClick={onRestart}>
+        Practice again
+      </Button>
+    </div>
   );
 }
 
@@ -247,20 +291,7 @@ export function PracticeGame({ tutorial }: { tutorial: Tutorial }) {
               to pick from a list of every answer instead of typing names.
             </li>
           </ul>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              className={buttonVariants({
-                size: "lg",
-                className: "no-underline",
-              })}
-              to="/"
-            >
-              Start playing
-            </Link>
-            <Button size="lg" variant="outline" onClick={restart}>
-              Practice again
-            </Button>
-          </div>
+          <PracticeEnd onRestart={restart} />
         </StepCard>
       );
   }

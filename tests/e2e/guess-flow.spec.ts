@@ -78,8 +78,6 @@ test("a free hint opens after 3 wrong guesses and stays after a reload", async (
   await expect(hint).toBeHidden();
   await submitGuess(page, wrong[2]!);
   await expect(hint).toContainText("You earned a free hint");
-  // The fixture game's entries have no description
-  await expect(page.locator("#hint-description-button")).toBeDisabled();
   await page.locator("#hint-attribute-button").click();
   await expect(hint).toContainText("Free hint");
   const text = await page.locator("#free-hint-text").textContent();
@@ -452,6 +450,29 @@ test("the practice game offers every pet of the pet game and fits a phone screen
   await page.getByRole("button", { name: "Bela", exact: true }).click();
   await page.getByRole("button", { name: "Next guess" }).click();
   expect(await fits()).toBe(true);
+});
+
+test("every game kind has a practice round, one open at a time, that fits a phone screen", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  await page.goto("/how-to-play");
+  const fits = (): Promise<boolean> =>
+    page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    );
+  const step = page.locator(".practice-step");
+  for (const kind of ["Blur", "Sequence", "Quiz"]) {
+    await page.getByRole("button", { name: new RegExp(`^${kind}`) }).click();
+    await expect(step).toHaveCount(1);
+    await expect(step).toContainText(`${kind} practice`);
+    expect(await fits()).toBe(true);
+  }
+  await page.getByRole("radio").first().click();
+  await page.getByRole("button", { name: "Check my answer" }).click();
+  await expect(page.locator(".practice-feedback")).toHaveText(
+    /^(Right|Not this time)/,
+  );
 });
 
 const giveUpButton = (page: Page): Locator => page.locator("#give-up-button");

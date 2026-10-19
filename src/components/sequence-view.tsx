@@ -2,7 +2,7 @@
 // far, newest first on screen, with numbered buttons to look back at earlier ones. Every photo
 // unlocks once the day or round is over.
 import { Lock } from "lucide-react";
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { blurProgress } from "../game/blur.ts";
 import { cn } from "../lib/utils.ts";
 
@@ -11,6 +11,7 @@ export function SequenceView({
   tries,
   wrong,
   finished,
+  shotStyle,
 }: {
   // Photo n of the answer, 1-based
   shotUrl: (n: number) => string;
@@ -18,6 +19,8 @@ export function SequenceView({
   // Wrong guesses and skips so far
   wrong: number;
   finished: boolean;
+  // How photo n is drawn, such as How to play's zoom on its one photo
+  shotStyle?: (n: number) => CSSProperties;
 }) {
   const { shown: unlocked, left } = blurProgress(wrong, tries, finished);
   // The photo the player looked back at, while no newer one has unlocked since
@@ -31,6 +34,7 @@ export function SequenceView({
           key={current}
           className="animate-in size-full object-cover"
           src={shotUrl(current)}
+          style={shotStyle?.(current)}
           alt={`Photo ${current} of ${tries}`}
         />
       </div>
