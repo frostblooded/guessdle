@@ -128,8 +128,16 @@ const revealed = (entry: Entry): RevealedEntry => ({
   ...(entry.description && { description: entry.description }),
 });
 
-export function partyView(input: ViewInput): PartyView {
-  const { attributes, all, players, rounds, viewer } = input;
+export const partyView = ({ viewer, ...input }: ViewInput): PartyView =>
+  partyViews(input, [viewer]).get(viewer)!;
+
+// Each viewer's view of one party state. Only `you` and the round's `yours` depend on the
+// viewer, so the rest is built once and shared.
+export function partyViews(
+  input: Omit<ViewInput, "viewer">,
+  viewers: readonly (number | null)[],
+): Map<number | null, PartyView> {
+  const { attributes, all, players, rounds } = input;
   const kind = input.game.kind ?? "classic";
   const entry = (id: number): Entry =>
     all.find((e) => e.id === id) ?? {
@@ -152,27 +160,15 @@ export function partyView(input: ViewInput): PartyView {
             ),
       );
   const latest = rounds.at(-1);
-  const me = players.find((p) => p.id === viewer);
-  let round: LiveRound | null = null;
+  // The latest round without `yours`, and the viewer's own board in it
+  let shared: Omit<LiveRound, "yours"> | null = null;
+  let yoursOf: (mine: Progress | undefined) => LiveRound["yours"] = () => null;
   if (latest) {
-    const mine = me && progressOf(latest, me.id);
     const answer = entry(latest.answerId);
-    // The Free Hint the viewer used this round, shown against its answer
-    const used =
-      mine && latest.hints?.find((h) => h.playerId === mine.playerId);
-    const hint = used && revealHint(attributes, answer, used.pick);
-    const hints =
-      mine &&
-      kind === "classic" &&
-      latest.endedAt === null &&
-      !isDone(mine) &&
-      !hint
-        ? hintChoices(attributes, answer, graded(latest, mine.playerId))
-        : null;
     // A live Quiz round keeps everyone's points secret
     const quiz = latest.quiz;
     const hide = quiz !== undefined && latest.endedAt === null;
-    round = {
+    shared = {
       number: latest.number,
       live: latest.endedAt === null,
       progress: participants(players, latest).map((p) => {
@@ -192,7 +188,21 @@ export function partyView(input: ViewInput): PartyView {
           : { playerId, guesses, solved, gaveUp, lost };
       }),
       ...(quiz && { question: quiz.question }),
-      yours: !mine
+    };
+    yoursOf = (mine) => {
+      // The Free Hint the viewer used this round, shown against its answer
+      const used =
+        mine && latest.hints?.find((h) => h.playerId === mine.playerId);
+      const hint = used && revealHint(attributes, answer, used.pick);
+      const hints =
+        mine &&
+        kind === "classic" &&
+        latest.endedAt === null &&
+        !isDone(mine) &&
+        !hint
+          ? hintChoices(attributes, answer, graded(latest, mine.playerId))
+          : null;
+      return !mine
         ? null
         : quiz
           ? {
@@ -212,7 +222,7 @@ export function partyView(input: ViewInput): PartyView {
               ...(isDone(mine) && { answer: revealed(answer) }),
               ...(hint && { hint }),
               ...(hints && { hints }),
-            },
+            };
     };
   }
   const history = rounds
@@ -242,23 +252,34 @@ export function partyView(input: ViewInput): PartyView {
       }),
     }))
     .reverse();
-  return {
-    code: input.code,
-    game: {
-      ...input.game,
-      kind,
-      guessMode: input.game.guessMode ?? "type",
-      attributes: [...attributes],
-      entries: input.entries.map((e) =>
-        kind !== "classic"
-          ? { ...ref(e), photo: "" }
-          : { ...ref(e), values: e.values },
-      ),
-    },
-    ended: input.ended,
-    you: me ? { playerId: me.id, host: me.host } : null,
-    players: standings(players, rounds),
-    round,
-    history,
+  const game = {
+    ...input.game,
+    kind,
+    guessMode: input.game.guessMode ?? "type",
+    attributes: [...attributes],
+    entries: input.entries.map((e) =>
+      kind !== "classic"
+        ? { ...ref(e), photo: "" }
+        : { ...ref(e), values: e.values },
+    ),
   };
+  const standing = standings(players, rounds);
+  return new Map(
+    viewers.map((viewer) => {
+      const me = players.find((p) => p.id === viewer);
+      const view: PartyView = {
+        code: input.code,
+        game,
+        ended: input.ended,
+        you: me ? { playerId: me.id, host: me.host } : null,
+        players: standing,
+        round: shared && {
+          ...shared,
+          yours: yoursOf(me && latest && progressOf(latest, me.id)),
+        },
+        history,
+      };
+      return [viewer, view];
+    }),
+  );
 }

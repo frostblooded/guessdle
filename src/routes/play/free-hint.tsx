@@ -66,7 +66,7 @@ export function FreeHintCard({
               id="hint-attribute-button"
               variant="outline"
               size="sm"
-              disabled={busy || !hints?.attribute}
+              disabled={busy}
               onClick={() => onTake("attribute")}
             >
               Reveal an attribute

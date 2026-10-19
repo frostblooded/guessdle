@@ -60,15 +60,15 @@ export function EntriesPanel({
   base,
   initial,
   active,
-  kind = "classic",
-  tries = 0,
+  kind,
+  tries,
   onChange,
 }: {
   base: string;
   // A Blur game's entries have an image and a square order instead of values, a Sequence
   // game's its `tries` photos
-  kind?: GameKind;
-  tries?: number;
+  kind: GameKind;
+  tries: number;
   initial: { attributes: Attribute[]; entries: Entry[] };
   // The tab is open: refresh the lists, since attributes may have changed
   active: boolean;

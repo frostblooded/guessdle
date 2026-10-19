@@ -8,7 +8,6 @@ const meta = {
     onOpenChange: () => {},
     answer: "Ati",
     failed: false,
-    returnFocusId: "stats-button",
     stats: {
       day: 427,
       you: { guesses: 3, seconds: 95 },

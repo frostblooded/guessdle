@@ -63,8 +63,7 @@ export function manageRoutes(
   const manageRoute =
     (
       handler: (
-        game: LoadedGame,
-        user: SessionUser,
+        game: LoadedGame & { user: SessionUser },
         req: Request,
         res: Response,
       ) => Promise<void>,
@@ -73,7 +72,7 @@ export function manageRoutes(
       res.set("Cache-Control", "no-store");
       const loaded = await guardGame(ctx, req, res, "edit");
       if (loaded) {
-        await handler(loaded, loaded.user, req, res);
+        await handler(loaded, req, res);
       }
     };
 
@@ -140,8 +139,8 @@ export function manageRoutes(
 
   app.get(
     "/api/games/:slug/details",
-    manageRoute(async (loaded, user, _req, res) => {
-      res.json(detailsOf(loaded, user));
+    manageRoute(async (loaded, _req, res) => {
+      res.json(detailsOf(loaded, loaded.user));
     }),
   );
 
@@ -176,7 +175,7 @@ export function manageRoutes(
   const attributeRoute = (
     build: (req: Request) => AttributeEdit | AttributeDraft[] | undefined,
   ) =>
-    manageRoute(async ({ game }, _user, req, res) => {
+    manageRoute(async ({ game }, req, res) => {
       const edit = build(req);
       if (!edit) {
         fail(res, "invalid");
@@ -192,7 +191,7 @@ export function manageRoutes(
 
   app.get(
     attrBase,
-    manageRoute(async ({ game }, _user, _req, res) => {
+    manageRoute(async ({ game }, _req, res) => {
       res.json(await listAttributes(pool, game));
     }),
   );
@@ -233,7 +232,7 @@ export function manageRoutes(
 
   const entryBase = "/api/games/:slug/entries";
   // Creates (no :id) or changes an entry, then answers with the entry list
-  const entryRoute = manageRoute(async ({ game }, user, req, res) => {
+  const entryRoute = manageRoute(async ({ game, user }, req, res) => {
     const raw = req.params["id"];
     const id = raw === undefined ? undefined : idOf(req);
     const input = parseEntryInput(
@@ -253,7 +252,7 @@ export function manageRoutes(
   });
   app.get(
     entryBase,
-    manageRoute(async ({ game }, _user, _req, res) => {
+    manageRoute(async ({ game }, _req, res) => {
       res.json(await listEntries(pool, game));
     }),
   );
@@ -262,7 +261,7 @@ export function manageRoutes(
   app.delete(
     `${entryBase}/:id`,
     writes,
-    manageRoute(async ({ game }, _user, req, res) => {
+    manageRoute(async ({ game }, req, res) => {
       const out = await edits.deleteEntry(game, idOf(req));
       if (out !== "ok") {
         fail(res, out);
@@ -274,7 +273,7 @@ export function manageRoutes(
 
   // Submit and unpublish: one guarded status move
   const flowRoute = (move: Move) =>
-    manageRoute(async ({ game }, user, req, res) => {
+    manageRoute(async ({ game, user }, req, res) => {
       const out = await edits.move(game, move);
       if (out !== "ok") {
         fail(res, out);
@@ -291,7 +290,7 @@ export function manageRoutes(
   app.delete(
     "/api/games/:slug",
     writes,
-    manageRoute(async ({ game }, _user, _req, res) => {
+    manageRoute(async ({ game }, _req, res) => {
       await edits.drop(game);
       res.json({ ok: true });
     }),
@@ -301,8 +300,8 @@ export function manageRoutes(
     "/api/games/:slug",
     writes,
     json,
-    manageRoute(async (loaded, user, req, res) => {
-      const { game, roster } = loaded;
+    manageRoute(async (loaded, req, res) => {
+      const { game, roster, user } = loaded;
       const body = bodyOf(req);
       if (body["slug"] !== undefined && body["slug"] !== game.slug) {
         fail(res, "slug_immutable");

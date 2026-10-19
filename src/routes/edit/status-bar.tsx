@@ -11,13 +11,11 @@ import { api, errorText } from "../../manage-client.ts";
 export function StatusBar({
   base,
   details,
-  name,
   onDetails,
   onReviewed,
 }: {
   base: string;
   details: Details;
-  name: string;
   onDetails: (details: Details) => void;
   onReviewed: () => Promise<void>;
 }) {
@@ -70,7 +68,7 @@ export function StatusBar({
         {details.canApprove && (
           <ReviewButtons
             slug={details.slug}
-            name={name}
+            name={details.name}
             size="default"
             approveId="approve-button"
             rejectId="reject-button"

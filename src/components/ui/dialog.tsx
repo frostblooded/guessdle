@@ -4,7 +4,6 @@ import type { ComponentProps } from "react";
 import { cn } from "../../lib/utils.ts";
 
 export const Dialog = Primitive.Root;
-export const DialogClose = Primitive.Close;
 
 // A modal panel: Escape, the overlay and the corner button close it; focus returns to the trigger
 export function DialogContent({

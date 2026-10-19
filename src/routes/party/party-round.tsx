@@ -11,10 +11,9 @@ import type { HintKind } from "../../game/free-hint.ts";
 import { FreeHintCard } from "../play/free-hint.tsx";
 import { AnswerImage, boardOf, PlayResults } from "../play/play-results.tsx";
 import { ResultBanner } from "../play/result-banner.tsx";
+import { guessesWord } from "../play/stats-dialog.tsx";
 
 type Board = NonNullable<LiveRound["yours"]>;
-
-const guesses = (n: number): string => `${n} ${n === 1 ? "guess" : "guesses"}`;
 
 export function PartyRound({
   view,
@@ -76,7 +75,7 @@ export function PartyRound({
             roster={entries}
             title={
               mine.solved
-                ? `Solved in ${guesses(mine.rows.length)}!`
+                ? `Solved in ${guessesWord(mine.rows.length)}!`
                 : mine.lost
                   ? "Out of tries"
                   : "You gave up"

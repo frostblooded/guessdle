@@ -2,7 +2,7 @@
 import { randomBytes } from "node:crypto";
 import type pg from "pg";
 import { MAX_OPEN_PARTIES, MAX_PARTY_PLAYERS } from "../game/limits.ts";
-import { partyView } from "../game/party-view.ts";
+import { partyViews } from "../game/party-view.ts";
 import { isImageGame } from "../game/blur.ts";
 import {
   randomCode,
@@ -186,17 +186,6 @@ export async function hostPlayerId(q: Q, partyId: number): Promise<number> {
   return rows[0]!.id;
 }
 
-export const isCurrentPlayer = async (
-  q: Q,
-  playerId: number,
-): Promise<boolean> =>
-  (
-    await q.query(
-      "select 1 from party_players where id = $1 and removed_at is null",
-      [playerId],
-    )
-  ).rowCount === 1;
-
 export interface PartyData {
   game: GameRow;
   roster: Roster;
@@ -339,29 +328,26 @@ export async function viewsOf(
         [party.id],
       )
     ).rows[0]?.ended ?? true;
-  return new Map(
-    [...new Set(viewers)].map((viewer) => [
-      viewer,
-      partyView({
-        code: party.code,
-        game: {
-          slug: game.slug,
-          name: game.name,
-          kind: game.kind,
-          ...(isImageGame(game.kind) && { blurTries: game.blurTries }),
-          ...(game.kind === "quiz" && { questions: roster.entries.length }),
-          guessMode: party.guessMode,
-        },
-        attributes: roster.attributes,
-        // A Quiz round sends its own question
-        entries: game.kind === "quiz" ? [] : roster.entries,
-        all: roster.all,
-        ended,
-        players,
-        rounds,
-        viewer,
-      }),
-    ]),
+  return partyViews(
+    {
+      code: party.code,
+      game: {
+        slug: game.slug,
+        name: game.name,
+        kind: game.kind,
+        ...(isImageGame(game.kind) && { blurTries: game.blurTries }),
+        ...(game.kind === "quiz" && { questions: roster.entries.length }),
+        guessMode: party.guessMode,
+      },
+      attributes: roster.attributes,
+      // A Quiz round sends its own question
+      entries: game.kind === "quiz" ? [] : roster.entries,
+      all: roster.all,
+      ended,
+      players,
+      rounds,
+    },
+    [...new Set(viewers)],
   );
 }
 

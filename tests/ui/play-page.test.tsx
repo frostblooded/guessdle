@@ -42,6 +42,9 @@ const json = (status: number, body: unknown): Response =>
     headers: { "Content-Type": "application/json" },
   });
 
+// The Day Number the fake grades on; a test bumps it to roll the day over
+let serverDay = 1;
+
 // The API as anonymous play sees it; `game` overrides the game lookup
 function fakeServer(game?: Response) {
   return vi.fn(async (url: string, init?: RequestInit): Promise<Response> => {
@@ -72,7 +75,7 @@ function fakeServer(game?: Response) {
     ) {
       const { ids } = JSON.parse(String(init?.body)) as { ids: number[] };
       return json(200, {
-        day: 1,
+        day: serverDay,
         rows: ids.map(row),
         victory: ids.includes(ANSWER),
         ...(ids.includes(ANSWER) && {
@@ -154,6 +157,7 @@ const guessRows = (): Element[] => [
 
 beforeEach(() => {
   localStorage.clear();
+  serverDay = 1;
 });
 afterEach(() => {
   cleanup();
@@ -242,6 +246,30 @@ describe("PlayPage", () => {
     assert.equal(document.activeElement, again);
     await userEvent.click(again);
     await screen.findByRole("dialog");
+  });
+
+  it("a win after the day rolled over times from the new day's first guess", async () => {
+    const server = fakeServer();
+    vi.stubGlobal("fetch", server);
+    renderPlay();
+    await screen.findByText(/No guesses yet/);
+    await guess("Bela");
+    // Yesterday's clock, as a tab left open overnight has it
+    localStorage.setItem(
+      "game:pets:firstGuessAt",
+      JSON.stringify([1, Date.now() - 86_400_000]),
+    );
+    serverDay = 2;
+    await userEvent.type(input(), "Dido");
+    await userEvent.click(screen.getByRole("button", { name: "Guess" }));
+    await screen.findByRole("dialog");
+    const sent = server.mock.calls.find(
+      ([url]) => url === "/api/games/pets/result",
+    )!;
+    const body = JSON.parse(String(sent[1]?.body)) as Record<string, unknown>;
+    assert.deepEqual(body["ids"], [2]);
+    assert.equal(typeof body["seconds"], "number");
+    assert.ok((body["seconds"] as number) < 60);
   });
 
   it("offers the free hint once earned, then shows the hint it drew", async () => {

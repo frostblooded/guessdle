@@ -2,13 +2,8 @@
 import express from "express";
 import type { Express, NextFunction, Request, Response } from "express";
 import { requestUser } from "../auth.ts";
-import {
-  ImageError,
-  isImageKind,
-  MAX_UPLOAD_BYTES,
-  processImage,
-  storeWebp,
-} from "../images.ts";
+import { isImageKind, MAX_UPLOAD_BYTES } from "../../game/crop.ts";
+import { ImageError, processImage, storeWebp } from "../images.ts";
 import { rateLimit, type RateLimit } from "../rate-limit.ts";
 import { uploadRefs } from "../upload-refs.ts";
 import {

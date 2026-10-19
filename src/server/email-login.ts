@@ -9,6 +9,8 @@ export const MAX_EMAIL_LENGTH = 254;
 export const MAX_TOKEN_LENGTH = 200;
 const MINUTE_MS = 60_000;
 const PER_HOUR = 5;
+// Login mails per hour across all addresses: caps what one sender can spray
+export const SITE_PER_HOUR = 100;
 // Rows outlive their expiry this long: the hourly limit counts them
 const KEEP_MS = 2 * 60 * MINUTE_MS;
 
@@ -24,40 +26,52 @@ export function normalizeEmail(value: unknown): string | null {
     : null;
 }
 
-export type RequestResult = "sent" | "limited";
-
-// Mails a link unless this address asked too recently (1/minute, 5/hour); the
-// caller answers the same either way. Sending errors propagate.
+// Mails a link unless this address asked too recently (1/minute, 5/hour) or the
+// site sent SITE_PER_HOUR this hour; the caller answers the same either way.
+// Sending errors propagate after dropping the token, so a retry is not limited.
 export async function requestLoginLink(
   pool: pg.Pool,
   mailer: Mailer,
   publicUrl: string,
   email: string,
   now: Date,
-): Promise<RequestResult> {
+): Promise<void> {
   const time = now.getTime();
   await pool.query("delete from login_tokens where expires_at < $1", [
     new Date(time - KEEP_MS),
   ]);
-  const { rows } = await pool.query<{ minute: number; hour: number }>(
-    `select count(*) filter (where created_at > $2)::int as minute, count(*)::int as hour
-     from login_tokens where email = $1 and created_at > $3`,
+  const { rows } = await pool.query<{
+    minute: number;
+    hour: number;
+    site: number;
+  }>(
+    `select count(*) filter (where email = $1 and created_at > $2)::int as minute,
+       count(*) filter (where email = $1)::int as hour, count(*)::int as site
+     from login_tokens where created_at > $3`,
     [email, new Date(time - MINUTE_MS), new Date(time - 60 * MINUTE_MS)],
   );
-  if (rows[0]!.minute >= 1 || rows[0]!.hour >= PER_HOUR) {
-    return "limited";
+  const { minute, hour, site } = rows[0]!;
+  if (minute >= 1 || hour >= PER_HOUR || site >= SITE_PER_HOUR) {
+    return;
   }
   const token = randomBytes(32).toString("base64url");
+  const tokenHash = hash(token);
   await pool.query(
     "insert into login_tokens (token_hash, email, expires_at, created_at) values ($1, $2, $3, $4)",
-    [hash(token), email, new Date(time + TOKEN_MINUTES * MINUTE_MS), now],
+    [tokenHash, email, new Date(time + TOKEN_MINUTES * MINUTE_MS), now],
   );
-  await mailer.send({
-    to: email,
-    subject: "Your Guessdle sign-in link",
-    text: `Open this link to sign in to Guessdle:\n\n${publicUrl}/verify?token=${token}\n\nIt works once and expires in ${TOKEN_MINUTES} minutes. If you did not ask for it, ignore this email.\n`,
-  });
-  return "sent";
+  try {
+    await mailer.send({
+      to: email,
+      subject: "Your Guessdle sign-in link",
+      text: `Open this link to sign in to Guessdle:\n\n${publicUrl}/verify?token=${token}\n\nIt works once and expires in ${TOKEN_MINUTES} minutes. If you did not ask for it, ignore this email.\n`,
+    });
+  } catch (err) {
+    await pool.query("delete from login_tokens where token_hash = $1", [
+      tokenHash,
+    ]);
+    throw err;
+  }
 }
 
 // The token's email once, atomically; null when unknown, expired or already used

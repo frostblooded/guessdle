@@ -2,15 +2,10 @@
 import type { LoadedGame } from "../access.ts";
 import express from "express";
 import type { Express, Request, Response } from "express";
-import {
-  clearOverride,
-  dateOfDay,
-  dayNumber,
-  peekDays,
-  setOverride,
-  todayIn,
-} from "../answers.ts";
+import { clearOverride, dayNumber, peekDays, setOverride } from "../answers.ts";
+import { dateOfDay } from "../../game/date.ts";
 import type { GameRow } from "../games.ts";
+import { todayOf } from "../play-day.ts";
 import {
   bodyOf,
   guardGame,
@@ -53,7 +48,7 @@ interface AnswersCtx extends LoadedGame {
 }
 
 export function answersRoutes(app: Express, ctx: AppContext): void {
-  const { pool, now, random, timeZone } = ctx;
+  const { pool, random } = ctx;
   const path = "/api/games/:slug/answers";
   const ownerRoute =
     (handler: (answers: AnswersCtx) => Promise<void>) =>
@@ -63,13 +58,13 @@ export function answersRoutes(app: Express, ctx: AppContext): void {
       if (!loaded) {
         return;
       }
-      const today = todayIn(now(), timeZone);
+      const { date: today, day: todayN } = todayOf(ctx, loaded.game);
       await handler({
         ...loaded,
         req,
         res,
         today,
-        todayN: dayNumber(today, loaded.game.startDate),
+        todayN,
         ids: loaded.roster.answerIds,
       });
     };

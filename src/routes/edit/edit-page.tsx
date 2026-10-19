@@ -3,7 +3,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router";
 import { EmptyState, MessageCard, PageHead } from "../../components/page.tsx";
-import { useCrop } from "../../components/crop-dialog.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button, buttonVariants } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
@@ -27,7 +26,8 @@ import { QuestionsPanel } from "./questions-panel.tsx";
 import { StatusBar } from "./status-bar.tsx";
 import { BlurTriesField } from "./blur-tries-field.tsx";
 import { isImageGame } from "../../game/blur.ts";
-import { IMAGE_TYPES, type Attribute, type Entry } from "./types.ts";
+import { ImagePicker, usePhotoUpload } from "./image-value.tsx";
+import type { Attribute, Entry } from "./types.ts";
 
 type Loaded =
   | { kind: "loading" }
@@ -126,7 +126,7 @@ function Editor({
   const [error, setError] = useState("");
   const [savedText, setSavedText] = useState("");
   const [busy, setBusy] = useState(false);
-  const { crop, dialog } = useCrop(setError);
+  const { uploadFile, dialog } = usePhotoUpload(setError);
 
   useTitle(`Edit ${saved.name} - Guessdle`);
 
@@ -174,21 +174,10 @@ function Editor({
     if (!file) {
       return;
     }
-    setError("");
     setSavedText("");
-    const cropped = await crop(file, "cover");
-    if (!cropped) {
-      return;
-    }
-    const up = await api<{ url?: string }>(
-      "POST",
-      "/api/uploads?kind=cover",
-      cropped,
-    );
-    if (up?.status === 200 && up.data.url) {
-      await save({ coverUrl: up.data.url });
-    } else {
-      setError(errorText(up));
+    const url = await uploadFile(file, "cover");
+    if (url) {
+      await save({ coverUrl: url });
     }
   };
 
@@ -200,7 +189,6 @@ function Editor({
         <StatusBar
           base={base}
           details={details}
-          name={saved.name}
           onDetails={setDetails}
           onReviewed={refreshStatus}
         />
@@ -267,22 +255,10 @@ function Editor({
                     />
                   )}
                   <div className="flex flex-wrap gap-2">
-                    <input
-                      type="file"
+                    <ImagePicker
                       id="cover-file"
-                      accept={IMAGE_TYPES}
-                      className="sr-only"
-                      onChange={(event) => void uploadCover(event.target)}
+                      onPick={(input) => void uploadCover(input)}
                     />
-                    <label
-                      className={buttonVariants({
-                        variant: "outline",
-                        size: "sm",
-                      })}
-                      htmlFor="cover-file"
-                    >
-                      Choose image
-                    </label>
                     {saved.cover && (
                       <Button
                         id="cover-remove"

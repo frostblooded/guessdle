@@ -21,6 +21,8 @@ services:
       context: ..
       dockerfile: Dockerfile
       target: api
+    # Node as PID 1 ignores SIGTERM: tini forwards it and reaps children
+    init: true
     env_file: .env
     environment:
       DATABASE_URL: postgres://petdle:${POSTGRES_PASSWORD}@db:5432/petdle

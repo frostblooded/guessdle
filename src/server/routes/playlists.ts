@@ -8,6 +8,7 @@ import {
 } from "../../game/limits.ts";
 import { isUsername, normalizeUsername } from "../../game/playlists.ts";
 import { requestUser, type SessionUser } from "../auth.ts";
+import { listGallery } from "../gallery.ts";
 import { findGame } from "../games.ts";
 import {
   addGame,
@@ -17,7 +18,6 @@ import {
   galleryGameId,
   listMine,
   loadProfile,
-  playlistGames,
   removeGame,
   setUsername,
   updatePlaylist,
@@ -232,7 +232,7 @@ export function playlistRoutes(
     res.json({
       ...shown,
       own: viewer?.id === ownerId,
-      games: await playlistGames(pool, playlist.id),
+      games: await listGallery(pool, { playlistId: playlist.id }),
     });
   });
 

@@ -6,8 +6,6 @@ import type { GameRow } from "./games.ts";
 
 type Q = Pick<pg.Pool, "query">;
 
-// Abuse caps (spec #66); entry value caps live with entry editing
-
 export interface AttributeRow {
   id: number;
   name: string;

@@ -5,7 +5,7 @@ import type { Play } from "../../game/play.ts";
 import { fetchStats, playerToken, type DayStats } from "../../game/stats.ts";
 import { browserFetch } from "../../lib/api.ts";
 
-// When the current board's first guess was made on this browser (ms since the epoch)
+// When the current board's first guess was made on this browser: [Day Number, ms since the epoch]
 const FIRST_GUESS_KEY = "firstGuessAt";
 
 export interface VictoryStats {
@@ -34,12 +34,14 @@ export function useVictoryStats(
   const [stats, setStats] = useState<DayStats | null>(null);
   const [failed, setFailed] = useState(false);
 
-  // Whole seconds since the first guess, or null when this browser did not see it
+  // Whole seconds since the first guess, or null when this browser did not see this day's
   const seconds = (): number | null => {
     try {
-      const started = Number(board().getItem(FIRST_GUESS_KEY));
-      return started > 0
-        ? Math.max(0, Math.round((Date.now() - started) / 1000))
+      const [day, started]: unknown[] = JSON.parse(
+        board().getItem(FIRST_GUESS_KEY) ?? "[]",
+      ) as unknown[];
+      return day === play.current?.getDay() && Number(started) > 0
+        ? Math.max(0, Math.round((Date.now() - Number(started)) / 1000))
         : null;
     } catch {
       return null;
@@ -53,7 +55,10 @@ export function useVictoryStats(
     failed,
     startClock(): void {
       try {
-        board().setItem(FIRST_GUESS_KEY, String(Date.now()));
+        board().setItem(
+          FIRST_GUESS_KEY,
+          JSON.stringify([play.current?.getDay() ?? null, Date.now()]),
+        );
       } catch {
         // Blocked storage: the time stays unknown
       }

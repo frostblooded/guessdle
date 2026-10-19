@@ -12,7 +12,6 @@ const show = (stats: DayStats): void => {
       answer="Dido"
       stats={stats}
       failed={false}
-      returnFocusId="stats-button"
     />,
   );
 };

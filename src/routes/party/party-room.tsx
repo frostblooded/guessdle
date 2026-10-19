@@ -28,7 +28,7 @@ import { QuizRound } from "./quiz-round.tsx";
 import { History, Players, Podium } from "./standings.tsx";
 import { getToken, setToken } from "./tokens.ts";
 
-const MISSING =
+export const MISSING =
   "There is no party with this code. Check the code and try again.";
 
 // The party's address as an SVG QR code; the library builds it from the URL alone

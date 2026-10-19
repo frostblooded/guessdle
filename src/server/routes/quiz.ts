@@ -3,10 +3,11 @@
 import express from "express";
 import type { Express } from "express";
 import { gradeQuiz, type QuizResult } from "../../game/quiz.ts";
-import { isPlayerToken, MAX_SECONDS } from "../../game/stats.ts";
+import { MAX_SECONDS } from "../../game/stats.ts";
 import { playBlocker } from "../access.ts";
 import { requestUser } from "../auth.ts";
 import { gradable, recordScore } from "../quiz.ts";
+import { playerOf } from "../results.ts";
 import { bodyOf, fail, loadGame, type AppContext } from "./context.ts";
 
 export function quizRoutes(app: Express, ctx: AppContext): void {
@@ -36,11 +37,7 @@ export function quizRoutes(app: Express, ctx: AppContext): void {
       const body = bodyOf(req);
       const answers = body["answers"];
       const user = await requestUser(pool, req, now());
-      const player = user
-        ? `user:${user.id}`
-        : isPlayerToken(body["player"])
-          ? `anon:${body["player"]}`
-          : null;
+      const player = playerOf(user?.id ?? null, body);
       if (
         typeof answers !== "object" ||
         answers === null ||

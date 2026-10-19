@@ -6,6 +6,7 @@ import { WebSocket } from "ws";
 import { attachPartySockets, createApp } from "../../src/server/app.ts";
 import { MIGRATIONS_DIR } from "../../src/server/main.ts";
 import { migrate } from "../../src/server/migrate.ts";
+import { CLOSE_TOO_FAST } from "../../src/server/party-hub.ts";
 import { sweepParties } from "../../src/server/parties.ts";
 import type {
   ClientMessage,
@@ -545,6 +546,15 @@ describe("party mode", () => {
         ((await visitor.next((m) => m.type === "error")) as Body).error,
         "not_player",
       );
+    });
+
+    it("closes a phone that floods the socket", async () => {
+      const { code } = await host();
+      const flood = await phone(code);
+      for (let i = 0; i < 31; i++) {
+        flood.ws.send("x");
+      }
+      assert.equal(await flood.closed, CLOSE_TOO_FAST);
     });
   });
 

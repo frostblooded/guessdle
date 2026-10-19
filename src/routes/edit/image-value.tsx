@@ -47,11 +47,9 @@ export function usePhotoUpload(setError: (text: string) => void) {
 // A file input dressed as a button: crops and uploads happen in `onPick`
 export function ImagePicker({
   id,
-  label = "Choose image",
   onPick,
 }: {
   id: string;
-  label?: string;
   onPick: (input: HTMLInputElement) => void;
 }) {
   return (
@@ -67,7 +65,7 @@ export function ImagePicker({
         className={buttonVariants({ variant: "outline", size: "sm" })}
         htmlFor={id}
       >
-        {label}
+        Choose image
       </label>
     </>
   );

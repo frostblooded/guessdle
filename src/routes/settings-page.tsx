@@ -4,19 +4,12 @@ import { PageHead } from "../components/page.tsx";
 import { Alert } from "../components/ui/alert.tsx";
 import { Switch } from "../components/ui/switch.tsx";
 import type { MailSettings } from "../mail-settings.ts";
+import { getJson } from "../lib/api.ts";
 import { api } from "../manage-client.ts";
 import { useSignedIn } from "../lib/use-signed-in.ts";
 import { useTitle } from "../lib/use-title.ts";
 
 const KEY = ["settings", "mail"];
-
-async function fetchSettings(): Promise<MailSettings> {
-  const reply = await api<MailSettings>("GET", "/api/settings/mail");
-  if (reply?.status !== 200) {
-    throw new Error("settings");
-  }
-  return reply.data;
-}
 
 const KINDS = [
   {
@@ -79,7 +72,7 @@ export function SettingsPage() {
   const queryClient = useQueryClient();
   const settings = useQuery({
     queryKey: KEY,
-    queryFn: fetchSettings,
+    queryFn: () => getJson<MailSettings>("/api/settings/mail"),
     enabled: user !== null,
   });
   const [failed, setFailed] = useState(false);

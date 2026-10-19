@@ -1,11 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import sharp from "sharp";
-import {
-  ImageError,
-  MAX_UPLOAD_BYTES,
-  processImage,
-} from "../src/server/images.ts";
+import { MAX_UPLOAD_BYTES } from "../src/game/crop.ts";
+import { ImageError, processImage } from "../src/server/images.ts";
 
 const make = (
   format: "jpeg" | "png" | "webp" | "gif",

@@ -3,6 +3,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { Link } from "react-router";
 import type { GameKind } from "../game/blur.ts";
 import { bannerOf, type Banner } from "../game/banner.ts";
+import { getJson } from "../lib/api.ts";
 import { cn } from "../lib/utils.ts";
 import { GameKindLabel } from "./game-kind.tsx";
 import { Badge } from "./ui/badge.tsx";
@@ -19,13 +20,8 @@ export interface GameCard {
 }
 
 // The gallery: GET /api/games
-export async function fetchGallery(): Promise<GameCard[]> {
-  const res = await fetch("/api/games");
-  if (!res.ok) {
-    throw new Error(String(res.status));
-  }
-  return (await res.json()) as GameCard[];
-}
+export const fetchGallery = (): Promise<GameCard[]> =>
+  getJson<GameCard[]>("/api/games");
 
 // One image for a cover, a grid of decorative tiles for a collage
 function BannerImage({

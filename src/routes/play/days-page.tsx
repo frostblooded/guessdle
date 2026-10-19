@@ -6,7 +6,6 @@ import { EmptyState, PageHead } from "../../components/page.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { buttonVariants } from "../../components/ui/button.tsx";
 import { statusOf, type DaysResponse } from "../../game/days.ts";
-import { failureText, UNREACHABLE } from "../../game/failures.ts";
 import {
   gameStorage,
   pastDayStorage,
@@ -16,25 +15,7 @@ import { gameKey, useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { DayList } from "./day-list.tsx";
 import { GameNotFound } from "./past-day.tsx";
-import { loadGame } from "./load-game.ts";
-
-// The list, "missing" for no such game, or the text of why it could not be loaded
-async function loadDays(
-  slug: string,
-): Promise<DaysResponse | "missing" | string> {
-  try {
-    const res = await fetch(`/api/games/${encodeURIComponent(slug)}/days`);
-    if (res.status === 404) {
-      return "missing";
-    }
-    const data = (await res.json().catch(() => null)) as unknown;
-    return res.ok
-      ? (data as DaysResponse)
-      : failureText((data as { error?: unknown } | null)?.error, res.status);
-  } catch {
-    return UNREACHABLE;
-  }
-}
+import { loadGame, loadJson } from "./load-game.ts";
 
 // An anonymous player's statuses, read (never written) from the browser's Game State of each day
 function withLocalStatuses(slug: string, list: DaysResponse): DaysResponse {
@@ -57,12 +38,13 @@ export function DaysPage() {
   const me = useMe();
   const game = useQuery({
     queryKey: gameKey(slug),
+    // Fetched again on each visit, so a day that just rolled over links to the right page
     queryFn: () => loadGame(slug),
-    staleTime: Infinity,
   });
   const days = useQuery({
     queryKey: ["days", slug, me.data?.email ?? null],
-    queryFn: () => loadDays(slug),
+    queryFn: () =>
+      loadJson<DaysResponse>(`/api/games/${encodeURIComponent(slug)}/days`),
     enabled: !me.isPending,
   });
   const name =

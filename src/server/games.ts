@@ -2,15 +2,11 @@
 import { DEFAULT_SHOTS, MAX_BLUR_TRIES } from "../game/limits.ts";
 import type pg from "pg";
 import type { AttributeValue } from "../game/correctness.ts";
-import {
-  firstImage,
-  type AttributeType,
-  type Entry,
-  type GameAttribute,
-} from "../game/game.ts";
+import { firstImage, type Entry, type GameAttribute } from "../game/game.ts";
 import { slugError } from "../game/slug.ts";
 import type { GameKind } from "../game/blur.ts";
 import type { QuizSpec } from "../game/quiz.ts";
+import { listAttributes, type AttributeRow } from "./attributes.ts";
 import { isAnswerable, isIncomplete } from "./completeness.ts";
 import type { EditKind } from "./lifecycle.ts";
 import { OWNER_BANNED } from "./users.ts";
@@ -39,8 +35,6 @@ export interface GameRow {
   // Its owner is banned: hidden from all but the owner and admins
   ownerBanned: boolean;
 }
-
-// A game plays with at least this many active entries
 
 export const skipOf = (game: GameRow): number =>
   game.skipPeriod ?? DEFAULT_SKIP_PERIOD;
@@ -85,14 +79,7 @@ export interface Roster {
 
 // A game's attributes and entries with their values
 export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
-  const attributes = await q.query<{
-    id: number;
-    name: string;
-    type: AttributeType;
-  }>(
-    "select id::int, name, type from attributes where game_id = $1 order by position, id",
-    [game.id],
-  );
+  const attributes = await listAttributes(q, game);
   const entries = await q.query<{
     id: number;
     name: string;
@@ -123,14 +110,14 @@ export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
     const key = `${entry_id}:${attribute_id}`;
     byCell.set(key, [...(byCell.get(key) ?? []), value]);
   }
-  const cell = (entryId: number, attr: (typeof attributes.rows)[number]) => {
+  const cell = (entryId: number, attr: AttributeRow) => {
     const list = byCell.get(`${entryId}:${attr.id}`) ?? [];
     return (attr.type === "list" ? list : (list[0] ?? "")) as AttributeValue;
   };
-  const attrs = attributes.rows.map(({ name, type }) => ({ name, type }));
+  const attrs = attributes.map(({ name, type }) => ({ name, type }));
   const all = entries.rows.map(
     ({ id, name, photo, description, blurOrder, shots, quiz }): Entry => {
-      const values = attributes.rows.map((attr) => cell(id, attr));
+      const values = attributes.map((attr) => cell(id, attr));
       return {
         id,
         name,

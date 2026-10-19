@@ -2,7 +2,7 @@
 import { useParams, useSearchParams } from "react-router";
 import { normalizeCode } from "../../game/party.ts";
 import { CodeForm, HostForm } from "./party-forms.tsx";
-import { PartyRoom } from "./party-room.tsx";
+import { MISSING, PartyRoom } from "./party-room.tsx";
 
 function PartyScreen() {
   const { code: raw } = useParams();
@@ -11,7 +11,7 @@ function PartyScreen() {
   if (raw !== undefined) {
     const code = normalizeCode(raw);
     return code === null ? (
-      <CodeForm error="There is no party with this code. Check the code and try again." />
+      <CodeForm error={MISSING} />
     ) : (
       <PartyRoom key={code} code={code} />
     );

@@ -270,6 +270,13 @@ describe("admin bans", () => {
       { error: "banned" },
     );
 
+    // Saving the list while Ann's game is hidden keeps it for later
+    assert.equal(
+      (await send("PATCH", `/api/playlists/${sams}`, sam, { games: [] }))
+        .status,
+      200,
+    );
+
     await unban(boss, annId);
     assert.equal((await send("GET", list, sam)).status, 200);
     assert.equal(await samGames(), 1);

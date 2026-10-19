@@ -27,7 +27,7 @@ import {
   boardOf,
   PlayResults,
 } from "./play-results.tsx";
-import { loadGame } from "./load-game.ts";
+import { gameStaleTime, loadGame } from "./load-game.ts";
 import { PlayActions, PlayStatus } from "./play-status.tsx";
 import { ResetDialog } from "./reset-dialog.tsx";
 import { ResultBanner } from "./result-banner.tsx";
@@ -41,7 +41,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const { data: game, isPending } = useQuery({
     queryKey: gameKey(slug),
     queryFn: () => loadGame(slug),
-    staleTime: Infinity,
+    staleTime: gameStaleTime,
   });
   const me = useMe();
 
@@ -259,7 +259,6 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
             answer={result.answer}
             stats={victory.stats}
             failed={victory.failed}
-            returnFocusId="stats-button"
           />
         )}
         <ResetDialog

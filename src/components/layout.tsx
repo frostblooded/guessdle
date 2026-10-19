@@ -1,7 +1,6 @@
 // The chrome shared by every page: header (brand, nav, theme, account area) and footer.
 import { useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
-import { cn } from "../lib/utils.ts";
 import { useMe } from "../lib/api.ts";
 import { AccountArea } from "./account-area.tsx";
 import { ThemeButton } from "./theme-button.tsx";
@@ -183,7 +182,7 @@ export function Layout({
       <Header />
       <main
         id="main"
-        className={cn("mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:py-10")}
+        className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:py-10"
       >
         <BanNotice />
         {legacyWiped && <ResetNotice />}

@@ -24,20 +24,31 @@ export type PlayableGame = {
   questions?: QuizQuestion[];
 } & StatusView;
 
-// The game's attributes and entries, "missing" for no such game, or the text of why it could not be loaded
-export async function loadGame(
-  slug: string,
-): Promise<PlayableGame | "missing" | string> {
+// A game's GET answer, "missing" for no such game, or the text of why it could not be loaded
+export async function loadJson<T>(
+  path: string,
+): Promise<T | "missing" | string> {
   try {
-    const res = await fetch(`/api/games/${encodeURIComponent(slug)}`);
+    const res = await fetch(path);
     if (res.status === 404) {
       return "missing";
     }
     const data = (await res.json().catch(() => null)) as unknown;
     return res.ok
-      ? (data as PlayableGame)
+      ? (data as T)
       : failureText((data as { error?: unknown } | null)?.error, res.status);
   } catch {
     return UNREACHABLE;
   }
 }
+
+// The game's attributes and entries
+export const loadGame = (slug: string) =>
+  loadJson<PlayableGame>(`/api/games/${encodeURIComponent(slug)}`);
+
+// Caches a loaded game for the visit, but asks again after a failure
+export const gameStaleTime = ({
+  state,
+}: {
+  state: { data?: unknown };
+}): number => (typeof state.data === "object" ? Infinity : 0);
