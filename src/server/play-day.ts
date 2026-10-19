@@ -8,7 +8,8 @@ import { hintChoices, type HintChoices } from "../game/free-hint.ts";
 import { gradeIds, type Entry, type GradedAttribute } from "../game/game.ts";
 import { MAX_SECONDS, type DayStats } from "../game/stats.ts";
 import { playBlocker, type LoadedGame } from "./access.ts";
-import { dateOfDay, dayNumber, ensureAnswer, todayIn } from "./answers.ts";
+import { dateOfDay } from "../game/date.ts";
+import { dayNumber, ensureAnswer, todayIn } from "./answers.ts";
 import type { GameRow, Roster } from "./games.ts";
 import { dayStats, recordResult } from "./results.ts";
 

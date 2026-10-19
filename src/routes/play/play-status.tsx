@@ -10,7 +10,7 @@ import { Alert } from "../../components/ui/alert.tsx";
 import { buttonVariants } from "../../components/ui/button.tsx";
 import { statusNotice, type Details } from "../../game/editor.ts";
 import { MIN_ENTRIES } from "../../game/limits.ts";
-import { gameKey } from "../../lib/api.ts";
+import { gameKey, ME_KEY } from "../../lib/api.ts";
 
 // What GET /api/games/:slug tells this viewer; the server leaves out `status` for other players
 export interface StatusView {
@@ -69,7 +69,7 @@ export function PlayStatus({ slug, view }: { slug: string; view: StatusView }) {
                     : game,
                 );
                 // The header's Admin count drops at once, not on the next page load
-                await client.invalidateQueries({ queryKey: ["me"] });
+                await client.invalidateQueries({ queryKey: ME_KEY });
               }}
               onFail={setError}
             />

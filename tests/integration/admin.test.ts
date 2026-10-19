@@ -9,10 +9,8 @@ import {
   describe,
   it,
 } from "vitest";
-import {
-  dateOfDay as dateOf,
-  dayNumber as dayNo,
-} from "../../src/server/answers.ts";
+import { dateOfDay as dateOf } from "../../src/game/date.ts";
+import { dayNumber as dayNo } from "../../src/server/answers.ts";
 import { createApp } from "../../src/server/app.ts";
 import { MIGRATIONS_DIR } from "../../src/server/main.ts";
 import { migrate } from "../../src/server/migrate.ts";

@@ -1,4 +1,5 @@
 // A party view's scoreboard, the podium of an ended party and its finished rounds.
+import { TILE_COLORS } from "../../components/board.tsx";
 import { Badge } from "../../components/ui/badge.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
@@ -13,12 +14,6 @@ import { quizPoints } from "../../game/quiz.ts";
 import { cn } from "../../lib/utils.ts";
 
 const points = (n: number): string => `${n} ${n === 1 ? "point" : "points"}`;
-
-const SQUARE_COLORS: Record<string, string> = {
-  correct: "bg-correct",
-  "partially-correct": "bg-partial",
-  incorrect: "bg-incorrect",
-};
 
 // Place, nickname, points and the live round's progress; the host gets Remove buttons
 export function Players({
@@ -203,7 +198,7 @@ function Round({ view, round }: { view: PartyView; round: FinishedRound }) {
                         className={cn(
                           "party-square size-3 rounded-[2px]",
                           correctnessClass(grade),
-                          SQUARE_COLORS[correctnessClass(grade)],
+                          TILE_COLORS[correctnessClass(grade)],
                         )}
                       />
                     ))}

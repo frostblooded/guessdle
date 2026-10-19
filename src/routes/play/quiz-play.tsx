@@ -22,7 +22,7 @@ import type { PlayableGame } from "./load-game.ts";
 import { PlayActions, PlayStatus } from "./play-status.tsx";
 import { BarChart } from "./stats-dialog.tsx";
 
-const pointsWord = (n: number): string =>
+export const pointsWord = (n: number): string =>
   `${scoreText(n)} ${n === 1 ? "point" : "points"}`;
 
 // The current question: its picture, then options to tap or a number box
@@ -54,15 +54,14 @@ export function Question({
       {question.options ? (
         <div
           id="quiz-options"
-          role="radiogroup"
+          role="group"
           aria-labelledby="quiz-prompt"
           className="grid gap-2 sm:grid-cols-2"
         >
           {question.options.map((option, i) => (
             <Button
               key={i}
-              role="radio"
-              aria-checked={answer === String(i)}
+              aria-pressed={answer === String(i)}
               variant={answer === String(i) ? "default" : "outline"}
               className="h-auto min-h-11 justify-start py-2 text-left whitespace-normal"
               onClick={() => onAnswer(String(i))}

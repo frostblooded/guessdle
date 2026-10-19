@@ -42,7 +42,7 @@ test("a Quiz game is written in the editor, then taken and scored", async ({
 
   await page.goto(`/g/${slug}`);
   await expect(page.locator("#quiz-progress")).toHaveText("Question 1 of 2");
-  await page.getByRole("radio", { name: "Jupiter" }).click();
+  await page.getByRole("button", { name: "Jupiter", exact: true }).click();
   await page.locator("#quiz-next").click();
   await page.locator("#quiz-number").fill("1994");
   await page.locator("#quiz-finish").click();
@@ -54,7 +54,7 @@ test("a Quiz game is written in the editor, then taken and scored", async ({
 
   // A retake starts over; the first score is the one that counts
   await page.locator("#quiz-retake").click();
-  await page.getByRole("radio", { name: "Mars" }).click();
+  await page.getByRole("button", { name: "Mars", exact: true }).click();
   await page.locator("#quiz-next").click();
   await page.locator("#quiz-finish").click();
   await expect(page.locator("#quiz-score")).toHaveText("0 / 2");
@@ -96,14 +96,14 @@ test("a Quiz party plays one question per round, then runs out", async ({
   await expect(page.locator(".party-player")).toHaveCount(2);
 
   await page.locator("#start-round").click();
-  await guest.getByRole("radio", { name: "Jupiter" }).click();
+  await guest.getByRole("button", { name: "Jupiter", exact: true }).click();
   await guest.locator("#quiz-answer").click();
   await expect(guest.locator("#result-banner")).toContainText("Jupiter");
   // The host sees that Bo answered, not whether it was right
   await expect(page.locator(".party-player", { hasText: "Bo" })).toContainText(
     "Answered",
   );
-  await page.getByRole("radio", { name: "Mars" }).click();
+  await page.getByRole("button", { name: "Mars", exact: true }).click();
   await page.locator("#quiz-answer").click();
 
   for (const p of [page, guest]) {

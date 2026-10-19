@@ -9,21 +9,18 @@ export function PageHead({
   lede,
   actions,
   centered = false,
-  className,
 }: {
   title: ReactNode;
   titleId?: string;
   lede?: ReactNode;
   actions?: ReactNode;
   centered?: boolean;
-  className?: string;
 }) {
   return (
     <div
       className={cn(
         "page-head mb-6 flex flex-wrap items-end justify-between gap-4",
         centered && "mb-8 flex-col items-center text-center sm:mt-4",
-        className,
       )}
     >
       <div className="min-w-0 space-y-2">

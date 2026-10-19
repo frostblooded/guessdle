@@ -14,8 +14,6 @@ export function dayNumber(date: string, start: string): number {
   return Math.round((utcMs(date) - utcMs(start)) / DAY_MS);
 }
 
-export { dateOfDay };
-
 // The calendar date ("YYYY-MM-DD") it is right now in `timeZone`
 export function todayIn(now: Date, timeZone: string): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -64,13 +62,13 @@ export function drawSequenceAnswer(
 
 type Client = Pick<pg.PoolClient, "query">;
 
-// Runs `work` in a transaction holding the game's answer lock, so generation,
-// overrides and re-draws never interleave.
 // Takes the game's answer lock in `tx`, held until that transaction ends
 async function lockAnswers(tx: Client, game: GameRow): Promise<void> {
   await tx.query("select pg_advisory_xact_lock($1, $2)", [LOCK_KEY, game.id]);
 }
 
+// Runs `work` in a transaction holding the game's answer lock, so generation,
+// overrides and re-draws never interleave.
 async function locked<T>(
   pool: pg.Pool,
   game: GameRow,
@@ -344,7 +342,7 @@ export function setOverride(
   date: string,
   entryId: number,
   random: () => number,
-  today: string = date,
+  today: string,
 ): Promise<void> {
   return locked(pool, game, async (client) => {
     const day = dayNumber(date, game.startDate);

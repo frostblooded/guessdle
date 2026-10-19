@@ -141,6 +141,8 @@ export interface Play {
   reset(): boolean | Promise<boolean>;
   // Entry ids
   getUsedGuesses(): number[];
+  // The Day Number the server last answered for, null before any answer
+  getDay(): number | null;
 }
 
 export interface PlayDeps {
@@ -342,6 +344,7 @@ export function createPlay({
     },
 
     getUsedGuesses: state.getUsedGuesses,
+    getDay: state.getDay,
   };
   return play;
 }

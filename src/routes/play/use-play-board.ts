@@ -138,7 +138,8 @@ export function usePlayBoard({
     if (res.kind === "duplicate") {
       return true;
     }
-    if (rows.length === 0) {
+    // Only this browser's own first guess starts the clock, never one after another device's
+    if (play.current.getUsedGuesses().length === 1) {
       victory.startClock();
     }
     freeHint.offer(res.hints);

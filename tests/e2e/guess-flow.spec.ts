@@ -468,7 +468,7 @@ test("every game kind has a practice round, one open at a time, that fits a phon
     await expect(step).toContainText(`${kind} practice`);
     expect(await fits()).toBe(true);
   }
-  await page.getByRole("radio").first().click();
+  await page.locator("#quiz-options button").first().click();
   await page.getByRole("button", { name: "Check my answer" }).click();
   await expect(page.locator(".practice-feedback")).toHaveText(
     /^(Right|Not this time)/,

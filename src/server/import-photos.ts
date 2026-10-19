@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type pg from "pg";
 import { processImage, storeWebp } from "./images.ts";
-import type { ImageKind } from "./images.ts";
+import type { ImageKind } from "../game/crop.ts";
 import { recordUpload } from "./upload-store.ts";
 
 export interface ImportOptions {

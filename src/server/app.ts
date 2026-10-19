@@ -95,7 +95,16 @@ export function createApp({
   hubs.set(app, hub);
   // One hop: nginx (or nothing in dev) sets X-Forwarded-For to the real client IP
   app.set("trust proxy", 1);
-  app.use("/api", rateLimit(pool, now, limit), csrfGuard);
+  const limiter = rateLimit(pool, now, limit);
+  // A party's phones often share one IP: its reads skip the per-IP budget (nginx has its own)
+  app.use(
+    "/api",
+    (req, res, next) =>
+      req.method === "GET" && req.path.startsWith("/parties/")
+        ? next()
+        : limiter(req, res, next),
+    csrfGuard,
+  );
   app.get("/api/health", async (_req, res) => {
     try {
       await pool.query("select 1");
@@ -105,7 +114,7 @@ export function createApp({
     }
   });
 
-  authRoutes(app, ctx, { mail, adminEmails, testLogin });
+  authRoutes(app, ctx, { adminEmails, testLogin });
   adminRoutes(app, ctx, backupDir, uploadsDir);
   gameRoutes(app, ctx);
   quizRoutes(app, ctx);

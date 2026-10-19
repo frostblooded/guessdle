@@ -14,7 +14,7 @@ import {
 } from "../../game/quiz.ts";
 import type { Tutorial } from "../../game/tutorial.ts";
 import { cn } from "../../lib/utils.ts";
-import { Question } from "../play/quiz-play.tsx";
+import { pointsWord, Question } from "../play/quiz-play.tsx";
 import { PracticeCard, PracticeEnd } from "./practice-game.tsx";
 
 const OPTIONS = 4;
@@ -63,9 +63,6 @@ function practiceQuestions(
     whichPet(pets, round * 2 + 1),
   ];
 }
-
-const pointsWord = (points: number): string =>
-  `${scoreText(points)} ${points === 1 ? "point" : "points"}`;
 
 export function QuizPractice({ tutorial }: { tutorial: Tutorial }) {
   const [round, setRound] = useState(0);

@@ -9,7 +9,7 @@ import { listDays } from "../days.ts";
 import { quizQuestions } from "../quiz.ts";
 import { listGallery } from "../gallery.ts";
 import { canApprove, canManage } from "../access.ts";
-import { requestUser, type SessionUser } from "../auth.ts";
+import { requestUser } from "../auth.ts";
 import { playerOf, recordFailure } from "../results.ts";
 import {
   boardOf,
@@ -127,11 +127,11 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       if (!loaded) {
         return;
       }
-      const ids = bodyOf(req)["ids"];
+      const ids = bodyOf(req)["ids"] as number[];
       // A malformed list is refused before the day's answer is drawn
       const valid = (): boolean => isIdList(loaded.game, loaded.roster, ids);
       const day = await playDayOf(ctx, req, res, loaded, valid);
-      if (!day || !isIdList(loaded.game, loaded.roster, ids)) {
+      if (!day) {
         return;
       }
       const board = boardOf(day, ids);
@@ -275,7 +275,6 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
   // Signed-in Game State. Every route needs a session and the day's answer
   // (today, or a past day named by ?day=N).
   interface GameRouteCtx extends GameContext {
-    user: SessionUser;
     body: Record<string, unknown>;
     res: Response;
   }
@@ -299,7 +298,6 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       await handler({
         ...day,
         userId: user.id,
-        user,
         body: bodyOf(req),
         res,
       });

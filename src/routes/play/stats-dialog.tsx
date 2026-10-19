@@ -69,7 +69,7 @@ export function BarChart({
 }
 
 const players = (n: number): string => `${n} ${n === 1 ? "player" : "players"}`;
-const guessesWord = (n: number): string =>
+export const guessesWord = (n: number): string =>
   `${n} ${n === 1 ? "guess" : "guesses"}`;
 
 const MIN_GUESS_BARS = 6;
@@ -175,7 +175,6 @@ export function StatsDialog({
   answer,
   stats,
   failed,
-  returnFocusId,
   past = false,
 }: {
   open: boolean;
@@ -183,8 +182,6 @@ export function StatsDialog({
   answer: string;
   stats: DayStats | null;
   failed: boolean;
-  // Gets focus back on close: the popup may have opened on its own, from a guess box that is gone
-  returnFocusId: string;
   past?: boolean;
 }) {
   const which = past ? "this day's" : "today's";
@@ -193,8 +190,10 @@ export function StatsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         id="stats-dialog"
+        // Focus goes back to See stats on close: the popup may have opened on its own, from a
+        // guess box that is gone
         onCloseAutoFocus={(event) => {
-          const target = document.getElementById(returnFocusId);
+          const target = document.getElementById("stats-button");
           if (target) {
             event.preventDefault();
             target.focus();

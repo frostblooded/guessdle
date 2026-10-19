@@ -233,7 +233,7 @@ describe("How to play game kinds", () => {
     const check = (): HTMLElement =>
       screen.getByRole("button", { name: "Check my answer" });
     assert.equal(check().hasAttribute("disabled"), true);
-    await user.click(screen.getByRole("radio", { name: "Ati" }));
+    await user.click(screen.getByRole("button", { name: "Ati" }));
     await user.click(check());
     assert.equal(text(".practice-feedback"), "Right! 1 point.");
     await user.click(screen.getByRole("button", { name: "Next question" }));
@@ -246,7 +246,7 @@ describe("How to play game kinds", () => {
     );
     await user.click(screen.getByRole("button", { name: "Next question" }));
 
-    await user.click(screen.getByRole("radio", { name: "Kimi" }));
+    await user.click(screen.getByRole("button", { name: "Kimi" }));
     await user.click(check());
     assert.equal(
       text(".practice-feedback"),

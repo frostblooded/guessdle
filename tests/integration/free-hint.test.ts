@@ -191,5 +191,19 @@ describe("Free Hints and entry descriptions", () => {
       assert.equal(replay.hint, undefined);
       assert.equal(replay.hints.attribute, true);
     });
+
+    it("refuses a second hint when the stored one names a renamed attribute", async () => {
+      const cookie = await login("c@x.test");
+      await guessAll(cookie);
+      await send(`${G}/state/hint`, { kind: "attribute" }, cookie);
+      await db.pool.query("update user_hints set attribute = 'Renamed'");
+      const again = await send(
+        `${G}/state/hint`,
+        { kind: "attribute" },
+        cookie,
+      );
+      assert.equal(again.status, 409);
+      assert.equal(again.body.error, "no_hint");
+    });
   });
 });

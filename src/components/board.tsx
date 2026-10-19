@@ -1,11 +1,12 @@
 // The guess board: a title row and graded rows of tiles, shared by Play and How to play.
-import type { ComponentProps, CSSProperties, ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { correctnessClass } from "../game/correctness.ts";
 import type { Hint } from "../game/correctness.ts";
 import type { BoardColumn, GradedAttribute } from "../game/game.ts";
 import { cn } from "../lib/utils.ts";
 
-const TILE_COLORS: Record<string, string> = {
+// A grade class (correctnessClass) to its background
+export const TILE_COLORS: Record<string, string> = {
   correct: "bg-correct",
   "partially-correct": "bg-partial",
   incorrect: "bg-incorrect",
@@ -69,14 +70,14 @@ export function TitleRow({ columns }: { columns: readonly BoardColumn[] }) {
   );
 }
 
-export function PhotoTile({ src, alt = "" }: { src: string; alt?: string }) {
+export function PhotoTile({ src }: { src: string }) {
   return (
     <div className={cn(tileBase, "overflow-hidden bg-muted p-0 sm:p-0")}>
       {src && (
         <img
           className="aspect-square size-full object-cover"
           src={src}
-          alt={alt}
+          alt=""
         />
       )}
     </div>
@@ -86,11 +87,9 @@ export function PhotoTile({ src, alt = "" }: { src: string; alt?: string }) {
 // A graded tile: green, orange or red with white text
 export function GradeTile({
   grade,
-  className,
   children,
 }: {
   grade: string;
-  className?: string;
   children: ReactNode;
 }) {
   return (
@@ -100,7 +99,6 @@ export function GradeTile({
         "guess-result-cell font-bold text-white",
         grade,
         TILE_COLORS[grade],
-        className,
       )}
     >
       {children}
@@ -129,18 +127,11 @@ export function HintArrow({ hint }: { hint: Hint }) {
 }
 
 // One guessed entry: its pictures as they are, then each graded value
-export function GuessRow({
-  row,
-  style,
-}: {
-  row: GradedAttribute[];
-  style?: CSSProperties;
-}) {
+export function GuessRow({ row }: { row: GradedAttribute[] }) {
   return (
     <BoardRow
       images={row.map((cell) => cell.image === true)}
       className="guess-result-row animate-in"
-      style={style}
     >
       {row.map(({ key, value, correctness, hint, image }) =>
         image ? (

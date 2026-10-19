@@ -2,7 +2,12 @@
 // secret pet" to a win, explaining each clue in plain words. Graded in the browser.
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router";
-import { BoardRow, GuessRow, TitleTile } from "../../components/board.tsx";
+import {
+  BoardRow,
+  GuessRow,
+  TILE_COLORS,
+  TitleRow,
+} from "../../components/board.tsx";
 import { Button, buttonVariants } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
 import { correctnessClass } from "../../game/correctness.ts";
@@ -28,12 +33,6 @@ const STEP_NUMBER: Record<Exclude<Step, "won">, number> = {
   narrow: 4,
 };
 
-const SWATCH: Record<string, string> = {
-  correct: "bg-correct",
-  "partially-correct": "bg-partial",
-  incorrect: "bg-incorrect",
-};
-
 function Board({
   columns,
   rows,
@@ -44,11 +43,7 @@ function Board({
   const images = columns.map((column) => column.image);
   return (
     <div className="practice-board flex flex-col gap-1.5 sm:gap-2">
-      <BoardRow images={images} aria-hidden="true">
-        {columns.map(({ title }) => (
-          <TitleTile key={title}>{title}</TitleTile>
-        ))}
-      </BoardRow>
+      <TitleRow columns={columns} />
       {rows.length === 0 ? (
         <BoardRow
           images={images}
@@ -81,7 +76,7 @@ function Clues({ lines, grades }: { lines: string[]; grades: string[] }) {
       {lines.map((line, i) => (
         <li key={i} className="flex items-start gap-2">
           <span
-            className={`mt-1 size-3 shrink-0 rounded-sm ${SWATCH[grades[i]!] ?? ""}`}
+            className={`mt-1 size-3 shrink-0 rounded-sm ${TILE_COLORS[grades[i]!] ?? ""}`}
             aria-hidden="true"
           />
           <span>{line}</span>

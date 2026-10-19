@@ -18,13 +18,10 @@ import {
   normalizeEmail,
   requestLoginLink,
 } from "../email-login.ts";
-import type { MailConfig } from "../mailer.ts";
 import { usernameOf } from "../playlists.ts";
 import { bodyOf, type AppContext } from "./context.ts";
 
 export interface AuthOptions {
-  // Without mail config the email sign-in routes answer 503
-  mail: MailConfig | undefined;
   adminEmails: readonly string[];
   testLogin: boolean;
 }
@@ -32,9 +29,10 @@ export interface AuthOptions {
 export function authRoutes(
   app: Express,
   ctx: AppContext,
-  { mail, adminEmails, testLogin }: AuthOptions,
+  { adminEmails, testLogin }: AuthOptions,
 ): void {
-  const { pool, now, secureCookies } = ctx;
+  // Without mail config the email sign-in routes answer 503
+  const { pool, now, secureCookies, mail } = ctx;
   app.get("/api/me", async (req, res) => {
     const user = await requestUser(pool, req, now());
     res.set("Cache-Control", "no-store");

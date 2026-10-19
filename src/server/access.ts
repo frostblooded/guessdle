@@ -21,9 +21,6 @@ export interface LoadedGame {
 const hasEnoughEntries = (roster: Roster): boolean =>
   roster.entries.length >= MIN_ENTRIES;
 
-export const isPlayable = (game: GameRow, roster: Roster): boolean =>
-  game.status !== "draft" && hasEnoughEntries(roster);
-
 // Why nobody can play the game for now, whoever may see it: too few active entries, or Paused
 // (an active entry missing a value). Play, opening a Party, starting a Round and submitting for
 // approval all ask this one rule. Null when it plays.
@@ -38,7 +35,7 @@ export const playBlocker = (
 
 // Open to everyone: playable, and its owner is not banned
 export const isPublic = (game: GameRow, roster: Roster): boolean =>
-  isPlayable(game, roster) && !game.ownerBanned;
+  game.status !== "draft" && hasEnoughEntries(roster) && !game.ownerBanned;
 
 const owns = (game: GameRow, user: SessionUser | null): boolean =>
   user !== null && game.ownerId === user.id;

@@ -29,7 +29,7 @@ export async function getJson<T>(path: string): Promise<T> {
   return out.data;
 }
 
-// Play's and Past days' copy of GET /api/games/:slug, kept for the whole visit
+// Play's and Past days' copy of GET /api/games/:slug; Play keeps a loaded game for the whole visit
 export const gameKey = (slug: string) => ["game", slug] as const;
 
 // Drops that copy after the game changed elsewhere (the editor, an admin list), so the next

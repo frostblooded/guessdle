@@ -218,11 +218,12 @@ export async function takeHint(
   if (!pick) {
     return "no_hint";
   }
-  await q.query(
-    "insert into user_hints (user_id, game_id, day, kind, attribute) values ($1, $2, $3, $4, $5)",
+  // A stored hint whose attribute was since renamed shows nothing, but it was still taken
+  const { rowCount } = await q.query(
+    "insert into user_hints (user_id, game_id, day, kind, attribute) values ($1, $2, $3, $4, $5) on conflict do nothing",
     [userId, game.id, date, pick.kind, pick.attribute],
   );
-  return null;
+  return rowCount === 0 ? "no_hint" : null;
 }
 
 // Adopts anonymous local history (POST /api/games/:slug/state/merge body); the user-row lock

@@ -2,7 +2,7 @@
 // signed-in player's progress on each.
 import type pg from "pg";
 import { statusOf, type DayItem, type DayProgress } from "../game/days.ts";
-import { dateOfDay } from "./answers.ts";
+import { dateOfDay } from "../game/date.ts";
 import type { GameRow } from "./games.ts";
 import { triesOf } from "./play-day.ts";
 

@@ -6,6 +6,7 @@ import { EmptyState, PageHead } from "../components/page.tsx";
 import { Alert } from "../components/ui/alert.tsx";
 import { Badge } from "../components/ui/badge.tsx";
 import { Button, buttonVariants } from "../components/ui/button.tsx";
+import { getJson } from "../lib/api.ts";
 import { api } from "../manage-client.ts";
 import { useSignedIn } from "../lib/use-signed-in.ts";
 import { useTitle } from "../lib/use-title.ts";
@@ -24,14 +25,6 @@ const STATUS_BADGE = {
   approved: "success",
   rejected: "error",
 } as const;
-
-async function fetchMine(): Promise<Mine[]> {
-  const reply = await api<Mine[]>("GET", "/api/my-games");
-  if (reply?.status !== 200) {
-    throw new Error("my games");
-  }
-  return reply.data;
-}
 
 function Row({ game, onError }: { game: Mine; onError: () => void }) {
   const queryClient = useQueryClient();
@@ -112,7 +105,7 @@ export function MyGamesPage() {
   const user = useSignedIn("/my-games");
   const mine = useQuery({
     queryKey: ["my-games"],
-    queryFn: fetchMine,
+    queryFn: () => getJson<Mine[]>("/api/my-games"),
     enabled: user !== null,
   });
   const [deleteFailed, setDeleteFailed] = useState(false);

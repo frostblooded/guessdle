@@ -196,6 +196,7 @@ export function createServerPlay({
     },
 
     getUsedGuesses: (): number[] => ids,
+    getDay: (): number | null => day,
   };
   return play;
 }

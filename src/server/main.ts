@@ -14,6 +14,8 @@ export const MIGRATIONS_DIR = join(import.meta.dirname, "../../db/migrations");
 // Pool + migrations from DATABASE_URL; shared by the API container and the dev server
 export async function connect(url: string): Promise<pg.Pool> {
   const pool = new pg.Pool({ connectionString: url });
+  // An idle client losing its connection emits here; unhandled, it crashes the process
+  pool.on("error", (err) => console.error("Idle database client error", err));
   const applied = await migrate(pool, MIGRATIONS_DIR);
   if (applied.length > 0) {
     console.log(`Applied migrations: ${applied.join(", ")}`);

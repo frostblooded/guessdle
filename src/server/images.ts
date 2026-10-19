@@ -10,8 +10,6 @@ import {
 } from "../game/crop.ts";
 import { cellRect } from "../game/blur.ts";
 
-export { type ImageKind, isImageKind, MAX_UPLOAD_BYTES } from "../game/crop.ts";
-
 // Decompression-bomb guard; sharp's default is 268 MP
 const MAX_PIXELS = 50_000_000;
 

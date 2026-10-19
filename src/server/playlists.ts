@@ -122,11 +122,6 @@ export async function findPlaylist(
     : null;
 }
 
-export const playlistGames = (
-  pool: pg.Pool,
-  playlistId: number,
-): Promise<GalleryCard[]> => listGallery(pool, { playlistId });
-
 // The signed-in player's playlists for the Save menu, each saying whether it holds `slug`
 export async function listMine(
   pool: pg.Pool,
@@ -196,9 +191,12 @@ export async function updatePlaylist(
       [id, patch.name ?? null, patch.description ?? null, patch.public ?? null],
     );
     if (patch.slugs !== undefined) {
-      await client.query("delete from playlist_games where playlist_id = $1", [
-        id,
-      ]);
+      // Only the games the owner sees: hidden ones (owner banned, back in review) stay
+      await client.query(
+        `delete from playlist_games pl using games g
+         where pl.playlist_id = $1 and g.id = pl.game_id and ${IN_GALLERY}`,
+        [id],
+      );
       await client.query(
         `insert into playlist_games (playlist_id, game_id, position)
          select $1, g.id, t.position from unnest($2::text[]) with ordinality as t(slug, position)

@@ -1,18 +1,22 @@
 // The party page's head and its forms before a party is open: find one by code, or host one.
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { PageHead } from "../../components/page.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
 import { Input, Label } from "../../components/ui/input.tsx";
+import { FAILURES } from "../../game/failures.ts";
 import { readGuessMode, type GuessMode } from "../../game/guess-mode.ts";
 import { MAX_NICKNAME } from "../../game/limits.ts";
 import { CODE_LENGTH, normalizeCode } from "../../game/party.ts";
+import { gameKey } from "../../lib/api.ts";
 import { useSignedIn } from "../../lib/use-signed-in.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { api, errorText } from "../../manage-client.ts";
 import { ModeSwitch } from "../play/guess-form.tsx";
+import { loadGame } from "../play/load-game.ts";
 import { setToken } from "./tokens.ts";
 
 export const LEDE =
@@ -110,8 +114,6 @@ export function CodeForm({ error: initial = "" }: { error?: string }) {
 export function HostForm({ slug }: { slug: string }) {
   const navigate = useNavigate();
   const user = useSignedIn(`/party?host=${encodeURIComponent(slug)}`);
-  const [game, setGame] = useState<string | null>(null);
-  const [quiz, setQuiz] = useState(false);
   const [nickname, setNickname] = useState<string | null>(null);
   // How every player will guess; starts as the host's own remembered mode
   const [guessMode, setGuessMode] = useState<GuessMode>(() =>
@@ -119,22 +121,22 @@ export function HostForm({ slug }: { slug: string }) {
   );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const { data: loaded } = useQuery({
+    queryKey: gameKey(slug),
+    queryFn: () => loadGame(slug),
+    enabled: user !== null,
+  });
+  const playable = typeof loaded === "object" ? loaded : null;
+  const game = playable?.name ?? null;
+  const quiz = playable?.kind === "quiz";
+  // Why the game could not be loaded
+  const loadError =
+    loaded === "missing"
+      ? FAILURES.not_found.text
+      : typeof loaded === "string"
+        ? loaded
+        : "";
   useTitle(game ? `Host a ${game} party - Guessdle` : "Party - Guessdle");
-
-  useEffect(() => {
-    if (user === null) {
-      return;
-    }
-    void (async () => {
-      const reply = await api("GET", `/api/games/${encodeURIComponent(slug)}`);
-      if (reply?.status === 200) {
-        setGame(String(reply.data["name"]));
-        setQuiz(reply.data["kind"] === "quiz");
-      } else {
-        setError(errorText(reply));
-      }
-    })();
-  }, [user, slug]);
 
   const open = async (): Promise<void> => {
     setError("");
@@ -166,7 +168,7 @@ export function HostForm({ slug }: { slug: string }) {
             ? "You play too. Friends join from their phones with the code or QR you get next."
             : LEDE
         }
-        error={error}
+        error={error || loadError}
       />
       {game && (
         <PartyForm id="host-form" onSubmit={() => void open()}>

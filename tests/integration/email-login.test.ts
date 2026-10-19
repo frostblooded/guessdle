@@ -4,6 +4,7 @@ import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import { createApp, type AppDeps } from "../../src/server/app.ts";
 import { hash } from "../../src/server/auth.ts";
+import { SITE_PER_HOUR } from "../../src/server/email-login.ts";
 import { MIGRATIONS_DIR } from "../../src/server/main.ts";
 import type { Mailer } from "../../src/server/mailer.ts";
 import { migrate } from "../../src/server/migrate.ts";
@@ -178,6 +179,14 @@ describe("email magic-link sign-in", () => {
       assert.deepEqual(await res.json(), { error: "login_unavailable" });
     });
 
+    it("drops the token when sending fails, so a retry mails at once", async () => {
+      failSend = true;
+      assert.equal((await request("ann@x.test")).status, 503);
+      assert.equal(await count("login_tokens"), 0);
+      failSend = false;
+      await link("ann@x.test");
+    });
+
     it("is behind the CSRF guard", async () => {
       const text = await fetch(`${url}/api/auth/email/request`, {
         method: "POST",
@@ -237,6 +246,20 @@ describe("email magic-link sign-in", () => {
       await request("a@x.test");
       await request("b@x.test");
       assert.equal(sent.length, 2);
+    });
+
+    it("caps login mails site-wide at SITE_PER_HOUR an hour", async () => {
+      await db.pool.query(
+        `insert into login_tokens (token_hash, email, expires_at, created_at)
+         select 'h' || i, 'u' || i || '@x.test', $1, $2 from generate_series(1, $3) i`,
+        [new Date(START.getTime() + 15 * MINUTE), START, SITE_PER_HOUR],
+      );
+      later(MINUTE);
+      const res = await request("ann@x.test");
+      assert.equal(res.status, 200);
+      assert.equal(sent.length, 0);
+      later(60 * MINUTE);
+      await link("ann@x.test");
     });
 
     it("purges long-expired tokens on the next request", async () => {
