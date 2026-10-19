@@ -4,6 +4,7 @@ import {
   gradeQuiz,
   isAnswerTo,
   parseQuizSpec,
+  sameQuestion,
   scoreAnswer,
   spreadOf,
 } from "../src/game/quiz.ts";
@@ -88,5 +89,18 @@ describe("gradeQuiz", () => {
 describe("spreadOf", () => {
   it("counts first scores per whole point, a full score in the last bar", () => {
     assert.deepEqual(spreadOf([0, 0.5, 1.9, 2, 3], 2), [2, 1, 2]);
+  });
+});
+
+describe("sameQuestion", () => {
+  it("lets only the right answer differ", () => {
+    assert.ok(sameQuestion(choice, { ...choice, correct: 0 }));
+    assert.ok(sameQuestion(year, { answer: "1990", range: "1" }));
+    assert.ok(
+      !sameQuestion(choice, { options: ["Mars", "Venus"], correct: 1 }),
+    );
+    assert.ok(!sameQuestion(choice, { options: ["Mars"], correct: 0 }));
+    assert.ok(!sameQuestion(choice, year));
+    assert.ok(!sameQuestion(year, choice));
   });
 });
