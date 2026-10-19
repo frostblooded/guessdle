@@ -54,7 +54,7 @@ export function BlurView({
 }
 
 // A Blur game's guesses, newest first: names only, green for the answer, red otherwise, grey
-// for a skip
+// for a skip, each labelled with its guess number
 export function BlurGuesses({ rows }: { rows: readonly GradedAttribute[][] }) {
   return (
     <ol
@@ -68,16 +68,23 @@ export function BlurGuesses({ rows }: { rows: readonly GradedAttribute[][] }) {
         return (
           <li
             key={rows.length - i}
-            className={cn(
-              "guess-result-cell animate-in rounded-lg px-3 py-2.5 text-center font-bold text-white",
-              right
-                ? "correct bg-correct"
-                : isSkipRow(row)
-                  ? "skipped border border-dashed bg-muted font-medium text-muted-foreground"
-                  : "incorrect bg-incorrect",
-            )}
+            className="animate-in flex items-center gap-3"
           >
-            {String(cell.value)}
+            <span className="guess-number w-16 shrink-0 text-right text-sm font-medium text-muted-foreground">
+              Guess {rows.length - i}
+            </span>
+            <div
+              className={cn(
+                "guess-result-cell min-w-0 flex-1 rounded-lg px-3 py-2.5 text-center font-bold text-white",
+                right
+                  ? "correct bg-correct"
+                  : isSkipRow(row)
+                    ? "skipped border border-dashed bg-muted font-medium text-muted-foreground"
+                    : "incorrect bg-incorrect",
+              )}
+            >
+              {String(cell.value)}
+            </div>
           </li>
         );
       })}
