@@ -1,27 +1,27 @@
 // Free Hints (classic games): after FREE_HINT_AFTER wrong guesses a player may reveal one thing
 // about the answer, once per day or party round: the value of an attribute they have not
-// matched yet, or the answer's description. Pure rules shared by the server and the page.
+// matched yet. Pure rules shared by the server and the page.
 import { Correctness, type AttributeValue } from "./correctness.ts";
 import type { Entry, GameAttribute, GradedAttribute } from "./game.ts";
 
 export const FREE_HINT_AFTER = 3;
 
-export type HintKind = "attribute" | "description";
+export type HintKind = "attribute";
 
 // What is stored once a hint is used: the kind, and which attribute was drawn (by name)
-export type HintPick =
-  { kind: "attribute"; attribute: string } | { kind: "description" };
+export interface HintPick {
+  kind: "attribute";
+  attribute: string;
+}
 
 // What the player is shown
-export type FreeHint =
-  // `image`: an Image attribute, whose value is a picture URL
-  | {
-      kind: "attribute";
-      attribute: string;
-      value: AttributeValue;
-      image?: true;
-    }
-  | { kind: "description"; description: string };
+// `image`: an Image attribute, whose value is a picture URL
+export interface FreeHint {
+  kind: "attribute";
+  attribute: string;
+  value: AttributeValue;
+  image?: true;
+}
 
 // A FreeHint read back from storage or the network; anything else is not one
 export function isFreeHint(value: unknown): value is FreeHint {
@@ -30,23 +30,22 @@ export function isFreeHint(value: unknown): value is FreeHint {
   }
   const hint = value as Record<string, unknown>;
   const text = hint["value"];
-  return hint["kind"] === "description"
-    ? typeof hint["description"] === "string"
-    : hint["kind"] === "attribute" &&
-        typeof hint["attribute"] === "string" &&
-        (hint["image"] === undefined || hint["image"] === true) &&
-        (typeof text === "string" ||
-          (Array.isArray(text) && text.every((v) => typeof v === "string")));
+  return (
+    hint["kind"] === "attribute" &&
+    typeof hint["attribute"] === "string" &&
+    (hint["image"] === undefined || hint["image"] === true) &&
+    (typeof text === "string" ||
+      (Array.isArray(text) && text.every((v) => typeof v === "string")))
+  );
 }
 
 // Which kinds a player may pick now
 export interface HintChoices {
   attribute: boolean;
-  description: boolean;
 }
 
 export const isHintKind = (value: unknown): value is HintKind =>
-  value === "attribute" || value === "description";
+  value === "attribute";
 
 // The attributes the answer has a value for and no guessed row matched yet, in game order
 export function unsolvedAttributes(
@@ -79,11 +78,9 @@ export function hintChoices(
   if (rows.length < FREE_HINT_AFTER) {
     return null;
   }
-  const choices = {
-    attribute: unsolvedAttributes(attributes, answer, rows).length > 0,
-    description: (answer.description ?? "") !== "",
-  };
-  return choices.attribute || choices.description ? choices : null;
+  return unsolvedAttributes(attributes, answer, rows).length > 0
+    ? { attribute: true }
+    : null;
 }
 
 // Draws the hint a player asked for, or null when that kind is not on offer
@@ -97,9 +94,6 @@ export function pickHint(
   if (!hintChoices(attributes, answer, rows)?.[kind]) {
     return null;
   }
-  if (kind === "description") {
-    return { kind };
-  }
   const open = unsolvedAttributes(attributes, answer, rows);
   return { kind, attribute: open[Math.floor(random() * open.length)]! };
 }
@@ -110,9 +104,6 @@ export function revealHint(
   answer: Entry,
   pick: HintPick,
 ): FreeHint | null {
-  if (pick.kind === "description") {
-    return { kind: "description", description: answer.description ?? "" };
-  }
   const i = attributes.findIndex((a) => a.name === pick.attribute);
   return i < 0
     ? null

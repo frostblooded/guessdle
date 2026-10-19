@@ -82,7 +82,7 @@ function fakeServer(game?: Response) {
         // This small fake offers the Free Hint after 2 wrong guesses
         ...(ids.length >= 2 &&
           !ids.includes(ANSWER) && {
-            hints: { attribute: true, description: false },
+            hints: { attribute: true },
           }),
       });
     }
@@ -253,12 +253,8 @@ describe("PlayPage", () => {
     await guess("Abby");
     await screen.findByText("You earned a free hint");
     assert.equal(
-      screen
-        .getByRole<HTMLButtonElement>("button", {
-          name: "Reveal the description",
-        })
-        .hasAttribute("disabled"),
-      true,
+      screen.queryByRole("button", { name: "Reveal the description" }),
+      null,
     );
     await userEvent.click(
       screen.getByRole("button", { name: "Reveal an attribute" }),
