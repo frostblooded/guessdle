@@ -26,7 +26,10 @@ export function QuizRound({
       <h2 id="round-title" className="mb-3 text-lg font-semibold">
         Question {round.number}
       </h2>
-      <Card id="guess-card" className="play-card mb-6 gap-4 p-4 sm:p-5">
+      <Card
+        id="guess-card"
+        className="play-card mb-6 flex flex-col gap-4 p-4 sm:p-5"
+      >
         {answered === null ? (
           <>
             <Question
