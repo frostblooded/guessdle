@@ -6,7 +6,6 @@ import {
   revealHint,
   type FreeHint,
   type HintChoices,
-  type HintKind,
   type HintPick,
 } from "../game/free-hint.ts";
 import { SKIP, type GradedAttribute } from "../game/game.ts";
@@ -108,16 +107,12 @@ async function storedHint(
   gameId: number,
   date: string,
 ): Promise<HintPick | null> {
-  const { rows } = await q.query<{ kind: HintKind; attribute: string | null }>(
-    "select kind, attribute from user_hints where user_id = $1 and game_id = $2 and day = $3",
+  const { rows } = await q.query<{ attribute: string }>(
+    "select attribute from user_hints where user_id = $1 and game_id = $2 and day = $3",
     [userId, gameId, date],
   );
   const row = rows[0];
-  return !row
-    ? null
-    : row.kind === "attribute"
-      ? { kind: "attribute", attribute: row.attribute ?? "" }
-      : { kind: "description" };
+  return row ? { kind: "attribute", attribute: row.attribute } : null;
 }
 
 // Runs `action` in a transaction holding the user's row lock, so one player's
@@ -225,13 +220,7 @@ export async function takeHint(
   }
   await q.query(
     "insert into user_hints (user_id, game_id, day, kind, attribute) values ($1, $2, $3, $4, $5)",
-    [
-      userId,
-      game.id,
-      date,
-      pick.kind,
-      pick.kind === "attribute" ? pick.attribute : null,
-    ],
+    [userId, game.id, date, pick.kind, pick.attribute],
   );
   return null;
 }

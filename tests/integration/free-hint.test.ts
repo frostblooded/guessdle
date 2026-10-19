@@ -94,10 +94,8 @@ describe("Free Hints and entry descriptions", () => {
       const two = await send(`${G}/grade`, { ids: WRONG.slice(0, 2) });
       assert.equal(two.body.hints, undefined);
       const three = await send(`${G}/grade`, { ids: WRONG });
-      assert.deepEqual(three.body.hints, {
-        attribute: unmatched(three.body.rows).length > 0,
-        description: false,
-      });
+      assert.ok(unmatched(three.body.rows).length > 0);
+      assert.deepEqual(three.body.hints, { attribute: true });
       const won = await send(`${G}/grade`, { ids: [...WRONG, ANSWER] });
       assert.equal(won.body.hints, undefined);
     });
@@ -119,31 +117,14 @@ describe("Free Hints and entry descriptions", () => {
       assert.deepEqual(body.hint.value, cell.value);
     });
 
-    it("reveals the description, offered only when the answer has one", async () => {
-      const refused = await send(`${G}/hint`, {
-        ids: WRONG,
-        kind: "description",
-      });
-      assert.equal(refused.status, 409);
-      assert.equal(refused.body.error, "no_hint");
-      await describeAnswer("Bela naps in the sun.");
-      const graded = await send(`${G}/grade`, { ids: WRONG });
-      assert.equal(graded.body.hints.description, true);
-      const { body } = await send(`${G}/hint`, {
-        ids: WRONG,
-        kind: "description",
-      });
-      assert.deepEqual(body.hint, {
-        kind: "description",
-        description: "Bela naps in the sun.",
-      });
-    });
-
     it("refuses too few guesses, a won board and a bad kind", async () => {
+      // The description is never a hint, even when the answer has one
+      await describeAnswer("Bela naps in the sun.");
       for (const [ids, kind, status] of [
         [WRONG.slice(0, 2), "attribute", 409],
         [[...WRONG, ANSWER], "attribute", 409],
         [WRONG, "name", 400],
+        [WRONG, "description", 400],
       ] as const) {
         const res = await send(`${G}/hint`, { ids, kind });
         assert.equal(res.status, status, String(kind));
@@ -174,20 +155,11 @@ describe("Free Hints and entry descriptions", () => {
       const cookie = await login("a@x.test");
       await describeAnswer("Bela naps in the sun.");
       const before = await guessAll(cookie);
-      assert.deepEqual(before.hints, {
-        attribute: unmatched(before.rows).length > 0,
-        description: true,
-      });
-      const used = await send(
-        `${G}/state/hint`,
-        { kind: "description" },
-        cookie,
-      );
+      assert.deepEqual(before.hints, { attribute: true });
+      const used = await send(`${G}/state/hint`, { kind: "attribute" }, cookie);
       assert.equal(used.status, 200);
-      assert.deepEqual(used.body.hint, {
-        kind: "description",
-        description: "Bela naps in the sun.",
-      });
+      assert.equal(used.body.hint.kind, "attribute");
+      assert.equal(used.body.hint.attribute, unmatched(before.rows)[0]);
       assert.equal(used.body.hints, undefined);
       const again = await send(
         `${G}/state/hint`,
@@ -199,7 +171,7 @@ describe("Free Hints and entry descriptions", () => {
       // Another device sees the same hint
       const other = await login("a@x.test");
       const state = await send(`${G}/state`, undefined, other);
-      assert.equal(state.body.hint.kind, "description");
+      assert.deepEqual(state.body.hint, used.body.hint);
     });
 
     it("refuses before 3 guesses and forgets the hint on reset", async () => {
