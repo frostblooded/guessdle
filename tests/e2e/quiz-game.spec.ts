@@ -80,6 +80,8 @@ test("a Quiz party plays one question per round, then runs out", async ({
 
   await page.goto(`/party?host=${slug}`);
   await page.locator("#host-nickname").fill("Ana");
+  // No Typing/Selecting choice: a quiz round brings its own answer box
+  await expect(page.locator("#guess-mode")).toHaveCount(0);
   await page.locator("#host-button").click();
   await expect(page).toHaveURL(/\/party\/[A-Z]{4}$/);
   const code = page.url().slice(-4);

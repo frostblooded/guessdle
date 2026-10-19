@@ -17,7 +17,7 @@ export function PickCard({
   name: string;
   photo: string;
   // False for a list with no pictures at all (a Blur or Sequence game, whose pictures are the
-  // answers): then the card shows the name alone
+  // answers, and How to play's picture rounds): then the card shows the name alone
   pictures?: boolean;
   // Crossed out: How to play's pets that no longer fit the clues
   struck?: boolean;
