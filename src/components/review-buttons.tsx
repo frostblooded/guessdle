@@ -1,7 +1,8 @@
-// An admin's Approve and Reject for a pending game, shared by Play, the editor and both admin
-// lists. Reject asks for the reason the owner will see in a dialog; it cannot be left empty.
+// An admin's See changes, Approve and Reject for a pending game, shared by Play, the editor and
+// both admin lists. See changes opens what changed since the last approval. Reject asks for the reason the owner will see in a dialog; it cannot be left empty.
 import { useState, type FormEvent } from "react";
 import { MAX_REASON } from "../game/limits.ts";
+import { ChangesDialog } from "./changes-dialog.tsx";
 import { api, errorText } from "../manage-client.ts";
 import {
   AlertDialog,
@@ -37,6 +38,7 @@ export function ReviewButtons({
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
+  const [seeing, setSeeing] = useState(false);
 
   const review = async (
     action: "approve" | "reject",
@@ -72,6 +74,21 @@ export function ReviewButtons({
 
   return (
     <>
+      <Button
+        className="review-changes"
+        variant="outline"
+        size={size}
+        onClick={() => setSeeing(true)}
+      >
+        See changes
+      </Button>
+      {seeing && (
+        <ChangesDialog
+          slug={slug}
+          name={name}
+          onClose={() => setSeeing(false)}
+        />
+      )}
       <Button
         id={approveId}
         className="review-approve"
