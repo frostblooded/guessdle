@@ -55,7 +55,7 @@ Signed-in users create games at `/create` and manage entries, attributes and pho
 
 ## Deployment
 
-GitHub Actions (`.github/workflows`) deploys the game to the home server on push to `prod`. GitHub Pages (push to `master`) only serves `deploy/redirect.html`, which sends visitors to the home server (ADR 0005).
+GitHub Actions (`.github/workflows`) deploys the game to the home server on push to `prod`. Nothing deploys to GitHub Pages any more: the old Pages site keeps its last redirect page to the home server (ADR 0005).
 
 ## License
 

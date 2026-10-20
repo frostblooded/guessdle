@@ -46,20 +46,6 @@ describe("build output is wired through the pages and the deploy", () => {
     assert.deepEqual(pages, ["index.html"]);
   });
 
-  it("Pages serves redirect.html as index and 404, all to one URL", () => {
-    const deploy: string = read(".github/workflows/deploy.yml");
-    assert.match(deploy, /cp deploy\/redirect\.html _site\/index\.html/);
-    assert.match(deploy, /cp deploy\/redirect\.html _site\/404\.html/);
-    const redirect: string = read("deploy/redirect.html");
-    const urls: string[] = [
-      ...redirect.matchAll(/https:\/\/guessdle\.niki\.casa\//g),
-    ].map((m) => m[0]);
-    assert.equal(urls.length, 3, "meta refresh, location.replace, link");
-    assert.match(redirect, /http-equiv="refresh"[^>]*url=https:/);
-    assert.match(redirect, /location\.replace\("https:/);
-    assert.match(redirect, /<a href="https:/);
-  });
-
   it("dist is gitignored", () => {
     assert.ok(read(".gitignore").split(/\r?\n/).includes("/dist"));
   });
