@@ -200,3 +200,24 @@ test("a signed-in player can reset mid-game, stored on the server", async ({
     (await (await page.request.get("/api/games/petdle/state")).json()).ids,
   ).toEqual([]);
 });
+
+test("a guest win is dropped once the player signs in and wins", async ({
+  page,
+  request,
+}) => {
+  const answer = await findAnswerName(request);
+  const [wrong] = wrongNames(answer);
+  await page.goto("/g/petdle");
+  await submitGuess(page, wrong!);
+  await winGame(page, answer);
+
+  await stubLogin(page, newEmail());
+  await page.reload();
+  await page.locator("#reset-button").click();
+  await confirmReset(page);
+  await submitGuess(page, answer);
+  // The guest's 2-guess win is dropped: the account's 1-guess win is its first
+  const dialog = page.locator("#stats-dialog");
+  await expect(dialog.locator("#stats-guesses")).toHaveText("1");
+  await expect(dialog.locator("#stats-replay")).toHaveCount(0);
+});
