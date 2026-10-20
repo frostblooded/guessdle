@@ -29,6 +29,7 @@ export function App({ legacyWiped }: { legacyWiped: boolean }) {
   const { pathname } = useLocation();
   // Trailing slashes are not special-cased (ADR 0012): /login/ is not /login
   const slashed = pathname !== "/" && pathname.endsWith("/");
+  // Pages render while the check loads, so it never delays them; maintenance swaps in when it answers
   const maintenance = useMaintenance();
   const down = maintenance.data?.on === true;
   const forced = maintenance.data?.forced === true;
@@ -36,7 +37,7 @@ export function App({ legacyWiped }: { legacyWiped: boolean }) {
   const open = !down || (!forced && OPEN_IN_MAINTENANCE.includes(pathname));
   return (
     <Layout legacyWiped={legacyWiped}>
-      {maintenance.isPending ? null : down && pathname === "/" ? (
+      {down && pathname === "/" ? (
         <MaintenancePage forced={forced} />
       ) : !open ? (
         <Navigate to="/" replace />
