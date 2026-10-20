@@ -7,12 +7,10 @@ import type pg from "pg";
 import { isImageGame, outOfTries } from "../game/blur.ts";
 import type { HintChoices } from "../game/free-hint.ts";
 import { gradeIds, type Entry, type GradedAttribute } from "../game/game.ts";
-import { MAX_SECONDS, type DayStats } from "../game/stats.ts";
 import { playBlocker, type LoadedGame } from "./access.ts";
 import { dateOfDay } from "../game/date.ts";
 import { dayNumber, ensureAnswer, todayIn } from "./answers.ts";
 import type { GameRow, Roster } from "./games.ts";
-import { dayStats, recordResult } from "./results.ts";
 
 export interface PlayDay {
   game: GameRow;
@@ -172,34 +170,4 @@ export function boardOf(
       used: false,
     }),
   };
-}
-
-// A believable solve time in seconds, or null
-export const knownSeconds = (seconds: unknown): number | null =>
-  Number.isInteger(seconds) &&
-  (seconds as number) >= 0 &&
-  (seconds as number) <= MAX_SECONDS
-    ? (seconds as number)
-    : null;
-
-// Records `player`'s first win of the day and answers with the day's stats. `ids` must be a
-// gradable list ending with the answer; `seconds` outside 0 to MAX_SECONDS is kept as unknown.
-// A replay after a reset changes nothing.
-export async function recordWin(
-  q: Pick<pg.Pool, "query">,
-  day: PlayDay,
-  player: string,
-  ids: readonly number[],
-  seconds: unknown,
-): Promise<DayStats | "not_won"> {
-  const board = boardOf(day, ids);
-  if (typeof board === "string" || ids.at(-1) !== day.answer.id) {
-    return "not_won";
-  }
-  const key = { gameId: day.game.id, date: day.date, player };
-  await recordResult(q, key, {
-    guesses: ids.length,
-    seconds: knownSeconds(seconds),
-  });
-  return dayStats(q, key, day.day);
 }

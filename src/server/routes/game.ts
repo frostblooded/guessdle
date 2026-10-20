@@ -11,16 +11,14 @@ import { quizQuestions } from "../quiz.ts";
 import { listGallery } from "../gallery.ts";
 import { canApprove, canManage } from "../access.ts";
 import { requestUser } from "../auth.ts";
-import { dropGuestResult, playerOf, recordFailure } from "../results.ts";
 import {
-  boardOf,
+  dropGuestResult,
   knownSeconds,
-  openDay,
+  playerOf,
+  recordFailure,
   recordWin,
-  revealOf,
-  todayOf,
-  triesOf,
-} from "../play-day.ts";
+} from "../results.ts";
+import { boardOf, openDay, revealOf, todayOf, triesOf } from "../play-day.ts";
 import {
   addGuess,
   boardSeconds,
@@ -145,11 +143,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       // Out of tries on the browser's first attempt: no later win that day counts
       const player = playerOf(null, bodyOf(req));
       if (board.lost && player !== null) {
-        await recordFailure(
-          pool,
-          { gameId: day.game.id, date: day.date, player },
-          ids.length,
-        );
+        await recordFailure(pool, day, player, ids.length);
       }
       res.json({
         day: day.day,
@@ -219,11 +213,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       }
       const player = playerOf(null, bodyOf(req));
       if (player !== null) {
-        await recordFailure(
-          pool,
-          { gameId: day.game.id, date: day.date, player },
-          0,
-        );
+        await recordFailure(pool, day, player, 0);
       }
       res.json({
         day: day.day,
@@ -263,11 +253,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         return;
       }
       if (user && isPlayerToken(body["player"])) {
-        await dropGuestResult(
-          pool,
-          { gameId: day.game.id, date: day.date },
-          body["player"],
-        );
+        await dropGuestResult(pool, day, body["player"]);
       }
       // A signed-in win is the stored guesses, timed by the server when it saw them all (else
       // by the browser); an anonymous one the ids and time sent

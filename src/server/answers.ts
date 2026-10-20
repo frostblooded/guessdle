@@ -3,6 +3,7 @@ import type pg from "pg";
 import type { GameRow } from "./games.ts";
 import { loadRoster, skipOf } from "./games.ts";
 import { dateOfDay } from "../game/date.ts";
+import { forgetDay } from "./day-rows.ts";
 
 const LOCK_KEY = 5_150_002; // arbitrary; serialises answer generation per game across API replicas
 const DAY_MS = 86_400_000;
@@ -206,17 +207,7 @@ async function restartIfChanged(
     "update daily_answers set revision = revision + 1 where game_id = $1 and day = $2",
     [game.id, date],
   );
-  for (const table of [
-    "user_guesses",
-    "user_give_ups",
-    "user_hints",
-    "game_results",
-  ]) {
-    await client.query(`delete from ${table} where game_id = $1 and day = $2`, [
-      game.id,
-      date,
-    ]);
-  }
+  await forgetDay(client, game.id, date);
 }
 
 // Re-draws every non-override day from `fromDate` on, in order, over the stored
