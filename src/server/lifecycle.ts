@@ -5,7 +5,7 @@ import type pg from "pg";
 import { playBlocker } from "./access.ts";
 import { saveSnapshot } from "./approval.ts";
 import { loadRoster, type GameRow, type GameStatus } from "./games.ts";
-import type { OwnerMailKind } from "../mail-settings.ts";
+import type { OwnerMailKind } from "../game/mail-settings.ts";
 import type { MailConfig } from "./mailer.ts";
 import { mailOwner, type OwnerNotice } from "./owner-mail.ts";
 import { withGameLock } from "./tx.ts";

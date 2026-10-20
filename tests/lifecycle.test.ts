@@ -13,7 +13,7 @@ import {
 } from "../src/server/lifecycle.ts";
 import type { MailConfig } from "../src/server/mailer.ts";
 import { ownerMessage } from "../src/server/owner-mail.ts";
-import type { MailSettings } from "../src/mail-settings.ts";
+import type { MailSettings } from "../src/game/mail-settings.ts";
 
 const STATUSES: GameStatus[] = ["draft", "pending", "approved", "rejected"];
 const KINDS = Object.keys(RESETS_STATUS) as EditKind[];

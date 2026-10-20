@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { describe, it } from "vitest";
 
 const read = (path: string): string =>
@@ -140,5 +140,32 @@ describe("build output is wired through the pages and the deploy", () => {
     const conf: string = read("deploy/nginx.conf");
     assert.match(conf, /add_header Cache-Control "no-cache"/);
     assert.match(conf, /location \/dist\/ \{[^}]*max-age=31536000, immutable/);
+  });
+
+  it("the API image copies every module the API imports", () => {
+    // The api stage's `COPY src/... ./src/...` lines: the only source the image has
+    const stage = read("Dockerfile").split(/^FROM .* AS api$/m)[1]!;
+    const copied = [...stage.matchAll(/^COPY (src\/\S+) /gm)].map((m) => m[1]!);
+    assert.ok(copied.length > 0);
+    const root = join(import.meta.dirname, "..");
+    const seen = new Set<string>();
+    const walk = (file: string): void => {
+      if (seen.has(file)) {
+        return;
+      }
+      seen.add(file);
+      const code = read(file);
+      for (const [, spec] of code.matchAll(
+        /(?:from|import\()\s*"(\.[^"]+)"/g,
+      )) {
+        walk(relative(root, resolve(root, dirname(file), spec!)));
+      }
+    };
+    walk("src/server/main.ts");
+    const missing = [...seen].filter(
+      (f) => !copied.some((dir) => f.startsWith(`${dir}/`)),
+    );
+    // A shared module the server uses belongs in src/game (or the Dockerfile copies it)
+    assert.deepEqual(missing, []);
   });
 });

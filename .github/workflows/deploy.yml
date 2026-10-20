@@ -16,6 +16,11 @@ jobs:
       - uses: actions/checkout@v7
       - run: docker build -f Dockerfile --target dev .
       - run: docker build -f Dockerfile --target prod .
+      # Loads every module the API imports, so a file the image does not copy fails here, not on prod
+      - name: API image loads
+        run: |
+          docker build -f Dockerfile --target api -t guessdle-api .
+          docker run --rm guessdle-api node -e 'await import("./src/server/main.ts")'
 
   unit:
     runs-on: ubuntu-latest

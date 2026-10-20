@@ -4,7 +4,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, it, vi } from "vitest";
-import type { MailSettings } from "../../src/mail-settings.ts";
+import type { MailSettings } from "../../src/game/mail-settings.ts";
 import { SettingsPage } from "../../src/routes/settings-page.tsx";
 
 const json = (status: number, body: unknown): Response =>
