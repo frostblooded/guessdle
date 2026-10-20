@@ -14,6 +14,7 @@ import type { FailureCode } from "../game/failures.ts";
 import type { GameRow, Roster } from "./games.ts";
 import { boardOf, isLost, triesOf, type PlayDay } from "./play-day.ts";
 import { recordFailure } from "./results.ts";
+import { forgetBoard } from "./day-rows.ts";
 
 export interface GameView {
   day: number;
@@ -162,12 +163,8 @@ const finished = (current: GameView): boolean =>
   isOver({ won: current.victory, gaveUp: current.gaveUp, lost: current.lost });
 
 // A failed attempt takes the account's one result for the day, if it is the first attempt
-const failed = (q: Q, { game, userId, date }: GameContext, guesses: number) =>
-  recordFailure(
-    q,
-    { gameId: game.id, date, player: `user:${userId}` },
-    guesses,
-  );
+const failed = (q: Q, ctx: GameContext, guesses: number) =>
+  recordFailure(q, ctx, `user:${ctx.userId}`, guesses);
 
 export async function addGuess(
   q: Q,
@@ -303,11 +300,6 @@ export async function resetGame(
   { game, userId, date }: GameContext,
 ): Promise<Refusal | null> {
   // Any time, even with no rows: deleting nothing is fine
-  for (const table of ["user_guesses", "user_give_ups", "user_hints"]) {
-    await q.query(
-      `delete from ${table} where user_id = $1 and game_id = $2 and day = $3`,
-      [userId, game.id, date],
-    );
-  }
+  await forgetBoard(q, game.id, date, userId);
   return null;
 }

@@ -4,10 +4,12 @@
 import type pg from "pg";
 import {
   isPlayerToken,
+  MAX_SECONDS,
   summarize,
   type DayStats,
   type WinResult,
 } from "../game/stats.ts";
+import { boardOf, type PlayDay } from "./play-day.ts";
 
 import { friendResults, userIdOf } from "./friends.ts";
 
@@ -32,7 +34,7 @@ export const playerOf = (
       : null;
 
 // Keeps the first attempt only: a replay after a reset changes nothing
-export async function recordResult(
+async function recordResult(
   q: Q,
   { gameId, date, player }: ResultKey,
   result: WinResult,
@@ -47,24 +49,56 @@ export async function recordResult(
 // in, only the account counts, so one person is never two players
 export async function dropGuestResult(
   q: Q,
-  { gameId, date }: Omit<ResultKey, "player">,
+  day: Pick<PlayDay, "game" | "date">,
   token: string,
 ): Promise<void> {
   await q.query(
     "delete from game_results where game_id = $1 and day = $2 and player = $3",
-    [gameId, date, `anon:${token}`],
+    [day.game.id, day.date, `anon:${token}`],
   );
 }
 
-// A first attempt that ended without a win; a later win that day does not count
+// A believable solve time in seconds, or null
+export const knownSeconds = (seconds: unknown): number | null =>
+  Number.isInteger(seconds) &&
+  (seconds as number) >= 0 &&
+  (seconds as number) <= MAX_SECONDS
+    ? (seconds as number)
+    : null;
+
+// Records `player`'s first win of the day and answers with the day's stats. `ids` must be a
+// gradable list ending with the answer; `seconds` outside 0 to MAX_SECONDS is kept as unknown.
+// A replay after a reset changes nothing.
+export async function recordWin(
+  q: Q,
+  day: PlayDay,
+  player: string,
+  ids: readonly number[],
+  seconds: unknown,
+): Promise<DayStats | "not_won"> {
+  const board = boardOf(day, ids);
+  if (typeof board === "string" || ids.at(-1) !== day.answer.id) {
+    return "not_won";
+  }
+  const key = { gameId: day.game.id, date: day.date, player };
+  await recordResult(q, key, {
+    guesses: ids.length,
+    seconds: knownSeconds(seconds),
+  });
+  return dayStats(q, key, day.day);
+}
+
+// A first attempt that ended without a win (a give-up, or a Blur or Sequence game's tries
+// used up); a later win that day does not count
 export async function recordFailure(
   q: Q,
-  { gameId, date, player }: ResultKey,
+  day: Pick<PlayDay, "game" | "date">,
+  player: string,
   guesses: number,
 ): Promise<void> {
   await q.query(
     "insert into game_results (game_id, day, player, guesses, won) values ($1, $2, $3, $4, false) on conflict do nothing",
-    [gameId, date, player, guesses],
+    [day.game.id, day.date, player, guesses],
   );
 }
 
