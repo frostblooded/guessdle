@@ -164,6 +164,77 @@ describe("victory stats", () => {
     assert.match(rows[0]!.player, /^user:\d+$/);
   });
 
+  describe("a guest who signs in", () => {
+    const winSignedIn = async (cookie: string): Promise<void> => {
+      await post(`${G}/state/guess`, { id: ANSWER }, cookie);
+    };
+
+    it("counts once: the guest win is dropped, the account's counts", async () => {
+      await post(`${G}/result`, {
+        ids: [OTHERS[0], ANSWER],
+        seconds: 40,
+        player: TOKEN_A,
+      });
+      const cookie = await login("a@x.test");
+      await winSignedIn(cookie);
+      const { body } = await post(
+        `${G}/result`,
+        { seconds: 3, player: TOKEN_A },
+        cookie,
+      );
+      assert.deepEqual(body.you, { guesses: 1, seconds: 3 });
+      assert.equal(body.players, 1);
+      assert.equal(
+        body.guesses.reduce((a: number, b: number) => a + b),
+        1,
+      );
+      assert.equal(
+        body.times.reduce((a: number, b: number) => a + b),
+        1,
+      );
+      const { rows } = await db.pool.query<{ player: string }>(
+        "select player from game_results",
+      );
+      assert.equal(rows.length, 1);
+      assert.match(rows[0]!.player, /^user:\d+$/);
+    });
+
+    it("keeps the account's own win over the guest one", async () => {
+      const cookie = await login("a@x.test");
+      await winSignedIn(cookie);
+      await post(`${G}/result`, { seconds: 7 }, cookie);
+      await post(`${G}/result`, {
+        ids: [OTHERS[0], OTHERS[1], ANSWER],
+        seconds: 50,
+        player: TOKEN_A,
+      });
+      const { body } = await post(`${G}/result`, { player: TOKEN_A }, cookie);
+      assert.deepEqual(body.you, { guesses: 1, seconds: 7 });
+      assert.equal(body.players, 1);
+    });
+
+    it("ignores a guest give-up", async () => {
+      await post(`${G}/give-up`, { player: TOKEN_A });
+      const cookie = await login("a@x.test");
+      await winSignedIn(cookie);
+      const { body } = await post(
+        `${G}/result`,
+        { seconds: 3, player: TOKEN_A },
+        cookie,
+      );
+      assert.deepEqual(body.you, { guesses: 1, seconds: 3 });
+      assert.equal(body.firstTryFailed, undefined);
+    });
+
+    it("leaves other browsers' guest wins alone", async () => {
+      await post(`${G}/result`, { ids: [ANSWER], player: TOKEN_B });
+      const cookie = await login("a@x.test");
+      await winSignedIn(cookie);
+      const { body } = await post(`${G}/result`, { player: TOKEN_A }, cookie);
+      assert.equal(body.players, 2);
+    });
+  });
+
   describe("a first attempt that failed", () => {
     it("an anonymous give-up keeps a win after a reset out of the stats", async () => {
       const gave = await post(`${G}/give-up`, { player: TOKEN_A });

@@ -3,6 +3,7 @@ import express from "express";
 import type { Express, Request, Response } from "express";
 import type pg from "pg";
 import { isImageGame } from "../../game/blur.ts";
+import { isPlayerToken } from "../../game/stats.ts";
 import { isHintKind, pickHint, revealHint } from "../../game/free-hint.ts";
 import type { DaysResponse } from "../../game/days.ts";
 import { listDays } from "../days.ts";
@@ -10,7 +11,7 @@ import { quizQuestions } from "../quiz.ts";
 import { listGallery } from "../gallery.ts";
 import { canApprove, canManage } from "../access.ts";
 import { requestUser } from "../auth.ts";
-import { playerOf, recordFailure } from "../results.ts";
+import { dropGuestResult, playerOf, recordFailure } from "../results.ts";
 import {
   boardOf,
   openDay,
@@ -258,6 +259,13 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       );
       if (!day || player === null) {
         return;
+      }
+      if (user && isPlayerToken(body["player"])) {
+        await dropGuestResult(
+          pool,
+          { gameId: day.game.id, date: day.date },
+          body["player"],
+        );
       }
       // A signed-in win is the stored guesses; an anonymous one the ids sent
       const won = user
