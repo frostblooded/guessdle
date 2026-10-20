@@ -3,7 +3,7 @@ import { useState } from "react";
 import { PageHead } from "../components/page.tsx";
 import { Alert } from "../components/ui/alert.tsx";
 import { Switch } from "../components/ui/switch.tsx";
-import type { MailSettings } from "../mail-settings.ts";
+import type { MailSettings } from "../game/mail-settings.ts";
 import { getJson } from "../lib/api.ts";
 import { api } from "../manage-client.ts";
 import { useSignedIn } from "../lib/use-signed-in.ts";

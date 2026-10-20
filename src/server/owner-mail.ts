@@ -5,7 +5,7 @@ import {
   wantsMail,
   type MailSettings,
   type OwnerMailKind,
-} from "../mail-settings.ts";
+} from "../game/mail-settings.ts";
 import type { MailConfig } from "./mailer.ts";
 
 type Q = Pick<pg.Pool, "query">;
