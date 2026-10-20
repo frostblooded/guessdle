@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "vitest";
 import {
+  boardClock,
   createGameState,
   type GameState,
   type StateStorage,
@@ -397,5 +398,35 @@ describe("readProgress", () => {
     const empty = new MemoryStorage();
     readProgress(pastDayStorage(empty, "pets", 3), () => today, false);
     assert.equal(empty.length, 0);
+  });
+});
+
+describe("boardClock", () => {
+  let now = 0;
+  const day = { current: 3 as number | null };
+  const clock = (storage?: StateStorage) =>
+    boardClock(
+      storage,
+      () => day.current,
+      () => now,
+    );
+  beforeEach(() => {
+    now = 1_000_000;
+    day.current = 3;
+  });
+  it("counts whole seconds since this browser started it", () => {
+    const c = clock(new MemoryStorage());
+    c.startClock();
+    now += 61_400;
+    assert.equal(c.solveSeconds(), 61);
+  });
+  it("is unknown before it starts, on another day, or without storage", () => {
+    const storage = new MemoryStorage();
+    assert.equal(clock(storage).solveSeconds(), null);
+    clock(storage).startClock();
+    day.current = 4;
+    assert.equal(clock(storage).solveSeconds(), null);
+    clock().startClock();
+    assert.equal(clock().solveSeconds(), null);
   });
 });
