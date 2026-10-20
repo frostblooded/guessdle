@@ -1,4 +1,5 @@
 // Anonymous play: the browser keeps pet ids, the server grades them.
+import { isOver } from "./board.ts";
 import type { FreeHint, HintChoices, HintKind } from "./free-hint.ts";
 import {
   isAnswerRow,
@@ -260,7 +261,7 @@ export function createPlay({
         Object.assign(loaded, revealIn(res));
         loaded.gaveUp = true;
       }
-      finished = loaded.victory || gaveUp || loaded.lost === true;
+      finished = isOver({ won: loaded.victory, gaveUp, lost: loaded.lost });
       return loaded;
     },
 

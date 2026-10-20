@@ -1,10 +1,9 @@
 // What a player's socket message does to a party (ADR 0016), under the party lock.
 import type pg from "pg";
-import { isImageGame } from "../game/blur.ts";
+import { checkGuess, hintOffer } from "../game/board.ts";
 import { pickHint } from "../game/free-hint.ts";
-import { gradeGuess } from "../game/game.ts";
+import { gradeIds, SKIP } from "../game/game.ts";
 import { playBlocker } from "./access.ts";
-import { SKIP } from "../game/game.ts";
 import { isAnswerTo } from "../game/quiz.ts";
 import {
   drawAnswer,
@@ -14,6 +13,7 @@ import {
   progressOf,
   type ClientMessage,
   type PartyRefusal,
+  type RoundData,
 } from "../game/party.ts";
 import { loadData, touch, withPartyLock, type PartyRow } from "./parties.ts";
 
@@ -54,6 +54,9 @@ export async function act(
       }
     };
     const quiz = data.game.kind === "quiz";
+    // The entry ids I guessed in a round, in order
+    const mineIds = (round: RoundData): number[] =>
+      round.guesses.filter((g) => g.playerId === me.id).map((g) => g.entryId);
     const refusal = await (async (): Promise<PartyRefusal | null> => {
       switch (msg.type) {
         case "hint": {
@@ -68,18 +71,17 @@ export async function act(
           }
           const { attributes, all } = data.roster;
           const answer = all.find((e) => e.id === live.answerId);
-          if (
-            !answer ||
-            data.game.kind !== "classic" ||
-            live.hints?.some((h) => h.playerId === me.id)
-          ) {
-            return "no_hint";
-          }
-          const rows = live.guesses
-            .filter((g) => g.playerId === me.id)
-            .flatMap((g) => all.filter((e) => e.id === g.entryId))
-            .map((guess) => gradeGuess(attributes, answer, guess));
-          const pick = pickHint(attributes, answer, rows, msg.kind, random);
+          const graded =
+            answer &&
+            gradeIds(attributes, all, answer, mineIds(live), data.game.kind);
+          const used = live.hints?.some((h) => h.playerId === me.id) ?? false;
+          const pick =
+            graded?.kind === "graded" &&
+            hintOffer(data.game.kind, attributes, answer!, graded.rows, {
+              over: false,
+              used,
+            }) &&
+            pickHint(attributes, answer!, graded.rows, msg.kind, random);
           if (!pick) {
             return "no_hint";
           }
@@ -120,24 +122,18 @@ export async function act(
               [live.id, me.id, now],
             );
           } else {
-            const skip = msg.entryId === SKIP && isImageGame(data.game.kind);
-            if (
-              !skip &&
-              !data.roster.entries.some((e) => e.id === msg.entryId)
-            ) {
-              return "invalid";
-            }
-            if (
-              !skip &&
-              live.guesses.some(
-                (g) => g.playerId === me.id && g.entryId === msg.entryId,
-              )
-            ) {
-              return "duplicate";
+            const check = checkGuess(
+              data.game.kind,
+              data.roster.entries,
+              mineIds(live),
+              msg.entryId,
+            );
+            if (check !== "ok") {
+              return check;
             }
             await tx.query(
               "insert into party_guesses (round_id, player_id, entry_id, guessed_at) values ($1, $2, $3, $4)",
-              [live.id, me.id, skip ? null : msg.entryId, now],
+              [live.id, me.id, msg.entryId === SKIP ? null : msg.entryId, now],
             );
           }
           await endIfAllDone();

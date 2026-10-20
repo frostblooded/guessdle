@@ -1,5 +1,6 @@
 // The viewer's own board in a live party round: the guess box, their graded rows (a Blur game's
 // image or a Sequence game's photos, and guessed names) and, once they solved it, gave up or ran out of tries, the answer.
+import { endingOf } from "../../game/board.ts";
 import { useState } from "react";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
@@ -35,7 +36,12 @@ export function PartyRound({
 }) {
   const [guess, setGuess] = useState("");
   const modes = useGuessMode(view.game.guessMode);
-  const done = mine.solved || mine.gaveUp || mine.lost;
+  const ending = endingOf({
+    won: mine.solved,
+    gaveUp: mine.gaveUp,
+    lost: mine.lost,
+  });
+  const done = ending !== null;
   // Selection mode's list, above the board
   const listing = modes.selecting && !done;
   const entries = view.game.entries;
@@ -64,10 +70,10 @@ export function PartyRound({
         Round {round.number}
       </h2>
       <div id="result-banner" aria-live="polite">
-        {done && mine.answer && (
+        {ending && mine.answer && (
           <ResultBanner
             result={{
-              kind: mine.solved ? "victory" : mine.lost ? "lost" : "give-up",
+              kind: ending,
               answer: mine.answer.name,
               photo: mine.answer.photo || undefined,
               description: mine.answer.description,

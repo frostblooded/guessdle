@@ -1,4 +1,5 @@
 // Signed-in play: guesses, give-up and reset live on the server (/api/game).
+import { isOver } from "./board.ts";
 import { isAnswerRow, type GradedAttribute } from "./game.ts";
 import type { HintKind } from "./free-hint.ts";
 import type { StateStorage } from "./game-state.ts";
@@ -65,7 +66,11 @@ export function createServerPlay({
     }
     day = game.day;
     ids = game.ids;
-    finished = game.victory || game.gaveUp || game.lost === true;
+    finished = isOver({
+      won: game.victory,
+      gaveUp: game.gaveUp,
+      lost: game.lost,
+    });
     noteRevision(game);
   }
 
