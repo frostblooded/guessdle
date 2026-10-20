@@ -37,6 +37,13 @@ const SERVER_CODES: FailureCode[] = [
   "self_ban",
   "admin_ban",
   "promote_banned",
+  "duplicate",
+  "finished",
+  "has_progress",
+  "stale_day",
+  "not_won",
+  "no_hint",
+  "no_such_day",
 ];
 
 describe("failure table", () => {
