@@ -1,4 +1,5 @@
 // A signed-in player's Game State for one day, stored in Postgres.
+import { checkGuess, isOver } from "../game/board.ts";
 import type pg from "pg";
 import {
   isHintKind,
@@ -10,7 +11,6 @@ import {
 } from "../game/free-hint.ts";
 import { SKIP, type GradedAttribute } from "../game/game.ts";
 import type { FailureCode } from "../game/failures.ts";
-import { isImageGame } from "../game/blur.ts";
 import type { GameRow, Roster } from "./games.ts";
 import { boardOf, isLost, triesOf, type PlayDay } from "./play-day.ts";
 import { recordFailure } from "./results.ts";
@@ -39,8 +39,7 @@ export interface GameView {
 
 // An id a player may guess: an active entry, or in a Blur or Sequence game SKIP
 const isGuessId = (game: GameRow, roster: Roster, id: unknown): boolean =>
-  (id === SKIP && isImageGame(game.kind)) ||
-  roster.entries.some((e) => e.id === id);
+  checkGuess(game.kind, roster.entries, [], id) !== "invalid";
 
 // Why a change is refused; statuses and texts live in FAILURES.
 // has_progress, stale_day: merge only (the account already has rows for the day; the
@@ -160,7 +159,7 @@ export async function changeGame(
 }
 
 const finished = (current: GameView): boolean =>
-  current.victory || current.gaveUp || current.lost === true;
+  isOver({ won: current.victory, gaveUp: current.gaveUp, lost: current.lost });
 
 // A failed attempt takes the account's one result for the day, if it is the first attempt
 const failed = (q: Q, { game, userId, date }: GameContext, guesses: number) =>
@@ -177,11 +176,15 @@ export async function addGuess(
   id: unknown,
 ): Promise<Refusal | null> {
   const { game, roster, userId, date, answer } = ctx;
-  if (typeof id !== "number" || !isGuessId(game, roster, id)) {
+  const check = checkGuess(game.kind, roster.entries, current.ids, id);
+  if (check === "invalid" || typeof id !== "number") {
     return "invalid";
   }
   if (finished(current)) {
     return "finished";
+  }
+  if (check === "duplicate") {
+    return "duplicate";
   }
   const { rowCount } = await q.query(
     "insert into user_guesses (user_id, game_id, day, entry_id) values ($1, $2, $3, $4) on conflict do nothing",

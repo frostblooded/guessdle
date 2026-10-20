@@ -2,6 +2,7 @@
 // A round is won with the fewest guesses, ties broken by time from the round's start;
 // rounds add up by placement points. A Quiz game's round is one question (ADR 0021): the most
 // quiz points win it, ties broken by time, and a wrong answer gets no placement points.
+import { isOver } from "./board.ts";
 import { isHintKind, type HintKind, type HintPick } from "./free-hint.ts";
 import { MAX_NICKNAME } from "./limits.ts";
 import { outOfTries } from "./blur.ts";
@@ -119,7 +120,7 @@ export function progressOf(round: RoundData, playerId: number): Progress {
 
 export const isDone = (
   p: Pick<Progress, "solved" | "gaveUp" | "lost">,
-): boolean => p.solved || p.gaveUp || p.lost;
+): boolean => isOver({ won: p.solved, gaveUp: p.gaveUp, lost: p.lost });
 
 // A live round ends by itself once every player has solved it, given up or run out of tries
 export function everyoneDone(

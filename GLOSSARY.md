@@ -52,6 +52,9 @@ A compared property of an Entry, such as colors or owners, defined per Game. Typ
 **Correctness**:
 How well one attribute of a guess matches the Daily Answer: correct, partially correct, or incorrect. Text: correct only on an exact match. List: correct on the same set, partially correct when at least one value is shared, otherwise incorrect. Number: correct on the same value, otherwise incorrect with a **Hint** (↑ the answer is higher, ↓ lower). Empty equals empty. Grades are never stored, so a schema edit regrades live.
 
+**Board**:
+One player's Guesses against one answer: a day's solo game, or one player's part of a Party Round. It is over once won, out of tries (Blur and Sequence) or given up; a win beats running out of tries, which beats giving up.
+
 **Free Hint**:
 In a Classic Game, after 3 wrong Guesses a player may reveal one thing about the answer, once per day (or Party Round): the answer's value for one Attribute drawn at random from those no Guess has matched yet (an Attribute the answer has no value for is never drawn). The Description is never a Free Hint. It is free: stats and Placement Points ignore it. It is part of the Game State and is forgotten on reset. Not the same as a Number column's **Hint** arrow.
 

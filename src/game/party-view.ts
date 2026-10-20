@@ -1,12 +1,8 @@
 // Party mode (ADR 0016): what each phone is sent of a party, built from its players and rounds.
 // A live round shows only counts, a finished round everything.
+import { hintOffer } from "./board.ts";
 import { isImageGame, type GameKind } from "./blur.ts";
-import {
-  hintChoices,
-  revealHint,
-  type FreeHint,
-  type HintChoices,
-} from "./free-hint.ts";
+import { revealHint, type FreeHint, type HintChoices } from "./free-hint.ts";
 import type { GuessMode } from "./guess-mode.ts";
 import type { Correctness } from "./correctness.ts";
 import {
@@ -196,12 +192,10 @@ export function partyViews(
       const hint = used && revealHint(attributes, answer, used.pick);
       const hints =
         mine &&
-        kind === "classic" &&
-        latest.endedAt === null &&
-        !isDone(mine) &&
-        !hint
-          ? hintChoices(attributes, answer, graded(latest, mine.playerId))
-          : null;
+        hintOffer(kind, attributes, answer, graded(latest, mine.playerId), {
+          over: latest.endedAt !== null || isDone(mine),
+          used: used !== undefined,
+        });
       return !mine
         ? null
         : quiz

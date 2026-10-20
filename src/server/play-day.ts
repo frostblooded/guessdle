@@ -2,9 +2,10 @@
 // which day a request plays, draws the answer, grades a list of guesses against it, says when
 // the day is over and what that reveals, and records a first win in the day's stats. Routes
 // only read the request and turn these outcomes into HTTP replies.
+import { hintOffer, isOver } from "../game/board.ts";
 import type pg from "pg";
 import { isImageGame, outOfTries } from "../game/blur.ts";
-import { hintChoices, type HintChoices } from "../game/free-hint.ts";
+import type { HintChoices } from "../game/free-hint.ts";
 import { gradeIds, type Entry, type GradedAttribute } from "../game/game.ts";
 import { MAX_SECONDS, type DayStats } from "../game/stats.ts";
 import { playBlocker, type LoadedGame } from "./access.ts";
@@ -160,16 +161,16 @@ export function boardOf(
     return graded.kind;
   }
   const lost = isLost(game, ids, graded.victory);
-  const over = graded.victory || gaveUp || lost;
+  const over = isOver({ won: graded.victory, gaveUp, lost });
   return {
     rows: graded.rows,
     victory: graded.victory,
     lost,
     reveal: over ? revealOf(game, answer) : null,
-    hints:
-      game.kind === "classic" && !over
-        ? hintChoices(roster.attributes, answer, graded.rows)
-        : null,
+    hints: hintOffer(game.kind, roster.attributes, answer, graded.rows, {
+      over,
+      used: false,
+    }),
   };
 }
 

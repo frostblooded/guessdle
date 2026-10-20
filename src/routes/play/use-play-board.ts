@@ -1,6 +1,7 @@
 // Play's board session: opens the day's Play once the game and who is signed in are known, and
 // keeps the guesses shown, the result, the notice and the Free Hint in step with each guess,
 // give-up and reset. The page only draws it and holds the guess box.
+import { endingOf } from "../../game/board.ts";
 import { useEffect, useRef, useState } from "react";
 import type { EntryRef, GradedAttribute } from "../../game/game.ts";
 import { openPlay } from "../../game/open-play.ts";
@@ -21,14 +22,12 @@ import { useVictoryStats } from "./use-victory-stats.ts";
 const now = (): Date => new Date();
 
 // The banner for a loaded board, null while the day is still being played
-const finishedResult = (loaded: Loaded): Result =>
-  loaded.answer !== undefined &&
-  (loaded.victory || loaded.gaveUp || loaded.lost)
-    ? resultOf(
-        loaded.victory ? "victory" : loaded.lost ? "lost" : "give-up",
-        loaded,
-      )
+const finishedResult = (loaded: Loaded): Result => {
+  const ending = endingOf({ won: loaded.victory, ...loaded });
+  return loaded.answer !== undefined && ending
+    ? resultOf(ending, loaded)
     : null;
+};
 
 // The notice a guess or give-up leaves: why it was refused, or none
 const noticeOf = (
