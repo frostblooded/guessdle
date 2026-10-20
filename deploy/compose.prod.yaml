@@ -34,6 +34,18 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # start.sh waits on this, so a deploy whose API never comes up fails the deploy job.
+    # start_period covers the migrations main.ts runs before it listens.
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 5s
+      timeout: 5s
+      retries: 6
+      start_period: 120s
     restart: unless-stopped
 
   db:

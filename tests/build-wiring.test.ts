@@ -142,6 +142,29 @@ describe("build output is wired through the pages and the deploy", () => {
     assert.match(conf, /location \/dist\/ \{[^}]*max-age=31536000, immutable/);
   });
 
+  it("nginx access log leaves out query strings and referers", () => {
+    const conf: string = read("deploy/nginx.conf");
+    const format = /log_format noquery ([^;]+);/.exec(conf);
+    assert.ok(format);
+    assert.doesNotMatch(
+      format[1]!,
+      /\$request_uri|\$request |\$args|\$query_string|\$http_referer/,
+    );
+    assert.match(conf, /access_log \S+ noquery;/);
+  });
+
+  it("a deploy fails when the API never gets healthy", () => {
+    assert.match(
+      read("deploy/start.sh"),
+      /compose\.prod\.yaml up -d --build --wait --wait-timeout \d+/,
+    );
+    const api = read("deploy/compose.prod.yaml").split(/^ {2}api:$/m)[1]!;
+    assert.match(
+      api.split(/^ {2}db:$/m)[0]!,
+      /healthcheck:[\s\S]*\/api\/health/,
+    );
+  });
+
   it("the API image copies every module the API imports", () => {
     // The api stage's `COPY src/... ./src/...` lines: the only source the image has
     const stage = read("Dockerfile").split(/^FROM .* AS api$/m)[1]!;
