@@ -55,6 +55,32 @@ export function failureMessage(res: Reply | null): string {
     : failureText((res.data as { error?: unknown } | null)?.error, res.status);
 }
 
+// A request the server did not accept: too many requests, or the text of why not and the
+// reply's failure code when it sent one
+export type Refused =
+  { kind: "rate_limited" } | { kind: "error"; message: string; code?: string };
+
+// GET (no body) or POST: the parsed body of a success, or why there is none
+export async function send<T>(
+  fetch: Fetch,
+  url: string,
+  body?: unknown,
+): Promise<T | Refused> {
+  const res = await call(fetch, url, body);
+  if (res?.status === 429) {
+    return { kind: "rate_limited" };
+  }
+  if (res?.ok) {
+    return res.data as T;
+  }
+  const code = (res?.data as { error?: unknown } | null)?.error;
+  return {
+    kind: "error",
+    message: failureMessage(res),
+    ...(typeof code === "string" && { code }),
+  };
+}
+
 export function failureOf(res: Reply | null): Failure | null {
   if (res === null) {
     return "error";

@@ -82,6 +82,40 @@ export function pastDayStorage(
   return gameStorage(storage, `${slug}:day:${day}`);
 }
 
+// When the current board's first guess was made on this browser: [Day Number, ms since the epoch]
+const FIRST_GUESS_KEY = "firstGuessAt";
+
+// The solve clock of one board, kept with its storage: started on a fresh board's first guess,
+// read when the board is won. Blocked storage leaves the time unknown.
+export function boardClock(
+  storage: StateStorage | undefined,
+  day: () => number | null,
+  now: () => number = Date.now,
+): { startClock(): void; solveSeconds(): number | null } {
+  return {
+    startClock(): void {
+      try {
+        storage?.setItem(FIRST_GUESS_KEY, JSON.stringify([day(), now()]));
+      } catch {
+        // the time stays unknown
+      }
+    },
+    // Whole seconds since the first guess, or null when this browser did not see this day's
+    solveSeconds(): number | null {
+      try {
+        const [started, at]: unknown[] = JSON.parse(
+          storage?.getItem(FIRST_GUESS_KEY) ?? "[]",
+        ) as unknown[];
+        return started === day() && Number(at) > 0
+          ? Math.max(0, Math.round((now() - Number(at)) / 1000))
+          : null;
+      } catch {
+        return null;
+      }
+    },
+  };
+}
+
 // One game's keys inside the shared browser storage, so games never share state
 export function gameStorage(storage: StateStorage, slug: string): StateStorage {
   const key = (name: string): string => `game:${slug}:${name}`;

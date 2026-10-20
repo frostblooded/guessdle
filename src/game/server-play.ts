@@ -2,9 +2,10 @@
 import { isOver } from "./board.ts";
 import { isAnswerRow, type GradedAttribute } from "./game.ts";
 import type { HintKind } from "./free-hint.ts";
-import type { StateStorage } from "./game-state.ts";
+import { boardClock, type StateStorage } from "./game-state.ts";
 import {
-  RATE_LIMITED,
+  refusalText,
+  refusedOf,
   revealIn,
   type HintResult,
   type HintState,
@@ -15,7 +16,8 @@ import {
   type Reveal,
   type SubmitResult,
 } from "./play.ts";
-import { call, failureMessage, type Fetch } from "./transport.ts";
+import { failureText } from "./failures.ts";
+import { send, type Fetch } from "./transport.ts";
 
 // The server's view of today's game
 interface GameResponse extends Reveal, HintState {
@@ -102,19 +104,15 @@ export function createServerPlay({
     ...(game.hints && { hints: game.hints }),
   });
 
-  const errorOf = (data: unknown): string | undefined =>
-    (data as { error?: string } | null)?.error;
+  const request = (path: string, body?: unknown) =>
+    send<GameResponse>(fetch, `${base}${path}${query}`, body);
 
   const play: Play = {
     async load(): Promise<Loaded | LoadFailure> {
-      const res = await call(fetch, `${base}${query}`);
-      if (res?.status === 429) {
-        return { failure: RATE_LIMITED };
+      const game = await request("");
+      if ("kind" in game) {
+        return { failure: refusalText(game) };
       }
-      if (res?.status !== 200) {
-        return { failure: failureMessage(res) };
-      }
-      const game = res.data as GameResponse;
       adopt(game);
       return {
         rows: game.rows,
@@ -130,78 +128,70 @@ export function createServerPlay({
       if (finished) {
         return { kind: "finished" };
       }
-      const res = await call(fetch, `${base}/guess${query}`, { id });
-      if (res?.status === 429) {
-        return { kind: "rate_limited" };
+      const game = await request("/guess", { id });
+      if ("kind" in game) {
+        const code = game.kind === "error" ? game.code : undefined;
+        if (code === "finished") {
+          finished = true;
+          return { kind: "finished" };
+        }
+        return code === "duplicate" || code === "invalid"
+          ? { kind: code }
+          : refusedOf(game);
       }
-      if (res?.status === 200) {
-        const game = res.data as GameResponse;
-        adopt(game);
-        const row = game.rows[game.rows.length - 1]!;
-        return {
-          kind: "accepted",
-          row,
-          isAnswer: isAnswerRow(row),
-          ...(game.hints && { hints: game.hints }),
-          ...(game.lost && { lost: true as const }),
-          ...revealIn(game),
-        };
-      }
-      const error = errorOf(res?.data);
-      if (error === "finished") {
-        finished = true;
-        return { kind: "finished" };
-      }
-      if (error === "duplicate" || error === "invalid") {
-        return { kind: error };
-      }
-      return { kind: "error", message: failureMessage(res) };
+      adopt(game);
+      const row = game.rows[game.rows.length - 1]!;
+      return {
+        kind: "accepted",
+        row,
+        isAnswer: isAnswerRow(row),
+        ...(game.hints && { hints: game.hints }),
+        ...(game.lost && { lost: true as const }),
+        ...revealIn(game),
+      };
     },
 
     async giveUp(): Promise<GiveUpResult> {
       if (finished) {
         return { kind: "finished" };
       }
-      const res = await call(fetch, `${base}/give-up${query}`, {});
-      if (res?.status === 429) {
-        return { kind: "rate_limited" };
+      const game = await request("/give-up", {});
+      if ("kind" in game) {
+        if (game.kind === "error" && game.code === "finished") {
+          finished = true;
+          return { kind: "finished" };
+        }
+        return refusedOf(game);
       }
-      if (res?.status === 200) {
-        const game = res.data as GameResponse;
-        adopt(game);
-        return { kind: "gaveUp", answer: game.answer!, ...revealIn(game) };
-      }
-      if (errorOf(res?.data) === "finished") {
-        finished = true;
-        return { kind: "finished" };
-      }
-      return { kind: "error", message: failureMessage(res) };
+      adopt(game);
+      return { kind: "gaveUp", answer: game.answer!, ...revealIn(game) };
     },
 
     async takeHint(kind: HintKind): Promise<HintResult> {
-      const res = await call(fetch, `${base}/hint${query}`, { kind });
-      if (res?.status === 429) {
-        return { kind: "rate_limited" };
+      const game = await request("/hint", { kind });
+      if ("kind" in game) {
+        return refusedOf(game);
       }
-      const game = res?.data as GameResponse | undefined;
-      if (res?.status === 200 && game?.hint) {
-        adopt(game);
-        return { kind: "hint", hint: game.hint };
+      if (!game.hint) {
+        // A success without the hint: nothing the player can act on
+        return { kind: "error", message: failureText(undefined, 200) };
       }
-      return { kind: "error", message: failureMessage(res) };
+      adopt(game);
+      return { kind: "hint", hint: game.hint };
     },
 
     async reset(): Promise<boolean> {
-      const res = await call(fetch, `${base}/reset${query}`, {});
-      if (res?.status !== 200) {
+      const game = await request("/reset", {});
+      if ("kind" in game) {
         return false;
       }
-      adopt(res.data as GameResponse);
+      adopt(game);
       return true;
     },
 
     getUsedGuesses: (): number[] => ids,
     getDay: (): number | null => day,
+    ...boardClock(storage, () => day),
   };
   return play;
 }

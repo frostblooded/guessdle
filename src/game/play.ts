@@ -8,11 +8,12 @@ import {
   type GradedAttribute,
 } from "./game.ts";
 import {
+  boardClock,
   createGameState,
   type GameState,
   type StateStorage,
 } from "./game-state.ts";
-import { call, failureMessage, type Fetch } from "./transport.ts";
+import { send, type Fetch, type Refused } from "./transport.ts";
 
 // What a finished day reveals: the answer's name, its description when it has one, and a Blur
 // game's whole image
@@ -77,9 +78,6 @@ export interface LoadFailure {
   failure: string;
 }
 
-// A POST the server did not accept: too many requests, or the text of why not
-type Refused = { kind: "rate_limited" } | { kind: "error"; message: string };
-
 // What the Play page says for any rate-limited load, guess, give-up or merge, anonymous or signed in
 export const RATE_LIMITED =
   "Too many requests in a short time. Wait a minute, then try again.";
@@ -88,9 +86,17 @@ export const RATE_LIMITED =
 export const ANSWER_CHANGED =
   "Today's answer was changed, so your board started over.";
 
-// The player's text for a refused POST
+// The player's text for a refused request
 export const refusalText = (refused: Refused): string =>
   refused.kind === "error" ? refused.message : RATE_LIMITED;
+
+// A refusal as the play results carry it, without the failure code
+export const refusedOf = (
+  refused: Refused,
+): { kind: "rate_limited" } | { kind: "error"; message: string } =>
+  refused.kind === "error"
+    ? { kind: "error", message: refused.message }
+    : refused;
 
 export type SubmitResult =
   | { kind: "invalid" }
@@ -144,6 +150,10 @@ export interface Play {
   getUsedGuesses(): number[];
   // The Day Number the server last answered for, null before any answer
   getDay(): number | null;
+  // The solve clock, kept with the board on this browser: call on a fresh board's first guess
+  startClock(): void;
+  // Whole seconds since this browser started the clock on this day's board, else null
+  solveSeconds(): number | null;
 }
 
 export interface PlayDeps {
@@ -189,16 +199,8 @@ export function createPlay({
   const offered = (res: GradeResponse): HintChoices | undefined =>
     state.getHint() === null ? res.hints : undefined;
 
-  // The parsed body of a successful POST, or why there is none
-  async function post<T>(url: string, body: unknown): Promise<T | Refused> {
-    const res = await call(fetch, url, body);
-    if (res?.status === 429) {
-      return { kind: "rate_limited" };
-    }
-    return res?.ok
-      ? (res.data as T)
-      : { kind: "error", message: failureMessage(res) };
-  }
+  const post = <T>(url: string, body: unknown): Promise<T | Refused> =>
+    send<T>(fetch, url, body);
 
   // True if the response is from a newer day than the stored game, or the day's answer
   // changed since; the stored game is then forgotten. Otherwise stores the day and revision.
@@ -284,7 +286,7 @@ export function createPlay({
         ...who,
       });
       if ("kind" in res) {
-        return res;
+        return refusedOf(res);
       }
       if (isNewDay(res)) {
         return play.submit(id);
@@ -313,7 +315,7 @@ export function createPlay({
         kind,
       });
       if ("kind" in res) {
-        return res;
+        return refusedOf(res);
       }
       if (isNewDay(res)) {
         return { kind: "newday" };
@@ -328,7 +330,7 @@ export function createPlay({
       }
       const res = await post<GiveUpResponse>(giveUpUrl, who);
       if ("kind" in res) {
-        return res;
+        return refusedOf(res);
       }
       if (isNewDay(res)) {
         return { kind: "newday" };
@@ -346,6 +348,7 @@ export function createPlay({
 
     getUsedGuesses: state.getUsedGuesses,
     getDay: state.getDay,
+    ...boardClock(storage, state.getDay, () => now().getTime()),
   };
   return play;
 }
