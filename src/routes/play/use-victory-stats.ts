@@ -94,6 +94,9 @@ export function useVictoryStats(
         day,
       );
       if (fresh) {
+        if (fresh.board) {
+          setThisTry(fresh.board);
+        }
         setStats(fresh);
       } else {
         setFailed(true);
