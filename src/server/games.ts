@@ -1,5 +1,4 @@
 // Game, attribute and entry data: the one seam between routes and the tables.
-import { DEFAULT_SHOTS, MAX_BLUR_TRIES } from "../game/limits.ts";
 import type pg from "pg";
 import type { AttributeValue } from "../game/correctness.ts";
 import { firstImage, type Entry, type GameAttribute } from "../game/game.ts";
@@ -8,6 +7,7 @@ import type { GameKind } from "../game/blur.ts";
 import type { QuizSpec } from "../game/quiz.ts";
 import { listAttributes, type AttributeRow } from "./attributes.ts";
 import { isAnswerable, isIncomplete } from "./completeness.ts";
+import { KINDS } from "../game/kinds.ts";
 import type { EditKind } from "./lifecycle.ts";
 import { OWNER_BANNED } from "./users.ts";
 
@@ -115,38 +115,35 @@ export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
     return (attr.type === "list" ? list : (list[0] ?? "")) as AttributeValue;
   };
   const attrs = attributes.map(({ name, type }) => ({ name, type }));
+  const kind = KINDS[game.kind];
   const all = entries.rows.map(
     ({ id, name, photo, description, blurOrder, shots, quiz }): Entry => {
       const values = attributes.map((attr) => cell(id, attr));
       return {
         id,
         name,
-        photo:
-          game.kind === "blur" || game.kind === "quiz"
-            ? photo
-            : firstImage(attrs, values),
+        photo: kind.photo ? photo : firstImage(attrs, values),
         values,
         description,
-        ...(game.kind === "blur" && blurOrder && { blurOrder }),
-        ...(game.kind === "sequence" && { shots }),
-        ...(game.kind === "quiz" && quiz && { quiz }),
+        ...(kind.blurOrder && blurOrder && { blurOrder }),
+        ...(kind.shots && { shots }),
+        ...(kind.quiz && quiz && { quiz }),
       };
     },
   );
   const active = all.filter((_, i) => !entries.rows[i]!.deleted);
   const answerIds = active
-    .filter((entry) => isAnswerable(game, entry))
+    .filter((entry) => isAnswerable(game, attrs, entry))
     .map((entry) => entry.id);
   return {
     attributes: attrs,
     entries: active,
     all,
-    incomplete:
-      game.kind === "sequence"
-        ? answerIds.length === 0
-          ? active.length
-          : 0
-        : active.filter((entry) => isIncomplete(game, attrs, entry)).length,
+    incomplete: kind.pauses
+      ? active.filter((entry) => isIncomplete(game, attrs, entry)).length
+      : answerIds.length === 0
+        ? active.length
+        : 0,
     answerIds,
   };
 }
@@ -186,14 +183,7 @@ export async function createGame(
       await q.query(
         `insert into games (slug, name, owner_id, start_date, kind, blur_tries)
          values ($1, $2, $3, $4, $5, $6) on conflict (slug) do nothing`,
-        [
-          candidate,
-          name,
-          ownerId,
-          startDate,
-          kind,
-          kind === "sequence" ? DEFAULT_SHOTS : MAX_BLUR_TRIES,
-        ],
+        [candidate, name, ownerId, startDate, kind, KINDS[kind].tries],
       )
     ).rowCount === 1;
   if ("typed" in slug) {

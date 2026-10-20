@@ -1,6 +1,6 @@
 // What a game needs from its entries before it plays, and which entries may be an answer.
 import { hasAllValues, type Entry, type GameAttribute } from "../game/game.ts";
-import { hasAllShots } from "../game/sequence.ts";
+import { isComplete, KINDS } from "../game/kinds.ts";
 import type { GameRow } from "./games.ts";
 
 // SQL true when the game aliased `g` has an active entry missing a value (no value rows for a
@@ -20,22 +20,27 @@ else exists (
   where e.game_id = g.id and e.deleted_at is null and a.type <> 'image' and not exists (
     select 1 from entry_values v where v.entry_id = e.id and v.attribute_id = a.id)) end)`;
 
-// An entry that pauses its game: a value missing, in a Blur game its photo or square order, or
-// a Quiz question's answer.
-// A Sequence entry never does on its own: without every photo it just cannot be the answer.
-export const isIncomplete = (
+const complete = (
   game: GameRow,
   roster: readonly GameAttribute[],
   entry: Entry,
 ): boolean =>
-  game.kind === "sequence"
-    ? false
-    : game.kind === "quiz"
-      ? entry.quiz === undefined
-      : game.kind === "blur"
-        ? entry.photo === "" || entry.blurOrder === undefined
-        : !hasAllValues(roster, entry.values);
+  isComplete(game.kind, entry, {
+    valuesFilled: hasAllValues(roster, entry.values),
+    tries: game.blurTries,
+  });
 
-// Whether the entry may be a day's answer (other kinds pause instead while one is incomplete)
-export const isAnswerable = (game: GameRow, entry: Entry): boolean =>
-  game.kind !== "sequence" || hasAllShots(entry.shots ?? [], game.blurTries);
+// An entry that pauses its game (KINDS: every kind but Sequence)
+export const isIncomplete = (
+  game: GameRow,
+  roster: readonly GameAttribute[],
+  entry: Entry,
+): boolean => KINDS[game.kind].pauses && !complete(game, roster, entry);
+
+// Whether the entry may be a day's answer (kinds that pause instead never draw while one is
+// incomplete)
+export const isAnswerable = (
+  game: GameRow,
+  roster: readonly GameAttribute[],
+  entry: Entry,
+): boolean => KINDS[game.kind].pauses || complete(game, roster, entry);
