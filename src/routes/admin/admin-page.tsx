@@ -1,4 +1,5 @@
-// /admin: Users, Backups, Approval queue and All games tabs (answers live in each game's editor).
+// /admin: Users, Backups, Approval queue, All games and Maintenance tabs (answers live in each
+// game's editor). During maintenance only the Maintenance tab shows, to turn it off.
 import { useState } from "react";
 import { Link } from "react-router";
 import { MessageCard, PageHead } from "../../components/page.tsx";
@@ -13,7 +14,9 @@ import {
 import { useMe } from "../../lib/api.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { BackupPanel } from "./backup-panel.tsx";
+import { useMaintenance } from "../maintenance-page.tsx";
 import { GamesPanel } from "./games-panel.tsx";
+import { MaintenancePanel } from "./maintenance-panel.tsx";
 import { QueuePanel } from "./queue-panel.tsx";
 import { UsersPanel } from "./users-panel.tsx";
 
@@ -22,22 +25,26 @@ const TABS = [
   ["backup", "Backups", "backup-panel", BackupPanel],
   ["queue", "Approval queue", "queue-panel", QueuePanel],
   ["games", "All games", "games-panel", GamesPanel],
+  ["maintenance", "Maintenance", "maintenance-panel", MaintenancePanel],
 ] as const;
 
 function AdminApp() {
-  const [tab, setTab] = useState("users");
+  const down = useMaintenance().data?.on === true;
+  const [picked, setTab] = useState("users");
+  const tab = down ? "maintenance" : picked;
+  const tabs = down ? TABS.filter(([value]) => value === "maintenance") : TABS;
   return (
     <div id="admin-app">
       <PageHead title="Admin" />
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList id="admin-tabs" aria-label="Admin sections">
-          {TABS.map(([value, label, panel]) => (
+          {tabs.map(([value, label, panel]) => (
             <TabsTrigger key={value} value={value} panelId={panel}>
               {label}
             </TabsTrigger>
           ))}
         </TabsList>
-        {TABS.map(([value, , panel, Panel]) => (
+        {tabs.map(([value, , panel, Panel]) => (
           <TabsContent key={value} value={value} selected={tab} asChild>
             <Card id={panel} className="p-6">
               <Panel active={tab === value} />

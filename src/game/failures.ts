@@ -158,6 +158,10 @@ export const FAILURES = {
     409,
     `No free hint is available right now. It opens after ${FREE_HINT_AFTER} wrong guesses, once per game.`,
   ),
+  maintenance: failure(
+    503,
+    "The site is down for maintenance. Try again a bit later.",
+  ),
   rate_limited: failure(
     429,
     "Too many changes in a short time. Wait a minute and retry.",
