@@ -173,6 +173,14 @@ export function boardOf(
   };
 }
 
+// A believable solve time in seconds, or null
+export const knownSeconds = (seconds: unknown): number | null =>
+  Number.isInteger(seconds) &&
+  (seconds as number) >= 0 &&
+  (seconds as number) <= MAX_SECONDS
+    ? (seconds as number)
+    : null;
+
 // Records `player`'s first win of the day and answers with the day's stats. `ids` must be a
 // gradable list ending with the answer; `seconds` outside 0 to MAX_SECONDS is kept as unknown.
 // A replay after a reset changes nothing.
@@ -190,12 +198,7 @@ export async function recordWin(
   const key = { gameId: day.game.id, date: day.date, player };
   await recordResult(q, key, {
     guesses: ids.length,
-    seconds:
-      Number.isInteger(seconds) &&
-      (seconds as number) >= 0 &&
-      (seconds as number) <= MAX_SECONDS
-        ? (seconds as number)
-        : null,
+    seconds: knownSeconds(seconds),
   });
   return dayStats(q, key, day.day);
 }

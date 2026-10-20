@@ -221,3 +221,25 @@ test("a guest win is dropped once the player signs in and wins", async ({
   await expect(dialog.locator("#stats-guesses")).toHaveText("1");
   await expect(dialog.locator("#stats-replay")).toHaveCount(0);
 });
+
+test("See stats shows the time of a win played on another device", async ({
+  page,
+  request,
+}) => {
+  const answer = await findAnswerName(request);
+  const [wrong] = wrongNames(answer);
+  await stubLogin(page, newEmail());
+  // Another device: the guesses go straight to the server
+  const ids = (name: string): number =>
+    GUESS_DATA.find((pet) => pet.name === name)!.id;
+  for (const name of [wrong!, answer]) {
+    await page.request.post("/api/games/petdle/state/guess", {
+      data: { id: ids(name) },
+    });
+  }
+  await page.goto("/g/petdle");
+  await page.locator("#stats-button").click();
+  const dialog = page.locator("#stats-dialog");
+  await expect(dialog.locator("#stats-guesses")).toHaveText("2");
+  await expect(dialog.locator("#stats-time")).toHaveText("0s");
+});
