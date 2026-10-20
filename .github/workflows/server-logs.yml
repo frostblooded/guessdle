@@ -1,8 +1,8 @@
 name: Server logs
 
 # Prints the prod stack's state and recent logs from the home server, for when nobody can SSH in.
-# The repo is public, so anyone can read this run's log: emails and URL query values (sign-in tokens) are masked; delete the run when
-# done (docs/deploy.md).
+# The repo is public, so anyone can read this run's log: emails and URL query values (sign-in
+# tokens) are masked; delete the run when done (docs/deploy.md).
 on:
   workflow_dispatch:
     inputs:
