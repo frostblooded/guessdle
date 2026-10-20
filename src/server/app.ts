@@ -13,6 +13,7 @@ import { gameRoutes } from "./routes/game.ts";
 import { manageRoutes } from "./routes/manage.ts";
 import { partyRoutes } from "./routes/parties.ts";
 import { createPartyHub, type PartyHub } from "./party-hub.ts";
+import { maintenanceRoutes } from "./routes/maintenance.ts";
 import { shellRoutes } from "./routes/shell.ts";
 import { uploadRoutes } from "./routes/uploads.ts";
 import { blurRoutes } from "./routes/blur.ts";
@@ -115,6 +116,7 @@ export function createApp({
     }
   });
 
+  maintenanceRoutes(app, ctx);
   authRoutes(app, ctx, { adminEmails, testLogin });
   adminRoutes(app, ctx, backupDir, uploadsDir);
   gameRoutes(app, ctx);

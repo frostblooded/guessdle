@@ -1,4 +1,4 @@
-import { Route, Routes, useLocation } from "react-router";
+import { Navigate, Route, Routes, useLocation } from "react-router";
 import { Layout } from "./components/layout.tsx";
 import { AdminPage } from "./routes/admin/admin-page.tsx";
 import { CreatePage } from "./routes/create-page.tsx";
@@ -7,6 +7,7 @@ import { FriendsPage } from "./routes/friends-page.tsx";
 import { GalleryPage } from "./routes/gallery-page.tsx";
 import { HowToPlayPage } from "./routes/how-to-play-page.tsx";
 import { LoginPage } from "./routes/login-page.tsx";
+import { MaintenancePage, useMaintenance } from "./routes/maintenance-page.tsx";
 import { MyGamesPage } from "./routes/my-games-page.tsx";
 import { NotFoundPage } from "./routes/not-found-page.tsx";
 import { PartyPage } from "./routes/party/party-page.tsx";
@@ -21,14 +22,26 @@ import { PlayPage } from "./routes/play/play-page.tsx";
 import { SettingsPage } from "./routes/settings-page.tsx";
 import { VerifyPage } from "./routes/verify-page.tsx";
 
+const OPEN_IN_MAINTENANCE = ["/login", "/verify", "/admin"];
+
 // The same paths the dev server and nginx answer with 200 (ADR 0018); anything else is a 404 there and here
 export function App({ legacyWiped }: { legacyWiped: boolean }) {
   const { pathname } = useLocation();
   // Trailing slashes are not special-cased (ADR 0012): /login/ is not /login
   const slashed = pathname !== "/" && pathname.endsWith("/");
+  // Pages render while the check loads, so it never delays them; maintenance swaps in when it answers
+  const maintenance = useMaintenance();
+  const down = maintenance.data?.on === true;
+  const forced = maintenance.data?.forced === true;
+  // During maintenance only sign-in and the admin panel (to turn it off) stay; the server blocks the rest too
+  const open = !down || (!forced && OPEN_IN_MAINTENANCE.includes(pathname));
   return (
     <Layout legacyWiped={legacyWiped}>
-      {slashed ? (
+      {down && pathname === "/" ? (
+        <MaintenancePage forced={forced} />
+      ) : !open ? (
+        <Navigate to="/" replace />
+      ) : slashed ? (
         <NotFoundPage />
       ) : (
         <Routes>
