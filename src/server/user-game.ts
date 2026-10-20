@@ -9,6 +9,7 @@ import {
   type HintPick,
 } from "../game/free-hint.ts";
 import { SKIP, type GradedAttribute } from "../game/game.ts";
+import type { FailureCode } from "../game/failures.ts";
 import { isImageGame } from "../game/blur.ts";
 import type { GameRow, Roster } from "./games.ts";
 import { boardOf, isLost, triesOf, type PlayDay } from "./play-day.ts";
@@ -41,19 +42,18 @@ const isGuessId = (game: GameRow, roster: Roster, id: unknown): boolean =>
   (id === SKIP && isImageGame(game.kind)) ||
   roster.entries.some((e) => e.id === id);
 
-// Each refusal and the HTTP status it answers with
-export const REFUSAL_STATUS = {
-  invalid: 400,
-  duplicate: 409,
-  finished: 409,
-  // merge: the account already has rows for the day
-  has_progress: 409,
-  // merge: the payload is for another day, or for an answer since changed
-  stale_day: 409,
-  // hint: none on offer (too few guesses, already used, finished, or nothing to reveal)
-  no_hint: 409,
-} as const;
-export type Refusal = keyof typeof REFUSAL_STATUS;
+// Why a change is refused; statuses and texts live in FAILURES.
+// has_progress, stale_day: merge only (the account already has rows for the day; the
+// payload is for another day or an answer since changed). no_hint: none on offer.
+export type Refusal = Extract<
+  FailureCode,
+  | "invalid"
+  | "duplicate"
+  | "finished"
+  | "has_progress"
+  | "stale_day"
+  | "no_hint"
+>;
 export type GameOutcome = { kind: "ok"; view: GameView } | { kind: Refusal };
 
 type Q = Pick<pg.Pool, "query">;

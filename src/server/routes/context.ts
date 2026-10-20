@@ -32,9 +32,12 @@ export const queryOf = (req: Request): Record<string, unknown> =>
 export const paramOf = (req: Request, name: string): unknown =>
   req.params[name];
 
-// Sends a failure code with the status the table gives it
-export const fail = (res: Response, code: FailureCode): void => {
-  res.status(FAILURES[code].status).json({ error: code });
+// Sends a failure code with the status the table gives it; once a Day of play is
+// known the reply names it
+export const fail = (res: Response, code: FailureCode, day?: number): void => {
+  res
+    .status(FAILURES[code].status)
+    .json({ error: code, ...(day !== undefined && { day }) });
 };
 
 // A guess list as a request sends it: at most one guess per entry, or for a Blur or Sequence
@@ -95,8 +98,5 @@ export async function playDayOf(
 
 // A day's refusal with its status; once the day is known the reply names it
 export function sendRefusal(res: Response, out: DayRefusal): void {
-  res.status(FAILURES[out.refusal].status).json({
-    error: out.refusal satisfies FailureCode,
-    ...("day" in out && { day: out.day }),
-  });
+  fail(res, out.refusal, "day" in out ? out.day : undefined);
 }

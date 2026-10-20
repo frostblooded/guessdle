@@ -28,7 +28,6 @@ import {
   giveUp,
   mergeLocal,
   resetGame,
-  REFUSAL_STATUS,
   takeHint,
   view,
   type GameContext,
@@ -37,6 +36,7 @@ import {
 } from "../user-game.ts";
 import {
   bodyOf,
+  fail,
   isIdList,
   loadGame,
   playDayOf,
@@ -139,7 +139,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       }
       const board = boardOf(day, ids);
       if (typeof board === "string") {
-        res.status(REFUSAL_STATUS[board]).json({ error: board, day: day.day });
+        fail(res, board, day.day);
         return;
       }
       // Out of tries on the browser's first attempt: no later win that day counts
@@ -187,7 +187,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       }
       const board = boardOf(day, ids as number[]);
       if (typeof board === "string") {
-        res.status(400).json({ error: "invalid", day: day.day });
+        fail(res, "invalid", day.day);
         return;
       }
       const { attributes } = day.roster;
@@ -196,7 +196,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         pickHint(attributes, day.answer, board.rows, kind, ctx.random);
       const hint = pick && revealHint(attributes, day.answer, pick);
       if (!hint) {
-        res.status(409).json({ error: "no_hint", day: day.day });
+        fail(res, "no_hint", day.day);
         return;
       }
       res.json({ day: day.day, revision: day.revision, hint });
@@ -277,7 +277,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         (game && (await boardSeconds(pool, game))) ?? body["seconds"];
       const stats = await recordWin(pool, day, player, won, seconds);
       if (stats === "not_won") {
-        res.status(409).json({ error: "not_won", day: day.day });
+        fail(res, "not_won", day.day);
         return;
       }
       res.json(
@@ -303,7 +303,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       res.set("Cache-Control", "no-store");
       const user = await requestUser(pool, req, now());
       if (!user) {
-        res.status(401).json({ error: "unauthorized" });
+        fail(res, "unauthorized");
         return;
       }
       const loaded = await loadGame(ctx, req, res);
@@ -335,9 +335,7 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       if (out.kind === "ok") {
         game.res.json(out.view);
       } else {
-        game.res
-          .status(REFUSAL_STATUS[out.kind])
-          .json({ error: out.kind, day: game.day });
+        fail(game.res, out.kind, game.day);
       }
     });
 

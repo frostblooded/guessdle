@@ -154,6 +154,23 @@ export const FAILURES = {
     500,
     "Today's answer could not be found for this game. Reload the page; if it keeps happening, ask the game owner or an admin to check the entries.",
   ),
+  duplicate: failure(409, "You already guessed that one. Pick another."),
+  finished: failure(
+    409,
+    "Today's game is already over. Reload the page to see the result.",
+  ),
+  has_progress: failure(
+    409,
+    "Your account already has guesses for this day, so the guesses from this browser were not added. Reload the page to see them.",
+  ),
+  stale_day: failure(
+    409,
+    "The day or its answer changed since you started. Reload the page to play the current one.",
+  ),
+  not_won: failure(
+    409,
+    "Stats are kept only once you find the answer. Reload the page and finish the game first.",
+  ),
   no_hint: failure(
     409,
     `No free hint is available right now. It opens after ${FREE_HINT_AFTER} wrong guesses, once per game.`,
