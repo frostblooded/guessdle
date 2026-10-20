@@ -1,7 +1,7 @@
 name: Server logs
 
 # Prints the prod stack's state and recent logs from the home server, for when nobody can SSH in.
-# The repo is public, so anyone can read this run's log: emails are masked; delete the run when
+# The repo is public, so anyone can read this run's log: emails and URL query values (sign-in tokens) are masked; delete the run when
 # done (docs/deploy.md).
 on:
   workflow_dispatch:
@@ -22,7 +22,7 @@ jobs:
           LINES: ${{ inputs.lines }}
         run: |
           dc() { docker compose -f deploy/compose.prod.yaml "$@"; }
-          redact() { sed -E 's/[[:alnum:]._%+-]+@[[:alnum:].-]+\.[[:alpha:]]{2,}/<email>/g'; }
+          redact() { sed -E -e 's/[[:alnum:]._%+-]+@[[:alnum:].-]+\.[[:alpha:]]{2,}/<email>/g' -e 's/([?&][^=&" ]+=)[^&" ]+/\1<redacted>/g'; }
           echo "::group::Containers"; dc ps -a; echo "::endgroup::"
           echo "::group::API health"; dc exec -T web wget -qO- http://api:3000/api/health || true; echo; echo "::endgroup::"
           for s in api web db; do
