@@ -4,6 +4,7 @@ import { parseNumberValue } from "../game/number.ts";
 import { listAttributes } from "./attributes.ts";
 import type { GameRow } from "./games.ts";
 import { sameQuestion, type QuizSpec } from "../game/quiz.ts";
+import { KINDS } from "../game/kinds.ts";
 
 export interface EntryRow {
   id: number;
@@ -43,12 +44,13 @@ export async function listEntries(
      from entries e where e.game_id = $1 and e.deleted_at is null order by e.id`,
     [game.id],
   );
+  const kind = KINDS[game.kind];
   return rows.map(({ blurOrder, shots, quiz, ...r }) => ({
     ...r,
     values: r.values ?? {},
-    ...(game.kind === "blur" && { blurOrder }),
-    ...(game.kind === "sequence" && { shots }),
-    ...(game.kind === "quiz" && { quiz }),
+    ...(kind.blurOrder && { blurOrder }),
+    ...(kind.shots && { shots }),
+    ...(kind.quiz && { quiz }),
   }));
 }
 
@@ -140,14 +142,14 @@ export async function saveEntry(
   if (!attrs.every((a) => a.type === "image" || filled(String(a.id)))) {
     return "missing_values";
   }
+  // Only the fields the game's kind stores
+  const kind = KINDS[game.kind];
   if (
-    game.kind !== "blur" &&
-    game.kind !== "quiz" &&
-    input.photo !== undefined
+    (!kind.photo && input.photo !== undefined) ||
+    (!kind.quiz && input.quiz !== undefined) ||
+    (!kind.blurOrder && input.blurOrder !== undefined) ||
+    (!kind.shots && input.shots !== undefined)
   ) {
-    return "invalid";
-  }
-  if (game.kind !== "quiz" && input.quiz !== undefined) {
     return "invalid";
   }
   const quiz = input.quiz ?? current?.quiz ?? null;
@@ -159,11 +161,6 @@ export async function saveEntry(
     if (photo === "" || order === null) {
       return "missing_order";
     }
-  } else if (input.blurOrder !== undefined) {
-    return "invalid";
-  }
-  if (input.shots !== undefined && game.kind !== "sequence") {
-    return "invalid";
   }
   const shots = input.shots ?? current?.shots ?? [];
   let entryId = id;

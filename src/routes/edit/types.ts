@@ -1,7 +1,7 @@
 // What the editor's API calls answer with.
 import type { QuizSpec } from "../../game/quiz.ts";
 import type { GameKind } from "../../game/blur.ts";
-import { hasAllShots } from "../../game/sequence.ts";
+import { isComplete } from "../../game/kinds.ts";
 
 export interface Attribute {
   id: number;
@@ -26,22 +26,21 @@ export interface Entry {
 
 export const IMAGE_TYPES = "image/jpeg,image/png,image/webp";
 
-// An entry missing what its game needs: values, a Blur image and order, or (guess-only, not
-// pausing) a Sequence game's `tries` photos
+// An entry missing what its game needs (KINDS): values, a Blur image and order, a Quiz answer,
+// or (guess-only, not pausing) a Sequence game's `tries` photos
 export const isIncomplete = (
   entry: Entry,
   kind: GameKind,
   tries: number,
   attributes: readonly Attribute[],
 ): boolean =>
-  kind === "sequence"
-    ? !hasAllShots(entry.shots ?? [], tries)
-    : kind === "blur"
-      ? !entry.photo || !entry.blurOrder
-      : attributes.some(
-          (attr) =>
-            attr.type !== "image" && !entry.values[String(attr.id)]?.length,
-        );
+  !isComplete(kind, entry, {
+    valuesFilled: attributes.every(
+      (attr) =>
+        attr.type === "image" || Boolean(entry.values[String(attr.id)]?.length),
+    ),
+    tries,
+  });
 
 // The entry's picture in the editor list: a Blur entry's image, a Sequence entry's first photo,
 // a classic entry's first Image value

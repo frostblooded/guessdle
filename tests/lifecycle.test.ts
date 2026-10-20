@@ -184,7 +184,12 @@ function fake(
   return { pool, mail, log, sent };
 }
 
-const game = { id: 1, slug: "pets", name: "Pets" } as GameRow;
+const game = {
+  id: 1,
+  slug: "pets",
+  name: "Pets",
+  kind: "classic",
+} as GameRow;
 
 describe("gameLifecycle.edit", () => {
   it("mails only the owner when an approved game is reset to pending (admins later)", async () => {
