@@ -11,7 +11,7 @@
 - Health: `curl http://localhost:3000/api/health` inside the api container, or `/api/health` through the site; 503 means the API cannot reach Postgres.
 - Maintenance: admins switch it in the admin panel's Maintenance tab (stored in the database, off by default). When the API itself is broken, force it in nginx: `set $maintenance_forced 1;` near the top of `deploy/nginx.conf`, then deploy. Only `/` and its assets load (the maintenance page), other pages redirect to `/`, the API answers 503, and the admin switch cannot lift it. Set it back to `0` and deploy to hand control back to the admin switch.
 - "Bad gateway" → run `docker inspect guessdle-server` and `docker inspect cloudflared_tunnel`; both must list the same network under `Networks`.
-- GitHub Pages only serves `deploy/redirect.html` to the home server (ADR 0005).
+- Nothing deploys to GitHub Pages any more. The old Pages site keeps serving its last deployment, a redirect to the home server (ADR 0005).
 
 ## Email sign-in (production)
 

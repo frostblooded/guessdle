@@ -10,20 +10,6 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      # Pages only redirects to the home server (ADR 0005).
-      - name: Assemble deploy folder
-        run: |
-          mkdir _site
-          cp deploy/redirect.html _site/index.html
-          cp deploy/redirect.html _site/404.html
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: _site
-
   docker:
     runs-on: ubuntu-latest
     steps:
@@ -91,25 +77,8 @@ jobs:
       - name: Run e2e tests
         run: npm run test:e2e -- --shard=${{ matrix.shard }}/2
 
-  deploy:
-    needs: [build, unit, integration, e2e]
-    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    concurrency:
-      group: pages
-      cancel-in-progress: false
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v5
-
   deploy-home:
-    needs: [build, unit, integration, e2e]
+    needs: [unit, integration, e2e]
     if: github.ref == 'refs/heads/prod' && github.event_name != 'pull_request'
     runs-on: [self-hosted, home-server]
     concurrency:
