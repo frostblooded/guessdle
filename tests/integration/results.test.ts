@@ -145,7 +145,7 @@ describe("victory stats", () => {
     assert.deepEqual(body.you, { guesses: 1, seconds: null });
   });
 
-  it("counts a signed-in player by their stored guesses, not the body", async () => {
+  it("counts a signed-in player by their stored guesses and their times, not the body", async () => {
     const cookie = await login("a@x.test");
     const early = await post(`${G}/result`, { seconds: 10 }, cookie);
     assert.equal(early.status, 409);
@@ -157,11 +157,54 @@ describe("victory stats", () => {
       cookie,
     );
     assert.equal(status, 200);
-    assert.deepEqual(body.you, { guesses: 2, seconds: 20 });
+    assert.deepEqual(body.you, { guesses: 2, seconds: 0 });
     const { rows } = await db.pool.query<{ player: string }>(
       "select player from game_results",
     );
     assert.match(rows[0]!.player, /^user:\d+$/);
+  });
+
+  describe("a signed-in win's time", () => {
+    it("is timed by the server, whatever the browser sends", async () => {
+      const cookie = await login("a@x.test");
+      await post(`${G}/state/guess`, { id: OTHERS[0] }, cookie);
+      await post(`${G}/state/guess`, { id: ANSWER }, cookie);
+      // The first guess was made 95 seconds before the winning one
+      await db.pool.query(
+        "update user_guesses set guessed_at = guessed_at - interval '95 seconds' where entry_id = $1",
+        [OTHERS[0]],
+      );
+      // Another device opens See stats: it never saw the first guess
+      const { body } = await post(`${G}/result`, { seconds: null }, cookie);
+      assert.deepEqual(body.you, { guesses: 2, seconds: 95 });
+      assert.deepEqual(body.board, { guesses: 2, seconds: 95 });
+      assert.equal(body.times[2], 1);
+    });
+
+    it("shows the board's own time on a replay", async () => {
+      const cookie = await login("a@x.test");
+      await post(`${G}/state/guess`, { id: ANSWER }, cookie);
+      await post(`${G}/result`, {}, cookie);
+      await post(`${G}/state/reset`, {}, cookie);
+      await post(`${G}/state/guess`, { id: OTHERS[0] }, cookie);
+      await post(`${G}/state/guess`, { id: ANSWER }, cookie);
+      const { body } = await post(`${G}/result`, {}, cookie);
+      assert.deepEqual(body.you, { guesses: 1, seconds: 0 });
+      assert.deepEqual(body.board, { guesses: 2, seconds: 0 });
+    });
+
+    it("uses the browser's time for guesses moved in at sign-in", async () => {
+      const cookie = await login("a@x.test");
+      const merged = await post(
+        `${G}/state/merge`,
+        { day: 427, revision: 0, ids: [OTHERS[0], ANSWER], gaveUp: false },
+        cookie,
+      );
+      assert.equal(merged.status, 200);
+      const { body } = await post(`${G}/result`, { seconds: 40 }, cookie);
+      assert.deepEqual(body.you, { guesses: 2, seconds: 40 });
+      assert.deepEqual(body.board, { guesses: 2, seconds: 40 });
+    });
   });
 
   describe("a guest who signs in", () => {
@@ -182,7 +225,7 @@ describe("victory stats", () => {
         { seconds: 3, player: TOKEN_A },
         cookie,
       );
-      assert.deepEqual(body.you, { guesses: 1, seconds: 3 });
+      assert.deepEqual(body.you, { guesses: 1, seconds: 0 });
       assert.equal(body.players, 1);
       assert.equal(
         body.guesses.reduce((a: number, b: number) => a + b),
@@ -209,7 +252,7 @@ describe("victory stats", () => {
         player: TOKEN_A,
       });
       const { body } = await post(`${G}/result`, { player: TOKEN_A }, cookie);
-      assert.deepEqual(body.you, { guesses: 1, seconds: 7 });
+      assert.deepEqual(body.you, { guesses: 1, seconds: 0 });
       assert.equal(body.players, 1);
     });
 
@@ -222,7 +265,7 @@ describe("victory stats", () => {
         { seconds: 3, player: TOKEN_A },
         cookie,
       );
-      assert.deepEqual(body.you, { guesses: 1, seconds: 3 });
+      assert.deepEqual(body.you, { guesses: 1, seconds: 0 });
       assert.equal(body.firstTryFailed, undefined);
     });
 
@@ -412,7 +455,7 @@ describe("victory stats", () => {
         cookie,
       );
       assert.equal(status, 200);
-      assert.deepEqual(body.you, { guesses: 1, seconds: 7 });
+      assert.deepEqual(body.you, { guesses: 1, seconds: 0 });
     });
 
     it("refuses a day after today", async () => {

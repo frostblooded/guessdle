@@ -14,6 +14,7 @@ import { requestUser } from "../auth.ts";
 import { dropGuestResult, playerOf, recordFailure } from "../results.ts";
 import {
   boardOf,
+  knownSeconds,
   openDay,
   recordWin,
   revealOf,
@@ -22,6 +23,7 @@ import {
 } from "../play-day.ts";
 import {
   addGuess,
+  boardSeconds,
   changeGame,
   giveUp,
   mergeLocal,
@@ -267,16 +269,25 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
           body["player"],
         );
       }
-      // A signed-in win is the stored guesses; an anonymous one the ids sent
-      const won = user
-        ? (await view(pool, { ...day, userId: user.id })).ids
-        : (ids as number[]);
-      const stats = await recordWin(pool, day, player, won, body["seconds"]);
+      // A signed-in win is the stored guesses, timed by the server when it saw them all (else
+      // by the browser); an anonymous one the ids and time sent
+      const game = user && { ...day, userId: user.id };
+      const won = game ? (await view(pool, game)).ids : (ids as number[]);
+      const seconds =
+        (game && (await boardSeconds(pool, game))) ?? body["seconds"];
+      const stats = await recordWin(pool, day, player, won, seconds);
       if (stats === "not_won") {
         fail(res, "not_won", day.day);
         return;
       }
-      res.json(stats);
+      res.json(
+        game
+          ? {
+              ...stats,
+              board: { guesses: won.length, seconds: knownSeconds(seconds) },
+            }
+          : stats,
+      );
     },
   );
 

@@ -43,6 +43,8 @@ export interface DayStats {
   firstTryFailed?: true;
   // Signed-in players only: the friends who played this day, best first
   friends?: FriendResult[];
+  // Signed-in players only: the board on the account, timed by the server, so any device shows it
+  board?: WinResult;
 }
 
 export const guessBar = (guesses: number): number =>

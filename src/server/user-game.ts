@@ -101,6 +101,20 @@ export async function view(q: Q, ctx: GameContext): Promise<GameView> {
   };
 }
 
+// Whole seconds from the board's first stored guess to its last; null when a guess has no time
+export async function boardSeconds(
+  q: Q,
+  { game, userId, date }: GameContext,
+): Promise<number | null> {
+  const { rows } = await q.query<{ seconds: number | null }>(
+    `select case when count(*) > 0 and count(guessed_at) = count(*)
+       then round(extract(epoch from max(guessed_at) - min(guessed_at)))::int end as seconds
+     from user_guesses where user_id = $1 and game_id = $2 and day = $3`,
+    [userId, game.id, date],
+  );
+  return rows[0]?.seconds ?? null;
+}
+
 async function storedHint(
   q: Q,
   userId: number,
@@ -262,7 +276,8 @@ export async function mergeLocal(
   );
   for (const id of adopted) {
     await q.query(
-      "insert into user_guesses (user_id, game_id, day, entry_id) values ($1, $2, $3, $4)",
+      // No guess time: these guesses were made in the browser, which timed them
+      "insert into user_guesses (user_id, game_id, day, entry_id, guessed_at) values ($1, $2, $3, $4, null)",
       [userId, game.id, date, id === SKIP ? null : id],
     );
   }
