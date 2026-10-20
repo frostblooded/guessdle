@@ -43,6 +43,19 @@ export async function recordResult(
   );
 }
 
+// Drops the guest result this browser recorded before its player signed in: once signed
+// in, only the account counts, so one person is never two players
+export async function dropGuestResult(
+  q: Q,
+  { gameId, date }: Omit<ResultKey, "player">,
+  token: string,
+): Promise<void> {
+  await q.query(
+    "delete from game_results where game_id = $1 and day = $2 and player = $3",
+    [gameId, date, `anon:${token}`],
+  );
+}
+
 // A first attempt that ended without a win; a later win that day does not count
 export async function recordFailure(
   q: Q,
