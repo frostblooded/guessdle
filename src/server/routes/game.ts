@@ -1,37 +1,25 @@
 // Grading and give-up for anonymous players, the signed-in Game State, and victory stats.
 import express from "express";
 import type { Express, Request, Response } from "express";
-import type pg from "pg";
 import { isImageGame } from "../../game/blur.ts";
 import { isPlayerToken } from "../../game/stats.ts";
-import { isHintKind, pickHint, revealHint } from "../../game/free-hint.ts";
+import { isHintKind } from "../../game/free-hint.ts";
 import type { DaysResponse } from "../../game/days.ts";
 import { listDays } from "../days.ts";
 import { quizQuestions } from "../quiz.ts";
 import { listGallery } from "../gallery.ts";
 import { canApprove, canManage } from "../access.ts";
 import { requestUser } from "../auth.ts";
+import { knownSeconds, playerOf } from "../results.ts";
+import { openDay, todayOf, triesOf, type PlayDay } from "../play-day.ts";
 import {
-  dropGuestResult,
-  knownSeconds,
-  playerOf,
-  recordFailure,
-  recordWin,
-} from "../results.ts";
-import { boardOf, openDay, revealOf, todayOf, triesOf } from "../play-day.ts";
-import {
-  addGuess,
-  boardSeconds,
-  changeGame,
-  giveUp,
-  mergeLocal,
-  resetGame,
-  takeHint,
-  view,
-  type GameContext,
+  daySession,
+  requestStore,
+  type DaySession,
   type GameView,
   type Refusal,
-} from "../user-game.ts";
+} from "../day-session.ts";
+import { changeGame, userSession, type GameContext } from "../user-game.ts";
 import {
   bodyOf,
   fail,
@@ -118,6 +106,14 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
     } satisfies DaysResponse);
   });
 
+  // A guest's Day session over the Board the request sends; `player` from the browser's token
+  const guestSession = (
+    day: PlayDay,
+    body: Record<string, unknown>,
+    ids: readonly number[] = [],
+  ): DaySession =>
+    daySession(pool, day, playerOf(null, body), requestStore(ids), ctx.random);
+
   // Stateless grading for anonymous players. The answer is revealed only to a
   // batch containing the right guess, or one using up a Blur game's tries.
   app.post(
@@ -128,32 +124,30 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       if (!loaded) {
         return;
       }
-      const ids = bodyOf(req)["ids"] as number[];
+      const body = bodyOf(req);
+      const ids = body["ids"] as number[];
       // A malformed list is refused before the day's answer is drawn
       const valid = (): boolean => isIdList(loaded.game, loaded.roster, ids);
       const day = await playDayOf(ctx, req, res, loaded, valid);
       if (!day) {
         return;
       }
-      const board = boardOf(day, ids);
+      const board = await guestSession(day, body, ids).view();
       if (typeof board === "string") {
         fail(res, board, day.day);
         return;
       }
-      // Out of tries on the browser's first attempt: no later win that day counts
-      const player = playerOf(null, bodyOf(req));
-      if (board.lost && player !== null) {
-        await recordFailure(pool, day, player, ids.length);
-      }
       res.json({
-        day: day.day,
-        revision: day.revision,
+        day: board.day,
+        revision: board.revision,
         rows: board.rows,
         victory: board.victory,
         ...(board.lost && { lost: true }),
-        ...board.reveal,
+        answer: board.answer,
+        answerPhoto: board.answerPhoto,
+        answerDescription: board.answerDescription,
         // The browser knows whether it already used its hint, and hides these then
-        ...(board.hints && { hints: board.hints }),
+        hints: board.hints,
       });
     },
   );
@@ -168,7 +162,8 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       if (!loaded) {
         return;
       }
-      const { ids, kind } = bodyOf(req);
+      const body = bodyOf(req);
+      const { ids, kind } = body;
       const day = await playDayOf(
         ctx,
         req,
@@ -176,24 +171,15 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         loaded,
         () => isIdList(loaded.game, loaded.roster, ids) && isHintKind(kind),
       );
-      if (!day || !isHintKind(kind)) {
+      if (!day) {
         return;
       }
-      const board = boardOf(day, ids as number[]);
-      if (typeof board === "string") {
-        fail(res, "invalid", day.day);
+      const out = await guestSession(day, body, ids as number[]).hint(kind);
+      if (typeof out === "string" || !out.hint) {
+        fail(res, typeof out === "string" ? out : "no_hint", day.day);
         return;
       }
-      const { attributes } = day.roster;
-      const pick =
-        board.hints &&
-        pickHint(attributes, day.answer, board.rows, kind, ctx.random);
-      const hint = pick && revealHint(attributes, day.answer, pick);
-      if (!hint) {
-        fail(res, "no_hint", day.day);
-        return;
-      }
-      res.json({ day: day.day, revision: day.revision, hint });
+      res.json({ day: day.day, revision: day.revision, hint: out.hint });
     },
   );
 
@@ -211,22 +197,22 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       if (!day) {
         return;
       }
-      const player = playerOf(null, bodyOf(req));
-      if (player !== null) {
-        await recordFailure(pool, day, player, 0);
-      }
+      // An empty Board never refuses a give-up
+      const out = (await guestSession(day, bodyOf(req)).giveUp()) as GameView;
       res.json({
-        day: day.day,
-        revision: day.revision,
-        ...revealOf(day.game, day.answer),
+        day: out.day,
+        revision: out.revision,
+        answer: out.answer,
+        answerPhoto: out.answerPhoto,
+        answerDescription: out.answerDescription,
       });
     },
   );
 
-  // Records the player's first attempt of the day if it is a win (today, or a past day named by ?day=N) and
-  // answers with that day's stats. Signed-in
-  // players are known by their session and their stored guesses; anonymous ones by
-  // the browser's token and the ids they send, which must end with the answer.
+  // Records the player's first attempt of the day if it is a win (today, or a past day named by
+  // ?day=N) and answers with that day's stats. Signed-in players are known by their session and
+  // their stored guesses; anonymous ones by the browser's token and the ids they send, which
+  // must end with the answer.
   app.post(
     `${base}/result`,
     express.json({ limit: "10kb" }),
@@ -238,7 +224,6 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         return;
       }
       const body = bodyOf(req);
-      const player = playerOf(user?.id ?? null, body);
       const ids = body["ids"];
       const day = await playDayOf(
         ctx,
@@ -246,45 +231,46 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
         res,
         loaded,
         () =>
-          player !== null &&
+          playerOf(user?.id ?? null, body) !== null &&
           (user !== null || isIdList(loaded.game, loaded.roster, ids)),
       );
-      if (!day || player === null) {
+      if (!day) {
         return;
       }
-      if (user && isPlayerToken(body["player"])) {
-        await dropGuestResult(pool, day, body["player"]);
-      }
-      // A signed-in win is the stored guesses, timed by the server when it saw them all (else
-      // by the browser); an anonymous one the ids and time sent
-      const game = user && { ...day, userId: user.id };
-      const won = game ? (await view(pool, game)).ids : (ids as number[]);
-      const seconds =
-        (game && (await boardSeconds(pool, game))) ?? body["seconds"];
-      const stats = await recordWin(pool, day, player, won, seconds);
-      if (stats === "not_won") {
+      const won = user
+        ? await userSession(pool, { ...day, userId: user.id }, ctx.random).win(
+            body["seconds"],
+            isPlayerToken(body["player"]) ? body["player"] : undefined,
+          )
+        : await guestSession(day, body, ids as number[]).win(body["seconds"]);
+      if (won === "not_won") {
         fail(res, "not_won", day.day);
         return;
       }
       res.json(
-        game
+        user
           ? {
-              ...stats,
-              board: { guesses: won.length, seconds: knownSeconds(seconds) },
+              ...won.stats,
+              board: {
+                guesses: won.guesses,
+                seconds: knownSeconds(won.seconds),
+              },
             }
-          : stats,
+          : won.stats,
       );
     },
   );
 
   // Signed-in Game State. Every route needs a session and the day's answer
   // (today, or a past day named by ?day=N).
-  interface GameRouteCtx extends GameContext {
-    body: Record<string, unknown>;
-    res: Response;
-  }
   const gameRoute =
-    (handler: (game: GameRouteCtx) => Promise<void>) =>
+    (
+      handler: (
+        game: GameContext,
+        body: Record<string, unknown>,
+        res: Response,
+      ) => Promise<void>,
+    ) =>
     async (req: Request, res: Response): Promise<void> => {
       res.set("Cache-Control", "no-store");
       const user = await requestUser(pool, req, now());
@@ -300,68 +286,56 @@ export function gameRoutes(app: Express, ctx: AppContext): void {
       if (!day) {
         return;
       }
-      await handler({
-        ...day,
-        userId: user.id,
-        body: bodyOf(req),
-        res,
-      });
+      await handler({ ...day, userId: user.id }, bodyOf(req), res);
     };
+  // One change to the account's Board, under its lock; answers the new view or the refusal
   const changeRoute = (
     action: (
-      game: GameRouteCtx,
-      current: GameView,
-      q: Pick<pg.Pool, "query">,
-    ) => Promise<Refusal | null>,
+      session: DaySession,
+      body: Record<string, unknown>,
+    ) => Promise<GameView | Refusal>,
   ): ReturnType<typeof gameRoute> =>
-    gameRoute(async (game) => {
-      const out = await changeGame(pool, game, (current, q) =>
-        action(game, current, q),
+    gameRoute(async (game, body, res) => {
+      const out = await changeGame(pool, game, ctx.random, (session) =>
+        action(session, body),
       );
-      if (out.kind === "ok") {
-        game.res.json(out.view);
+      if (typeof out === "string") {
+        fail(res, out, game.day);
       } else {
-        fail(game.res, out.kind, game.day);
+        res.json(out);
       }
     });
 
   app.get(
     `${base}/state`,
-    gameRoute(async (game) => {
-      game.res.json(await view(pool, game));
+    gameRoute(async (game, _body, res) => {
+      res.json(await userSession(pool, game, ctx.random).view());
     }),
   );
   const json = express.json({ limit: "10kb" });
   app.post(
     `${base}/state/guess`,
     json,
-    changeRoute(({ body, ...game }, current, q) =>
-      addGuess(q, game, current, body["id"]),
-    ),
+    changeRoute((session, body) => session.guess(body["id"])),
   );
   app.post(
     `${base}/state/give-up`,
     json,
-    changeRoute((game, current, q) => giveUp(q, game, current)),
+    changeRoute((session) => session.giveUp()),
   );
   app.post(
     `${base}/state/merge`,
     json,
-    // Only today's browser guesses are adopted; past days stay where they were played
-    changeRoute(async ({ body, ...game }, current, q) =>
-      game.past ? "stale_day" : mergeLocal(q, game, current, body),
-    ),
+    changeRoute((session, body) => session.merge(body)),
   );
   app.post(
     `${base}/state/hint`,
     json,
-    changeRoute(({ body, ...game }, current, q) =>
-      takeHint(q, game, current, body["kind"], ctx.random),
-    ),
+    changeRoute((session, body) => session.hint(body["kind"])),
   );
   app.post(
     `${base}/state/reset`,
     json,
-    changeRoute((game, _current, q) => resetGame(q, game)),
+    changeRoute((session) => session.reset()),
   );
 }
