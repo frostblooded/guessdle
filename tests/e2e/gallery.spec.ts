@@ -74,7 +74,10 @@ test("an admin gets an Edit link on the original game, a visitor does not", asyn
   await expect(page.locator("#edit-link")).toBeHidden();
 
   await page.request.post("/api/test/login", {
-    data: { email: `edit-${Date.now()}@example.test`, admin: true },
+    data: {
+      email: `edit-${Date.now()}${Math.random().toString(36).slice(2, 6)}@example.test`,
+      admin: true,
+    },
   });
   await page.goto("/g/petdle");
   await expect(page.locator("#loading-state")).toBeHidden();

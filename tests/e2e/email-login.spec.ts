@@ -8,7 +8,8 @@ import { GUESS_DATA } from "./roster.ts";
 import { findAnswerName, signOutViaMenu, submitGuess } from "./helpers.ts";
 
 let counter = 0;
-const freshEmail = (): string => `link${Date.now()}-${counter++}@example.test`;
+const freshEmail = (): string =>
+  `link${Date.now()}${Math.random().toString(36).slice(2, 6)}-${counter++}@example.test`;
 
 // Types the address into the form and sends the link
 const requestLink = async (page: Page, email: string): Promise<void> => {

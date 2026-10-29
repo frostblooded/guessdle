@@ -2,7 +2,8 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 import { GUESS_DATA } from "./roster.ts";
 
 let counter = 0;
-const newEmail = (): string => `party${Date.now()}-${counter++}@example.test`;
+const newEmail = (): string =>
+  `party${Date.now()}${Math.random().toString(36).slice(2, 6)}-${counter++}@example.test`;
 
 // A phone-sized guest in its own browser
 async function phone(browser: Browser, baseURL: string): Promise<Page> {

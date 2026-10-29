@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 const stubLogin = (page: Page, admin: boolean): Promise<unknown> =>
   page.request.post("/api/test/login", {
     data: {
-      email: `${admin ? "admin" : "player"}-${Date.now()}@example.test`,
+      email: `${admin ? "admin" : "player"}-${Date.now()}${Math.random().toString(36).slice(2, 6)}@example.test`,
       admin,
     },
   });

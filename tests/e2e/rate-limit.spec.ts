@@ -21,7 +21,9 @@ const api429 = (route: Route): Promise<void> =>
 let counter = 0;
 const signIn = (page: Page): Promise<unknown> =>
   page.request.post("/api/test/login", {
-    data: { email: `rl${Date.now()}-${counter++}@example.test` },
+    data: {
+      email: `rl${Date.now()}-${counter++}${Math.random().toString(36).slice(2, 6)}@example.test`,
+    },
   });
 const input = (page: Page) => page.locator("#new-guess-input");
 const notice = (page: Page) => page.locator("#notice");

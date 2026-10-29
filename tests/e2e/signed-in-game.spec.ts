@@ -10,7 +10,8 @@ import {
 
 // Each test is its own player, so stored games never collide
 let counter = 0;
-const newEmail = (): string => `p${Date.now()}-${counter++}@example.test`;
+const newEmail = (): string =>
+  `p${Date.now()}${Math.random().toString(36).slice(2, 6)}-${counter++}@example.test`;
 const stubLogin = (page: Page, email: string): Promise<unknown> =>
   page.request.post("/api/test/login", { data: { email } });
 const wrongNames = (answer: string): string[] =>
