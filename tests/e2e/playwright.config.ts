@@ -7,6 +7,8 @@ const CHROMIUM = process.env["PW_CHROMIUM_PATH"];
 
 export default defineConfig({
   testDir: ".",
+  // Tests, not files, are spread over workers and CI shards, so the two shards finish close together
+  fullyParallel: true,
   forbidOnly: !!process.env["CI"],
   retries: process.env["CI"] ? 1 : 0,
   reporter: process.env["CI"] ? "github" : "list",

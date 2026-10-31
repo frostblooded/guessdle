@@ -10,7 +10,32 @@ permissions:
   contents: read
 
 jobs:
+  # A PR that only changes Markdown or skills skips docker, integration and e2e (skipped jobs pass
+  # required checks). Pushes always run everything, since deploy-home needs those jobs.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          code=true
+          if [ "$GITHUB_EVENT_NAME" = pull_request ] &&
+            ! git diff --name-only "$BASE...$HEAD" | grep -qvE '(\.md$|^\.claude/skills/)'; then
+            code=false
+          fi
+          echo "code=$code" | tee -a "$GITHUB_OUTPUT"
+
   docker:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -42,6 +67,8 @@ jobs:
 
   # Needs Docker (Testcontainers Postgres), which the runner has
   integration:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -53,33 +80,42 @@ jobs:
       - name: Integration tests
         run: npm run test:integration
 
-  # Split over two runners; each half starts its own server and Postgres
+  # Split over two runners; each half starts its own server and Postgres. A docs-only PR skips the
+  # steps, not the job: a skipped matrix job reports as plain "e2e", not the "e2e (1)"/"e2e (2)" checks.
   e2e:
+    needs: changes
     runs-on: ubuntu-latest
+    env:
+      RUN: ${{ needs.changes.outputs.code }}
     strategy:
       fail-fast: false
       matrix:
         shard: [1, 2]
     steps:
       - uses: actions/checkout@v7
+        if: env.RUN == 'true'
       - uses: actions/setup-node@v7
+        if: env.RUN == 'true'
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+        if: env.RUN == 'true'
       - name: Cache Playwright browser
+        if: env.RUN == 'true'
         id: playwright-cache
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Install Chromium
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        if: env.RUN == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
       - name: Install Chromium system dependencies
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        if: env.RUN == 'true' && steps.playwright-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
       - name: Run e2e tests
+        if: env.RUN == 'true'
         run: npm run test:e2e -- --shard=${{ matrix.shard }}/2
 
   deploy-home:

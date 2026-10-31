@@ -4,6 +4,8 @@ import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 const STATUS = join(tmpdir(), "petdle-e2e-backups", "status.json");
+// Every test rewrites the one status file, so they run one at a time in one worker
+test.describe.configure({ mode: "default" });
 const ago = (hours: number): string =>
   new Date(Date.now() - hours * 3600e3).toISOString();
 const dump = (hours: number, ok = true): object => ({
@@ -14,7 +16,10 @@ const dump = (hours: number, ok = true): object => ({
 
 const openBackups = async (page: Page, admin = true): Promise<void> => {
   await page.request.post("/api/test/login", {
-    data: { email: `backup-${Date.now()}@example.test`, admin },
+    data: {
+      email: `backup-${Date.now()}${Math.random().toString(36).slice(2, 6)}@example.test`,
+      admin,
+    },
   });
   await page.goto("/admin");
   await page.locator("#tab-backup").click();
@@ -77,7 +82,10 @@ test("an unreadable status file shows a clear error, not a crash", async ({
 test("the endpoint is admin only", async ({ page }) => {
   expect((await page.request.get("/api/admin/backup")).status()).toBe(401);
   await page.request.post("/api/test/login", {
-    data: { email: `plain-${Date.now()}@example.test`, admin: false },
+    data: {
+      email: `plain-${Date.now()}${Math.random().toString(36).slice(2, 6)}@example.test`,
+      admin: false,
+    },
   });
   expect((await page.request.get("/api/admin/backup")).status()).toBe(403);
 });

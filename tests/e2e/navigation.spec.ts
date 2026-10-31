@@ -67,7 +67,9 @@ test("the signed-out account area offers Sign in / Sign up", async ({
 
 test("keyboard users can reach and use the account menu", async ({ page }) => {
   await page.request.post("/api/test/login", {
-    data: { email: `kb-${Date.now()}@example.test` },
+    data: {
+      email: `kb-${Date.now()}${Math.random().toString(36).slice(2, 6)}@example.test`,
+    },
   });
   await page.goto("/");
   await page.locator("#user-menu-button").focus();

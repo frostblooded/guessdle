@@ -3,7 +3,8 @@ import { GUESS_DATA } from "./roster.ts";
 import { confirmReset, winGame } from "./helpers.ts";
 
 let counter = 0;
-const newEmail = (): string => `past${Date.now()}-${counter++}@example.test`;
+const newEmail = (): string =>
+  `past${Date.now()}${Math.random().toString(36).slice(2, 6)}-${counter++}@example.test`;
 
 // Today's Day Number, from the Past days list
 async function today(request: APIRequestContext): Promise<number> {
