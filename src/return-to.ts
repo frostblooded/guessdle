@@ -2,10 +2,23 @@
 const KEY = "returnTo";
 
 // Same-site paths only: an open redirect must not survive a crafted ?next=
-export const safeNext = (value: string | null): string | null =>
-  value !== null && /^\/(?![/\\])/.test(value) && !/[\r\n]/.test(value)
-    ? value
-    : null;
+// Browsers drop tabs and newlines and read a backslash as "/" while parsing, so "/\t/evil.test" became
+// "//evil.test": refuse controls, spaces and backslashes, then check the parsed origin too.
+const HOME = "https://guessdle.invalid";
+export const safeNext = (value: string | null): string | null => {
+  if (
+    value === null ||
+    !value.startsWith("/") ||
+    [...value].some((c) => c <= " " || c === "\u007f" || c === "\\")
+  ) {
+    return null;
+  }
+  try {
+    return new URL(value, HOME).origin === HOME ? value : null;
+  } catch {
+    return null;
+  }
+};
 
 export function rememberReturnTo(storage: Storage, value: string | null): void {
   const next = safeNext(value);

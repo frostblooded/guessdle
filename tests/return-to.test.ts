@@ -23,6 +23,12 @@ describe("return-to", () => {
       "/\\evil.test",
       "https://evil.test",
       "/a\nb",
+      "/\t/evil.test",
+      "/\n/evil.test",
+      "/\r/evil.test",
+      "/ /evil.test",
+      "/\u0000/evil.test",
+      "/x\\..\\/evil.test",
     ]) {
       assert.equal(safeNext(bad), null, String(bad));
     }
