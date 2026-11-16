@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import type { Server } from "node:http";
-import type { AddressInfo } from "node:net";
+import { once } from "node:events";
+import { connect, type AddressInfo } from "node:net";
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import { WebSocket } from "ws";
 import { attachPartySockets, createApp } from "../../src/server/app.ts";
@@ -523,6 +524,26 @@ describe("party mode", () => {
         /403/,
       );
       await assert.rejects(phone("ZZZZ"), /404/);
+    });
+
+    it("refuses a code that is not valid percent-encoding, and keeps serving", async () => {
+      await assert.rejects(phone("%FF"), /400/);
+      await assert.rejects(phone("%E0%A4"), /400/);
+      const { code } = await host();
+      await (await phone(code)).view();
+    });
+
+    it("survives an upgrade whose request target is not a URL", async () => {
+      const { port } = new URL(url);
+      const raw = connect(Number(port), "127.0.0.1");
+      await once(raw, "connect");
+      raw.end(
+        "GET http://[ HTTP/1.1\r\nHost: x\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n" +
+          "Sec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n",
+      );
+      await once(raw, "close");
+      const { code } = await host();
+      await (await phone(code)).view();
     });
 
     it("rejoins a dropped phone as the same player, guesses kept", async () => {

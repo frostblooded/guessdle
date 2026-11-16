@@ -226,7 +226,15 @@ export function createPartyHub({ pool, now, random }: AppContext): PartyHub {
         refuse(socket, "403 Forbidden");
         return;
       }
-      const code = normalizeCode(decodeURIComponent(match[1]!));
+      // Runs outside Express, so a throw here would end the whole process: %FF is malformed UTF-8
+      let raw: string;
+      try {
+        raw = decodeURIComponent(match[1]!);
+      } catch {
+        refuse(socket, "400 Bad Request");
+        return;
+      }
+      const code = normalizeCode(raw);
       void (async () => {
         const party = code === null ? null : await findParty(pool, code, now());
         if (!party) {

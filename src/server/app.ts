@@ -59,7 +59,15 @@ const hubs = new WeakMap<Express, PartyHub>();
 // Closing the server closes the hub.
 export function attachPartySockets(server: Server, app: Express): void {
   const hub = hubs.get(app)!;
-  server.on("upgrade", hub.upgrade);
+  // A throw from an upgrade listener would end the process (no Express error handling here)
+  server.on("upgrade", (req, socket, head) => {
+    try {
+      hub.upgrade(req, socket, head);
+    } catch (error) {
+      console.error("party socket upgrade failed", error);
+      socket.destroy();
+    }
+  });
   server.on("close", hub.close);
 }
 
