@@ -47,8 +47,10 @@ export async function recordScore(
     [gameId, player, score, seconds, now],
   );
   const { rows } = await q.query<{ player: string; score: number }>(
-    "select player, score::float8 as score from quiz_results where game_id = $1",
-    [gameId],
+    // Accounts only, plus the caller's own row: guest tokens are unverified (see dayStats)
+    `select player, score::float8 as score from quiz_results
+     where game_id = $1 and (player = $2 or player like 'user:%')`,
+    [gameId, player],
   );
   const userId = userIdOf(player);
   return {

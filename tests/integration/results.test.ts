@@ -97,12 +97,26 @@ describe("victory stats", () => {
     assert.equal(replay.body.players, 1);
   });
 
+  // A win stored under an account, with a time the test picks
+  const accountWin = async (
+    email: string,
+    ids: (number | undefined)[],
+    seconds: number,
+  ) => {
+    await login(email);
+    await post(`${G}/result`, { ids, seconds, player: TOKEN_B });
+    await db.pool.query(
+      "update game_results r set player = 'user:' || u.id from users u where u.email = $1 and r.player = $2",
+      [email, `anon:${TOKEN_B}`],
+    );
+  };
+
   it("compares the player with the other winners", async () => {
-    await post(`${G}/result`, {
-      ids: [OTHERS[0], OTHERS[1], OTHERS[2], ANSWER],
-      seconds: 300,
-      player: TOKEN_B,
-    });
+    await accountWin(
+      "b@x.test",
+      [OTHERS[0], OTHERS[1], OTHERS[2], ANSWER],
+      300,
+    );
     const { body } = await post(`${G}/result`, {
       ids: [OTHERS[0], ANSWER],
       seconds: 30,
@@ -111,6 +125,17 @@ describe("victory stats", () => {
     assert.equal(body.players, 2);
     assert.equal(body.fewerGuessesThan, 100);
     assert.equal(body.fasterThan, 100);
+  });
+
+  it("leaves guest wins out of everyone else's stats", async () => {
+    await post(`${G}/result`, { ids: [ANSWER], seconds: 1, player: TOKEN_B });
+    const { body } = await post(`${G}/result`, {
+      ids: [OTHERS[0], ANSWER],
+      seconds: 30,
+      player: TOKEN_A,
+    });
+    assert.equal(body.players, 1);
+    assert.deepEqual(body.you, { guesses: 2, seconds: 30 });
   });
 
   it("refuses a list that does not end with the answer", async () => {
@@ -273,8 +298,12 @@ describe("victory stats", () => {
       await post(`${G}/result`, { ids: [ANSWER], player: TOKEN_B });
       const cookie = await login("a@x.test");
       await winSignedIn(cookie);
-      const { body } = await post(`${G}/result`, { player: TOKEN_A }, cookie);
-      assert.equal(body.players, 2);
+      await post(`${G}/result`, { player: TOKEN_A }, cookie);
+      const { rows } = await db.pool.query(
+        "select 1 from game_results where player = $1",
+        [`anon:${TOKEN_B}`],
+      );
+      assert.equal(rows.length, 1);
     });
   });
 

@@ -107,12 +107,14 @@ export async function dayStats(
   { gameId, date, player }: ResultKey,
   day: number,
 ): Promise<DayStats> {
-  // A banned player's wins leave the stats while the ban lasts, except in their own view
+  // Only accounts count for everyone: a guest token is whatever the browser sends, so guest
+  // results could be forged at will. A guest still sees their own row. A banned player's wins
+  // leave the stats while the ban lasts, except in their own view.
   const { rows } = await q.query<WinResult & { player: string; won: boolean }>(
     `select r.player, r.guesses, r.seconds, r.won from game_results r
-     where r.game_id = $1 and r.day = $2 and (r.player = $3 or not exists (
+     where r.game_id = $1 and r.day = $2 and (r.player = $3 or (r.player like 'user:%' and not exists (
        select 1 from users u where r.player = 'user:' || u.id and u.banned_at is not null
-     ))`,
+     )))`,
     [gameId, date, player],
   );
   const mine = rows.find((row) => row.player === player);
