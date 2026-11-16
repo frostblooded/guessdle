@@ -97,35 +97,40 @@ export function gameEdits(ctx: EditContext, uploadsDir: string) {
       id: number | undefined,
       input: EntryInput,
     ): Promise<SaveEntryResult> {
-      const current =
-        id === undefined
-          ? undefined
-          : (await listEntries(pool, game)).find((e) => e.id === id);
-      // Every picture sent, the photo, each Image value and each Sequence shot, with what it
-      // replaces
-      const images = (await listAttributes(pool, game))
-        .filter(
-          (a) => a.type === "image" && String(a.id) in (input.values ?? {}),
-        )
-        .map((a) => ({
-          url: input.values![String(a.id)]![0] ?? "",
-          current: current?.values[String(a.id)]?.[0] ?? "",
-        }));
-      if (input.photo !== undefined) {
-        images.push({ url: input.photo, current: current?.photo ?? "" });
-      }
-      for (const url of input.shots ?? []) {
-        images.push({ url, current: current?.shots?.includes(url) ? url : "" });
-      }
-      for (const { url, current } of images) {
-        if (!(await mayAttach(game, editor, url, current))) {
-          return "invalid";
-        }
-      }
       const out = await lifecycle.edit(
         game,
         "entries",
         async (tx) => {
+          // Checked under the game lock: an attribute retyped to Image between a check made
+          // before it and this write would let a URL that is not an upload through
+          const current =
+            id === undefined
+              ? undefined
+              : (await listEntries(tx, game)).find((e) => e.id === id);
+          // Every picture sent, the photo, each Image value and each Sequence shot, with what it
+          // replaces
+          const images = (await listAttributes(tx, game))
+            .filter(
+              (a) => a.type === "image" && String(a.id) in (input.values ?? {}),
+            )
+            .map((a) => ({
+              url: input.values![String(a.id)]![0] ?? "",
+              current: current?.values[String(a.id)]?.[0] ?? "",
+            }));
+          if (input.photo !== undefined) {
+            images.push({ url: input.photo, current: current?.photo ?? "" });
+          }
+          for (const url of input.shots ?? []) {
+            images.push({
+              url,
+              current: current?.shots?.includes(url) ? url : "",
+            });
+          }
+          for (const { url, current } of images) {
+            if (!(await mayAttach(game, editor, url, current))) {
+              return "invalid" as const;
+            }
+          }
           const saved = await saveEntry(tx, game, id, input);
           if (typeof saved !== "string") {
             await rescheduleFuture(tx, game, today(), random);

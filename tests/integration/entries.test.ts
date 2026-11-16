@@ -289,6 +289,30 @@ describe("game entries", () => {
       assert.equal(res.status, 400);
     });
 
+    it("checks pictures under the game lock, so a retype to Image mid-save is caught", async () => {
+      // Another edit holds the game and retypes a Text attribute to Image while this save waits
+      const other = await db.pool.connect();
+      await other.query("begin");
+      await other.query(
+        "select 1 from games where slug = 'ann-game' for update",
+      );
+      const saving = add({
+        name: "Rex",
+        values: { [originId]: "https://evil.example/x.png" },
+      });
+      await new Promise((r) => setTimeout(r, 300));
+      await other.query("delete from entry_values where attribute_id = $1", [
+        originId,
+      ]);
+      await other.query("update attributes set type = 'image' where id = $1", [
+        originId,
+      ]);
+      await other.query("commit");
+      other.release();
+      assert.equal((await saving).status, 400);
+      assert.equal(await one("Rex"), undefined);
+    });
+
     it("replacing or removing a picture deletes the old upload", async () => {
       await add({ name: "Rex", values: { [photoId]: file(1) } });
       const id = (await one("Rex")).id;
