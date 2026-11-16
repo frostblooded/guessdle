@@ -199,10 +199,12 @@ describe("quiz games", () => {
     assert.equal(again.body.score, 2);
     assert.equal(again.body.stats.first, 1.5);
     assert.equal(again.body.stats.players, 1);
-    // Another player who answers nothing scores 0
+    // Another guest who answers nothing scores 0 and sees only their own score: guest scores
+    // stay out of everyone else's stats
     const blank = await take({}, "b".repeat(20));
     assert.equal(blank.body.score, 0);
-    assert.deepEqual(blank.body.stats.spread, [1, 1, 0]);
+    assert.deepEqual(blank.body.stats.spread, [1, 0, 0]);
+    assert.equal(blank.body.stats.players, 1);
     assert.equal(
       (
         await request("POST", `${G}/quiz`, undefined, {
