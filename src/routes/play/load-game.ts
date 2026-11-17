@@ -1,4 +1,5 @@
 // Play's view of a game: what GET /api/games/:slug answers.
+import { browserFetch } from "../../lib/api.ts";
 import { failureText, UNREACHABLE } from "../../game/failures.ts";
 import type { GameKind } from "../../game/blur.ts";
 import type { EntryRef, GameAttribute } from "../../game/game.ts";
@@ -29,7 +30,7 @@ export async function loadJson<T>(
   path: string,
 ): Promise<T | "missing" | string> {
   try {
-    const res = await fetch(path);
+    const res = await browserFetch(path);
     if (res.status === 404) {
       return "missing";
     }

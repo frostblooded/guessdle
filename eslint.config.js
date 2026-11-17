@@ -2,6 +2,7 @@ import eslint from "@eslint/js";
 import reactHooks from "eslint-plugin-react-hooks";
 import storybook from "eslint-plugin-storybook";
 import tseslint from "typescript-eslint";
+import guessdle from "./eslint-rules/index.mjs";
 
 export default tseslint.config(
   {
@@ -24,10 +25,27 @@ export default tseslint.config(
   { files: ["**/*.mjs"], rules: { "no-undef": "off" } },
   {
     files: ["src/**/*.ts", "src/**/*.tsx"],
+    plugins: { guessdle },
     rules: {
+      "guessdle/boundaries": "error",
       "max-lines": [
         "error",
         { max: 400, skipBlankLines: true, skipComments: true },
+      ],
+    },
+  },
+  // Browser code calls the API through src/game/transport.ts (fetch injected) or api() in src/manage-client.ts
+  {
+    files: ["src/**/*.ts", "src/**/*.tsx"],
+    ignores: ["src/server/**", "src/lib/api.ts", "src/manage-client.ts"],
+    rules: {
+      "no-restricted-globals": [
+        "error",
+        {
+          name: "fetch",
+          message:
+            "Call the API through api() in src/manage-client.ts, or take a Fetch parameter (src/game/transport.ts) and pass browserFetch from src/lib/api.ts, so status and error mapping stay in one place.",
+        },
       ],
     },
   },
