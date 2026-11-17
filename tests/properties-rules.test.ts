@@ -216,7 +216,7 @@ describe("Quiz properties", () => {
         (s, answer) => {
           const points = scoreAnswer(s, answer);
           assert.ok(points >= 0 && points <= 1);
-          assert.equal(Math.round(points * 100), points * 100);
+          assert.ok(Math.abs(points * 100 - Math.round(points * 100)) < 1e-9);
           const right = "options" in s ? String(s.correct) : s.answer;
           assert.equal(scoreAnswer(s, right), 1);
         },
