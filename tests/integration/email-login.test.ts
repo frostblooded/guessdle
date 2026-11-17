@@ -4,7 +4,10 @@ import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import { createApp, type AppDeps } from "../../src/server/app.ts";
 import { hash } from "../../src/server/auth.ts";
-import { SITE_PER_HOUR } from "../../src/server/email-login.ts";
+import {
+  REQUESTER_PER_HOUR,
+  SITE_PER_HOUR,
+} from "../../src/server/email-login.ts";
 import { MIGRATIONS_DIR } from "../../src/server/main.ts";
 import type { Mailer } from "../../src/server/mailer.ts";
 import { migrate } from "../../src/server/migrate.ts";
@@ -246,6 +249,29 @@ describe("email magic-link sign-in", () => {
       await request("a@x.test");
       await request("b@x.test");
       assert.equal(sent.length, 2);
+    });
+
+    it("caps one requester at REQUESTER_PER_HOUR an hour, whatever the addresses", async () => {
+      const from = (ip: string) => (email: string) =>
+        post("/api/auth/email/request", { email }, url, {
+          "X-Forwarded-For": ip,
+        });
+      const one = from("203.0.113.1");
+      for (let i = 0; i < REQUESTER_PER_HOUR; i++) {
+        assert.equal((await one(`u${i}@x.test`)).status, 200);
+      }
+      assert.equal(sent.length, REQUESTER_PER_HOUR);
+      const res = await one("ann@x.test");
+      assert.equal(res.status, 200);
+      assert.equal(sent.length, REQUESTER_PER_HOUR);
+      // Someone else still gets their link
+      await from("203.0.113.2")("ann@x.test");
+      assert.equal(sent.length, REQUESTER_PER_HOUR + 1);
+      assert.equal(
+        await count("login_tokens", "requester like '203.%'"),
+        0,
+        "IPs are stored hashed",
+      );
     });
 
     it("caps login mails site-wide at SITE_PER_HOUR an hour", async () => {
