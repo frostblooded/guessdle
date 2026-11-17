@@ -90,3 +90,19 @@ test("Settings fits a 320px phone and keeps a switch turned off", async ({
   await page.reload();
   await expect(review).toHaveAttribute("aria-checked", "false");
 });
+
+// Found by the fuzzer (fuzz.spec.ts): one long word in a game's name pushed the Play page sideways
+test("a game named with one long word still fits a 320px phone", async ({
+  page,
+}) => {
+  await page.request.post("/api/test/login", {
+    data: { email: `mobile-${unique()}@example.test` },
+  });
+  const name = `Supercalifragilistic${unique()}`;
+  const { slug } = (await (
+    await page.request.post("/api/games", { data: { name } })
+  ).json()) as { slug: string };
+  await page.goto(`/g/${slug}`);
+  await expect(page.locator("h1")).toHaveText(name, { ignoreCase: true });
+  await noSidewaysScroll(page);
+});
