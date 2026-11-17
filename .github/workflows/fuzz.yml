@@ -1,0 +1,56 @@
+name: Nightly fuzz
+
+# The outer loop: every night, and after each deploy to prod, the UI fuzzer (tests/e2e/fuzz.spec.ts)
+# plays the app with fresh random seeds and many more steps than the PR run. A red run lists
+# the seed and steps to replay it.
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  push:
+    branches: [prod]
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: Seed to replay (empty for a random one)
+        required: false
+      steps:
+        description: Steps per run
+        required: false
+        default: "300"
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Pick the seed
+        env:
+          SEED: ${{ inputs.seed }}
+          LANE: ${{ matrix.lane }}
+        run: |
+          if [ -z "$SEED" ]; then SEED=$(( (RANDOM << 15 | RANDOM) + LANE * 1000 )); fi
+          echo "FUZZ_SEED=$SEED" | tee -a "$GITHUB_ENV"
+      - name: Fuzz
+        env:
+          FUZZ_STEPS: ${{ inputs.steps || '300' }}
+        run: npm run test:e2e -- fuzz.spec.ts
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: fuzz-trace-${{ matrix.lane }}
+          path: test-results/
+          retention-days: 14

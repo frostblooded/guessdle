@@ -27,7 +27,7 @@ export function PageHead({
         <h1
           id={titleId}
           className={cn(
-            "text-3xl font-bold tracking-wide break-words uppercase sm:text-4xl",
+            "text-3xl font-bold tracking-wide wrap-anywhere uppercase sm:text-4xl",
             centered && "text-5xl sm:text-7xl",
           )}
         >
