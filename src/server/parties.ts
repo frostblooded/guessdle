@@ -148,10 +148,20 @@ export async function joinParty(
       return "party_full";
     }
     const token = newToken();
-    await tx.query(
-      `insert into party_players (party_id, nickname, token_hash, joined_at) values ($1, $2, $3, $4)`,
-      [party.id, nickname, hash(token), now],
+    const restored = await tx.query(
+      `update party_players set removed_at = null, token_hash = $3
+       where id = (
+         select max(id) from party_players
+         where party_id = $1 and lower(nickname) = lower($2) and removed_at is not null
+       )`,
+      [party.id, nickname, hash(token)],
     );
+    if (restored.rowCount === 0) {
+      await tx.query(
+        `insert into party_players (party_id, nickname, token_hash, joined_at) values ($1, $2, $3, $4)`,
+        [party.id, nickname, hash(token), now],
+      );
+    }
     await touch(tx, party.id, now);
     return { token };
   });

@@ -43,14 +43,14 @@ Init ==
     /\ rounds = 0
     /\ ended = FALSE
 
-(* joinParty in src/server/parties.ts: a late joiner plays the live round *)
+(* joinParty in src/server/parties.ts: a late joiner plays the live round; a removed player
+   who joins again under the same nickname is restored with their board for the round *)
 Join(p) ==
     /\ ~ended
     /\ p \notin joined
     /\ joined' = joined \cup {p}
-    /\ status' = [status EXCEPT ![p] = IF live THEN "playing" ELSE "none"]
-    /\ wrong' = [wrong EXCEPT ![p] = 0]
-    /\ UNCHANGED <<live, rounds, ended>>
+    /\ status' = [status EXCEPT ![p] = IF @ # "none" THEN @ ELSE IF live THEN "playing" ELSE "none"]
+    /\ UNCHANGED <<wrong, live, rounds, ended>>
 
 (* act "start-round": host only, no live round *)
 StartRound ==
@@ -96,16 +96,15 @@ EndRound ==
     /\ live' = FALSE
     /\ UNCHANGED <<joined, status, wrong, rounds, ended>>
 
-(* act "remove-player": host only, never the host; the round may end now *)
+(* act "remove-player": host only, never the host; the round may end now. The player row keeps
+   its guesses, so status and wrong stay for a later rejoin *)
 Remove(p) ==
     /\ ~ended
     /\ p \in joined
     /\ p # Host
     /\ joined' = joined \ {p}
-    /\ LET st == [status EXCEPT ![p] = "none"]
-       IN status' = st /\ Settle(joined', st)
-    /\ wrong' = [wrong EXCEPT ![p] = 0]
-    /\ UNCHANGED <<rounds, ended>>
+    /\ Settle(joined', status)
+    /\ UNCHANGED <<status, wrong, rounds, ended>>
 
 (* act "end-party", and sweepParties after 12 idle hours: both end the live round *)
 EndParty ==
@@ -119,8 +118,8 @@ Next ==
     \/ \E p \in Players : Join(p) \/ WrongGuess(p) \/ RightGuess(p) \/ GiveUp(p) \/ Remove(p)
 
 (* A player who keeps getting the chance eventually finishes (a give-up at worst), even if the
-   host removes them and they join again. The host is never forced to end a round or the
-   party, so a round must end by itself. *)
+   host keeps removing them and they keep joining again. The host is never forced to end a
+   round or the party, so a round must end by itself. *)
 Spec == Init /\ [][Next]_vars /\ \A p \in Players : SF_vars(GiveUp(p))
 
 -----------------------------------------------------------------------------
@@ -138,14 +137,16 @@ EndedPartyHasNoLiveRound == ended => ~live
 (* A live round always has someone still playing: it never hangs with everyone done *)
 LiveRoundHasAPlayer == live => \E p \in joined : status[p] = "playing"
 
-OnlyPlayersHaveAStatus == \A p \in Players \ joined : status[p] = "none"
-
 NoStatusBetweenRounds == ~live /\ rounds = 0 => \A p \in Players : status[p] = "none"
 
 BlurTriesHold == Tries > 0 => \A p \in Players : wrong[p] <= Tries
 
-(* Liveness: every live round ends, once the host stops removing players. Without that
-   assumption TLC finds a host who removes each player after they finish while they join again
-   under the same nickname with a fresh board for the same round, forever. *)
-RoundsEnd == (<>[][\A p \in Players : ~Remove(p)]_vars) => [](live => <>~live)
+(* Liveness: every live round ends, however often the host removes players and they join
+   again. Before rejoining restored the player, TLC found a host who removed each player after
+   they finished while they joined again with a fresh board for the same round, forever. *)
+RoundsEnd == [](live => <>~live)
+
+(* No replay: within a round, a player who finished stays finished, even after removal and rejoining *)
+FinishedStaysFinished ==
+    [][\A p \in Players : rounds' = rounds /\ status[p] \in Done => status'[p] = status[p]]_vars
 =============================================================================

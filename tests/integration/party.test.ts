@@ -483,6 +483,27 @@ describe("party mode", () => {
       await ana.view((v) => v.round?.live === false);
     });
 
+    it("brings a removed player back as themselves, so a finished round stays finished", async () => {
+      const { code, token } = await host();
+      const bo = await phone(code, await join(code, "Bo"));
+      await join(code, "Cy");
+      const ana = await phone(code, token);
+      ana.say({ type: "start-round" });
+      const live = await ana.view((v) => v.round?.live === true);
+      bo.say({ type: "guess", entryId: await answerOf(code) });
+      await bo.view((v) => v.round?.yours?.solved);
+      const boId = live.players.find((p) => p.nickname === "Bo")!.id;
+      ana.say({ type: "remove-player", playerId: boId });
+      await ana.view((v) => v.players.length === 2);
+      const back = await (await phone(code, await join(code, "bo"))).view();
+      assert.equal(back.you!.playerId, boId);
+      assert.equal(back.round!.live, true);
+      assert.equal(back.round!.yours!.solved, true);
+      ana.say({ type: "end-round" });
+      const done = await ana.view((v) => v.round?.live === false);
+      assert.equal(done.players.find((p) => p.id === boId)!.points, 3);
+    });
+
     it("ends the party: the link keeps the read-only results", async () => {
       const { code, token } = await host();
       const bo = await phone(code, await join(code, "Bo"));
