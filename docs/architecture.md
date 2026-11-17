@@ -79,6 +79,7 @@ ADR 0016. Pure rules in `src/game/party.ts` (codes, nicknames, ranking, Placemen
 
 ## Tests
 
+- Lint rules of our own live in `eslint-rules/` (plugin `guessdle`, tested with ESLint's `RuleTester` in `tests/lint-rules.test.ts`). `guessdle/boundaries` keeps three zones apart: `src/game` imports only `src/game` (no packages), `src/server` imports only `src/server` and `src/game` (the API image copies just those two), and browser code (the rest of `src/`) never imports `src/server` or a server-only package (`node:*`, `pg`, `express`, `ws`, `nodemailer`, `sharp`). Browser code may call the global `fetch` only in `src/lib/api.ts` and `src/manage-client.ts`; everything else takes a `Fetch` parameter or calls `api()`.
 - Unit, component and integration tests run on Vitest (`vitest.config.ts`: a `unit` project for `tests/*.test.ts`, a `ui` project for React components in `tests/ui/*.test.tsx` (jsdom, Testing Library; `npm test` runs both) and an `integration` project whose files run in parallel). `npm test` type-checks them all first with `tsc -p tsconfig.test.json`. Assertions use `node:assert/strict`.
 - `npm run test:integration` runs the HTTP API against Testcontainers Postgres (needs Docker): `tests/integration/global-setup.ts` starts one container per run and `startDb()` gives each file its own empty database in it.
 - Page URLs are served by `scripts/server.mjs` (dev) and `location /` `try_files` in `deploy/nginx.conf` (prod); `tests/e2e/server.spec.ts` and `tests/build-wiring.test.ts` cover both lists.
