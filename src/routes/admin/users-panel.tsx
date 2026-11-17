@@ -21,7 +21,7 @@ import {
 } from "../../components/ui/table.tsx";
 import { MAX_REASON } from "../../game/limits.ts";
 import { getJson } from "../../lib/api.ts";
-import { useDelayed } from "../../lib/use-delayed.ts";
+import { useDelayed } from "../../lib/effects.ts";
 import { api } from "../../manage-client.ts";
 
 interface AdminUser {

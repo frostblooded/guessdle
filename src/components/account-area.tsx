@@ -1,5 +1,6 @@
 // The header's account area: a Sign in link, or the signed-in user's menu.
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useOutsideClick } from "../lib/effects.ts";
 import { Link } from "react-router";
 import { signOut, type AccountUser } from "../account.ts";
 import { profilePath } from "../game/playlists.ts";
@@ -24,18 +25,7 @@ function UserMenu({ user }: { user: AccountUser }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!open) {
-      return undefined;
-    }
-    const outside = (event: MouseEvent): void => {
-      if (!root.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("click", outside);
-    return () => document.removeEventListener("click", outside);
-  }, [open]);
+  useOutsideClick(root, open, () => setOpen(false));
 
   return (
     <div

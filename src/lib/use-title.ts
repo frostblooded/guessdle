@@ -1,11 +1,11 @@
-import { useEffect } from "react";
+import { useWhile } from "./effects.ts";
 
 // Sets the tab title (and, for private pages, a robots noindex tag) while the page is shown
 export function useTitle(title: string, noindex: boolean = false): void {
-  useEffect(() => {
+  useWhile(title, () => {
     document.title = title;
-  }, [title]);
-  useEffect(() => {
+  });
+  useWhile(noindex, () => {
     if (!noindex) {
       return undefined;
     }
@@ -14,5 +14,5 @@ export function useTitle(title: string, noindex: boolean = false): void {
     meta.content = "noindex";
     document.head.append(meta);
     return () => meta.remove();
-  }, [noindex]);
+  });
 }

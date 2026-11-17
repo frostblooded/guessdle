@@ -100,4 +100,4 @@ Every user-facing feature, by page, with the names to use for it (terms from `GL
 
 ## Behind the pages
 
-- **Delayed spinners**: loading states show only after a short delay. Code: `src/lib/use-delayed.ts`. Tests: `tests/ui/use-delayed.test.tsx`.
+- **Delayed spinners**: loading states show only after a short delay. Code: `src/lib/effects.ts`. Tests: `tests/ui/effects.test.tsx`.

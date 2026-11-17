@@ -1,5 +1,11 @@
 // The sign-in page: one passwordless form that also creates accounts.
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
+import {
+  focusOnMount,
+  selectOnMount,
+  useTicker,
+  useWhile,
+} from "../lib/effects.ts";
 import { Link, useSearchParams } from "react-router";
 import { requestLoginLink } from "../account.ts";
 import { Alert } from "../components/ui/alert.tsx";
@@ -30,14 +36,7 @@ async function send(
 
 // Seconds until another link may be sent; counts down once a second from `sentAt`
 function useCooldown(sentAt: number | null): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (sentAt === null) {
-      return undefined;
-    }
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [sentAt]);
+  const now = useTicker(sentAt !== null, 1000);
   // `now` may predate a fresh send until the first tick
   return sentAt === null ? 0 : secondsLeft(sentAt, Math.max(now, sentAt));
 }
@@ -53,8 +52,6 @@ function SentPanel({
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const left = useCooldown(sentAt);
-  const title = useRef<HTMLHeadingElement>(null);
-  useEffect(() => title.current?.focus(), []);
 
   const resend = async (): Promise<void> => {
     setBusy(true);
@@ -74,7 +71,7 @@ function SentPanel({
     <div id="login-sent" className="space-y-4">
       <h1
         id="sent-title"
-        ref={title}
+        ref={focusOnMount}
         tabIndex={-1}
         className="text-2xl font-bold tracking-tight outline-none"
       >
@@ -122,14 +119,8 @@ function LoginForm() {
     null,
   );
   const [busy, setBusy] = useState(false);
-  const input = useRef<HTMLInputElement>(null);
-  const changed = useRef(false);
-  useEffect(() => {
-    if (sent === null && changed.current) {
-      input.current?.focus();
-      input.current?.select();
-    }
-  }, [sent]);
+  // Back from the sent panel to fix the address: the field takes focus with its text selected
+  const [changed, setChanged] = useState(false);
 
   const submit = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
@@ -150,7 +141,7 @@ function LoginForm() {
       <SentPanel
         address={sent}
         onChangeEmail={() => {
-          changed.current = true;
+          setChanged(true);
           setSent(null);
         }}
       />
@@ -177,7 +168,7 @@ function LoginForm() {
         <div className="space-y-2">
           <Label htmlFor="login-email">Email address</Label>
           <Input
-            ref={input}
+            ref={changed ? selectOnMount : undefined}
             id="login-email"
             type="email"
             autoComplete="email"
@@ -218,10 +209,10 @@ export function LoginPage() {
   const [params] = useSearchParams();
   const next = params.get("next");
   // ?next= is where verify sends the user after sign-in (story 23); an older target is dropped
-  useEffect(() => {
+  useWhile(next, () => {
     takeReturnTo(localStorage);
     rememberReturnTo(localStorage, next);
-  }, [next]);
+  });
   const { data: user } = useMe();
 
   return (

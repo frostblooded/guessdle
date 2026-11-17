@@ -34,6 +34,51 @@ export default tseslint.config(
       ],
     },
   },
+  // React effects and timers need nuance and breed bugs (stale closures, double runs, leaked
+  // timers); browser code asks src/lib/effects.ts for a hook that names the job instead
+  {
+    files: ["src/**/*.ts", "src/**/*.tsx"],
+    ignores: ["src/server/**", "src/lib/effects.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "react",
+              importNames: [
+                "useEffect",
+                "useLayoutEffect",
+                "useInsertionEffect",
+              ],
+              message:
+                "Effects are banned outside src/lib/effects.ts. Use a hook from there (useOnce, useWhile, useOnOpen, useOutsideClick, useTicker, useDebounced, useDelayed, focusOnMount) or add a named one there with a test in tests/ui/effects.test.tsx. Often no effect is needed: do the work in the event handler.",
+            },
+          ],
+        },
+      ],
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "CallExpression[callee.name=/^(setTimeout|setInterval|clearTimeout|clearInterval|requestAnimationFrame|cancelAnimationFrame|requestIdleCallback|cancelIdleCallback)$/]",
+          message:
+            "Timers are banned outside src/lib/effects.ts: use useDebounced, useDelayed or useTicker in components, or schedule() outside React.",
+        },
+        {
+          selector:
+            "CallExpression[callee.object.name=/^(window|globalThis|self)$/][callee.property.name=/^(setTimeout|setInterval|requestAnimationFrame|requestIdleCallback)$/]",
+          message:
+            "Timers are banned outside src/lib/effects.ts: use useDebounced, useDelayed or useTicker in components, or schedule() outside React.",
+        },
+        {
+          selector:
+            "MemberExpression[object.name='React'][property.name=/^use(Layout|Insertion)?Effect$/]",
+          message: "Effects are banned outside src/lib/effects.ts.",
+        },
+      ],
+    },
+  },
   // Browser code calls the API through src/game/transport.ts (fetch injected) or api() in src/manage-client.ts
   {
     files: ["src/**/*.ts", "src/**/*.tsx"],

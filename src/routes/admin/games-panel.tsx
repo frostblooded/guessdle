@@ -6,7 +6,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { Search } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router";
 import { ReviewButtons } from "../../components/review-buttons.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
@@ -20,7 +20,7 @@ import {
   TableRow,
 } from "../../components/ui/table.tsx";
 import { forgetGame, getJson } from "../../lib/api.ts";
-import { useDelayed } from "../../lib/use-delayed.ts";
+import { useDebounced, useDelayed } from "../../lib/effects.ts";
 import { api } from "../../manage-client.ts";
 
 interface GameItem {
@@ -44,8 +44,7 @@ export function GamesPanel({ active }: { active: boolean }) {
   const client = useQueryClient();
   const [search, setSearch] = useState("");
   // What the list shows: the search box, 250 ms after the last keystroke
-  const [query, setQuery] = useState("");
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const query = useDebounced(search, 250);
   // Refetched each time the tab opens (stale at once)
   const list = useQuery({
     queryKey: ["admin", "games", query],
@@ -74,7 +73,6 @@ export function GamesPanel({ active }: { active: boolean }) {
         : games.length === 0
           ? "No games match."
           : null));
-  useEffect(() => () => clearTimeout(timer.current), []);
 
   const remove = async (game: GameItem): Promise<void> => {
     if (!confirm(`Delete "${game.name}" and everything in it?`)) {
@@ -115,9 +113,6 @@ export function GamesPanel({ active }: { active: boolean }) {
               value={search}
               onChange={(event) => {
                 setSearch(event.target.value);
-                const value = event.target.value;
-                clearTimeout(timer.current);
-                timer.current = setTimeout(() => setQuery(value), 250);
               }}
             />
           </div>

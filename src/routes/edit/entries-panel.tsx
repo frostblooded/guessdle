@@ -1,7 +1,8 @@
 // The editor's Entries tab: list, add, change and delete entries with their values (a Blur
 // entry: its image and square order; a Sequence entry: its photos). Adding and editing happen
 // in a popup, so the form shows up where the user is looking however long the list is.
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useOnOpen } from "../../lib/effects.ts";
+import { useRef, useState, type FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { CELLS, type GameKind } from "../../game/blur.ts";
 import { FAILURES } from "../../game/failures.ts";
@@ -87,10 +88,7 @@ export function EntriesPanel({
   const blur = kind === "blur";
   const sequence = kind === "sequence";
 
-  useEffect(() => {
-    if (!active) {
-      return;
-    }
+  useOnOpen(active, () => {
     void (async () => {
       const [attrs, got] = await Promise.all([
         api<Attribute[]>("GET", `${base}/attributes`),
@@ -109,7 +107,7 @@ export function EntriesPanel({
         setDraft(draftOf(null));
       }
     })();
-  }, [active, base]);
+  });
 
   const edit = (entry: Entry | null): void => {
     setError("");

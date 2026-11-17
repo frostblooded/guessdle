@@ -1,5 +1,5 @@
 // The editor's Answers tab: Answer History and Overrides by real calendar date.
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Alert } from "../../components/ui/alert.tsx";
 import {
   AlertDialog,
@@ -19,7 +19,7 @@ import {
   TableHead,
   TableRow,
 } from "../../components/ui/table.tsx";
-import { useDelayed } from "../../lib/use-delayed.ts";
+import { useDelayed, useOnOpen } from "../../lib/effects.ts";
 import { api, errorText } from "../../manage-client.ts";
 import { OverrideDialog, type Choice } from "./override-dialog.tsx";
 import { thumbOf, type Attribute, type Entry } from "./types.ts";
@@ -118,10 +118,7 @@ export function AnswersPanel({
     }
   };
 
-  useEffect(() => {
-    if (!active) {
-      return;
-    }
+  useOnOpen(active, () => {
     void (async () => {
       const [roster, attributes] = await Promise.all([
         api<Entry[]>("GET", `${base}/entries`),
@@ -157,7 +154,7 @@ export function AnswersPanel({
       setLoading(false);
       show(full?.status === 200 ? full.data : first);
     })();
-  }, [active, base]);
+  });
 
   const openEditor = (day: AnswerDay): void => {
     setEditing(day);
