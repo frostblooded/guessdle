@@ -11,3 +11,4 @@ storybook-static
 # Third-party Claude Code hooks, kept as upstream ships them.
 .claude/caveman
 .claude/ponytail
+shots
