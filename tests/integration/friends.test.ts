@@ -111,13 +111,14 @@ describe("friends", () => {
     const bob = await player("bob", "bob@x.test");
     const cy = await player(null, "Cy@X.test");
 
-    for (const query of ["bo", "BOB@x", "nobody@x.test", "ann"]) {
-      const out = await ask(ann.cookie, query);
-      assert.equal(
-        out.body.error,
-        query === "ann" ? "friend_self" : "player_not_found",
-        query,
-      );
+    const refusals = {
+      bo: "player_not_found",
+      "BOB@x": "invalid",
+      ann: "friend_self",
+      "ANN@x.test": "friend_self",
+    };
+    for (const [query, error] of Object.entries(refusals)) {
+      assert.equal((await ask(ann.cookie, query)).body.error, error, query);
     }
     assert.deepEqual((await ask(ann.cookie, "BOB")).body, { outcome: "sent" });
     assert.deepEqual((await ask(ann.cookie, " cy@x.TEST ")).body, {
@@ -154,6 +155,93 @@ describe("friends", () => {
       0,
     );
     assert.equal((await ask(bob.cookie, "ann")).body.error, "friend_exists");
+  });
+
+  it("answers the same for any email, and never says whether it has an account", async () => {
+    const ann = await player("ann", "ann@x.test");
+    const bob = await player("bob", "bob@x.test");
+    await player("dan", "dan@x.test");
+    await db.pool.query(
+      "update users set banned_at = now() where email = 'dan@x.test'",
+    );
+    for (const email of ["bob@x.test", "nobody@x.test", "dan@x.test"]) {
+      assert.deepEqual((await ask(ann.cookie, email)).body, {
+        outcome: "sent",
+      });
+    }
+    assert.equal(
+      (await ask(ann.cookie, "Nobody@x.test")).body.error,
+      "friend_exists",
+    );
+    // Only bob's account is mailed; the sender sees every email as typed, never a username
+    assert.deepEqual(
+      sent.map((m) => m.to),
+      ["bob@x.test"],
+    );
+    const outgoing = (await list(ann.cookie)).outgoing;
+    assert.deepEqual(names(outgoing), [
+      "bob@x.test",
+      "dan@x.test",
+      "nobody@x.test",
+    ]);
+    assert.ok(outgoing.every((f: { id: number }) => f.id < 0));
+
+    // Someone signing up with a waiting email never gets the request
+    const nobody = await player("nob", "nobody@x.test");
+    assert.deepEqual((await list(nobody.cookie)).incoming, []);
+
+    // Declining keeps it pending for the sender, the same as an email with no account
+    assert.deepEqual(names((await list(bob.cookie)).incoming), ["ann"]);
+    await send("DELETE", `/api/friends/${ann.id}`, bob.cookie);
+    assert.deepEqual(await list(bob.cookie), {
+      friends: [],
+      incoming: [],
+      outgoing: [],
+    });
+    assert.equal((await list(ann.cookie)).outgoing.length, 3);
+
+    // Cancelling removes one's own request; another player's id does nothing
+    const [first] = outgoing as { id: number }[];
+    await send("DELETE", `/api/friends/${first!.id}`, bob.cookie);
+    assert.equal((await list(ann.cookie)).outgoing.length, 3);
+    await send("DELETE", `/api/friends/${first!.id}`, ann.cookie);
+    assert.deepEqual(names((await list(ann.cookie)).outgoing), [
+      "dan@x.test",
+      "nobody@x.test",
+    ]);
+  });
+
+  it("accepting an email request shows the username, once", async () => {
+    const ann = await player("ann", "ann@x.test");
+    const bob = await player("bob", "bob@x.test");
+    await ask(ann.cookie, "bob@x.test");
+    // Also asked by username: bob still sees one request
+    await ask(ann.cookie, "bob");
+    assert.deepEqual(names((await list(bob.cookie)).incoming), ["ann"]);
+    assert.equal(
+      (await send("GET", "/api/me", bob.cookie)).body.user.friendRequests,
+      1,
+    );
+    assert.equal(
+      (await send("PUT", `/api/friends/${ann.id}`, bob.cookie)).status,
+      200,
+    );
+    assert.deepEqual(await list(ann.cookie), {
+      friends: [{ id: bob.id, name: "bob" }],
+      incoming: [],
+      outgoing: [],
+    });
+
+    // An email request alone is accepted the same way
+    const cy = await player("cyd", "cy@x.test");
+    await ask(cy.cookie, "ANN@x.test");
+    assert.deepEqual(names((await list(ann.cookie)).incoming), ["cyd"]);
+    assert.equal(
+      (await send("PUT", `/api/friends/${cy.id}`, ann.cookie)).status,
+      200,
+    );
+    assert.deepEqual(names((await list(cy.cookie)).friends), ["ann"]);
+    assert.deepEqual((await list(cy.cookie)).outgoing, []);
   });
 
   it("asking someone who already asked you makes you friends", async () => {
