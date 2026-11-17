@@ -64,6 +64,8 @@ jobs:
         run: npm run dup
       - name: Compile, type-check and run unit tests
         run: npm test
+      - name: Model-check the TLA+ specs (tla/)
+        run: npm run model
 
   # Needs Docker (Testcontainers Postgres), which the runner has
   integration:
