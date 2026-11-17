@@ -9,8 +9,11 @@ export const MAX_EMAIL_LENGTH = 254;
 export const MAX_TOKEN_LENGTH = 200;
 const MINUTE_MS = 60_000;
 const PER_HOUR = 5;
-// Login mails per hour across all addresses: caps what one sender can spray
-export const SITE_PER_HOUR = 100;
+// Login mails per hour from one requester (a hashed IP), across addresses: one sender can no
+// longer use up the site-wide cap and block everyone else
+export const REQUESTER_PER_HOUR = 10;
+// Login mails per hour across the site: a spending guard against many senders at once
+export const SITE_PER_HOUR = 300;
 // Rows outlive their expiry this long: the hourly limit counts them
 const KEEP_MS = 2 * 60 * MINUTE_MS;
 
@@ -26,14 +29,15 @@ export function normalizeEmail(value: unknown): string | null {
     : null;
 }
 
-// Mails a link unless this address asked too recently (1/minute, 5/hour) or the
-// site sent SITE_PER_HOUR this hour; the caller answers the same either way.
+// Mails a link unless this address asked too recently (1/minute, 5/hour), this requester asked
+// REQUESTER_PER_HOUR times this hour, or the site sent SITE_PER_HOUR this hour; the caller answers the same either way.
 // Sending errors propagate after dropping the token, so a retry is not limited.
 export async function requestLoginLink(
   pool: pg.Pool,
   mailer: Mailer,
   publicUrl: string,
   email: string,
+  requester: string,
   now: Date,
 ): Promise<void> {
   const time = now.getTime();
@@ -43,22 +47,40 @@ export async function requestLoginLink(
   const { rows } = await pool.query<{
     minute: number;
     hour: number;
+    sender: number;
     site: number;
   }>(
     `select count(*) filter (where email = $1 and created_at > $2)::int as minute,
-       count(*) filter (where email = $1)::int as hour, count(*)::int as site
+       count(*) filter (where email = $1)::int as hour,
+       count(*) filter (where requester = $4)::int as sender, count(*)::int as site
      from login_tokens where created_at > $3`,
-    [email, new Date(time - MINUTE_MS), new Date(time - 60 * MINUTE_MS)],
+    [
+      email,
+      new Date(time - MINUTE_MS),
+      new Date(time - 60 * MINUTE_MS),
+      requester,
+    ],
   );
-  const { minute, hour, site } = rows[0]!;
-  if (minute >= 1 || hour >= PER_HOUR || site >= SITE_PER_HOUR) {
+  const { minute, hour, sender, site } = rows[0]!;
+  if (
+    minute >= 1 ||
+    hour >= PER_HOUR ||
+    sender >= REQUESTER_PER_HOUR ||
+    site >= SITE_PER_HOUR
+  ) {
     return;
   }
   const token = randomBytes(32).toString("base64url");
   const tokenHash = hash(token);
   await pool.query(
-    "insert into login_tokens (token_hash, email, expires_at, created_at) values ($1, $2, $3, $4)",
-    [tokenHash, email, new Date(time + TOKEN_MINUTES * MINUTE_MS), now],
+    "insert into login_tokens (token_hash, email, expires_at, created_at, requester) values ($1, $2, $3, $4, $5)",
+    [
+      tokenHash,
+      email,
+      new Date(time + TOKEN_MINUTES * MINUTE_MS),
+      now,
+      requester,
+    ],
   );
   try {
     await mailer.send({
