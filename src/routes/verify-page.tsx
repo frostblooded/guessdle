@@ -1,6 +1,7 @@
 // The emailed link's landing: spends ?token= and sends the user on.
 import { LoaderCircle } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { useOnce } from "../lib/effects.ts";
 import { Link } from "react-router";
 import { verifyLoginToken } from "../account.ts";
 import { MessageCard } from "../components/page.tsx";
@@ -30,13 +31,8 @@ async function completeLogin(): Promise<"ok" | Failure> {
 export function VerifyPage() {
   useTitle("Signing you in - Guessdle");
   const [failure, setFailure] = useState<Failure | null>(null);
-  // A token works once: never spend it twice, even when React runs effects twice in dev
-  const started = useRef(false);
-  useEffect(() => {
-    if (started.current) {
-      return;
-    }
-    started.current = true;
+  // A token works once: never spend it twice
+  useOnce(true, () => {
     void completeLogin().then((result) => {
       if (result === "ok") {
         // A full load, so every page sees the new session; Play merges local guesses on load
@@ -45,7 +41,7 @@ export function VerifyPage() {
         setFailure(result);
       }
     });
-  }, []);
+  });
   const retryable = failure === "error" || failure === "rate_limited";
 
   return (

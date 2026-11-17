@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { Change, FieldChange } from "../game/approval-diff.ts";
 import { getJson } from "../lib/api.ts";
-import { useDelayed } from "../lib/use-delayed.ts";
+import { useDelayed } from "../lib/effects.ts";
 import { Alert } from "./ui/alert.tsx";
 import { Badge } from "./ui/badge.tsx";
 import {

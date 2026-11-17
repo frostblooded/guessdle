@@ -2,7 +2,8 @@
 // keeps the guesses shown, the result, the notice and the Free Hint in step with each guess,
 // give-up and reset. The page only draws it and holds the guess box.
 import { endingOf } from "../../game/board.ts";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useOnce } from "../../lib/effects.ts";
 import type { EntryRef, GradedAttribute } from "../../game/game.ts";
 import { openPlay } from "../../game/open-play.ts";
 import {
@@ -60,7 +61,6 @@ export function usePlayBoard({
   // Bumped on every fresh board, so a Blur game's board image is fetched again
   const [board, setBoard] = useState(0);
   const play = useRef<Play | null>(null);
-  const started = useRef(false);
   const submitting = useRef(false);
   // A past day's first win counts in that day's stats, like today's
   const victory = useVictoryStats(slug, play, pastDay);
@@ -88,13 +88,8 @@ export function usePlayBoard({
     setReady(true);
   }
 
-  // Picks where the game lives, then loads it. The ref keeps StrictMode's second effect run
-  // from merging twice.
-  useEffect(() => {
-    if (!canOpen || started.current) {
-      return;
-    }
-    started.current = true;
+  // Picks where the game lives, then loads it, once: opening twice would merge twice
+  useOnce(canOpen, () => {
     void (async () => {
       const { play: current, rateLimited } = await openPlay({
         slug,
@@ -113,7 +108,7 @@ export function usePlayBoard({
       play.current = current;
       await showBoard(current);
     })();
-  }, [canOpen, roster, signedIn, slug, pastDay, adoptHint]);
+  });
 
   // Sends a guess by entry id, or SKIP. True when the guess box should clear: the guess was
   // graded, or was already on the board.

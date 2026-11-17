@@ -1,5 +1,6 @@
 // Admin Backups tab: how old the newest dump is, and anything wrong with backups.
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useOnOpen } from "../../lib/effects.ts";
 import { api } from "../../manage-client.ts";
 import { cn } from "../../lib/utils.ts";
 
@@ -48,14 +49,11 @@ function summarize(data: BackupStatus | null): Shown {
 export function BackupPanel({ active }: { active: boolean }) {
   const [shown, setShown] = useState<Shown | null>(null);
 
-  useEffect(() => {
-    if (!active) {
-      return;
-    }
+  useOnOpen(active, () => {
     void api<BackupStatus>("GET", "/api/admin/backup").then((out) =>
       setShown(summarize(out?.status === 200 ? out.data : null)),
     );
-  }, [active]);
+  });
 
   return (
     <div className="space-y-4">

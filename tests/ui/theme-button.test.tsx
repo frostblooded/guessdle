@@ -26,10 +26,10 @@ describe("ThemeButton", () => {
     assert.equal("theme" in document.documentElement.dataset, false);
   });
 
-  it("applies a stored mode on load", () => {
+  // index.html's inline script applies the stored mode before first paint; the button shows it
+  it("shows a stored mode on load", () => {
     localStorage.setItem("theme", "dark");
     render(<ThemeButton />);
-    assert.equal(document.documentElement.dataset["theme"], "dark");
     assert.equal(button().textContent, "Theme: dark");
   });
 

@@ -1,6 +1,7 @@
 // /party/<CODE>: the party itself, live over its socket, and its results once it ends (ADR 0016).
 import qrcode from "qrcode-generator";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useWhile } from "../../lib/effects.ts";
 import { EmptyState } from "../../components/page.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import {
@@ -121,7 +122,7 @@ export function PartyRoom({ code }: { code: string }) {
   const [ending, setEnding] = useState(false);
   const socket = useRef<PartySocket | null>(null);
 
-  useEffect(() => {
+  useWhile(code, () => {
     let gone = false;
     let opened: PartySocket | null = null;
     void (async () => {
@@ -159,7 +160,7 @@ export function PartyRoom({ code }: { code: string }) {
       opened?.close();
       socket.current = null;
     };
-  }, [code]);
+  });
 
   useTitle(view ? `${view.game.name} party - Guessdle` : "Party - Guessdle");
 

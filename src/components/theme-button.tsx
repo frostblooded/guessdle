@@ -1,5 +1,5 @@
 import { Monitor, Moon, Sun } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   applyThemeMode,
   nextThemeMode,
@@ -17,7 +17,6 @@ export function ThemeButton() {
   const [mode, setMode] = useState<ThemeMode>(() =>
     readThemeMode(localStorage),
   );
-  useEffect(() => applyThemeMode(document.documentElement, mode), [mode]);
   const Icon = ICONS[mode];
   return (
     <Button
@@ -28,6 +27,7 @@ export function ThemeButton() {
       onClick={() => {
         const next = nextThemeMode(mode);
         writeThemeMode(localStorage, next);
+        applyThemeMode(document.documentElement, next);
         setMode(next);
       }}
     >

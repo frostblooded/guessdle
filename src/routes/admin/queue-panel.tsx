@@ -12,7 +12,7 @@ import {
   TableRow,
 } from "../../components/ui/table.tsx";
 import { forgetGame, getJson } from "../../lib/api.ts";
-import { useDelayed } from "../../lib/use-delayed.ts";
+import { useDelayed } from "../../lib/effects.ts";
 import { api } from "../../manage-client.ts";
 
 interface QueueItem {

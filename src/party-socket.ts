@@ -5,6 +5,7 @@ import {
   type ClientMessage,
   type ServerMessage,
 } from "./game/party.ts";
+import { schedule } from "./lib/effects.ts";
 
 export interface PartySocket {
   send(msg: ClientMessage): boolean;
@@ -27,7 +28,7 @@ export function openPartySocket(
   const url = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/parties/${encodeURIComponent(code)}/socket`;
   let ws: WebSocket | null = null;
   let delay = 1000;
-  let timer: ReturnType<typeof setTimeout> | undefined;
+  let cancel = (): void => undefined;
 
   const connect = (): void => {
     const socket = new WebSocket(url);
@@ -55,7 +56,7 @@ export function openPartySocket(
       } else {
         on.connected(false);
       }
-      timer = setTimeout(connect, event.code === CLOSE_REMOVED ? 0 : delay);
+      cancel = schedule(connect, event.code === CLOSE_REMOVED ? 0 : delay);
       delay = Math.min(delay * 2, 10_000);
     };
   };
@@ -70,14 +71,14 @@ export function openPartySocket(
       return true;
     },
     restart(): void {
-      clearTimeout(timer);
+      cancel();
       const old = ws;
       ws = null;
       old?.close();
       connect();
     },
     close(): void {
-      clearTimeout(timer);
+      cancel();
       const old = ws;
       ws = null;
       old?.close();
