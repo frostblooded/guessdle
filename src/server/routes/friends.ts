@@ -2,13 +2,14 @@
 import express from "express";
 import type { Express, Request, Response } from "express";
 import { requestUser, type SessionUser } from "../auth.ts";
-import { MAX_EMAIL_LENGTH } from "../email-login.ts";
+import { MAX_EMAIL_LENGTH, normalizeEmail } from "../email-login.ts";
 import {
   acceptRequest,
   findPlayer,
   listFriends,
   mailRequest,
   removeFriend,
+  sendEmailRequest,
   sendRequest,
 } from "../friends.ts";
 import { rateLimit, type RateLimit } from "../rate-limit.ts";
@@ -17,7 +18,7 @@ import { DEFAULT_WRITE_LIMIT } from "./manage.ts";
 
 const idParam = (req: Request): number | null => {
   const raw = String(paramOf(req, "id"));
-  return /^\d{1,15}$/.test(raw) ? Number(raw) : null;
+  return /^-?\d{1,15}$/.test(raw) ? Number(raw) : null;
 };
 
 export function friendRoutes(
@@ -66,6 +67,28 @@ export function friendRoutes(
       fail(res, "invalid");
       return;
     }
+    if (query.includes("@")) {
+      // Same answer whether or not the email has an account (no lookup by email)
+      const email = normalizeEmail(query);
+      if (email === null) {
+        fail(res, "invalid");
+        return;
+      }
+      const sent = await sendEmailRequest(pool, user.id, email, now());
+      if (sent.outcome === "self") {
+        fail(res, "friend_self");
+        return;
+      }
+      if (sent.outcome === "exists") {
+        fail(res, "friend_exists");
+        return;
+      }
+      if (sent.outcome === "sent" && sent.to !== null && mail) {
+        await mailRequest(pool, mail, user.id, sent.to);
+      }
+      res.json({ outcome: sent.outcome });
+      return;
+    }
     const other = await findPlayer(pool, query);
     if (!other || other.banned) {
       fail(res, "player_not_found");
@@ -100,7 +123,7 @@ export function friendRoutes(
     res.json({ ok: true });
   });
 
-  // Declines, cancels or unfriends player `:id`
+  // Declines, cancels or unfriends player `:id` (a negative id: the user's request sent by email)
   app.delete("/api/friends/:id", writes, async (req, res) => {
     const user = await needUser(req, res);
     if (!user) {

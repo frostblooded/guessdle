@@ -5,6 +5,7 @@ import { pendingCount } from "../approval.ts";
 import {
   clearSessionCookie,
   endSession,
+  hash,
   requestUser,
   sessionToken,
   setSessionCookie,
@@ -84,7 +85,16 @@ export function authRoutes(
       }
       try {
         // Same answer whether or not it mailed, and no user lookup: no enumeration
-        await requestLoginLink(pool, mail.mailer, mail.publicUrl, email, now());
+        // Hashed: the limit needs to tell requesters apart, not to know their IPs
+        const requester = hash(req.ip ?? "");
+        await requestLoginLink(
+          pool,
+          mail.mailer,
+          mail.publicUrl,
+          email,
+          requester,
+          now(),
+        );
       } catch (err) {
         console.error(err);
         res.status(503).json({ error: "login_unavailable" });
