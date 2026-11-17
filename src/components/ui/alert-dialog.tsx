@@ -6,7 +6,6 @@ import { buttonVariants } from "./button.tsx";
 export const AlertDialog = Primitive.Root;
 export const AlertDialogTrigger = Primitive.Trigger;
 
-// A modal question: focus moves to Cancel, Escape cancels, focus returns to the trigger
 export function AlertDialogContent({
   className,
   children,

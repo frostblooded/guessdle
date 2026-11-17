@@ -1,4 +1,3 @@
-// Admin user management: list users, promote and demote with lock-out guards, ban and unban.
 import type pg from "pg";
 import type { UploadRefs } from "./upload-refs.ts";
 
@@ -14,7 +13,6 @@ export interface AdminUser {
 
 const LOCK_KEY = 48_002;
 
-// SQL true when the owner of the game aliased `g` is banned
 export const OWNER_BANNED =
   "exists (select 1 from users o where o.id = g.owner_id and o.banned_at is not null)";
 
@@ -30,8 +28,6 @@ export async function listUsers(pool: pg.Pool): Promise<AdminUser[]> {
 export type SetAdminResult =
   "ok" | "not_found" | "self_demotion" | "last_admin" | "promote_banned";
 
-// Demotions serialise on an advisory lock, so two admins demoting each other
-// at once cannot both pass the last-admin check.
 export async function setAdmin(
   pool: pg.Pool,
   actorId: number,
@@ -85,7 +81,6 @@ export async function setAdmin(
   }
 }
 
-// Deletes the user (their games, state and uploads go with them, see upload-refs.ts)
 export async function deleteUser(
   refs: UploadRefs,
   actorId: number,
@@ -99,8 +94,6 @@ export async function deleteUser(
 
 export type SetBanResult = "ok" | "not_found" | "self_ban" | "admin_ban";
 
-// Bans the user with `reason`, or unbans them when it is null. Admins cannot be banned, so a ban
-// takes the same lock as promotions: a player cannot be promoted and banned at once.
 export async function setBan(
   pool: pg.Pool,
   actorId: number,

@@ -1,4 +1,3 @@
-// /party/<CODE>: the party itself, live over its socket, and its results once it ends (ADR 0016).
 import qrcode from "qrcode-generator";
 import { useRef, useState } from "react";
 import { useWhile } from "../../lib/effects.ts";
@@ -32,7 +31,6 @@ import { getToken, setToken } from "./tokens.ts";
 export const MISSING =
   "There is no party with this code. Check the code and try again.";
 
-// The party's address as an SVG QR code; the library builds it from the URL alone
 const qrSvg = (url: string): string => {
   const qr = qrcode(0, "M");
   qr.addData(url);
@@ -40,7 +38,6 @@ const qrSvg = (url: string): string => {
   return qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
 };
 
-// The code, QR and link to share; while a round is live it shrinks to the code
 function Invite({ code, compact }: { code: string; compact: boolean }) {
   const url = `${location.origin}/party/${code}`;
   const [copy, setCopy] = useState("Copy link");
@@ -193,7 +190,6 @@ export function PartyRoom({ code }: { code: string }) {
   const live = round?.live === true;
   const host = view.you?.host === true && !view.ended;
   const mine = live ? round.yours : null;
-  // A quiz plays each question once
   const outOfQuestions =
     view.game.questions !== undefined &&
     (round?.number ?? 0) >= view.game.questions;

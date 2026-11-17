@@ -1,6 +1,3 @@
-// The guess controls, shared by Play and party rounds: the Typing / Selecting switch, then the guess box
-// and its Guess button, or in selection mode the button that opens the list of every entry; with
-// a Skip button under them for games that allow skipping (Blur games, ADR 0019).
 import { useState } from "react";
 import { SkipButton } from "../../components/skip-button.tsx";
 import { Button } from "../../components/ui/button.tsx";
@@ -12,8 +9,6 @@ import {
 import { cn } from "../../lib/utils.ts";
 import { GuessBox } from "./guess-box.tsx";
 
-// The remembered guess mode, and whether selection mode's list is open above the board.
-// A party passes the mode its host picked: then it is fixed and there is no switch.
 export function useGuessMode(fixed?: GuessMode) {
   const [remembered, setMode] = useState<GuessMode>(() =>
     readGuessMode(localStorage),
@@ -28,7 +23,6 @@ export function useGuessMode(fixed?: GuessMode) {
       setMode(next);
       setListOpen(false);
     },
-    // The list shows only in selection mode
     selecting: mode === "select" && listOpen,
     setSelecting: setListOpen,
   };
@@ -93,16 +87,12 @@ export function GuessForm({
   hidden = false,
 }: {
   modes: GuessModeState;
-  // The names not guessed yet
   names: readonly string[];
   value: string;
   onChange: (value: string) => void;
   onSubmit: (name: string) => void;
-  // Shown only when given
   onSkip?: (() => void) | undefined;
-  // Nothing can be guessed (the game is closed)
   disabled?: boolean;
-  // Still loading: the box takes typing but nothing is sent yet
   busy?: boolean;
   hidden?: boolean;
 }) {

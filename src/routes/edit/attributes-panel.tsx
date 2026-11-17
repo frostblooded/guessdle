@@ -1,6 +1,3 @@
-// The editor's Attributes tab: each attribute is a column on the board. Edits stay here until
-// Save sends the whole list at once. Rows reorder by drag handle or the up and down arrows. A new
-// attribute is named in a popup, like a new entry.
 import {
   closestCenter,
   DndContext,
@@ -43,7 +40,6 @@ const TYPES = [
   ["image", "Image"],
 ] as const;
 
-// One row of the unsaved list: a saved attribute (with its id) or a new one
 interface Draft {
   key: string;
   id?: number;
@@ -54,7 +50,6 @@ interface Draft {
 let nextKey = 0;
 const draftsOf = (attributes: Attribute[]): Draft[] =>
   attributes.map((a) => ({ key: `saved-${a.id}`, ...a }));
-// One list row; its handle drags it
 function SortableRow({
   id,
   label,
@@ -107,17 +102,14 @@ export function AttributesPanel({
   onChange,
 }: {
   base: string;
-  // What the server has
   attributes: Attribute[];
   setAttributes: (attributes: Attribute[]) => void;
-  // Runs after every saved change, so the page can refresh its status line
   onChange: () => Promise<void>;
 }) {
   const [drafts, setDrafts] = useState(() => draftsOf(attributes));
   const [error, setError] = useState("");
   const [newName, setNewName] = useState("");
   const [newType, setNewType] = useState<Attribute["type"]>("text");
-  // The new-attribute popup is open
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
 

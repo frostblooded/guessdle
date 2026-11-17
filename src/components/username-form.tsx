@@ -1,4 +1,3 @@
-// Picking the one public username a player's profile and playlists go under.
 import { useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { MAX_USERNAME } from "../game/limits.ts";

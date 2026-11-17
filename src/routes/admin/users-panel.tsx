@@ -1,4 +1,3 @@
-// Admin Users tab: every account, with promote/demote, ban/unban and delete.
 import { useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import {
@@ -44,7 +43,6 @@ const DELETE_FAILED =
   "Could not delete that user. The server refused it (you cannot delete your own account) or failed. Reload the list to check, then try again.";
 
 export function UsersPanel({ active }: { active: boolean }) {
-  // Refetched each time the tab opens (stale at once)
   const users = useQuery({
     queryKey: ["admin", "users"],
     queryFn: () =>
@@ -58,7 +56,6 @@ export function UsersPanel({ active }: { active: boolean }) {
     ? LOAD_FAILED
     : (failed ?? (slow ? "Loading users…" : null));
 
-  // Runs one change, then reloads the list; `failed` says what went wrong
   const act = async (
     method: "PUT" | "DELETE",
     user: AdminUser,
@@ -128,7 +125,6 @@ export function UsersPanel({ active }: { active: boolean }) {
               </TableCell>
               <TableCell>
                 <span className="flex justify-end gap-2">
-                  {/* The server enforces both guards too; the buttons just show them */}
                   <Button
                     className="role-toggle"
                     variant="outline"
@@ -193,7 +189,6 @@ export function UsersPanel({ active }: { active: boolean }) {
   );
 }
 
-// Ban asks for the reason the player will see on every page; it cannot be left empty
 function BanButton({
   user,
   disabled,

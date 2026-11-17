@@ -5,7 +5,6 @@ import { cn } from "../../lib/utils.ts";
 
 export const Dialog = Primitive.Root;
 
-// A modal panel: Escape, the overlay and the corner button close it; focus returns to the trigger
 export function DialogContent({
   className,
   children,

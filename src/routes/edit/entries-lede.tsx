@@ -1,5 +1,3 @@
-// The line above the editor's entry list: what an entry is in this kind of game, and what it
-// needs.
 import type { GameKind } from "../../game/blur.ts";
 
 export function EntriesLede({
@@ -7,7 +5,6 @@ export function EntriesLede({
   tries,
 }: {
   kind: GameKind;
-  // A Sequence game's photos per entry
   tries: number;
 }) {
   return (

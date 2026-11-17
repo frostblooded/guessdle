@@ -1,5 +1,3 @@
-// Taking a Quiz game (ADR 0021): one request grades the whole quiz, records the player's first
-// score and answers with the review and the score spread.
 import express from "express";
 import type { Express } from "express";
 import { gradeQuiz, type QuizResult } from "../../game/quiz.ts";
@@ -13,8 +11,6 @@ import { bodyOf, fail, loadGame, type AppContext } from "./context.ts";
 export function quizRoutes(app: Express, ctx: AppContext): void {
   const { pool, now } = ctx;
 
-  // {answers: {questionId: answer}, seconds, player}. Signed-in players are known by their
-  // session, anonymous ones by the browser's token.
   app.post(
     "/api/games/:slug/quiz",
     express.json({ limit: "32kb" }),

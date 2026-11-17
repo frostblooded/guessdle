@@ -1,5 +1,3 @@
-// The party page's socket (ADR 0016): says hello with the stored token, hands every
-// server message to the page and reconnects after a drop, backing off up to 10 s.
 import {
   CLOSE_REMOVED,
   type ClientMessage,
@@ -9,9 +7,7 @@ import { schedule } from "./lib/effects.ts";
 
 export interface PartySocket {
   send(msg: ClientMessage): boolean;
-  // Reconnects at once, e.g. with a new token after joining
   restart(): void;
-  // Closes for good: the page is leaving the party
   close(): void;
 }
 
@@ -20,7 +16,6 @@ export function openPartySocket(
   token: () => string | null,
   on: {
     message(msg: ServerMessage): void;
-    // True while connected; false while waiting to reconnect
     connected(up: boolean): void;
     removed(): void;
   },

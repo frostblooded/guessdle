@@ -37,7 +37,6 @@ const KINDS: { kind: GameKind; title: string; text: string }[] = [
 function CreateForm() {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
-  // The address follows the name until the creator types one of their own
   const [typed, setTyped] = useState(false);
   const [error, setError] = useState("");
   const [slugRefused, setSlugRefused] = useState(false);

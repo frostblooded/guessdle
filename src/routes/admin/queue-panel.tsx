@@ -1,4 +1,3 @@
-// Admin Approval queue tab: pending games oldest first, each with a play link, Approve, Reject and Delete.
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router";
@@ -30,7 +29,6 @@ const ACT_FAILED =
 
 export function QueuePanel({ active }: { active: boolean }) {
   const client = useQueryClient();
-  // Refetched each time the tab opens (stale at once)
   const queue = useQuery({
     queryKey: ["admin", "queue"],
     queryFn: () => getJson<{ games: QueueItem[] }>("/api/admin/queue"),
@@ -51,7 +49,6 @@ export function QueuePanel({ active }: { active: boolean }) {
           ? "No games are waiting."
           : null;
 
-  // Deletes one game (`slug` already encoded), then reloads the list
   const remove = async (slug: string): Promise<void> => {
     const out = await api("DELETE", `/api/admin/games/${slug}`, {});
     setFailed(out?.status !== 200);

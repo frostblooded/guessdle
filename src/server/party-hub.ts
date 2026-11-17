@@ -1,6 +1,3 @@
-// Party sockets (ADR 0016): every phone in a party holds one WebSocket at
-// /api/parties/<CODE>/socket. A phone says hello with its player token (none for a
-// visitor), sends actions, and is sent the whole party view after every change.
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import { WebSocketServer, type WebSocket } from "ws";
@@ -23,28 +20,23 @@ import type { AppContext } from "./routes/context.ts";
 
 const PATH = /^\/api\/parties\/([^/]+)\/socket$/;
 const HELLO_MS = 5000;
-// Keeps idle sockets open through the tunnel (Cloudflare drops them after 100 s)
 const PING_MS = 30_000;
-// A phone sends a handful of actions a minute; more than this per window closes it
 const MAX_MESSAGES = 30;
 const WINDOW_MS = 10_000;
 const MAX_SOCKETS_PER_PARTY = 100;
 
-// Close codes the party page reads
 export const CLOSE_TOO_FAST = 4008;
 export const CLOSE_NO_HELLO = 4002;
 
 interface Client {
   ws: WebSocket;
   party: PartyRow;
-  // Null for a visitor who has not joined
   playerId: number | null;
   alive: boolean;
 }
 
 export interface PartyHub {
   upgrade(req: IncomingMessage, socket: Duplex, head: Buffer): void;
-  // Sends every socket in the party its current view
   broadcast(party: PartyRow): Promise<void>;
   close(): void;
 }
@@ -56,7 +48,6 @@ const refuse = (socket: Duplex, status: string): void => {
 export function createPartyHub({ pool, now, random }: AppContext): PartyHub {
   const wss = new WebSocketServer({ noServer: true, maxPayload: 1024 });
   const rooms = new Map<number, Set<Client>>();
-  // One broadcast at a time per party, so a newer view never arrives before an older one
   const chains = new Map<number, Promise<void>>();
 
   const send = (client: Client, msg: ServerMessage): void => {
@@ -78,7 +69,6 @@ export function createPartyHub({ pool, now, random }: AppContext): PartyHub {
     for (const client of room) {
       const view = views.get(client.playerId)!;
       if (client.playerId !== null && view.you === null) {
-        // The host removed this player
         send(client, { type: "removed" });
         client.ws.close(CLOSE_REMOVED, "removed");
         continue;
@@ -109,7 +99,6 @@ export function createPartyHub({ pool, now, random }: AppContext): PartyHub {
     }
   };
 
-  // The player a hello names: the token's player, else the signed-in host on a new device
   const identify = async (
     party: PartyRow,
     token: string | undefined,
@@ -137,7 +126,6 @@ export function createPartyHub({ pool, now, random }: AppContext): PartyHub {
       clearTimeout(helloTimer);
       leave(client);
     });
-    // Messages run one at a time per socket
     let queue = Promise.resolve();
     ws.on("message", (data) => {
       const time = Date.now();
@@ -211,22 +199,17 @@ export function createPartyHub({ pool, now, random }: AppContext): PartyHub {
       const url = new URL(req.url ?? "/", "http://localhost");
       const match = PATH.exec(url.pathname);
       if (!match) {
-        // Not ours: leave the socket for any other upgrade listener
         return;
       }
-      // A cross-site page must not open a socket with this site's cookie
       const origin = req.headers.origin;
       let host: string | null = null;
       try {
         host = origin === undefined ? null : new URL(origin).host;
-      } catch {
-        // unparsable: refused below
-      }
+      } catch {}
       if (origin !== undefined && host !== req.headers.host) {
         refuse(socket, "403 Forbidden");
         return;
       }
-      // Runs outside Express, so a throw here would end the whole process: %FF is malformed UTF-8
       let raw: string;
       try {
         raw = decodeURIComponent(match[1]!);

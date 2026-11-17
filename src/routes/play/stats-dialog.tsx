@@ -1,4 +1,3 @@
-// The victory popup: congratulations, the player's guesses and time, and how the day's winners did.
 import type { ReactNode } from "react";
 import { FriendResults } from "../../components/friend-results.tsx";
 import {
@@ -23,7 +22,6 @@ export interface Bar {
   mine: boolean;
 }
 
-// Horizontal bars, one per bucket, the player's own in the correct-tile green
 export function BarChart({
   id,
   title,
@@ -52,7 +50,6 @@ export function BarChart({
               <span
                 className={`h-5 rounded-r-sm ${bar.mine ? "bg-correct" : "bg-input"}`}
                 style={{
-                  // The longest bar leaves room for its count and "(you)"
                   width: `calc((100% - 4.5rem) * ${bar.count / max})`,
                   minWidth: bar.count > 0 ? "4px" : 0,
                 }}
@@ -79,7 +76,6 @@ const MIN_GUESS_BARS = 6;
 
 export function guessBars(stats: DayStats): Bar[] {
   const mine = stats.you === null ? -1 : guessBar(stats.you.guesses);
-  // Empty bars past the longest win go, keeping at least MIN_GUESS_BARS
   const last = Math.max(
     MIN_GUESS_BARS - 1,
     mine,
@@ -102,12 +98,10 @@ export function timeBars(stats: DayStats): Bar[] {
   }));
 }
 
-// What the popup says under the title about how the player compares
 function comparison(percent: number | null, better: string): string | null {
   return percent === null ? null : `${better} than ${percent}% of players`;
 }
 
-// Guesses and time side by side, with how they compare when `stats` is given
 function Scores({
   result,
   id,
@@ -145,7 +139,6 @@ function Scores({
   );
 }
 
-// A labelled group of the popup
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-2">
@@ -155,7 +148,6 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-// The board on screen is not the win in the stats: a later try, or the first one failed
 export function isReplay(stats: DayStats, thisTry: WinResult | null): boolean {
   const { you } = stats;
   if (thisTry === null) {
@@ -166,15 +158,12 @@ export function isReplay(stats: DayStats, thisTry: WinResult | null): boolean {
   }
   return (
     you.guesses !== thisTry.guesses ||
-    // A time too long to record is stored as unknown
     (thisTry.seconds !== null &&
       you.seconds !== null &&
       you.seconds !== thisTry.seconds)
   );
 }
 
-// `past`: the stats of a past day (anyone who won it, then or later), not today.
-// `thisTry`: the board on screen, shown apart when it is not the win the stats count.
 export function StatsPanel({
   stats,
   past = false,
@@ -252,7 +241,6 @@ export function StatsPanel({
   );
 }
 
-// The popup itself; `stats` is null while loading or when the server could not answer
 export function StatsDialog({
   open,
   onOpenChange,
@@ -271,14 +259,11 @@ export function StatsDialog({
   thisTry?: WinResult | null;
 }) {
   const which = past ? "this day's" : "today's";
-  // The headline is the board on screen; the stats may count an earlier win
   const you = thisTry ?? stats?.you;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         id="stats-dialog"
-        // Focus goes back to See stats on close: the popup may have opened on its own, from a
-        // guess box that is gone
         onCloseAutoFocus={(event) => {
           const target = document.getElementById("stats-button");
           if (target) {

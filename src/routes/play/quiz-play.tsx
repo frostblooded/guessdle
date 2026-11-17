@@ -1,6 +1,3 @@
-// A Quiz game's Play page (ADR 0021): one question at a time, then the score, the review with
-// the right answers and how everyone's first scores spread. A retake starts over; only the
-// first score counts.
 import { useRef, useState } from "react";
 import { Navigate } from "react-router";
 import { PageHead } from "../../components/page.tsx";
@@ -26,7 +23,6 @@ import { BarChart } from "./stats-dialog.tsx";
 export const pointsWord = (n: number): string =>
   `${scoreText(n)} ${n === 1 ? "point" : "points"}`;
 
-// The current question: its picture, then options to tap or a number box
 export function Question({
   question,
   answer,
@@ -87,7 +83,6 @@ export function Question({
   );
 }
 
-// The finished quiz: score, spread and every question with the right answer
 function Review({
   result,
   onRetake,
@@ -170,7 +165,6 @@ function Review({
   );
 }
 
-// A quiz has no days: its own page, whatever day the address names
 export function QuizPlay({
   slug,
   game,
@@ -186,7 +180,6 @@ export function QuizPlay({
   const [result, setResult] = useState<QuizResult | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  // When this attempt began; set by the first answer
   const started = useRef<number | null>(null);
   const question = questions[index];
   const last = index === questions.length - 1;

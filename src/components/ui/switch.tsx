@@ -2,7 +2,6 @@ import { Switch as Primitive } from "radix-ui";
 import type { ComponentProps } from "react";
 import { cn } from "../../lib/utils.ts";
 
-// An on/off switch (a button with role="switch"); label it with a <label htmlFor>
 export function Switch({
   className,
   ...props

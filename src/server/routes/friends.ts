@@ -1,4 +1,3 @@
-// Friends: the Friends page's list, requests by exact username or email, accept and remove.
 import express from "express";
 import type { Express, Request, Response } from "express";
 import { requestUser, type SessionUser } from "../auth.ts";
@@ -48,7 +47,6 @@ export function friendRoutes(
     }
   });
 
-  // `query`: the other player's exact username or email
   app.post("/api/friends", writes, json, async (req, res) => {
     const user = await needUser(req, res);
     if (!user) {
@@ -68,7 +66,6 @@ export function friendRoutes(
       return;
     }
     if (query.includes("@")) {
-      // Same answer whether or not the email has an account (no lookup by email)
       const email = normalizeEmail(query);
       if (email === null) {
         fail(res, "invalid");
@@ -109,7 +106,6 @@ export function friendRoutes(
     res.json({ outcome });
   });
 
-  // Accepts the request from player `:id`
   app.put("/api/friends/:id", writes, async (req, res) => {
     const user = await needUser(req, res);
     if (!user) {
@@ -123,7 +119,6 @@ export function friendRoutes(
     res.json({ ok: true });
   });
 
-  // Declines, cancels or unfriends player `:id` (a negative id: the user's request sent by email)
   app.delete("/api/friends/:id", writes, async (req, res) => {
     const user = await needUser(req, res);
     if (!user) {

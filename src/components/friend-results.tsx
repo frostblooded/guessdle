@@ -1,5 +1,3 @@
-// The result screens' Friends list: how each friend who played did, best first.
-
 export function FriendResults({
   rows,
 }: {

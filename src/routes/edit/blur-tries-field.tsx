@@ -1,6 +1,3 @@
-// A Blur or Sequence game's number of tries on the Details tab. In a Blur game each wrong guess
-// clears one more square; in a Sequence game it shows the next photo, so it is also the number
-// of photos every entry needs to be an answer.
 import { Label, NativeSelect } from "../../components/ui/input.tsx";
 import { MAX_BLUR_TRIES } from "../../game/limits.ts";
 

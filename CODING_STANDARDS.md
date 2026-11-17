@@ -1,6 +1,6 @@
 # Coding standards
 
-Read during review. Judgement calls only; tooling covers the rest (`npm run lint` enforces braces, explicit types on function parameters, class members and properties, `src/**/*.ts` files under 400 lines, the import boundaries between `src/game`, `src/server` and browser code, no global `fetch` outside the API helpers, and no React effects or timers outside `src/lib/effects.ts` (rules of our own in `eslint-rules/`); `npm run dup` fails on duplicated code in `src/`).
+Read during review. Judgement calls only; tooling covers the rest (`npm run lint` enforces braces, explicit types on function parameters, class members and properties, `src/**/*.ts` files under 400 lines, the import boundaries between `src/game`, `src/server` and browser code, no global `fetch` outside the API helpers, no React effects or timers outside `src/lib/effects.ts`, and no comments in `src/` except `shortcut:` debt notes and tool directives (`eslint-disable`, `@ts-expect-error`) (rules of our own in `eslint-rules/`); `npm run dup` fails on duplicated code in `src/`).
 
 ## Indentation
 

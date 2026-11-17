@@ -1,4 +1,3 @@
-// Email-link sign-in, sign-out and the session probe.
 import express from "express";
 import type { Express, Response } from "express";
 import { pendingCount } from "../approval.ts";
@@ -34,7 +33,6 @@ export function authRoutes(
   ctx: AppContext,
   { adminEmails, testLogin }: AuthOptions,
 ): void {
-  // Without mail config the email sign-in routes answer 503
   const { pool, now, secureCookies, mail } = ctx;
   app.get("/api/me", async (req, res) => {
     const user = await requestUser(pool, req, now());
@@ -43,14 +41,10 @@ export function authRoutes(
       user: user && {
         name: user.name,
         email: user.email,
-        // The public name on the profile and playlists; null until picked
         username: await usernameOf(pool, user.id),
         admin: user.admin,
-        // The banner on every page
         ...(user.banned && { banned: true, banReason: user.banReason }),
-        // Friend requests waiting for an answer: the Friends link's badge
         friendRequests: await incomingCount(pool, user.id),
-        // The Admin link's badge
         ...(user.admin && { pending: await pendingCount(pool) }),
       },
     });
@@ -84,8 +78,6 @@ export function authRoutes(
         return;
       }
       try {
-        // Same answer whether or not it mailed, and no user lookup: no enumeration
-        // Hashed: the limit needs to tell requesters apart, not to know their IPs
         const requester = hash(req.ip ?? "");
         await requestLoginLink(
           pool,
@@ -104,7 +96,6 @@ export function authRoutes(
     },
   );
 
-  // POST, not GET: a mail scanner that prefetches the link must not burn the token
   app.post(
     "/api/auth/email/verify",
     express.json({ limit: "1kb" }),
@@ -146,7 +137,6 @@ export function authRoutes(
         res.json({ ok: true });
       },
     );
-    // Sends every scheduled admin email now, so e2e need not wait 5 minutes
     app.post("/api/test/admin-mails", async (_req, res) => {
       if (mail) {
         await mailDueAdmins(pool, mail, new Date(Date.now() + 3600_000));

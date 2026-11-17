@@ -1,15 +1,11 @@
-// Party mode's words for the page (issue #90, ADR 0016): places, solve times, progress and
-// why an action was refused.
 import type { LiveRound, PartyRefusal } from "./party.ts";
 
-// "1st", "2nd", "3rd", "4th", ... "11th", "21st"
 export function ordinal(n: number): string {
   const teen = n % 100 >= 11 && n % 100 <= 13;
   const suffix = teen ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
   return `${n}${suffix}`;
 }
 
-// A solve time as a clock: 0:07, 1:23, 1:02:03
 export function clockTime(ms: number): string {
   const total = Math.floor(ms / 1000);
   const [h, m, sec] = [
@@ -21,7 +17,6 @@ export function clockTime(ms: number): string {
   return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
 }
 
-// How a player is doing in the live round, as the scoreboard says it
 export function progressLabel(p: LiveRound["progress"][number]): string {
   if (p.answered !== undefined) {
     return p.answered ? "Answered" : "Thinking…";

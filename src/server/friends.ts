@@ -1,5 +1,3 @@
-// Friends: requests by exact username or email, accepting, removing, and the friends'
-// first tries shown on the result screens.
 import type pg from "pg";
 import type {
   Friend,
@@ -12,13 +10,11 @@ import type { MailConfig } from "./mailer.ts";
 
 type Q = Pick<pg.Pool, "query">;
 
-// SQL: the user ids that are friends of the user id in `$n`, with their shown name
 const friendsOf = (n: number): string =>
   `select u.id, coalesce(u.username, u.email) as name, u.banned_at from friendships f
    join users u on u.id = case when f.requester_id = $${n} then f.addressee_id else f.requester_id end
    where f.accepted_at is not null and $${n} in (f.requester_id, f.addressee_id)`;
 
-// The player a friend request names by exact username (any case)
 export async function findPlayer(
   q: Q,
   query: string,
@@ -31,8 +27,6 @@ export async function findPlayer(
   return rows[0] ?? null;
 }
 
-// A request the user sent by email is listed with minus its row's id (so it never names an
-// account) and the email as typed, whether or not that email has an account
 export async function listFriends(q: Q, userId: number): Promise<FriendList> {
   const named = (rows: (Friend & { accepted: boolean; mine: boolean })[]) =>
     rows.map(({ id, name }) => ({ id, name }));
@@ -60,7 +54,6 @@ export async function listFriends(q: Q, userId: number): Promise<FriendList> {
   };
 }
 
-// Requests waiting for this player's answer: the account menu's badge
 export async function incomingCount(q: Q, userId: number): Promise<number> {
   const { rows } = await q.query<{ n: number }>(
     `select ((select count(*) from friendships where addressee_id = $1 and accepted_at is null)
@@ -72,15 +65,12 @@ export async function incomingCount(q: Q, userId: number): Promise<number> {
   return rows[0]!.n;
 }
 
-// A request from `from` to `to`; when `to` had already asked `from`, that request is accepted
-// instead. "exists" when they are friends or `from` already asked.
 export async function sendRequest(
   q: Q,
   from: number,
   to: number,
   now: Date,
 ): Promise<FriendRequestOutcome | "exists"> {
-  // `to` asked `from` by email: `from` sees that request, so this accepts it
   const asked = await q.query(
     "select 1 from friend_email_requests where requester_id = $2 and addressee_id = $1",
     [from, to],
@@ -106,10 +96,6 @@ export async function sendRequest(
   return sent.rowCount ? "sent" : "exists";
 }
 
-// A request by email always answers "sent" (or "exists" for an email this user already
-// asked), so it never tells whether the email has an account. It reaches that account,
-// unless banned, as an incoming request; otherwise it waits and is never delivered.
-// `to` is the account to mail, null when nobody new sees the request.
 export async function sendEmailRequest(
   q: Q,
   from: number,
@@ -134,7 +120,6 @@ export async function sendEmailRequest(
   if (!sent.rowCount) {
     return { outcome: "exists" };
   }
-  // The pair already has a request or friendship: the addressee is not asked twice
   return {
     outcome: "sent",
     to: to !== null && !(await paired(q, from, to)) ? to : null,
@@ -152,7 +137,6 @@ const paired = async (q: Q, a: number, b: number): Promise<boolean> =>
     ).rowCount,
   );
 
-// Friends now: email requests between them are done
 const dropEmailRequests = async (q: Q, a: number, b: number): Promise<void> => {
   await q.query(
     `delete from friend_email_requests where (requester_id = $1 and addressee_id = $2)
@@ -161,7 +145,6 @@ const dropEmailRequests = async (q: Q, a: number, b: number): Promise<void> => {
   );
 };
 
-// `requester`'s email request to `addressee` is accepted
 const befriend = async (
   q: Q,
   requester: number,
@@ -183,10 +166,6 @@ const befriend = async (
   }
 };
 
-// The answer to an email request whose account already has a row with `from`: "accepted"
-// when it had asked `from`, "exists" when they are friends or `from` asked by username;
-// null when there is no row
-// Accepts `other`'s request to `userId`; false when there is none
 export async function acceptRequest(
   q: Q,
   userId: number,
@@ -213,14 +192,12 @@ export async function acceptRequest(
   return true;
 }
 
-// Declines, cancels or unfriends, whichever the pair's row is
 export async function removeFriend(
   q: Q,
   userId: number,
   other: number,
 ): Promise<void> {
   if (other < 0) {
-    // One of the user's own requests sent by email
     await q.query(
       "delete from friend_email_requests where id = $2 and requester_id = $1",
       [userId, -other],
@@ -232,8 +209,6 @@ export async function removeFriend(
        or (requester_id = $2 and addressee_id = $1)`,
     [userId, other],
   );
-  // Email requests between them stay pending for their sender but are never delivered,
-  // the same as for an email with no account
   await q.query(
     `update friend_email_requests set addressee_id = null
      where (requester_id = $1 and addressee_id = $2) or (requester_id = $2 and addressee_id = $1)`,
@@ -241,12 +216,9 @@ export async function removeFriend(
   );
 }
 
-// The user id of a "user:<id>" player, null for an anonymous one
 export const userIdOf = (player: string): number | null =>
   player.startsWith("user:") ? Number(player.slice(5)) : null;
 
-// Friends' first tries on one day, wins first (fewest guesses, then fastest). Banned
-// friends are left out, as they are from the day's stats.
 export async function friendResults(
   q: Q,
   userId: number,
@@ -264,7 +236,6 @@ export async function friendResults(
   return rows;
 }
 
-// Friends' first scores on a quiz, best first
 export async function quizFriendResults(
   q: Q,
   userId: number,
@@ -281,8 +252,6 @@ export async function quizFriendResults(
   return rows;
 }
 
-// Emails `to` about `from`'s request unless they switched these emails off. Never throws: a
-// mail problem must not fail the request.
 export async function mailRequest(
   q: Q,
   mail: MailConfig,

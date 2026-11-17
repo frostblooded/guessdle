@@ -1,4 +1,3 @@
-// Party mode storage and rules (ADR 0016): the one seam between the party routes, the socket hub and the tables.
 import { randomBytes } from "node:crypto";
 import type pg from "pg";
 import { MAX_OPEN_PARTIES, MAX_PARTY_PLAYERS } from "../game/limits.ts";
@@ -29,7 +28,6 @@ import {
 type Q = Pick<pg.Pool, "query">;
 
 const HOUR_MS = 3600_000;
-// A party nobody acts in ends by itself; an ended one is deleted (freeing its code) after 30 days
 export const IDLE_MS = 12 * HOUR_MS;
 export const KEEP_MS = 30 * 24 * HOUR_MS;
 
@@ -44,8 +42,6 @@ export interface PartyRow {
 
 const newToken = (): string => randomBytes(24).toString("base64url");
 
-// Ends parties idle for IDLE_MS (and their live rounds) and deletes those ended KEEP_MS ago.
-// `code` limits it to one party, so a read never shows a stale open party.
 export async function sweepParties(
   q: Q,
   now: Date,
@@ -96,7 +92,6 @@ const openParties = async (q: Q, userId: number): Promise<number> =>
 
 export type CreateRefusal = "too_many_parties";
 
-// Opens a party with its host as the first player; the token identifies the host's phone
 export async function createParty(
   q: Q,
   game: GameRow,
@@ -131,7 +126,6 @@ export async function createParty(
 
 export type JoinRefusal = "party_ended" | "nickname_taken" | "party_full";
 
-// Under the party lock, so the player cap and nickname check hold
 export async function joinParty(
   pool: pg.Pool,
   party: PartyRow,
@@ -163,7 +157,6 @@ export async function joinParty(
   });
 }
 
-// The current player a phone's token names, or null (unknown, or removed by the host)
 export async function playerByToken(
   q: Q,
   partyId: number,
@@ -177,7 +170,6 @@ export async function playerByToken(
   return rows[0]?.id ?? null;
 }
 
-// The host's player, for a host who signs in on another device
 export async function hostPlayerId(q: Q, partyId: number): Promise<number> {
   const { rows } = await q.query<{ id: number }>(
     "select id::int from party_players where party_id = $1 and host",
@@ -254,7 +246,6 @@ export async function loadData(q: Q, party: PartyRow): Promise<PartyData> {
           )
         ).rows
       : [];
-  // A Quiz round's question, graded against its answer (soft-deleted ones still resolve)
   const quizOf = (r: {
     id: number;
     answerId: number;
@@ -314,7 +305,6 @@ export async function loadData(q: Q, party: PartyRow): Promise<PartyData> {
   };
 }
 
-// What `viewers` (player ids, null for a visitor) each see of the party
 export async function viewsOf(
   q: Q,
   party: PartyRow,
@@ -340,7 +330,6 @@ export async function viewsOf(
         guessMode: party.guessMode,
       },
       attributes: roster.attributes,
-      // A Quiz round sends its own question
       entries: game.kind === "quiz" ? [] : roster.entries,
       all: roster.all,
       ended,
@@ -359,7 +348,6 @@ export async function withPartyLock<T>(
   const client = await pool.connect();
   try {
     await client.query("begin");
-    // Serializes every change to one party, so "everyone is done" and caps are read under the lock
     const { rows } = await client.query<{ ended: boolean }>(
       "select ended_at is not null as ended from parties where id = $1 for update",
       [partyId],

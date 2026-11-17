@@ -1,4 +1,3 @@
-// The emailed link's landing: spends ?token= and sends the user on.
 import { LoaderCircle } from "lucide-react";
 import { useState } from "react";
 import { useOnce } from "../lib/effects.ts";
@@ -13,8 +12,6 @@ import { useTitle } from "../lib/use-title.ts";
 
 type Failure = keyof typeof VERIFY_MESSAGES;
 
-// The token leaves the address bar once it is spent or refused, but stays after a network
-// or rate-limit failure so a reload (Try again) can retry
 async function completeLogin(): Promise<"ok" | Failure> {
   const url = new URL(location.href);
   const token = url.searchParams.get("token");
@@ -31,11 +28,9 @@ async function completeLogin(): Promise<"ok" | Failure> {
 export function VerifyPage() {
   useTitle("Signing you in - Guessdle");
   const [failure, setFailure] = useState<Failure | null>(null);
-  // A token works once: never spend it twice
   useOnce(true, () => {
     void completeLogin().then((result) => {
       if (result === "ok") {
-        // A full load, so every page sees the new session; Play merges local guesses on load
         location.replace(takeReturnTo(localStorage));
       } else {
         setFailure(result);

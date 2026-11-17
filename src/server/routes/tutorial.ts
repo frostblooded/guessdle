@@ -1,5 +1,3 @@
-// How to play's practice game: the frozen pet game copy migration 015 took (no secret to keep,
-// so the page grades in the browser).
 import type { Express } from "express";
 import type { Tutorial } from "../../game/tutorial.ts";
 import type { AppContext } from "./context.ts";

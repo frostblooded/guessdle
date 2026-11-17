@@ -3,7 +3,6 @@ import { Accordion as Primitive } from "radix-ui";
 import type { ComponentProps } from "react";
 import { cn } from "../../lib/utils.ts";
 
-// Radix accordion as a stack of cards, one per item
 export const Accordion = Primitive.Root;
 
 export function AccordionItem({

@@ -1,5 +1,3 @@
-// How to play's practice game: four short steps on the frozen pet game copy, from "there is a
-// secret pet" to a win, explaining each clue in plain words. Graded in the browser.
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import {
@@ -69,7 +67,6 @@ function Board({
   );
 }
 
-// What the newest row says, one colored line per column
 function Clues({ lines, grades }: { lines: string[]; grades: string[] }) {
   return (
     <ul className="practice-clues space-y-1.5 text-sm sm:text-base">
@@ -86,8 +83,6 @@ function Clues({ lines, grades }: { lines: string[]; grades: string[] }) {
   );
 }
 
-// One step of a practice round, shared by every game kind's round: a small label such as
-// "Step 2 of 4" over its title
 export function PracticeCard({
   step,
   label,
@@ -138,7 +133,6 @@ function StepCard({
   );
 }
 
-// A finished practice round's way out: to the gallery, or another round
 export function PracticeEnd({ onRestart }: { onRestart: () => void }) {
   return (
     <div className="flex flex-wrap gap-2">

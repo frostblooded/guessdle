@@ -1,5 +1,3 @@
-// The guesses under Play's guess box, newest first: a classic game's graded rows under its column
-// titles, or a Blur or Sequence game's names.
 import { GuessRow, TitleRow } from "../../components/board.tsx";
 import { EmptyState } from "../../components/page.tsx";
 import { BlurGuesses, BlurView } from "../../components/blur-view.tsx";
@@ -15,8 +13,6 @@ import {
   type GradedAttribute,
 } from "../../game/game.ts";
 
-// What a board of guesses shows (Play and party rounds): a Blur or Sequence game's tries and wrong
-// guesses, the entries left to guess, and a classic game's columns
 export function boardOf(
   game: {
     kind: GameKind;
@@ -27,22 +23,17 @@ export function boardOf(
   rows: readonly GradedAttribute[][],
 ) {
   const image = isImageGame(game.kind);
-  // Each row names its guess; those names leave the suggestions
   const used = guessedNames(rows);
   const unguessed = entries.filter((entry) => !used.has(entry.name));
   return {
-    // Null for a classic game, whose guesses are unlimited
     tries: image ? (game.blurTries ?? 1) : null,
     wrong: rows.filter((row) => !isAnswerRow(row)).length,
     unguessed,
     names: unguessed.map((entry) => entry.name),
-    // Null for a Blur or Sequence game, which shows names only
     titles: image ? null : boardColumns(game.attributes),
   };
 }
 
-// What a Blur or Sequence game shows of the answer: the image with n squares clear (`blur`), or
-// photo n (`shot`). `board` refetches it on a fresh board, `day` names a past day.
 export const answerImageUrl = (
   path: ImagePath,
   slug: string,
@@ -54,7 +45,6 @@ export const answerImageUrl = (
 
 type ImagePath = "blur" | "shot";
 
-// A Blur game's board or a Sequence game's photos, above the guess box (Play and party rounds)
 export function AnswerImage({
   kind,
   url,
@@ -65,7 +55,6 @@ export function AnswerImage({
   tries: number;
   wrong: number;
   finished: boolean;
-  // A Blur game's whole image, once over
   reveal?: string | undefined;
 }) {
   return kind === "sequence" ? (
@@ -83,7 +72,6 @@ export function PlayResults({
   empty,
 }: {
   rows: readonly GradedAttribute[][];
-  // A classic game's columns; null for a Blur or Sequence game
   titles: readonly BoardColumn[] | null;
   loading: boolean;
   loadingText: string;

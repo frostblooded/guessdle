@@ -1,5 +1,3 @@
-// /admin: Users, Backups, Approval queue, All games and Maintenance tabs (answers live in each
-// game's editor). During maintenance only the Maintenance tab shows, to turn it off.
 import { useState } from "react";
 import { Link } from "react-router";
 import { MessageCard, PageHead } from "../../components/page.tsx";
@@ -56,7 +54,6 @@ function AdminApp() {
   );
 }
 
-// The API refuses non-admins too; this is the page-level 401/403
 function Gate({ signedIn }: { signedIn: boolean | null }) {
   return (
     <MessageCard id="admin-gate" aria-live="polite">

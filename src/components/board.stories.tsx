@@ -8,7 +8,6 @@ import { BoardRow, GuessRow, TitleTile } from "./board.tsx";
 
 const { Correct, PartiallyCorrect, Incorrect } = Correctness;
 
-// A row as the API grades it: name, the Photo image column, then Colors and Owners
 const row = (
   photo: string,
   name: [string, Correctness],
@@ -69,7 +68,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Newest first: a win after two guesses
 export const Won: Story = {};
 export const OneGuess: Story = { args: { rows: ROWS.slice(2) } };
 export const Empty: Story = { args: { rows: [] } };

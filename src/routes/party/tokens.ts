@@ -1,4 +1,3 @@
-// The phone's player token for each party; storage may be blocked, then it lasts this page view.
 const tokens = new Map<string, string>();
 const key = (code: string): string => `party:${code}`;
 
@@ -22,7 +21,5 @@ export function setToken(code: string, token: string | null): void {
     } else {
       localStorage.setItem(key(code), token);
     }
-  } catch {
-    // blocked storage: the in-memory copy above
-  }
+  } catch {}
 }

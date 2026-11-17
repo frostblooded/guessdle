@@ -1,6 +1,3 @@
-// Every failure code the server sends: its HTTP status and the text the browser shows.
-// One table so a new code cannot reach one side without the other.
-
 import { FREE_HINT_AFTER } from "./free-hint.ts";
 import {
   MAX_OPEN_PARTIES,
@@ -187,11 +184,9 @@ export const FAILURES = {
 
 export type FailureCode = keyof typeof FAILURES;
 
-// The one text for a request that never got an answer (offline, DNS, server down, dropped)
 export const UNREACHABLE =
   "Could not reach the server. Check your connection and try again; if your connection is fine, the server may be down, so try again in a few minutes.";
 
-// The text for a reply's `error` code; a 429 from anywhere else still reads as rate limiting
 export const failureText = (code: unknown, status: number): string =>
   FAILURES[String(code) as FailureCode]?.text ??
   (status === 429

@@ -1,7 +1,5 @@
-// Pure sign-in page logic: messages, email shape and the resend cooldown (unit-tested without a DOM).
 import type { LinkRequest, VerifyResult } from "./account.ts";
 
-// The server allows one mail per address a minute (ADR 0011)
 export const RESEND_SECONDS = 60;
 
 export const MESSAGES: Record<Exclude<LinkRequest, "sent">, string> = {
@@ -24,12 +22,10 @@ export const VERIFY_MESSAGES: Record<
   error: "Could not reach the server. Check your connection and try again.",
 };
 
-// A cheap shape check so a typo never costs a request; the server checks again
 export function looksLikeEmail(value: string): boolean {
   return value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-// Whole seconds until a new link may be requested (0 when it may be now)
 export function secondsLeft(sentAt: number, now: number): number {
   const left = Math.ceil(RESEND_SECONDS - (now - sentAt) / 1000);
   return Math.min(RESEND_SECONDS, Math.max(0, left));

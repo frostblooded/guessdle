@@ -1,5 +1,3 @@
-// An admin's See changes, Approve and Reject for a pending game, shared by Play, the editor and
-// both admin lists. See changes opens what changed since the last approval. Reject asks for the reason the owner will see in a dialog; it cannot be left empty.
 import { useState, type FormEvent } from "react";
 import { MAX_REASON } from "../game/limits.ts";
 import { ChangesDialog } from "./changes-dialog.tsx";
@@ -31,7 +29,6 @@ export function ReviewButtons({
   size?: "sm" | "default";
   approveId?: string;
   rejectId?: string;
-  // `reason` is the rejection reason, empty on approve
   onDone: (review: Review, reason: string) => void | Promise<void>;
   onFail: (text: string) => void;
 }) {
@@ -65,7 +62,6 @@ export function ReviewButtons({
     if (text === "") {
       return;
     }
-    // Closed on failure too: the error shows next to the buttons, not under the dialog
     setOpen(false);
     if (await review("reject", text)) {
       setReason("");

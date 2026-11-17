@@ -1,4 +1,3 @@
-// The Past days list: one row per day, newest first, each with how far the player got.
 import { ChevronRight } from "lucide-react";
 import { Link } from "react-router";
 import { Badge } from "../../components/ui/badge.tsx";

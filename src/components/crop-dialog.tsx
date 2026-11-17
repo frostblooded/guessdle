@@ -1,6 +1,3 @@
-// The editor's crop step (issue #82): a modal around image-cropper.ts. `useCrop` gives a
-// `crop(file, kind)` that resolves to the cropped file, or null after a cancel or a failure,
-// whose text goes to `onError`; the page renders the returned `dialog`.
 import { Minus, Plus } from "lucide-react";
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import { CropError, type ImageKind } from "../game/crop.ts";
@@ -19,7 +16,6 @@ import {
 } from "./ui/alert-dialog.tsx";
 import { Button } from "./ui/button.tsx";
 
-// What the dialog calls each kind: a Sequence photo is still a photo to the owner
 const LABELS: Record<ImageKind, string> = {
   photo: "photo",
   shot: "photo",
@@ -29,14 +25,12 @@ const LABELS: Record<ImageKind, string> = {
 interface Job {
   kind: ImageKind;
   image: HTMLImageElement;
-  // The cropped file, null for a cancel, or the CropError the crop threw
   done(out: Blob | null | CropError): void;
 }
 
 function CropDialog({ job }: { job: Job }) {
   const cropper = useRef<MountedCropper | null>(null);
   const [busy, setBusy] = useState(false);
-  // Mounted with the host and gone with it (StrictMode mounts twice)
   const host = useCallback(
     (el: HTMLDivElement) => {
       const mounted = mountCropper(el, job.image, job.kind);
@@ -49,7 +43,6 @@ function CropDialog({ job }: { job: Job }) {
     [job],
   );
 
-  // The crop reads the frame's on-screen geometry, so it runs while the dialog is still open
   const confirm = async (): Promise<void> => {
     setBusy(true);
     try {
@@ -83,7 +76,6 @@ function CropDialog({ job }: { job: Job }) {
           ref={host}
         />
         <div className="flex gap-2">
-          {/* A bigger frame shows more of the photo: zooming in shrinks it */}
           <Button
             id="crop-zoom-out"
             variant="outline"

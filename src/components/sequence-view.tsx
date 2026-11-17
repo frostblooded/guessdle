@@ -1,6 +1,3 @@
-// A Sequence game's photos (ADR 0020), shared by Play and party rounds: the photos unlocked so
-// far, newest first on screen, with numbered buttons to look back at earlier ones. Every photo
-// unlocks once the day or round is over.
 import { Lock } from "lucide-react";
 import { useState, type CSSProperties } from "react";
 import { blurProgress } from "../game/blur.ts";
@@ -13,17 +10,13 @@ export function SequenceView({
   finished,
   shotStyle,
 }: {
-  // Photo n of the answer, 1-based
   shotUrl: (n: number) => string;
   tries: number;
-  // Wrong guesses and skips so far
   wrong: number;
   finished: boolean;
-  // How photo n is drawn, such as How to play's zoom on its one photo
   shotStyle?: (n: number) => CSSProperties;
 }) {
   const { shown: unlocked, left } = blurProgress(wrong, tries, finished);
-  // The photo the player looked back at, while no newer one has unlocked since
   const [picked, setPicked] = useState<{ n: number; at: number } | null>(null);
   const current = picked?.at === unlocked ? picked.n : unlocked;
   return (

@@ -1,4 +1,3 @@
-// A game in a grid of games: the gallery, a profile and a playlist all draw it the same way.
 import type { ComponentProps, ReactNode } from "react";
 import { Link } from "react-router";
 import type { GameKind } from "../game/blur.ts";
@@ -8,7 +7,6 @@ import { cn } from "../lib/utils.ts";
 import { GameKindLabel } from "./game-kind.tsx";
 import { Badge } from "./ui/badge.tsx";
 
-// One game as GET /api/games lists it
 export interface GameCard {
   slug: string;
   name: string;
@@ -19,11 +17,9 @@ export interface GameCard {
   kind: GameKind;
 }
 
-// The gallery: GET /api/games
 export const fetchGallery = (): Promise<GameCard[]> =>
   getJson<GameCard[]>("/api/games");
 
-// One image for a cover, a grid of decorative tiles for a collage
 function BannerImage({
   banner,
   className,
@@ -67,7 +63,6 @@ function BannerImage({
   );
 }
 
-// `corner` sits over the card's top right, outside its link (a Save button)
 export function GameCardItem({
   card,
   featured = false,
@@ -131,7 +126,6 @@ export function GameCardItem({
   );
 }
 
-// A grid of game cards
 export function GameGrid({
   className,
   children,

@@ -1,4 +1,3 @@
-// The party page's head and its forms before a party is open: find one by code, or host one.
 import { useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router";
@@ -45,7 +44,6 @@ export function PartyHead({
   );
 }
 
-// A card holding one labelled field and its button
 export function PartyForm({
   id,
   onSubmit,
@@ -72,7 +70,6 @@ export function PartyForm({
   );
 }
 
-// /party: type a code to find a party
 export function CodeForm({ error: initial = "" }: { error?: string }) {
   const navigate = useNavigate();
   const [code, setCode] = useState("");
@@ -110,12 +107,10 @@ export function CodeForm({ error: initial = "" }: { error?: string }) {
   );
 }
 
-// /party?host=<slug>: a signed-in player opens a party on a game
 export function HostForm({ slug }: { slug: string }) {
   const navigate = useNavigate();
   const user = useSignedIn(`/party?host=${encodeURIComponent(slug)}`);
   const [nickname, setNickname] = useState<string | null>(null);
-  // How every player will guess; starts as the host's own remembered mode
   const [guessMode, setGuessMode] = useState<GuessMode>(() =>
     readGuessMode(localStorage),
   );
@@ -129,7 +124,6 @@ export function HostForm({ slug }: { slug: string }) {
   const playable = typeof loaded === "object" ? loaded : null;
   const game = playable?.name ?? null;
   const quiz = playable?.kind === "quiz";
-  // Why the game could not be loaded
   const loadError =
     loaded === "missing"
       ? FAILURES.not_found.text
@@ -156,7 +150,6 @@ export function HostForm({ slug }: { slug: string }) {
     setBusy(false);
   };
 
-  // The account name until the host types their own
   const shown =
     nickname ?? [...(user?.name ?? "")].slice(0, MAX_NICKNAME).join("");
   return (
@@ -180,7 +173,6 @@ export function HostForm({ slug }: { slug: string }) {
             value={shown}
             onChange={(event) => setNickname(event.target.value)}
           />
-          {/* A quiz round brings its own answer box */}
           {!quiz && (
             <ModeSwitch
               mode={guessMode}

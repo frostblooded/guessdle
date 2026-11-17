@@ -1,4 +1,3 @@
-// Browser side of creating and editing games: JSON calls, the sign-in detour and error texts.
 import { failureText } from "./game/failures.ts";
 
 export interface Reply<T = Record<string, unknown>> {
@@ -6,7 +5,6 @@ export interface Reply<T = Record<string, unknown>> {
   data: T;
 }
 
-// JSON request, or raw bytes when `body` is a File; null when the server could not be reached
 export async function api<T = Record<string, unknown>>(
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   path: string,
@@ -16,7 +14,6 @@ export async function api<T = Record<string, unknown>>(
     const raw = body instanceof Blob;
     const res = await fetch(path, {
       method,
-      // The CSRF guard wants JSON or raw bytes on every mutating call, DELETE included
       ...(method !== "GET" && {
         headers: {
           "Content-Type": raw ? "application/octet-stream" : "application/json",
@@ -30,7 +27,6 @@ export async function api<T = Record<string, unknown>>(
   }
 }
 
-// Signed-out visitors sign in and come back to `path`
 export const signInThen = (path: string): void =>
   location.replace(`/login?next=${encodeURIComponent(path)}`);
 

@@ -1,5 +1,3 @@
-// The editor's status row: the status notice and the moves open to this user (Submit, Unpublish,
-// and an admin's Approve and Reject on a pending game).
 import { useState } from "react";
 import { ReviewButtons } from "../../components/review-buttons.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
@@ -21,7 +19,6 @@ export function StatusBar({
 }) {
   const [flowError, setFlowError] = useState("");
 
-  // Submit and unpublish move the status; the server answers with the fresh details
   const flow = async (action: "submit" | "unpublish"): Promise<void> => {
     const out = await api<Details>("POST", `${base}/${action}`, {});
     if (out?.status === 200) {
@@ -31,7 +28,6 @@ export function StatusBar({
   };
 
   const notice = statusNotice(details);
-  // A rejected game resubmits by editing, but a plain Submit is allowed too
   const canSubmit = details.status === "draft" || details.status === "rejected";
 
   return (

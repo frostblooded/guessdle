@@ -1,4 +1,3 @@
-// Upload quota rows (spec #66); references, deletion and the sweep live in upload-refs.ts.
 import type pg from "pg";
 
 export const DEFAULT_UPLOAD_QUOTA_BYTES = 200 * 1024 * 1024;

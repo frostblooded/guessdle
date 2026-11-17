@@ -1,4 +1,3 @@
-// The app shell (index.html) served at /g/<slug> with the game's link-preview meta injected.
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Express, Request } from "express";
@@ -22,7 +21,6 @@ export function shellRoutes(
   { pool, now }: AppContext,
   shellDir: string,
 ): void {
-  // The slug is not a path here (the shell is read from a fixed file). Express has already decoded it once; decoding again threw on e.g. /g/%25zz
   app.get(/^\/g\/([^/]+)$/, async (req: Request, res) => {
     const slug = String(paramOf(req, "0"));
     const loaded = await resolveGame(pool, now, req, slug, "play");
@@ -53,7 +51,6 @@ export function shellRoutes(
       tags.push("<title>Game not found - Guessdle</title>");
       tags.push(meta("name", "robots", "noindex"));
     }
-    // The game's own title and description replace the site-wide ones
     const html = (await readFile(join(shellDir, "index.html"), "utf8")).replace(
       /<title>Guessdle<\/title>\s*<meta\s+name="description"[^>]*>/,
       () => tags.join("\n    "),

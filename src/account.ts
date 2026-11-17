@@ -1,22 +1,16 @@
-// Browser side of sign-in: who is signed in, and signing out.
 import { call, failureOf, type Fetch } from "./game/transport.ts";
 
 export interface AccountUser {
   name: string;
   email: string;
-  // The public profile name; null until the player picks one
   username: string | null;
   admin: boolean;
-  // Friend requests waiting for this player's answer
   friendRequests: number;
-  // Games waiting for review; sent to admins only
   pending?: number;
-  // Sent only to a banned player, with the reason the admin gave
   banned?: true;
   banReason?: string;
 }
 
-// null when signed out, or when the server cannot be reached (shown as signed out)
 export async function fetchUser(fetch: Fetch): Promise<AccountUser | null> {
   try {
     const res = await fetch("/api/me");
@@ -30,7 +24,6 @@ export async function fetchUser(fetch: Fetch): Promise<AccountUser | null> {
   }
 }
 
-// True once the server has ended the session
 export async function signOut(fetch: Fetch): Promise<boolean> {
   try {
     const res = await fetch("/api/auth/logout", {
@@ -47,7 +40,6 @@ export async function signOut(fetch: Fetch): Promise<boolean> {
 export type LinkRequest =
   "sent" | "invalid" | "unavailable" | "rate_limited" | "error";
 
-// Asks the server to email a sign-in link
 export async function requestLoginLink(
   fetch: Fetch,
   email: string,
@@ -72,7 +64,6 @@ export async function requestLoginLink(
 
 export type VerifyResult = "ok" | "invalid" | "rate_limited" | "error";
 
-// "ok" when the emailed token was valid and the session cookie is now set
 export async function verifyLoginToken(
   fetch: Fetch,
   token: string,

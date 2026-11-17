@@ -1,4 +1,3 @@
-// The header's account area: a Sign in link, or the signed-in user's menu.
 import { useRef, useState } from "react";
 import { useOutsideClick } from "../lib/effects.ts";
 import { Link } from "react-router";
@@ -9,7 +8,6 @@ import { browserFetch, useMe } from "../lib/api.ts";
 import { cn } from "../lib/utils.ts";
 import { buttonVariants } from "./ui/button.tsx";
 
-// Signing out also forgets the local game, so the next person starts clean
 async function signOutAndLeave(): Promise<void> {
   if (await signOut(browserFetch)) {
     forgetAllGames(localStorage);
@@ -20,7 +18,6 @@ async function signOutAndLeave(): Promise<void> {
 const menuItem =
   "block w-full cursor-pointer rounded-md bg-card px-3 py-2 text-left text-sm text-foreground no-underline hover:bg-secondary";
 
-// A disclosure, not an ARIA menu: Tab walks its links, Escape and an outside click close it
 function UserMenu({ user }: { user: AccountUser }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);

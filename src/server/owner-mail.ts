@@ -1,4 +1,3 @@
-// Approval emails to a game's owner and the switches that stop them (Settings page).
 import type pg from "pg";
 import {
   MAIL_KINDS,
@@ -25,7 +24,6 @@ export async function mailSettings(
   return rows[0];
 }
 
-// A full set of booleans, or undefined when `value` is not one
 export function parseMailSettings(value: unknown): MailSettings | undefined {
   if (typeof value !== "object" || value === null) {
     return undefined;
@@ -91,7 +89,6 @@ export function ownerMessage(
   }
 }
 
-// Mails the game's owner unless their switches say no. Never throws: a mail problem must not fail the change.
 export async function mailOwner(
   q: Q,
   mail: MailConfig,

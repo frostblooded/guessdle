@@ -12,7 +12,6 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 export const Disabled: Story = { args: { disabled: true } };
 
-// The fields of the editor's details form, labelled as on the page
 export const Form: Story = {
   render: () => (
     <div className="grid max-w-md gap-4">

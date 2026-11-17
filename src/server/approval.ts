@@ -1,5 +1,3 @@
-// The admin queue, game list (spec #66) and what changed since a game's last approval; status
-// moves live in lifecycle.ts.
 import type pg from "pg";
 import { diffGame, type Change, type Snapshot } from "../game/approval-diff.ts";
 import { listAttributes } from "./attributes.ts";
@@ -15,7 +13,6 @@ export interface QueueItem {
   since: string;
 }
 
-// Pending games, oldest first (updated_at is when it last changed, which is when it entered pending)
 export async function listQueue(q: Q): Promise<QueueItem[]> {
   const { rows } = await q.query<QueueItem>(
     `select g.slug, g.name, u.email as owner, g.updated_at as since,
@@ -41,8 +38,6 @@ export interface GameListItem {
   entryCount: number;
 }
 
-// Every game of any status for the admin, newest first. `search` matches name, slug or owner email,
-// case-insensitive; strpos keeps LIKE wildcards literal.
 export async function listAllGames(
   q: Q,
   search: string,
@@ -60,7 +55,6 @@ export async function listAllGames(
   return rows;
 }
 
-// The game as it is now, in the shape approval saves (ADR 0022)
 export async function snapshotOf(q: Q, game: GameRow): Promise<Snapshot> {
   const attributes = await listAttributes(q, game);
   const { entries } = await loadRoster(q, game);
@@ -87,8 +81,6 @@ export async function snapshotOf(q: Q, game: GameRow): Promise<Snapshot> {
   };
 }
 
-// Saves the game at `id` as approved. With `ifMissing`, only when none is saved yet: games
-// approved before snapshots existed get theirs before their first edit.
 export async function saveSnapshot(
   q: Q,
   id: number,
@@ -110,7 +102,6 @@ export async function saveSnapshot(
   }
 }
 
-// What changed since the last approval; null when the game was never approved
 export async function changesSinceApproval(
   q: Q,
   game: GameRow,

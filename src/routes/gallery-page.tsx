@@ -54,7 +54,6 @@ export function GalleryPage() {
       )}
       <GameGrid id="gallery" className="gallery">
         {games.data?.map((card, i) => (
-          // The API lists the original game first
           <GameCardItem
             key={card.slug}
             card={card}

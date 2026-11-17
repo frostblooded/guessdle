@@ -1,6 +1,3 @@
-// Blur games (ADR 0019): players guess an entry from its square image split into a 3x3 grid.
-// At first only one square is clear; each wrong guess clears the next one, in the order the
-// owner picked. Pure, so the server, the editor and Play share it.
 import { MAX_BLUR_TRIES } from "./limits.ts";
 
 export type GameKind = "classic" | "blur" | "sequence" | "quiz";
@@ -11,21 +8,15 @@ export const isGameKind = (value: unknown): value is GameKind =>
   value === "sequence" ||
   value === "quiz";
 
-// Blur and Sequence games: no attributes, graded on the name only, a fixed number of tries
-// (`blurTries`), and entry photos kept secret until the day is over
 export const isImageGame = (kind: GameKind): boolean =>
   kind === "blur" || kind === "sequence";
 
-// Whether `guesses` (skips included) used up a Blur game's tries without the answer. `tries` is
-// absent for a classic game, whose guesses are unlimited. Solo play, Past days and party rounds
-// all lose by this one rule.
 export const outOfTries = (
   tries: number | null | undefined,
   guesses: number,
   won: boolean,
 ): boolean => tries !== null && tries !== undefined && !won && guesses >= tries;
 
-// The grid is GRID x GRID squares, numbered 0..CELLS-1 row by row from the top left
 export const GRID = 3;
 export const CELLS = GRID * GRID;
 
@@ -34,15 +25,12 @@ export const isTryCount = (value: unknown): value is number =>
   (value as number) >= 1 &&
   (value as number) <= MAX_BLUR_TRIES;
 
-// A complete clearing order: every cell exactly once
 export const isBlurOrder = (value: unknown): value is number[] =>
   Array.isArray(value) &&
   value.length === CELLS &&
   value.every((cell) => Number.isInteger(cell) && cell >= 0 && cell < CELLS) &&
   new Set(value).size === CELLS;
 
-// The editor's click on a cell: an unpicked cell goes last, a picked one leaves the order. When
-// one cell is left it goes last on its own, so eight clicks finish the order.
 export function toggleCell(order: readonly number[], cell: number): number[] {
   const next = order.includes(cell)
     ? order.filter((c) => c !== cell)
@@ -56,11 +44,8 @@ export function toggleCell(order: readonly number[], cell: number): number[] {
   return next;
 }
 
-// Where a player is in the day: wrong guesses so far against the game's tries
 export interface BlurProgress {
-  // Squares clear now, 1..tries
   shown: number;
-  // Tries left before the day is lost
   left: number;
   lost: boolean;
 }
@@ -78,7 +63,6 @@ export function blurProgress(
   };
 }
 
-// The pixel bounds of a cell in a width x height image; rounding spreads the leftover pixels
 export function cellRect(
   cell: number,
   width: number,

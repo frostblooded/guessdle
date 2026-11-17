@@ -1,6 +1,3 @@
-// Play's board session: opens the day's Play once the game and who is signed in are known, and
-// keeps the guesses shown, the result, the notice and the Free Hint in step with each guess,
-// give-up and reset. The page only draws it and holds the guess box.
 import { endingOf } from "../../game/board.ts";
 import { useRef, useState } from "react";
 import { useOnce } from "../../lib/effects.ts";
@@ -22,7 +19,6 @@ import { useVictoryStats } from "./use-victory-stats.ts";
 
 const now = (): Date => new Date();
 
-// The banner for a loaded board, null while the day is still being played
 const finishedResult = (loaded: Loaded): Result => {
   const ending = endingOf({ won: loaded.victory, ...loaded });
   return loaded.answer !== undefined && ending
@@ -30,7 +26,6 @@ const finishedResult = (loaded: Loaded): Result => {
     : null;
 };
 
-// The notice a guess or give-up leaves: why it was refused, or none
 const noticeOf = (
   res: SubmitResult | GiveUpResult | HintResult,
 ): string | null =>
@@ -45,24 +40,19 @@ export function usePlayBoard({
 }: {
   slug: string;
   roster: readonly EntryRef[];
-  // A past day's Day Number; today when absent
   pastDay: number | undefined;
   signedIn: boolean;
-  // The game is loaded and playable, and who is signed in is known
   canOpen: boolean;
 }) {
-  // Newest first, as shown
   const [rows, setRows] = useState<GradedAttribute[][]>([]);
   const [result, setResult] = useState<Result>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [restarted, setRestarted] = useState(false);
   const [ready, setReady] = useState(false);
   const [blocked, setBlocked] = useState(false);
-  // Bumped on every fresh board, so a Blur game's board image is fetched again
   const [board, setBoard] = useState(0);
   const play = useRef<Play | null>(null);
   const submitting = useRef(false);
-  // A past day's first win counts in that day's stats, like today's
   const victory = useVictoryStats(slug, play, pastDay);
   const freeHint = useFreeHint(play, board, (res) => setNotice(noticeOf(res)));
   const adoptHint = freeHint.adopt;
@@ -73,8 +63,6 @@ export function usePlayBoard({
     setBoard((n) => n + 1);
   };
 
-  // Loads the board as stored and shows it: on open, and when a guess or give-up finds the day
-  // already over (finished on another device)
   async function showBoard(current: Play): Promise<void> {
     const loaded = await current.load();
     if ("failure" in loaded) {
@@ -88,7 +76,6 @@ export function usePlayBoard({
     setReady(true);
   }
 
-  // Picks where the game lives, then loads it, once: opening twice would merge twice
   useOnce(canOpen, () => {
     void (async () => {
       const { play: current, rateLimited } = await openPlay({
@@ -110,8 +97,6 @@ export function usePlayBoard({
     })();
   });
 
-  // Sends a guess by entry id, or SKIP. True when the guess box should clear: the guess was
-  // graded, or was already on the board.
   async function submit(id: number): Promise<boolean> {
     if (submitting.current || !play.current) {
       return false;
@@ -125,14 +110,12 @@ export function usePlayBoard({
       await showBoard(play.current);
       return false;
     }
-    // The typed guess stays when the server could not grade it, to retry
     if (res.kind !== "accepted" && res.kind !== "duplicate") {
       return false;
     }
     if (res.kind === "duplicate") {
       return true;
     }
-    // Only this browser's own first guess starts the clock, never one after another device's
     if (play.current.getUsedGuesses().length === 1) {
       victory.startClock();
     }

@@ -1,5 +1,3 @@
-// A playlist's editor at /p/<id>/edit: name, description, public or private, which games and
-// in what order. Nothing is stored until Save; Delete asks first.
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
@@ -32,14 +30,12 @@ import { api, errorText } from "../../manage-client.ts";
 import { NotFoundPage } from "../not-found-page.tsx";
 import { PlaylistFailure, usePlaylist } from "./playlist-page.tsx";
 
-// Swaps the game at `i` with its neighbour `i + by`
 const moved = (games: GameCard[], i: number, by: -1 | 1): GameCard[] => {
   const next = [...games];
   [next[i], next[i + by]] = [next[i + by]!, next[i]!];
   return next;
 };
 
-// Gallery games not in the playlist whose name matches the search, a few at a time
 function AddGames({
   games,
   onAdd,

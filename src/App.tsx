@@ -24,16 +24,12 @@ import { VerifyPage } from "./routes/verify-page.tsx";
 
 const OPEN_IN_MAINTENANCE = ["/login", "/verify", "/admin"];
 
-// The same paths the dev server and nginx answer with 200 (ADR 0018); anything else is a 404 there and here
 export function App({ legacyWiped }: { legacyWiped: boolean }) {
   const { pathname } = useLocation();
-  // Trailing slashes are not special-cased (ADR 0012): /login/ is not /login
   const slashed = pathname !== "/" && pathname.endsWith("/");
-  // Pages render while the check loads, so it never delays them; maintenance swaps in when it answers
   const maintenance = useMaintenance();
   const down = maintenance.data?.on === true;
   const forced = maintenance.data?.forced === true;
-  // During maintenance only sign-in and the admin panel (to turn it off) stay; the server blocks the rest too
   const open = !down || (!forced && OPEN_IN_MAINTENANCE.includes(pathname));
   return (
     <Layout legacyWiped={legacyWiped}>

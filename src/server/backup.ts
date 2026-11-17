@@ -1,4 +1,3 @@
-// Reads the backup sidecar's status file (format: docs/backup-runbook.md) from the read-only backups volume
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -15,9 +14,7 @@ export type BackupStatus =
   | { state: "error"; message: string }
   | {
       state: "ok" | "red";
-      // Why the panel is red; empty when ok
       reasons: string[];
-      // ISO time of the newest successful dump, or null
       newestDump: string | null;
       lastRestore: { time: string; ok: boolean; error?: string } | null;
     };
@@ -71,7 +68,6 @@ export async function readBackupStatus(
     reasons.push("The last dump is older than 36 hours.");
   }
 
-  // Cross-check the files themselves: the newest dump on disk must be recent too
   const mtimes = await Promise.all(
     (daily ?? [])
       .filter((f) => f.endsWith(".dump"))

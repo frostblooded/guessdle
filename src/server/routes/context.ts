@@ -1,4 +1,3 @@
-// What every route group needs from createApp, plus the request-input helpers.
 import type { Request, Response } from "express";
 import type pg from "pg";
 import { FAILURES, type FailureCode } from "../../game/failures.ts";
@@ -19,12 +18,9 @@ export interface AppContext {
   random: () => number;
   timeZone: string;
   secureCookies: boolean;
-  // Mail transport; absent when SMTP is not configured
   mail?: MailConfig | undefined;
 }
 
-// Request input is untrusted: these are the only places it is cast, and every
-// value is validated by the caller.
 export const bodyOf = (req: Request): Record<string, unknown> =>
   (req.body ?? {}) as Record<string, unknown>;
 export const queryOf = (req: Request): Record<string, unknown> =>
@@ -32,16 +28,12 @@ export const queryOf = (req: Request): Record<string, unknown> =>
 export const paramOf = (req: Request, name: string): unknown =>
   req.params[name];
 
-// Sends a failure code with the status the table gives it; once a Day of play is
-// known the reply names it
 export const fail = (res: Response, code: FailureCode, day?: number): void => {
   res
     .status(FAILURES[code].status)
     .json({ error: code, ...(day !== undefined && { day }) });
 };
 
-// A guess list as a request sends it: at most one guess per entry, or for a Blur or Sequence
-// game (which may skip, ADR 0019) one per try
 export const isIdList = (
   game: GameRow,
   { entries }: Roster,
@@ -51,7 +43,6 @@ export const isIdList = (
   value.length <= (isImageGame(game.kind) ? game.blurTries : entries.length) &&
   value.every((id: unknown) => Number.isInteger(id));
 
-// Resolves `:slug` for what the viewer wants to do (access.ts) and sends the 404/401/403 itself.
 export async function guardGame<N extends Need>(
   { pool, now }: AppContext,
   req: Request,
@@ -72,15 +63,12 @@ export async function guardGame<N extends Need>(
   return out;
 }
 
-// Play access: a draft or a game with fewer than 2 active entries is a 404 for all but its owner and admins
 export const loadGame = (
   ctx: AppContext,
   req: Request,
   res: Response,
 ): Promise<LoadedGame | undefined> => guardGame(ctx, req, res, "play");
 
-// The Day of play a request names (`?day=N`, today when absent) with its answer, or the
-// refusal sent and undefined. `accepts` validates the rest of the request (openDay).
 export async function playDayOf(
   ctx: AppContext,
   req: Request,
@@ -96,7 +84,6 @@ export async function playDayOf(
   return out;
 }
 
-// A day's refusal with its status; once the day is known the reply names it
 export function sendRefusal(res: Response, out: DayRefusal): void {
   fail(res, out.refusal, "day" in out ? out.day : undefined);
 }

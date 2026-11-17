@@ -2,8 +2,6 @@ import { Tabs as Primitive } from "radix-ui";
 import type { ComponentProps } from "react";
 import { cn } from "../../lib/utils.ts";
 
-// Radix tabs with stable ids (`tab-<value>`), so links, labels and tests can name a tab.
-// Panels stay mounted while hidden: what a user typed in one tab survives a visit to another.
 export const Tabs = Primitive.Root;
 
 export function TabsList({

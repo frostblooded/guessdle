@@ -1,8 +1,6 @@
 import { type GameKind } from "./blur.ts";
 import { MIN_ENTRIES } from "./limits.ts";
 
-// Editor wording that depends on a game's status (pure, so it is unit tested).
-
 export interface Details {
   slug: string;
   name: string;
@@ -12,16 +10,12 @@ export interface Details {
   rejectReason: string;
   skipPeriod: number | null;
   kind: GameKind;
-  // Blur games: the number of tries
   blurTries: number;
   entryCount: number;
-  // Active entries missing a value; while any are, the game is paused
   incompleteCount: number;
-  // An admin looking at a pending game
   canApprove?: boolean;
 }
 
-// Shared by the editor and the Play page, which knows only these fields
 export function statusNotice(
   d: Pick<Details, "status" | "rejectReason" | "entryCount"> &
     Partial<Pick<Details, "incompleteCount" | "kind">>,
@@ -50,8 +44,6 @@ export function statusNotice(
   }
 }
 
-// The names of the saved attributes that saving `drafts` erases from every entry: the removed
-// ones (no draft has their id) and the ones whose type changed
 export function erasedBy(
   saved: readonly { id: number; name: string; type: string }[],
   drafts: readonly { id?: number | undefined; type: string }[],

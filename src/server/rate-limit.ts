@@ -8,10 +8,8 @@ export interface RateLimit {
   windowMs: number;
 }
 
-// Starting values, tune after launch (docs/deploy.md); nginx limits per IP before this
 export const DEFAULT_RATE_LIMIT: RateLimit = { max: 120, windowMs: 60_000 };
 
-// Fixed-window counter per signed-in user, or per IP for everyone else.
 // shortcut: in memory, so it resets on restart and is per process; use a shared store if the API ever scales out
 export function rateLimit(
   pool: pg.Pool,
@@ -54,7 +52,6 @@ export function rateLimit(
   };
 }
 
-// RATE_LIMIT_MAX / RATE_LIMIT_WINDOW_MS override the defaults (the e2e suite raises them)
 export function rateLimitFromEnv(env: NodeJS.ProcessEnv): RateLimit {
   return {
     max: Number(env["RATE_LIMIT_MAX"] ?? DEFAULT_RATE_LIMIT.max),

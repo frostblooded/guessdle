@@ -1,6 +1,3 @@
-// A Quiz game's Questions tab (ADR 0021): list, add, change and delete questions. Each is
-// multiple choice (options with one right) or a number scored by how close the answer is.
-// Adding and editing happen in a popup, like the Entries tab.
 import { useState, type FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { Alert } from "../../components/ui/alert.tsx";
@@ -24,7 +21,6 @@ import { ImagePicker, usePhotoUpload } from "./image-value.tsx";
 import type { Entry } from "./types.ts";
 
 interface Draft {
-  // The question being edited (null: adding)
   editing: Entry | null;
   prompt: string;
   photo: string;
@@ -52,7 +48,6 @@ const draftOf = (entry: Entry | null): Draft => {
   };
 };
 
-// The spec the draft describes, or the text of what is missing
 function specOf(draft: Draft): QuizSpec | string {
   if (draft.type === "choice") {
     return draft.options.some((o) => o.trim() === "")
@@ -75,12 +70,10 @@ export function QuestionsPanel({
 }: {
   base: string;
   initial: Entry[];
-  // Runs after every saved change, so the page can refresh its status line
   onChange: () => Promise<void>;
 }) {
   const [questions, setQuestions] = useState(initial);
   const [draft, setDraft] = useState<Draft>(() => draftOf(null));
-  // The add/edit popup is open
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const { upload, dialog } = usePhotoUpload(setError);
@@ -93,8 +86,6 @@ export function QuestionsPanel({
     setOpen(true);
   };
 
-  // Runs a call that answers with the question list; a save also empties the form and closes
-  // the popup
   const run = async (
     method: "POST" | "PATCH" | "DELETE",
     path: string,

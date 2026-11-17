@@ -9,7 +9,6 @@ type Story = StoryObj<typeof meta>;
 
 const TABS = ["details", "attributes", "entries", "answers"];
 
-// The editor's tabs: every panel stays mounted, the unselected ones hidden
 function EditorTabs() {
   const [tab, setTab] = useState("details");
   return (

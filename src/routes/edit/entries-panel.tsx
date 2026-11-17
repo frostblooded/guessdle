@@ -1,6 +1,3 @@
-// The editor's Entries tab: list, add, change and delete entries with their values (a Blur
-// entry: its image and square order; a Sequence entry: its photos). Adding and editing happen
-// in a popup, so the form shows up where the user is looking however long the list is.
 import { useOnOpen } from "../../lib/effects.ts";
 import { useRef, useState, type FormEvent } from "react";
 import { Plus } from "lucide-react";
@@ -28,17 +25,13 @@ import { BlurOrderEditor } from "./blur-order-editor.tsx";
 import { EntriesLede } from "./entries-lede.tsx";
 import { ShotsEditor } from "./shots-editor.tsx";
 
-// What the form holds: the entry being edited (null: adding), its name, Blur image URL,
-// description and values (an Image value is its URL)
 interface Draft {
   editing: Entry | null;
   name: string;
   photo: string;
   description: string;
   values: Record<string, string>;
-  // Blur games: the squares picked so far, in the order they clear
   blurOrder: number[];
-  // Sequence games: the photos, "" for an empty slot
   shots: string[];
 }
 
@@ -66,22 +59,16 @@ export function EntriesPanel({
   onChange,
 }: {
   base: string;
-  // A Blur game's entries have an image and a square order instead of values, a Sequence
-  // game's its `tries` photos
   kind: GameKind;
   tries: number;
   initial: { attributes: Attribute[]; entries: Entry[] };
-  // The tab is open: refresh the lists, since attributes may have changed
   active: boolean;
-  // Runs after every saved change, so the page can refresh its status line
   onChange: () => Promise<void>;
 }) {
   const [entries, setEntries] = useState(initial.entries);
   const [draft, setDraft] = useState<Draft>(() => draftOf(null));
-  // The add/edit popup is open
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
-  // The attributes the form was built for; the ref lets the refresh compare without re-running
   const [formAttributes, setFormAttributes] = useState(initial.attributes);
   const built = useRef(initial.attributes);
   const { upload, uploadFile, dialog } = usePhotoUpload(setError);
@@ -100,7 +87,6 @@ export function EntriesPanel({
       }
       setError("");
       setEntries(got.data);
-      // Opening the tab refreshes while the user may already be typing: keep the form unless the attributes changed
       if (JSON.stringify(built.current) !== JSON.stringify(attrs.data)) {
         built.current = attrs.data;
         setFormAttributes(attrs.data);
@@ -115,8 +101,6 @@ export function EntriesPanel({
     setOpen(true);
   };
 
-  // Runs a call that answers with the entry list; false when it was refused. `clear` empties
-  // the form and closes the popup with the new list, before the page refresh.
   const run = async (
     method: "POST" | "PATCH" | "DELETE",
     path: string,

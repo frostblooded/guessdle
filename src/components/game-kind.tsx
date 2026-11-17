@@ -7,8 +7,6 @@ import {
 } from "lucide-react";
 import type { GameKind } from "../game/blur.ts";
 
-// How each game kind is named and drawn wherever the site shows it. A Record, so a new
-// kind fails the type check until it gets its own label and icon here.
 export const KIND_LABELS: Record<
   GameKind,
   { label: string; icon: LucideIcon }

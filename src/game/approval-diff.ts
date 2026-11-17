@@ -1,5 +1,3 @@
-// What changed in a game since an admin last approved it: the game as approved (a Snapshot,
-// saved on approve) against the game now, as a list the admin reads before approving again.
 import type { AttributeType } from "./game.ts";
 import type { AttributeValue } from "./correctness.ts";
 import { isChoice, type QuizSpec } from "./quiz.ts";
@@ -8,10 +6,8 @@ import type { GameKind } from "./blur.ts";
 export interface SnapshotEntry {
   id: number;
   name: string;
-  // Blur and Quiz games only; a classic game's pictures are Image values
   photo: string;
   description: string;
-  // By attribute id
   values: Record<string, AttributeValue>;
   blurOrder?: number[];
   shots?: string[];
@@ -19,7 +15,6 @@ export interface SnapshotEntry {
 }
 
 export interface Snapshot {
-  // When it was taken (ISO)
   at: string;
   kind: GameKind;
   name: string;
@@ -27,11 +22,9 @@ export interface Snapshot {
   cover: string;
   blurTries: number;
   attributes: { id: number; name: string; type: AttributeType }[];
-  // Active entries
   entries: SnapshotEntry[];
 }
 
-// One changed field: `image` when the values are picture URLs
 export interface FieldChange {
   label: string;
   before: string[];
@@ -62,7 +55,6 @@ const field = (
   image = false,
 ): FieldChange => ({ label, before: [], after: values, image });
 
-// An entry's fields as label, values and whether they are pictures, in editor order
 function fieldsOf(
   kind: GameKind,
   attributes: Snapshot["attributes"],
@@ -95,7 +87,6 @@ function fieldsOf(
 const same = (a: string[], b: string[]): boolean =>
   a.length === b.length && a.every((v, i) => v === b[i]);
 
-// Changed fields of `now` against `then`, matched by label
 function fieldDiff(then: FieldChange[], now: FieldChange[]): FieldChange[] {
   return now.flatMap((field) => {
     const before = then.find((f) => f.label === field.label)?.after ?? [];
@@ -103,7 +94,6 @@ function fieldDiff(then: FieldChange[], now: FieldChange[]): FieldChange[] {
   });
 }
 
-// Tries count only in the kinds that have them
 const detailsOf = (game: Snapshot, kind: GameKind): FieldChange[] => [
   field("Name", [game.name]),
   field("Description", list(game.description)),
@@ -173,7 +163,6 @@ export function diffGame(then: Snapshot, now: Snapshot): Change[] {
       });
       continue;
     }
-    // The old values under today's attributes, so a renamed one still lines up
     const changed = fieldDiff(fieldsOf(now.kind, now.attributes, old), fields);
     if (changed.length > 0) {
       changes.push({

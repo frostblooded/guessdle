@@ -1,5 +1,3 @@
-// A classic game's Free Hint, on Play and in a party round: the offer once the player has made
-// enough wrong guesses, then the hint they picked.
 import { Lightbulb } from "lucide-react";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
@@ -14,9 +12,7 @@ export function FreeHintCard({
   busy = false,
   onTake,
 }: {
-  // The hint already used, if any
   hint?: FreeHint | undefined;
-  // The kinds on offer, while unused
   hints?: HintChoices | undefined;
   busy?: boolean;
   onTake: (kind: HintKind) => void;

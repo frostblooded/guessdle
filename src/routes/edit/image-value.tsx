@@ -1,14 +1,11 @@
-// The Entries tab's picture fields: an upload button, and an Image attribute's field.
 import { Button, buttonVariants } from "../../components/ui/button.tsx";
 import { useCrop } from "../../components/crop-dialog.tsx";
 import type { ImageKind } from "../../game/crop.ts";
 import { api, errorText } from "../../manage-client.ts";
 import { IMAGE_TYPES } from "./types.ts";
 
-// Crops and uploads pictures. Problems go to `setError`; `dialog` is the crop dialog to render.
 export function usePhotoUpload(setError: (text: string) => void) {
   const { crop, dialog } = useCrop(setError);
-  // Crops and uploads the file; its URL, or null after a cancel or a failure
   const uploadFile = async (
     file: File,
     shape: ImageKind,
@@ -30,7 +27,6 @@ export function usePhotoUpload(setError: (text: string) => void) {
     return url ?? null;
   };
 
-  // Uploads the picture chosen in a file input, then hands its URL to `done`
   const upload = async (
     input: HTMLInputElement,
     done: (url: string) => void,
@@ -44,7 +40,6 @@ export function usePhotoUpload(setError: (text: string) => void) {
   };
   return { upload, uploadFile, dialog };
 }
-// A file input dressed as a button: crops and uploads happen in `onPick`
 export function ImagePicker({
   id,
   onPick,
@@ -71,7 +66,6 @@ export function ImagePicker({
   );
 }
 
-// An Image attribute's field: its picture, if any, with Choose and Remove
 export function ImageValue({
   id,
   name,

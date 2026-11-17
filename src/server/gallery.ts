@@ -1,4 +1,3 @@
-// The gallery: the games it shows, as cards, on the front page, profiles and playlists.
 import type pg from "pg";
 import { MAX_TILES } from "../game/banner.ts";
 import type { GameKind } from "../game/blur.ts";
@@ -8,8 +7,6 @@ import { OWNER_BANNED } from "./users.ts";
 
 type Q = Pick<pg.Pool, "query">;
 
-// SQL true when the game aliased `g` is one the gallery shows: approved, with enough active
-// entries (MIN_ENTRIES), none missing a value, and an owner not banned
 export const IN_GALLERY = `(g.status = 'approved' and not ${HAS_MISSING_VALUES} and not ${OWNER_BANNED}
   and (select count(*) from entries n where n.game_id = g.id and n.deleted_at is null)
     >= ${MIN_ENTRIES})`;
@@ -19,27 +16,20 @@ export interface GalleryCard {
   name: string;
   description: string;
   cover: string;
-  // Banner collage photos of active entries, by id; only for a game without a cover. A Blur
-  // game's photos are its answers, so it gets blurred tiles instead (`tileUrl`); a Sequence
-  // game gets each entry's first photo, through the same tile route so its URL stays secret.
   photos: string[];
   entryCount: number;
   kind: GameKind;
 }
 
-// SQL for the first Image value of the entry aliased `alias` (null when it has none)
 const FIRST_IMAGE = (alias: string): string =>
   `(select v.value from entry_values v join attributes a on a.id = v.attribute_id
      where v.entry_id = ${alias}.id and a.type = 'image' order by a.position, a.id limit 1)`;
 
-// Which gallery games a list shows: all of them, one owner's, or one playlist's in its order
 export type GalleryScope =
   | { ownerId: number; playlistId?: never }
   | { playlistId: number; ownerId?: never }
   | Record<string, never>;
 
-// Approved games with enough active entries (MIN_ENTRIES) and none missing
-// a value: the original first, then newest first. A scope narrows them to an owner's (newest first) or a playlist's.
 export async function listGallery(
   q: Q,
   scope: GalleryScope = {},
@@ -81,7 +71,5 @@ export async function listGallery(
   );
 }
 
-// Tile n of a Blur or Sequence game's banner collage: its nth entry photo with a photo, blurred
-// for Blur (ADR 0019), the first of its photos for Sequence
 export const tileUrl = (slug: string, n: number): string =>
   `/api/games/${encodeURIComponent(slug)}/tile/${n}`;

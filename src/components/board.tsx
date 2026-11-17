@@ -1,19 +1,15 @@
-// The guess board: a title row and graded rows of tiles, shared by Play and How to play.
 import type { ComponentProps, ReactNode } from "react";
 import { correctnessClass } from "../game/correctness.ts";
 import type { Hint } from "../game/correctness.ts";
 import type { BoardColumn, GradedAttribute } from "../game/game.ts";
 import { cn } from "../lib/utils.ts";
 
-// A grade class (correctnessClass) to its background
 export const TILE_COLORS: Record<string, string> = {
   correct: "bg-correct",
   "partially-correct": "bg-partial",
   incorrect: "bg-incorrect",
 };
 
-// A grid row: a narrow square column per picture (`images`, one flag per column), the others
-// sharing the rest equally
 export function BoardRow({
   images,
   className,
@@ -53,7 +49,6 @@ export function TitleTile({ className, ...props }: ComponentProps<"div">) {
   );
 }
 
-// The board's title row: one dark tile per column
 export function TitleRow({ columns }: { columns: readonly BoardColumn[] }) {
   return (
     <BoardRow
@@ -84,7 +79,6 @@ export function PhotoTile({ src }: { src: string }) {
   );
 }
 
-// A graded tile: green, orange or red with white text
 export function GradeTile({
   grade,
   children,
@@ -111,7 +105,6 @@ const HINTS: Record<Hint, { arrow: string; label: string }> = {
   lower: { arrow: "↓", label: "The answer is lower" },
 };
 
-// A wrong Number's arrow: which way the answer lies
 export function HintArrow({ hint }: { hint: Hint }) {
   const { arrow, label } = HINTS[hint];
   return (
@@ -126,7 +119,6 @@ export function HintArrow({ hint }: { hint: Hint }) {
   );
 }
 
-// One guessed entry: its pictures as they are, then each graded value
 export function GuessRow({ row }: { row: GradedAttribute[] }) {
   return (
     <BoardRow

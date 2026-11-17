@@ -1,4 +1,3 @@
-// The editor's Answers tab: Answer History and Overrides by real calendar date.
 import { useState } from "react";
 import { Alert } from "../../components/ui/alert.tsx";
 import {
@@ -39,7 +38,6 @@ interface AnswerList {
   from: string;
   to: string;
   days: AnswerDay[];
-  // The entries an Override may name (a Sequence game's with every photo); all when absent
   answerIds?: number[];
 }
 
@@ -59,7 +57,6 @@ function Tag({ tag }: { tag: keyof typeof TAG_VARIANTS }) {
   );
 }
 
-// The day before `today` minus the history, as YYYY-MM-DD
 function historyStart(today: string): string {
   const [y, m, d] = today.split("-").map(Number) as [number, number, number];
   return new Date(Date.UTC(y, m - 1, d - HISTORY_DAYS))
@@ -72,11 +69,9 @@ export function AnswersPanel({
   active,
 }: {
   base: string;
-  // The tab is open: reload the roster and the days
   active: boolean;
 }) {
   const [message, setMessage] = useState<string | null>(null);
-  // The first load of the days; its notice waits in case the days arrive at once
   const [loading, setLoading] = useState(false);
   const slow = useDelayed(loading);
   const [entries, setEntries] = useState<Choice[]>([]);
@@ -89,7 +84,6 @@ export function AnswersPanel({
   );
   const [editing, setEditing] = useState<AnswerDay | null>(null);
   const [pick, setPick] = useState<number | null>(null);
-  // A change to today's answer waiting for the owner to confirm the restart
   const [confirming, setConfirming] = useState<"PUT" | "DELETE" | null>(null);
 
   const load = async (query: string): Promise<AnswerList | null> => {
@@ -110,7 +104,6 @@ export function AnswersPanel({
     setAnswerIds(data.answerIds ?? null);
     setEditing(null);
   };
-  // Saving or clearing re-draws later days, so reload the same range afterwards
   const reload = async (): Promise<void> => {
     const data = await load(`?from=${from}&to=${to}`);
     if (data) {
@@ -139,7 +132,6 @@ export function AnswersPanel({
       }
       setMessage(null);
       setLoading(true);
-      // One call finds today, a second adds the days before it as the Answer History
       const out = await api<AnswerList>("GET", `${base}/answers`);
       if (out?.status !== 200) {
         setLoading(false);
@@ -177,7 +169,6 @@ export function AnswersPanel({
   const save = (method: "PUT" | "DELETE"): void => {
     void apply(method, method === "PUT" ? { entryId: pick } : {});
   };
-  // Changing today's answer restarts the day for every player, so it asks first
   const saveOrAsk = (method: "PUT" | "DELETE"): void => {
     const changesToday =
       editing!.today && (method === "DELETE" || pick !== editing!.entryId);
@@ -246,7 +237,6 @@ export function AnswersPanel({
           </thead>
           <tbody id="ans-days">
             {days.map((day) => (
-              // Every row the same height, the last included (issue #83)
               <TableRow
                 key={day.date}
                 data-date={day.date}
@@ -259,7 +249,6 @@ export function AnswersPanel({
                   {day.missing ? `MISSING (${day.entryId})` : day.name}
                 </TableCell>
                 <TableCell>
-                  {/* Pills and action stay on one line, so rows stay even on phones (the table scrolls) */}
                   <span className="flex gap-1 whitespace-nowrap">
                     {day.today && <Tag tag="today" />}
                     <Tag

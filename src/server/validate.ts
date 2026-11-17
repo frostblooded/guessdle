@@ -1,5 +1,3 @@
-// Pure checks of game and entry request input: no database, no HTTP. Upload ownership is a
-// database check and stays with the caller.
 import {
   MAX_DESCRIPTION,
   MAX_BLUR_TRIES,
@@ -13,15 +11,11 @@ import { parseQuizSpec } from "../game/quiz.ts";
 import type { GamePatch } from "./games.ts";
 import type { EntryInput } from "./entries.ts";
 
-// A non-empty string of at most max chars once trimmed; undefined otherwise
 export const nameIn = (v: unknown, max: number): string | undefined =>
   typeof v === "string" && v.trim() !== "" && v.trim().length <= max
     ? v.trim()
     : undefined;
 
-// The game fields of a PATCH body; undefined when any is malformed. `maxSkip` is the largest
-// skip period the roster allows; `blur` whether the game is a Blur or Sequence game, the only
-// kinds with a try count. A coverUrl is only shape-checked here.
 export function parseGamePatch(
   body: Record<string, unknown>,
   maxSkip: number,
@@ -73,9 +67,6 @@ export function parseGamePatch(
   return patch;
 }
 
-// The entry fields in a request body; undefined when any is malformed. A photo or a Sequence
-// entry's shots are only shape-checked here. `maxName` is longer for a Quiz question, whose
-// name is its text.
 export function parseEntryInput(
   body: Record<string, unknown>,
   maxName: number = MAX_ENTRY_NAME,

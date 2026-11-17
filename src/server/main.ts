@@ -1,4 +1,3 @@
-// API container entry: migrate, then serve /api on PORT
 import { join } from "node:path";
 import pg from "pg";
 import { attachPartySockets, createApp } from "./app.ts";
@@ -12,10 +11,8 @@ import { uploadRefs } from "./upload-refs.ts";
 
 export const MIGRATIONS_DIR = join(import.meta.dirname, "../../db/migrations");
 
-// Pool + migrations from DATABASE_URL; shared by the API container and the dev server
 export async function connect(url: string): Promise<pg.Pool> {
   const pool = new pg.Pool({ connectionString: url });
-  // An idle client losing its connection emits here; unhandled, it crashes the process
   pool.on("error", (err) => console.error("Idle database client error", err));
   const applied = await migrate(pool, MIGRATIONS_DIR);
   if (applied.length > 0) {
@@ -46,14 +43,12 @@ if (import.meta.main) {
   };
   sweep();
   setInterval(sweep, 24 * 3600_000).unref();
-  // Ends idle parties and deletes old ones (reads also end an idle party on the spot)
   setInterval(() => {
     sweepParties(pool, new Date()).catch((err: unknown) =>
       console.error("Party sweep failed", err),
     );
   }, 3600_000).unref();
   const mail = mailConfigFromEnv(process.env);
-  // Sends the admin email for games still pending 5 minutes after they were sent for approval
   if (mail) {
     setInterval(() => void mailDueAdmins(pool, mail), 60_000).unref();
   }

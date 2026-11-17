@@ -20,7 +20,6 @@ import {
 import { PracticeGame } from "./how-to-play/practice-game.tsx";
 import { QuizPractice } from "./how-to-play/quiz-practice.tsx";
 
-// One item per game kind, Classic first and open; opening one closes the others
 const MODES: {
   kind: GameKind;
   blurb: string;

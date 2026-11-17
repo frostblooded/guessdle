@@ -2,19 +2,14 @@ import { dateToString } from "./date.ts";
 import { isFreeHint, type FreeHint } from "./free-hint.ts";
 import type { DayProgress } from "./days.ts";
 
-// Game State: what the browser remembers about today.
-
 const LOCAL_STORAGE_USED_GUESSES_STRING: string = "usedGuesses";
-// Only a hint for the Past days list: the board's victory always comes from the server
 const LOCAL_STORAGE_VICTORY_STRING: string = "victory";
 const LOCAL_STORAGE_DAY_STRING: string = "day";
 const LOCAL_STORAGE_REVISION_STRING: string = "revision";
 const LOCAL_STORAGE_GAVE_UP_STRING: string = "gaveUp";
 const LOCAL_LAST_PLAYED_STRING: string = "lastPlayed";
-// The Free Hint the player used, as the server drew it
 const LOCAL_STORAGE_HINT_STRING: string = "hint";
 
-// The part of the browser Storage that Game State uses
 export interface StateStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
@@ -22,30 +17,21 @@ export interface StateStorage {
 }
 
 export interface GameState {
-  // Entry ids
   getUsedGuesses(): number[];
   addUsedGuess(guess: number): void;
   setUsedGuesses(guesses: number[]): void;
-  // Server Day Number the guesses were graded on, null until a response says
   getDay(): number | null;
-  // The answer's revision the guesses were graded on, null until a response says
   getRevision(): number | null;
   setDay(day: number, revision?: number): void;
-  // Whether the player gave up today (the answer was revealed)
   getGaveUp(): boolean;
   setGaveUp(): void;
-  // Whether a server reply said the guesses won
   getWon(): boolean;
   setWon(): void;
-  // The Free Hint used today, null while unused
   getHint(): FreeHint | null;
   setHint(hint: FreeHint): void;
-  // Forgets guesses, day, give-up and hint (a newer day was seen, or the player reset)
   reset(): void;
 }
 
-// Before games had slugs the keys had no prefix (spec #66): forget them once
-// Returns whether any existed, so the shell can tell the player once
 export function wipeLegacyState(storage: StateStorage): boolean {
   let found = false;
   for (const key of [
@@ -61,7 +47,6 @@ export function wipeLegacyState(storage: StateStorage): boolean {
   return found;
 }
 
-// Signing out: every game's local state goes, whichever game page we are on
 export function forgetAllGames(
   storage: StateStorage & Pick<Storage, "length" | "key">,
 ): void {
@@ -73,7 +58,6 @@ export function forgetAllGames(
   }
 }
 
-// One past day's keys inside a game's, so archive play never touches today's
 export function pastDayStorage(
   storage: StateStorage,
   slug: string,
@@ -82,11 +66,8 @@ export function pastDayStorage(
   return gameStorage(storage, `${slug}:day:${day}`);
 }
 
-// When the current board's first guess was made on this browser: [Day Number, ms since the epoch]
 const FIRST_GUESS_KEY = "firstGuessAt";
 
-// The solve clock of one board, kept with its storage: started on a fresh board's first guess,
-// read when the board is won. Blocked storage leaves the time unknown.
 export function boardClock(
   storage: StateStorage | undefined,
   day: () => number | null,
@@ -96,11 +77,8 @@ export function boardClock(
     startClock(): void {
       try {
         storage?.setItem(FIRST_GUESS_KEY, JSON.stringify([day(), now()]));
-      } catch {
-        // the time stays unknown
-      }
+      } catch {}
     },
-    // Whole seconds since the first guess, or null when this browser did not see this day's
     solveSeconds(): number | null {
       try {
         const [started, at]: unknown[] = JSON.parse(
@@ -116,7 +94,6 @@ export function boardClock(
   };
 }
 
-// One game's keys inside the shared browser storage, so games never share state
 export function gameStorage(storage: StateStorage, slug: string): StateStorage {
   const key = (name: string): string => `game:${slug}:${name}`;
   return {
@@ -127,8 +104,6 @@ export function gameStorage(storage: StateStorage, slug: string): StateStorage {
   };
 }
 
-// Blocked storage (private mode, disabled cookies) throws. Writes are kept in
-// memory too, so the state still works for this page view.
 function tolerantStorage(storage: StateStorage): StateStorage {
   const memory: Map<string, string> = new Map();
   return {
@@ -143,22 +118,17 @@ function tolerantStorage(storage: StateStorage): StateStorage {
       memory.set(key, value);
       try {
         storage.setItem(key, value);
-      } catch {
-        // kept in memory
-      }
+      } catch {}
     },
     removeItem(key: string): void {
       memory.delete(key);
       try {
         storage.removeItem(key);
-      } catch {
-        // dropped from memory
-      }
+      } catch {}
     },
   };
 }
 
-// Corrupt JSON or a value of the wrong shape reads as missing
 function readJson(storage: StateStorage, key: string): unknown {
   const raw: string | null = storage.getItem(key);
   if (raw === null) {
@@ -172,9 +142,6 @@ function readJson(storage: StateStorage, key: string): unknown {
   }
 }
 
-// What a board's stored Game State says was played, without writing anything: the Past days
-// list reads every day this way. Today's board (`expires`) reads as unplayed once its last
-// played date is not today, as createGameState would clear it.
 export function readProgress(
   rawStorage: StateStorage,
   now: () => Date,
@@ -194,7 +161,6 @@ export function readProgress(
   };
 }
 
-// The stored entry ids; anything else reads as none
 function usedGuessesIn(storage: StateStorage): number[] {
   const value: unknown = readJson(storage, LOCAL_STORAGE_USED_GUESSES_STRING);
   if (!Array.isArray(value)) {
@@ -205,9 +171,6 @@ function usedGuessesIn(storage: StateStorage): number[] {
   );
 }
 
-// Clears guesses and victory unless last played is today (a missing or invalid
-// last played counts as another day), then marks today as played. A past day's
-// state (`expires` false) is kept for good.
 export function createGameState(
   rawStorage: StateStorage,
   now: () => Date,

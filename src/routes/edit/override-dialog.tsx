@@ -1,4 +1,3 @@
-// The Answers tab's popup for overriding one day: search the entries by name, tap one, save.
 import { useState, type FormEvent } from "react";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
@@ -14,7 +13,6 @@ import { cn } from "../../lib/utils.ts";
 export interface Choice {
   id: number;
   name: string;
-  // The entry's picture, "" when it has none
   thumb: string;
 }
 
@@ -31,12 +29,10 @@ export function OverrideDialog({
   onClose,
 }: {
   date: string;
-  // The day already has an Override, so it can be cleared
   isOverride: boolean;
   choices: readonly Choice[];
   pick: number | null;
   onPick: (id: number) => void;
-  // Entries that were the answer in the days just before
   recent: readonly number[];
   error: string | null;
   onSave: () => void;

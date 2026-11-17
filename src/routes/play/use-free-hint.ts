@@ -1,9 +1,7 @@
-// Play's Free Hint: the hint used, the kinds on offer while it is not, and taking one.
 import { useCallback, useState, type RefObject } from "react";
 import type { FreeHint, HintChoices, HintKind } from "../../game/free-hint.ts";
 import type { HintResult, HintState, Play } from "../../game/play.ts";
 
-// `board` changes on every fresh board, which starts with no hint
 export function useFreeHint(
   play: RefObject<Play | null>,
   board: number,
@@ -19,7 +17,6 @@ export function useFreeHint(
     setHints(undefined);
   }
 
-  // A loaded board's hint state
   const adopt = useCallback((state: HintState): void => {
     setHint(state.hint);
     setHints(state.hints);
@@ -46,7 +43,6 @@ export function useFreeHint(
     busy,
     take,
     adopt,
-    // The kinds on offer after a guess
     offer: setHints,
   };
 }

@@ -1,4 +1,3 @@
-// Maintenance mode in the app: whether it is on, and the page everyone sees at / while it is.
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { MessageCard } from "../components/page.tsx";
@@ -6,7 +5,6 @@ import { buttonVariants } from "../components/ui/button.tsx";
 import { getJson, useMe } from "../lib/api.ts";
 import { useTitle } from "../lib/use-title.ts";
 
-// `forced`: nginx forces it on (deploy/nginx.conf), so the admin toggle cannot lift it
 export interface Maintenance {
   on: boolean;
   forced?: boolean;
@@ -14,7 +12,6 @@ export interface Maintenance {
 
 export const MAINTENANCE_KEY = ["maintenance"] as const;
 
-// Off when the server cannot say, so a failing check never hides the site
 export const useMaintenance = () =>
   useQuery({
     queryKey: MAINTENANCE_KEY,

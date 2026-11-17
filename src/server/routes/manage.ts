@@ -1,4 +1,3 @@
-// Creating a game and editing its details (spec #66): owner and admin only.
 import { canApprove, type LoadedGame } from "../access.ts";
 import express from "express";
 import type { Express, Request, Response } from "express";
@@ -32,7 +31,6 @@ import {
   type AppContext,
 } from "./context.ts";
 
-// Starting values, tune after launch (docs/deploy.md)
 export const DEFAULT_WRITE_LIMIT: RateLimit = { max: 60, windowMs: 60_000 };
 
 export function manageRoutes(
@@ -43,7 +41,6 @@ export function manageRoutes(
 ): void {
   const { pool, now } = ctx;
   const json = express.json({ limit: "10kb" });
-  // An entry carries up to 10 attributes of 20 items
   const bigJson = express.json({ limit: "64kb" });
   const writes = rateLimit(pool, now, limit);
   const edits = gameEdits(ctx, uploadsDir);
@@ -59,7 +56,6 @@ export function manageRoutes(
     return user ?? undefined;
   };
 
-  // Owner or admin only (guardGame "edit"): 404 for a hidden game first, then 401 / 403
   const manageRoute =
     (
       handler: (
@@ -76,7 +72,6 @@ export function manageRoutes(
       }
     };
 
-  // `canApprove`: the editor shows an admin Approve and Reject on a pending game
   const detailsOf = ({ game, roster }: LoadedGame, user: SessionUser) => ({
     slug: game.slug,
     name: game.name,
@@ -155,7 +150,6 @@ export function manageRoutes(
     const raw = String(req.params["id"]);
     return /^\d{1,15}$/.test(raw) ? Number(raw) : -1;
   };
-  // The editor's Save: the whole list, each item {id?, name, type}; undefined when malformed
   const draftsOf = (v: unknown): AttributeDraft[] | undefined => {
     if (!Array.isArray(v)) {
       return undefined;
@@ -170,8 +164,6 @@ export function manageRoutes(
     });
     return drafts.every((d) => d !== undefined) ? drafts : undefined;
   };
-  // Applies the edit `build` reads from the request (one change, or the whole list), then
-  // answers with the attributes. Only a real change resets the status; a reorder does not.
   const attributeRoute = (
     build: (req: Request) => AttributeEdit | AttributeDraft[] | undefined,
   ) =>
@@ -231,7 +223,6 @@ export function manageRoutes(
   );
 
   const entryBase = "/api/games/:slug/entries";
-  // Creates (no :id) or changes an entry, then answers with the entry list
   const entryRoute = manageRoute(async ({ game, user }, req, res) => {
     const raw = req.params["id"];
     const id = raw === undefined ? undefined : idOf(req);
@@ -271,7 +262,6 @@ export function manageRoutes(
     }),
   );
 
-  // Submit and unpublish: one guarded status move
   const flowRoute = (move: Move) =>
     manageRoute(async ({ game, user }, req, res) => {
       const out = await edits.move(game, move);

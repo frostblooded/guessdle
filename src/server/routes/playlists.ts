@@ -1,4 +1,3 @@
-// Usernames, profiles and playlists: anyone reads public ones, only the owner changes them.
 import express from "express";
 import type { Express, Request, Response } from "express";
 import {
@@ -29,7 +28,6 @@ import { nameIn } from "../validate.ts";
 import { bodyOf, fail, paramOf, queryOf, type AppContext } from "./context.ts";
 import { DEFAULT_WRITE_LIMIT } from "./manage.ts";
 
-// The playlist fields of a create or PATCH body; undefined when any is malformed
 function parseInput(
   body: Record<string, unknown>,
 ): (Partial<PlaylistInput> & { slugs?: string[] }) | undefined {
@@ -95,8 +93,6 @@ export function playlistRoutes(
     return user ?? undefined;
   };
 
-  // The viewer's own playlist from `:id`; a playlist they cannot see is a 404, one of someone
-  // else's they can see is a 403
   const ownPlaylist = async (
     req: Request,
     res: Response,
@@ -156,7 +152,6 @@ export function playlistRoutes(
     res.json({ ...shown, own: viewer?.id === ownerId });
   });
 
-  // The Save menu: the viewer's playlists, each saying whether it holds `?game=<slug>`
   app.get("/api/my-playlists", async (req, res) => {
     res.set("Cache-Control", "no-store");
     const user = await needUser(req, res);
@@ -174,7 +169,6 @@ export function playlistRoutes(
     });
   });
 
-  // `game` (a slug) goes straight into the new playlist, for "New playlist" in the Save menu
   app.post("/api/playlists", writes, json, async (req, res) => {
     const user = await needUser(req, res);
     if (!user) {
@@ -276,7 +270,6 @@ export function playlistRoutes(
     res.json({ ok: true });
   });
 
-  // Removing works on a hidden game too, so a player can tidy a list they cannot see in full
   app.delete("/api/playlists/:id/games/:slug", writes, async (req, res) => {
     const id = await ownPlaylist(req, res);
     if (id === undefined) {

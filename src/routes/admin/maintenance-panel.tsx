@@ -1,4 +1,3 @@
-// Admin Maintenance tab: the switch that takes the whole site down for maintenance and back.
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Switch } from "../../components/ui/switch.tsx";
