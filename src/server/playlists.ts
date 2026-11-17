@@ -1,9 +1,7 @@
-// Usernames, profiles and playlists: the one seam between the playlist routes and their tables.
 import type pg from "pg";
 import { MAX_PLAYLIST_GAMES, MAX_PLAYLISTS } from "../game/limits.ts";
 import { IN_GALLERY, listGallery, type GalleryCard } from "./gallery.ts";
 
-// Who is looking: a banned player's public playlists show only to them and admins
 export type Viewer = { id: number; admin: boolean } | null;
 
 export async function usernameOf(
@@ -19,7 +17,6 @@ export async function usernameOf(
 
 export type UsernameResult = "ok" | "username_taken" | "username_set";
 
-// A username is picked once: profile and playlist links carry it
 export async function setUsername(
   pool: pg.Pool,
   userId: number,
@@ -44,11 +41,9 @@ export interface PlaylistSummary {
   name: string;
   description: string;
   public: boolean;
-  // Games the playlist shows now (gallery games only)
   gameCount: number;
 }
 
-// SQL count of the gallery games in the playlist aliased `p`, the rule listGallery applies
 const SHOWN_COUNT = `(select count(*)::int from playlist_games pl join games g on g.id = pl.game_id
   where pl.playlist_id = p.id and ${IN_GALLERY})`;
 
@@ -58,9 +53,6 @@ export interface Profile {
   games: GalleryCard[];
 }
 
-// A player's profile: their public playlists (every one when `viewer` is them, none to others
-// but admins while they are banned), newest first, and their gallery games. null for an
-// unknown username.
 export async function loadProfile(
   pool: pg.Pool,
   username: string,
@@ -98,8 +90,6 @@ interface PlaylistRow {
   public: boolean;
 }
 
-// A playlist as `viewer` may see it: private ones only to their owner, a banned owner's only to
-// them and admins, else null
 export async function findPlaylist(
   pool: pg.Pool,
   id: number,
@@ -122,7 +112,6 @@ export async function findPlaylist(
     : null;
 }
 
-// The signed-in player's playlists for the Save menu, each saying whether it holds `slug`
 export async function listMine(
   pool: pg.Pool,
   userId: number,
@@ -138,7 +127,6 @@ export async function listMine(
   return rows;
 }
 
-// The id of a game the gallery shows, the only kind a playlist takes
 export async function galleryGameId(
   pool: pg.Pool,
   slug: string,
@@ -156,13 +144,11 @@ export interface PlaylistInput {
   public: boolean;
 }
 
-// The new playlist's id, or null when the player already has MAX_PLAYLISTS
 export async function createPlaylist(
   pool: pg.Pool,
   ownerId: number,
   input: PlaylistInput,
 ): Promise<number | null> {
-  // One insert guarded by the count; two racing creates can pass it together, a harmless overshoot
   const { rows } = await pool.query<{ id: number }>(
     `insert into playlists (owner_id, name, description, public)
      select $1, $2, $3, $4
@@ -173,8 +159,6 @@ export async function createPlaylist(
   return rows[0]?.id ?? null;
 }
 
-// Changes the fields given; `slugs` replaces the games, in that order (unknown or hidden
-// slugs are dropped)
 export async function updatePlaylist(
   pool: pg.Pool,
   id: number,
@@ -191,7 +175,6 @@ export async function updatePlaylist(
       [id, patch.name ?? null, patch.description ?? null, patch.public ?? null],
     );
     if (patch.slugs !== undefined) {
-      // Only the games the owner sees: hidden ones (owner banned, back in review) stay
       await client.query(
         `delete from playlist_games pl using games g
          where pl.playlist_id = $1 and g.id = pl.game_id and ${IN_GALLERY}`,
@@ -222,7 +205,6 @@ export const deletePlaylist = async (
   await pool.query("delete from playlists where id = $1", [id]);
 };
 
-// Adds a game at the end; false when the playlist is full. Adding a saved game changes nothing.
 export async function addGame(
   pool: pg.Pool,
   playlistId: number,

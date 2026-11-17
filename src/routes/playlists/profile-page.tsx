@@ -1,5 +1,3 @@
-// A player's profile at /u/<username>: their playlists and the games they made. /profile sends
-// the signed-in player to their own, after picking a username if they have none yet.
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { useState, type FormEvent } from "react";
@@ -88,7 +86,6 @@ function PlaylistCard({ playlist }: { playlist: PlaylistSummary }) {
   );
 }
 
-// "New playlist" on your own profile: name and visibility, then on to its edit page
 function NewPlaylistDialog() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -183,7 +180,6 @@ export function ProfilePage() {
   return (
     <>
       <PageHead
-        // Usernames are lowercase; the heading keeps them as typed
         title={<span className="normal-case">{username}</span>}
         titleId="profile-name"
         lede={

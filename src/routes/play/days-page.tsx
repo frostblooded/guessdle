@@ -1,5 +1,3 @@
-// /g/:slug/days: every day of the game, newest first, to play or review. Signed-in progress comes
-// from the server; an anonymous player's from the browser.
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { EmptyState, PageHead } from "../../components/page.tsx";
@@ -17,7 +15,6 @@ import { DayList } from "./day-list.tsx";
 import { GameNotFound } from "./past-day.tsx";
 import { loadGame, loadJson } from "./load-game.ts";
 
-// An anonymous player's statuses, read (never written) from the browser's Game State of each day
 function withLocalStatuses(slug: string, list: DaysResponse): DaysResponse {
   const now = new Date();
   return {
@@ -38,7 +35,6 @@ export function DaysPage() {
   const me = useMe();
   const game = useQuery({
     queryKey: gameKey(slug),
-    // Fetched again on each visit, so a day that just rolled over links to the right page
     queryFn: () => loadGame(slug),
   });
   const days = useQuery({

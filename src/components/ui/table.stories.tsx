@@ -12,7 +12,6 @@ const GAMES = [
   { name: "Plantdle", owner: "Niki", status: "In review" },
 ];
 
-// The admin games list
 export const Default: Story = {
   render: () => (
     <Table>

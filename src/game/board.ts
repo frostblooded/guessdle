@@ -1,6 +1,3 @@
-// One player's Board: their Guesses against one answer, in solo play (server and page) and
-// in a Party Round. Pure rules shared by every place that plays one: when it is over and
-// how, which guess it takes next, and when it offers the Free Hint.
 import { isImageGame, type GameKind } from "./blur.ts";
 import { hintChoices, type HintChoices } from "./free-hint.ts";
 import {
@@ -10,7 +7,6 @@ import {
   type GradedAttribute,
 } from "./game.ts";
 
-// How a Board ended. A win beats running out of tries, which beats giving up.
 export type Ending = "victory" | "lost" | "give-up";
 
 export interface BoardState {
@@ -24,8 +20,6 @@ export const endingOf = ({ won, gaveUp, lost }: BoardState): Ending | null =>
 
 export const isOver = (board: BoardState): boolean => endingOf(board) !== null;
 
-// Whether a Board takes `id` as its next guess: an active entry it has not guessed yet, or in
-// a Blur or Sequence game SKIP, as often as it likes
 export function checkGuess(
   kind: GameKind,
   active: readonly { id: number }[],
@@ -41,8 +35,6 @@ export function checkGuess(
   return guessed.includes(id) ? "duplicate" : "ok";
 }
 
-// The Free Hint kinds a Board offers: a Classic game's, while it is not over and its hint is
-// unused, once enough guesses are wrong
 export const hintOffer = (
   kind: GameKind,
   attributes: readonly GameAttribute[],

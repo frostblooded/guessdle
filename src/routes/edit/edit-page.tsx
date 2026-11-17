@@ -1,4 +1,3 @@
-// /g/:slug/edit: the game editor, with Details, Attributes, Entries and Answers tabs.
 import { useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { useOnce, useWhile } from "../../lib/effects.ts";
@@ -40,7 +39,6 @@ type Loaded =
       entries: Entry[];
     };
 
-// Everything the editor shows first; the page appears only once all of it is in
 async function loadEditor(base: string): Promise<Loaded> {
   const reply = await api<Details>("GET", `${base}/details`);
   if (reply?.status === 404) {
@@ -77,8 +75,6 @@ const TABS = [
   ["answers", "Answers", "panel-answers"],
 ] as const;
 
-// The Details form's fields: set on the first load and the user's own saves only, so a status
-// refresh from another tab never overwrites what they typed
 interface Fields {
   name: string;
   description: string;
@@ -92,7 +88,6 @@ const fieldsOf = (d: Details): Fields => ({
   blurTries: d.blurTries,
 });
 
-// The title row: the game name once loaded, and a way to the game itself
 function Head({ slug, name }: { slug: string; name: string }) {
   return (
     <PageHead
@@ -120,7 +115,6 @@ function Editor({
 }) {
   const [details, setDetails] = useState(initial.details);
   const [fields, setFields] = useState(() => fieldsOf(initial.details));
-  // The cover and title follow saves, not typing
   const [saved, setSaved] = useState(initial.details);
   const [attributes, setAttributes] = useState(initial.attributes);
   const [tab, setTab] = useState("details");
@@ -131,7 +125,6 @@ function Editor({
 
   useTitle(`Edit ${saved.name} - Guessdle`);
 
-  // What other tabs can change under the user's hands: status, counts, buttons
   const refreshStatus = async (): Promise<void> => {
     const fresh = await api<Details>("GET", `${base}/details`);
     if (fresh?.status === 200) {
@@ -139,7 +132,6 @@ function Editor({
     }
   };
 
-  // PATCHes `changes`, shows the result and returns whether it was saved
   const save = async (changes: Record<string, unknown>): Promise<boolean> => {
     setError("");
     setSavedText("");
@@ -195,7 +187,6 @@ function Editor({
         />
         <Tabs value={tab} onValueChange={setTab} className="space-y-4">
           <TabsList aria-label="Editor sections">
-            {/* Only a classic game has attributes; a Quiz game has questions and no daily answers */}
             {TABS.filter(
               ([value]) =>
                 (saved.kind === "classic" || value !== "attributes") &&
@@ -360,7 +351,6 @@ function EditGame({ slug }: { slug: string }) {
   const client = useQueryClient();
   useTitle("Edit game - Guessdle", true);
 
-  // Edits here can move the game's status and roster, so Play must not show its old copy after
   useWhile(slug, () => () => forgetGame(client, slug));
 
   useOnce(Boolean(user), () => {
@@ -390,6 +380,5 @@ function EditGame({ slug }: { slug: string }) {
 
 export function EditPage() {
   const { slug = "" } = useParams();
-  // Another game is a fresh editor
   return <EditGame key={slug} slug={slug} />;
 }

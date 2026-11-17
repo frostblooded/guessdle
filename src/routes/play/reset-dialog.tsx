@@ -1,5 +1,3 @@
-// "Reset today's guesses?": asks before Play clears the board, says only the first attempt counts in the
-// stats, then hands focus back to the button that asked.
 import type { RefObject } from "react";
 import {
   AlertDialog,
@@ -22,7 +20,6 @@ export function ResetDialog({
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
   opener: RefObject<HTMLButtonElement | null>;
-  // A past day's board rather than today's
   past: boolean;
 }) {
   return (

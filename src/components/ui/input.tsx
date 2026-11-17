@@ -24,7 +24,6 @@ export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
   );
 }
 
-// A styled native <select>: keyboard, screen readers and tests all get the real control
 export function NativeSelect({
   className,
   ...props

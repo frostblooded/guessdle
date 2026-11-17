@@ -1,4 +1,3 @@
-// The chrome shared by every page: header (brand, nav, theme, account area) and footer.
 import { useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 import { useMe } from "../lib/api.ts";
@@ -7,7 +6,6 @@ import { ThemeButton } from "./theme-button.tsx";
 import { Alert } from "./ui/alert.tsx";
 import { Button } from "./ui/button.tsx";
 
-// The site icon's tiles (icons/favicon.svg) in shades of the theme colour
 function TilesMark() {
   return (
     <svg className="brand-mark size-7" viewBox="0 0 64 64" aria-hidden="true">
@@ -60,7 +58,6 @@ const LINKS = [
   ["/how-to-play", "How to play"],
 ] as const;
 
-// Games live under /g/, so a game page marks the Games link
 function useCurrent(): (to: string) => "page" | undefined {
   const { pathname } = useLocation();
   const here = pathname.startsWith("/g/") ? "/" : pathname;
@@ -134,7 +131,6 @@ function Footer() {
   );
 }
 
-// One-time notice (spec #66, story 73): the old un-namespaced browser guesses were cleared
 function ResetNotice() {
   const [shown, setShown] = useState(true);
   if (!shown) {
@@ -155,7 +151,6 @@ function ResetNotice() {
   );
 }
 
-// A banned player sees why on every page (the server refuses their game changes)
 function BanNotice() {
   const { data: user } = useMe();
   if (!user?.banned) {

@@ -1,7 +1,3 @@
-// One player's Board on one Day of play, whoever plays it: every play action (guess, give-up,
-// Free Hint, merge, reset, win), the reveal, and the player's first try (results.ts). Where
-// the Board lives is the DayStore's business: in the request for a guest (stateless grading,
-// ADR 0010), in Postgres once signed in (user-game.ts). Routes only parse and answer.
 import type pg from "pg";
 import { checkGuess, isOver } from "../game/board.ts";
 import type { FailureCode } from "../game/failures.ts";
@@ -20,57 +16,37 @@ import { dropGuestResult, recordFailure, recordWin } from "./results.ts";
 
 type Q = Pick<pg.Pool, "query">;
 
-// A Board as a store keeps it: the guesses in order (SKIP for a skip), whether it was given
-// up, and the Free Hint drawn
 export interface StoredBoard {
   ids: number[];
   gaveUp: boolean;
   hint: HintPick | null;
 }
 
-// Where a Board lives. Two adapters: requestStore (a guest's request, nothing kept) and
-// userStore (a signed-in player's rows, user-game.ts).
 export interface DayStore {
   read(): Promise<StoredBoard>;
-  // Appends a guess; false when the Board already holds it
   addGuess(id: number): Promise<boolean>;
   giveUp(): Promise<void>;
-  // False when the Board already holds a hint
   setHint(pick: HintPick): Promise<boolean>;
-  // Fills an empty Board with these guesses, given up or not (merge)
   adopt(ids: readonly number[], gaveUp: boolean): Promise<void>;
-  // Forgets the Board; the player's first try stays
   reset(): Promise<void>;
-  // The solve time the store measured itself, else null
   seconds(): Promise<number | null>;
 }
 
-// A Board graded against the day's answer, as the signed-in state routes answer it
 export interface GameView {
   day: number;
-  // The answer's revision: a changed one means the day started over (migration 018)
   revision: number;
   ids: number[];
   rows: GradedAttribute[][];
   victory: boolean;
   gaveUp: boolean;
-  // Blur and Sequence games: every try was used without finding the answer
   lost?: true;
-  // The answer's name: present once the day is over (victory, give-up or lost)
   answer?: string;
-  // Blur games, once the day is over: the answer's whole image
   answerPhoto?: string;
-  // Once the day is over, when the answer has one
   answerDescription?: string;
-  // Classic games: the Free Hint the player used
   hint?: FreeHint;
-  // Classic games: the hint kinds on offer, while the day is on and no hint was used
   hints?: HintChoices;
 }
 
-// Why an action is refused; statuses and texts live in FAILURES.
-// has_progress, stale_day: merge only (the account already has rows for the day; the
-// payload is for another day or an answer since changed). no_hint: none on offer.
 export type Refusal = Extract<
   FailureCode,
   | "invalid"
@@ -83,31 +59,20 @@ export type Refusal = Extract<
 
 export interface Win {
   stats: DayStats;
-  // The Board the win was recorded from
   guesses: number;
   seconds: unknown;
 }
 
 export interface DaySession {
-  // The Board graded on read against the current answer, so an overridden answer applies at
-  // once. A guest's list can be ungradable. Seeing a Board that ended without a win takes
-  // the player's first try for the day, so no later win that day counts.
   view(): Promise<GameView | "invalid" | "duplicate">;
   guess(id: unknown): Promise<GameView | Refusal>;
   giveUp(): Promise<GameView | Refusal>;
-  // Draws the day's Free Hint of this kind; the view carries it
   hint(kind: unknown): Promise<GameView | Refusal>;
-  // Adopts a browser's anonymous Board for today (POST /state/merge body)
   merge(local: Record<string, unknown>): Promise<GameView | Refusal>;
   reset(): Promise<GameView | Refusal>;
-  // Records the Board as the player's first win and answers with the day's stats. A store's
-  // own time wins over `seconds` from the browser. `guestToken`: the browser's player token,
-  // whose guest result goes once its player signs in (one person is never two players).
   win(seconds: unknown, guestToken?: string): Promise<Win | "not_won">;
 }
 
-// `player`: "user:<id>" or "anon:<token>"; null for a guest without a token, whose first try
-// is never recorded
 export function daySession(
   q: Q,
   day: PlayDay,
@@ -147,7 +112,6 @@ export function daySession(
   }
   const over = (v: GameView): boolean =>
     isOver({ won: v.victory, gaveUp: v.gaveUp, lost: v.lost });
-  // The view after a change; a stored Board always grades
   const after = async (): Promise<GameView> => {
     const v = await view();
     if (typeof v === "string") {
@@ -207,7 +171,6 @@ export function daySession(
         kind,
         random,
       );
-      // A stored hint whose attribute was since renamed shows nothing, but it was still taken
       if (!pick || !(await store.setHint(pick))) {
         return "no_hint";
       }
@@ -215,7 +178,6 @@ export function daySession(
     },
 
     async merge(local: Record<string, unknown>) {
-      // Only today's browser guesses are adopted; past days stay where they were played
       if (day.past) {
         return "stale_day";
       }
@@ -231,7 +193,6 @@ export function daySession(
       ) {
         return "invalid";
       }
-      // Browsers from before revisions existed send none: they played revision 0
       if (
         local["day"] !== day.day ||
         (local["revision"] ?? 0) !== day.revision
@@ -242,7 +203,6 @@ export function daySession(
       if (current.ids.length > 0 || current.gaveUp) {
         return "has_progress";
       }
-      // Keep first occurrences (and every skip) in order, stop after the answer
       const keep = (ids as number[]).filter(
         (id, i) => id === SKIP || ids.indexOf(id) === i,
       );
@@ -278,7 +238,6 @@ export function daySession(
   };
 }
 
-// A guest's Board as the request sends it; nothing outlives the request
 export function requestStore(ids: readonly number[] = []): DayStore {
   const board: StoredBoard = { ids: [...ids], gaveUp: false, hint: null };
   return {

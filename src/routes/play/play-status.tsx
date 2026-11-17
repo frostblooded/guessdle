@@ -1,6 +1,3 @@
-// Play's extras for the game's people: the status line for the owner and admins (issue #87), the
-// admin's Approve and Reject buttons on a pending game (issue #88), and the head's Host a party /
-// Edit links.
 import { useQueryClient } from "@tanstack/react-query";
 import { SaveButton } from "../../components/save-to-playlist.tsx";
 import { useState } from "react";
@@ -12,7 +9,6 @@ import { statusNotice, type Details } from "../../game/editor.ts";
 import { MIN_ENTRIES } from "../../game/limits.ts";
 import { gameKey, ME_KEY } from "../../lib/api.ts";
 
-// What GET /api/games/:slug tells this viewer; the server leaves out `status` for other players
 export interface StatusView {
   name?: string;
   status?: Details["status"];
@@ -30,7 +26,6 @@ export function PlayStatus({ slug, view }: { slug: string; view: StatusView }) {
       : statusNotice({
           status,
           rejectReason: view.rejectReason ?? "",
-          // The board's own notice already says when entries are missing
           entryCount: MIN_ENTRIES,
         });
 
@@ -56,8 +51,6 @@ export function PlayStatus({ slug, view }: { slug: string; view: StatusView }) {
               rejectId="reject-button"
               onDone={async (review, reason) => {
                 setError("");
-                // Into the game's cached copy, so the notice and buttons change at once and a
-                // later visit does not bring back the pending state
                 client.setQueryData<unknown>(gameKey(slug), (game: unknown) =>
                   typeof game === "object" && game !== null
                     ? {
@@ -68,7 +61,6 @@ export function PlayStatus({ slug, view }: { slug: string; view: StatusView }) {
                       }
                     : game,
                 );
-                // The header's Admin count drops at once, not on the next page load
                 await client.invalidateQueries({ queryKey: ME_KEY });
               }}
               onFail={setError}
@@ -88,8 +80,6 @@ export function PlayStatus({ slug, view }: { slug: string; view: StatusView }) {
   );
 }
 
-// The head's buttons: Host a party on any playable game (issue #90), Edit for its people
-// `saveName` is the game's name once it is playable: the Save to a playlist button shows then
 export function PlayActions({
   slug,
   canHost,

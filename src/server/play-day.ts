@@ -1,7 +1,3 @@
-// A Day of play: one game on one day (today, or a Past Day) with its Daily Answer. It decides
-// which day a request plays, draws the answer, grades a list of guesses against it, says when
-// the day is over and what that reveals, and records a first win in the day's stats. Routes
-// only read the request and turn these outcomes into HTTP replies.
 import { hintOffer, isOver } from "../game/board.ts";
 import type pg from "pg";
 import { isImageGame, outOfTries } from "../game/blur.ts";
@@ -16,16 +12,12 @@ export interface PlayDay {
   game: GameRow;
   roster: Roster;
   answer: Entry;
-  // Bumped each time an override changed the day's answer (migration 018)
   revision: number;
-  // "YYYY-MM-DD" in the server time zone, and its Day Number
   date: string;
   day: number;
-  // A Past Day (not today), played from the Past days list
   past: boolean;
 }
 
-// Why a day cannot be played. `day` is set once the requested day is known.
 export type DayRefusal =
   | { refusal: "no_such_day" }
   | {
@@ -39,7 +31,6 @@ export interface Clock {
   timeZone: string;
 }
 
-// Today's date and Day Number in the game's calendar
 export function todayOf(
   { now, timeZone }: Clock,
   game: GameRow,
@@ -48,8 +39,6 @@ export function todayOf(
   return { date, day: dayNumber(date, game.startDate) };
 }
 
-// The day a request plays: today when `raw` (the `?day=` query) is absent, else a Day Number
-// from 0 up to today; null for anything else
 export function dayOf(
   clock: Clock,
   game: GameRow,
@@ -73,8 +62,6 @@ export function dayOf(
   };
 }
 
-// The day `raw` names with its answer, drawn (and stored) on first request. `accepts` checks
-// the rest of the request once the day is known: a request it refuses ("invalid") draws nothing.
 export async function openDay(
   { pool, random, ...clock }: Clock & { pool: pg.Pool; random: () => number },
   { game, roster }: Pick<LoadedGame, "game" | "roster">,
@@ -82,7 +69,6 @@ export async function openDay(
   accepts: () => boolean = () => true,
 ): Promise<PlayDay | DayRefusal> {
   const played = dayOf(clock, game, raw);
-  // A Quiz game has no days: it is taken whole, any time (ADR 0021)
   if (!played || game.kind === "quiz") {
     return { refusal: "no_such_day" };
   }
@@ -90,7 +76,6 @@ export async function openDay(
   if (!accepts()) {
     return { refusal: "invalid", day };
   }
-  // Only the owner and admins reach a game too small to draw an answer from
   const blocker = playBlocker(roster);
   if (blocker) {
     return { refusal: blocker, day };
@@ -102,12 +87,9 @@ export async function openDay(
     : { refusal: "answer_missing", day };
 }
 
-// A Blur or Sequence game's tries, null for a classic game with unlimited guesses
 export const triesOf = (game: GameRow): number | null =>
   isImageGame(game.kind) ? game.blurTries : null;
 
-// The answer as a finished day reveals it: its name, its description when it has one, and a
-// Blur game's whole image or a Sequence game's first photo
 export interface Reveal {
   answer: string;
   answerPhoto?: string;
@@ -122,27 +104,20 @@ export const revealOf = (game: GameRow, answer: Entry): Reveal => ({
   ...(answer.description && { answerDescription: answer.description }),
 });
 
-// Whether `ids` used up a Blur or Sequence game's tries without the answer
 export const isLost = (
   game: GameRow,
   ids: readonly number[],
   victory: boolean,
 ): boolean => outOfTries(triesOf(game), ids.length, victory);
 
-// A list of guesses graded against the day's answer. `reveal` is set once the day is over:
-// won, given up, or (Blur and Sequence games) every try used.
 export interface Board {
   rows: GradedAttribute[][];
   victory: boolean;
   lost: boolean;
   reveal: Reveal | null;
-  // Classic games, while the day is on: the Free Hint kinds these guesses earn (whether one
-  // was already used is the caller's to know)
   hints: HintChoices | null;
 }
 
-// Grades guesses by entry id (soft-deleted entries still resolve, so old guesses keep their
-// rows); "invalid" for an unknown id, "duplicate" for a repeated one
 export function boardOf(
   { game, roster, answer }: Pick<PlayDay, "game" | "roster" | "answer">,
   ids: readonly number[],

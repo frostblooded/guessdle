@@ -1,5 +1,3 @@
-// How to play's Quiz practice round: three questions about the practice pets, two to tap and one
-// number scored by closeness. Unlike a real quiz, each answer is checked right away.
 import { useState } from "react";
 import { Button } from "../../components/ui/button.tsx";
 import type { Entry } from "../../game/game.ts";
@@ -18,7 +16,6 @@ import { pointsWord, Question } from "../play/quiz-play.tsx";
 import { PracticeCard, PracticeEnd } from "./practice-game.tsx";
 
 const OPTIONS = 4;
-// How far off a count may be before it scores 0
 const COUNT_RANGE = 4;
 
 interface PracticeQuestion {
@@ -28,7 +25,6 @@ interface PracticeQuestion {
   spec: QuizSpec;
 }
 
-// "Which pet is this?" with the pet's photo, and it plus the pets after it as options
 function whichPet(pets: readonly Entry[], at: number): PracticeQuestion {
   const pet = pets[at % pets.length]!;
   const options = [

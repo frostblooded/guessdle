@@ -1,4 +1,3 @@
-// The result card above the guesses after a win, a give-up or (Blur games) running out of tries.
 import type { ReactNode } from "react";
 import type { EntryRef } from "../../game/game.ts";
 import type { Reveal } from "../../game/play.ts";
@@ -6,13 +5,10 @@ import type { Reveal } from "../../game/play.ts";
 export type Result = {
   kind: "victory" | "give-up" | "lost";
   answer: string;
-  // A Blur game's answer image, which its roster does not carry
   photo?: string | undefined;
-  // The answer's description, when it has one
   description?: string | undefined;
 } | null;
 
-// The result a finished day's response reveals
 export const resultOf = (
   kind: NonNullable<Result>["kind"],
   reveal: Reveal,
@@ -29,7 +25,6 @@ const TITLES = {
   lost: "Out of tries",
 } as const;
 
-// An entry's description under its name once it is revealed, line breaks kept
 export function AnswerDescription({ text }: { text: string }) {
   return (
     <p
@@ -41,8 +36,6 @@ export function AnswerDescription({ text }: { text: string }) {
   );
 }
 
-// The result card above the guesses (Play and party rounds): the answer's photo, name and
-// description. A party round names its own title and adds a line under the answer.
 export function ResultBanner({
   result,
   roster,

@@ -76,3 +76,45 @@ tester.run("boundaries", rule("boundaries"), {
     },
   ],
 });
+
+tester.run("no-comments", rule("no-comments"), {
+  valid: [
+    {
+      filename: at("src/server/rate-limit.ts"),
+      code: `// shortcut: in memory until the API scales out\nconst a = 1;\n// eslint-disable-next-line no-control-regex\nconst b = /\\x00/;\n/// <reference types="vite/client" />\n// @ts-expect-error untyped\nconst c = a + b;\n`,
+    },
+    {
+      filename: at("src/game/play.ts"),
+      code: `const url = "https://example.test/a//b"; const re = /\\/\\//;`,
+    },
+  ],
+  invalid: [
+    {
+      filename: at("src/game/play.ts"),
+      code: `// what this does\nconst a = 1;\n`,
+      output: `const a = 1;\n`,
+      errors: [{ messageId: "comment" }],
+    },
+    {
+      filename: at("src/game/play.ts"),
+      code: `const a = 1; // why\nconst b = 2;\n`,
+      output: `const a = 1;\nconst b = 2;\n`,
+      errors: [{ messageId: "comment" }],
+    },
+    {
+      filename: at("src/game/play.ts"),
+      code: `/**\n * Docs\n */\nexport const a = 1;\n`,
+      output: `export const a = 1;\n`,
+      errors: [{ messageId: "comment" }],
+    },
+    {
+      filename: at("src/components/x.tsx"),
+      code: `const el = (\n  <div>\n    {/* note */}\n    <span />\n  </div>\n);\n`,
+      output: `const el = (\n  <div>\n    <span />\n  </div>\n);\n`,
+      languageOptions: {
+        parserOptions: { ecmaFeatures: { jsx: true } },
+      },
+      errors: [{ messageId: "comment" }],
+    },
+  ],
+});

@@ -1,13 +1,8 @@
-// Upload references (spec #66): who may attach an uploaded file, and when a file is deleted.
-// A file lives while a game cover, a Blur entry's photo, a Sequence shot, an Image value
-// (soft-deleted entries too) or a tutorial picture uses it; callers state intent (attach,
-// release, drop a game or user) and never unlink files themselves.
 import { readdir, stat, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import type pg from "pg";
 import type { GameRow } from "./games.ts";
 
-// Unreferenced files younger than this may belong to an editor session in progress
 export const SWEEP_GRACE_MS = 24 * 3600 * 1000;
 const URL_RE = /^\/uploads\/([0-9a-f]{32}\.webp)$/;
 
@@ -20,7 +15,6 @@ const unlinkQuiet = (path: string): Promise<void> =>
 
 type MaybeUrl = string | null | undefined;
 
-// SQL: every Image value with its entry's game id, as (url, game_id)
 const IMAGE_VALUES = `select v.value as url, e.game_id from entry_values v
   join attributes a on a.id = v.attribute_id join entries e on e.id = v.entry_id
   where a.type = 'image'`;
@@ -37,7 +31,6 @@ export function uploadRefs(pool: pg.Pool, dir: string) {
       )
     ).rowCount! > 0;
 
-  // URLs still used by content (soft-deleted entries stay, they can be restored)
   const referencedUrls = async (): Promise<Set<string>> => {
     const { rows } = await pool.query<{ url: string }>(
       `select cover_url as url from games union select photo_url from entries
@@ -47,7 +40,6 @@ export function uploadRefs(pool: pg.Pool, dir: string) {
     return new Set(rows.map((r) => r.url));
   };
 
-  // Deletes the file and frees its quota unless still referenced (a URL that is not ours is ignored)
   const release = async (urls: Iterable<MaybeUrl>): Promise<void> => {
     for (const url of new Set(urls)) {
       const name = URL_RE.exec(url ?? "")?.[1];
@@ -58,7 +50,6 @@ export function uploadRefs(pool: pg.Pool, dir: string) {
     }
   };
 
-  // A cover or photo may be cleared, kept, or a file stored for the acting user or the game's owner
   const mayAttach = async (
     url: string,
     current: string,
@@ -83,7 +74,6 @@ export function uploadRefs(pool: pg.Pool, dir: string) {
     release,
     mayAttach,
 
-    // Deletes the game (everything under it cascades), then releases its cover and pictures
     async dropGame(game: GameRow): Promise<void> {
       const { rows } = await pool.query<{ url: string }>(
         `select photo_url as url from entries where game_id = $1
@@ -95,8 +85,6 @@ export function uploadRefs(pool: pg.Pool, dir: string) {
       await release([...rows.map((r) => r.url), game.coverUrl]);
     },
 
-    // Deletes the user (their games, state and upload rows cascade), then releases every file they
-    // own plus the covers and pictures of their games. False when there is no such user.
     async dropUser(userId: number): Promise<boolean> {
       const { rows } = await pool.query<{ url: string }>(
         `select '/uploads/' || name as url from uploads where user_id = $1
@@ -113,8 +101,6 @@ export function uploadRefs(pool: pg.Pool, dir: string) {
       return rowCount === 1;
     },
 
-    // Deletes unreferenced files older than the grace period, and quota rows whose file is gone.
-    // Returns the file names removed.
     async sweep(now: Date): Promise<string[]> {
       const keep = await referencedUrls();
       const names = await readdir(dir).catch(() => [] as string[]);

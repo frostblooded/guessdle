@@ -1,4 +1,3 @@
-// Per-game Daily Answer peek and Overrides: owner and admin only.
 import type { LoadedGame } from "../access.ts";
 import express from "express";
 import type { Express, Request, Response } from "express";
@@ -22,7 +21,6 @@ const isDate = (value: unknown, start: string): value is string =>
   !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) &&
   dateOfDay(dayNumber(value, start), start) === value;
 
-// A date the editor may name: valid, not before the start, within a year ahead
 const answerDate = (
   value: unknown,
   game: GameRow,
@@ -75,7 +73,6 @@ export function answersRoutes(app: Express, ctx: AppContext): void {
       const query = queryOf(req);
       const rawFrom = query["from"] ?? today;
       const rawTo = query["to"] ?? dateOfDay(todayN + 6, game.startDate);
-      // A start before Day Number 0 is clamped to it
       const from =
         isDate(rawFrom, game.startDate) && rawFrom < game.startDate
           ? game.startDate
@@ -90,7 +87,6 @@ export function answersRoutes(app: Express, ctx: AppContext): void {
         res.status(400).json({ error: "invalid" });
         return;
       }
-      // Nothing can be drawn from an empty roster
       const days =
         ids.length === 0
           ? []
@@ -99,7 +95,6 @@ export function answersRoutes(app: Express, ctx: AppContext): void {
         today,
         from,
         to: rawTo,
-        // The entries an Override may name: in a Sequence game only those with every photo
         answerIds: ids,
         days: days.map((row) => {
           const entry = roster.all.find((e) => e.id === row.entryId);

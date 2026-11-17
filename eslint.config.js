@@ -28,6 +28,9 @@ export default tseslint.config(
     plugins: { guessdle },
     rules: {
       "guessdle/boundaries": "error",
+      "guessdle/no-comments": "error",
+      // `catch {}` is how src/ says "ignore this failure" now that comments are gone
+      "no-empty": ["error", { allowEmptyCatch: true }],
       "max-lines": [
         "error",
         { max: 400, skipBlankLines: true, skipComments: true },

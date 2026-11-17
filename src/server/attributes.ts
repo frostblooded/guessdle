@@ -1,4 +1,3 @@
-// A game's attributes: listing them and the editor's changes to them.
 import type pg from "pg";
 import { MAX_ATTRIBUTES } from "../game/limits.ts";
 import type { AttributeType } from "../game/game.ts";
@@ -23,17 +22,12 @@ export async function listAttributes(
   return rows;
 }
 
-// The whole attribute list as the editor's Save sends it: kept ones by id, new ones without
 export interface AttributeDraft {
   id?: number | undefined;
   name: string;
   type: AttributeType;
 }
 
-// Replaces a game's attributes with `drafts`, in that order: missing ids are removed, a changed
-// type erases that attribute's values, new ones are added. All or nothing, in the caller's game
-// transaction (lifecycle.edit). "noop" when nothing changed, "reorder" when only the order did
-// (which keeps the game's status).
 export async function saveAttributes(
   client: Q,
   game: GameRow,
@@ -104,10 +98,6 @@ export type AttributeEdit =
     }
   | { remove: number };
 
-// Adds, renames, retypes or removes an attribute. Removing or retyping hard-deletes its values,
-// which pauses the game until every entry is filled in again. A real change is "ok" (the
-// lifecycle then resets the status), a rename to the same name is "noop".
-// Runs in the caller's game transaction (lifecycle.edit).
 export async function editAttributes(
   client: Q,
   game: GameRow,

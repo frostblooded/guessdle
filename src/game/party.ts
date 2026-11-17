@@ -1,7 +1,3 @@
-// Party mode (issue #90, ADR 0016): pure rules shared by the server and the party page.
-// A round is won with the fewest guesses, ties broken by time from the round's start;
-// rounds add up by placement points. A Quiz game's round is one question (ADR 0021): the most
-// quiz points win it, ties broken by time, and a wrong answer gets no placement points.
 import { isOver } from "./board.ts";
 import { isHintKind, type HintKind, type HintPick } from "./free-hint.ts";
 import { MAX_NICKNAME } from "./limits.ts";
@@ -16,7 +12,6 @@ export type {
   ViewInput,
 } from "./party-view.ts";
 
-// No I or O, so a code read aloud or off a screen is never mistaken for 1 or 0
 export const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
 export const CODE_LENGTH = 4;
 
@@ -26,7 +21,6 @@ export const randomCode = (random: () => number): string =>
     () => CODE_LETTERS[Math.floor(random() * CODE_LETTERS.length)]!,
   ).join("");
 
-// The code typed or in a URL, upper-cased; null when it cannot be one
 export function normalizeCode(input: string): string | null {
   const code = input.trim().toUpperCase();
   return new RegExp(`^[${CODE_LETTERS}]{${CODE_LENGTH}}$`).test(code)
@@ -34,7 +28,6 @@ export function normalizeCode(input: string): string | null {
     : null;
 }
 
-// A nickname with its spaces collapsed, or null when empty, too long or holding control characters
 export function cleanNickname(input: unknown): string | null {
   if (typeof input !== "string") {
     return null;
@@ -51,28 +44,21 @@ export interface PartyPlayer {
   id: number;
   nickname: string;
   host: boolean;
-  // Epoch ms
   joinedAt: number;
 }
 
 export interface RoundData {
   number: number;
   answerId: number;
-  // Epoch ms; endedAt is null while the round is live
   startedAt: number;
   endedAt: number | null;
-  // In the order they were made
   guesses: { playerId: number; entryId: number; at: number }[];
   giveUps: { playerId: number; at: number }[];
-  // Classic games: the Free Hints players used, at most one each
   hints?: { playerId: number; pick: HintPick }[];
-  // Blur games: guesses each player gets (ADR 0019); unlimited when absent
   tries?: number;
-  // Quiz games: the round's question, its right answer and each player's one answer, graded
   quiz?: QuizRound;
 }
 
-// Who plays a round: everyone in the party when it ended (or now, while live), late joiners too
 export const participants = (
   players: readonly PartyPlayer[],
   round: RoundData,
@@ -84,12 +70,8 @@ export interface Progress {
   guesses: number;
   solved: boolean;
   gaveUp: boolean;
-  // Blur games: used every try without solving it
   lost: boolean;
-  // From the round's start to the solving guess
   timeMs: number | null;
-  // Quiz games: the answer's quiz points (0 to 1), absent before answering. An answer with
-  // points counts as solved, one without as lost.
   score?: number;
 }
 
@@ -122,7 +104,6 @@ export const isDone = (
   p: Pick<Progress, "solved" | "gaveUp" | "lost">,
 ): boolean => isOver({ won: p.solved, gaveUp: p.gaveUp, lost: p.lost });
 
-// A live round ends by itself once every player has solved it, given up or run out of tries
 export function everyoneDone(
   players: readonly PartyPlayer[],
   round: RoundData,
@@ -134,19 +115,16 @@ export function everyoneDone(
 }
 
 export interface RoundResult extends Progress {
-  // 1-based; null when not solved. Equal guesses and time share a place.
   place: number | null;
   points: number;
 }
 
-// Fewer guesses, or in a Quiz game more points, then less time
 const better = (a: Progress, b: Progress): boolean => {
   const [mine, theirs] =
     a.score === undefined ? [b.guesses, a.guesses] : [a.score, b.score!];
   return mine > theirs || (mine === theirs && a.timeMs! < b.timeMs!);
 };
 
-// Placement points: with N players, 1st gets N, 2nd N - 1, and so on; unsolved gets 0
 export function roundResults(
   players: readonly PartyPlayer[],
   round: RoundData,
@@ -175,11 +153,9 @@ export interface Standing {
   nickname: string;
   host: boolean;
   points: number;
-  // 1-based; equal points share a place
   place: number;
 }
 
-// The party's scoreboard over its finished rounds, most points first
 export function standings(
   players: readonly PartyPlayer[],
   rounds: readonly RoundData[],
@@ -207,7 +183,6 @@ export function standings(
     );
 }
 
-// The next secret entry: random among active entries this party has not had yet (all of them once used up)
 export function drawAnswer(
   activeIds: readonly number[],
   used: readonly number[],
@@ -218,11 +193,9 @@ export function drawAnswer(
   return pool[Math.floor(random() * pool.length)]!;
 }
 
-// Messages a phone sends over the party socket
 export type ClientMessage =
   | { type: "hello"; token?: string }
   | { type: "guess"; entryId: number }
-  // Quiz games: the one answer to the round's question
   | { type: "answer"; answer: string }
   | { type: "give-up" }
   | { type: "hint"; kind: HintKind }
@@ -231,7 +204,6 @@ export type ClientMessage =
   | { type: "remove-player"; playerId: number }
   | { type: "end-party" };
 
-// Messages the server sends: the whole view on every change, or why an action was refused
 export type ServerMessage =
   | { type: "view"; view: PartyView }
   | { type: "error"; error: PartyRefusal }
@@ -254,7 +226,6 @@ export type PartyRefusal =
 
 const ACTIONS = new Set(["give-up", "start-round", "end-round", "end-party"]);
 
-// A socket frame as a message, or null when it is not one
 export function parseClientMessage(raw: string): ClientMessage | null {
   let data: unknown;
   try {
@@ -296,5 +267,4 @@ export function parseClientMessage(raw: string): ClientMessage | null {
   }
 }
 
-// The socket close code for a player the host removed
 export const CLOSE_REMOVED = 4001;

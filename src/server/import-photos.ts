@@ -1,5 +1,3 @@
-// One-off (#71): runs the repo's photos/*.jpg through the upload pipeline and points Petdle's Image
-// values at the results.
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type pg from "pg";
@@ -10,9 +8,7 @@ import { recordUpload } from "./upload-store.ts";
 export interface ImportOptions {
   photosDir: string;
   uploadsDir: string;
-  // Owner charged for the bytes (an uploads row needs a user)
   userId: number;
-  // Optional image to become Petdle's cover
   coverFile?: string;
 }
 
@@ -28,8 +24,6 @@ async function store(
   return url;
 }
 
-// Image values still on /photos/<slug>.jpg are converted; values already moved are skipped, so reruns are safe.
-// `missing` lists slugs with no file in photosDir (left untouched).
 export async function importPhotos(
   pool: pg.Pool,
   options: ImportOptions,

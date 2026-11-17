@@ -1,6 +1,3 @@
-// The editor's photos for one Sequence game entry (ADR 0020): one slot per photo, in the order
-// players see them. Each slot crops its upload to 16:9; an entry needs every slot filled to be
-// a day's answer.
 import { ImagePlus, X } from "lucide-react";
 import { useId } from "react";
 import { Button } from "../../components/ui/button.tsx";
@@ -13,11 +10,8 @@ export function ShotsEditor({
   onUpload,
   onChange,
 }: {
-  // "" for an empty slot
   shots: readonly string[];
-  // The game's photos per entry
   count: number;
-  // Crops and uploads the file; resolves to its URL, or null after a cancel or a failure
   onUpload: (file: File) => Promise<string | null>;
   onChange: (shots: string[]) => void;
 }) {
@@ -26,7 +20,6 @@ export function ShotsEditor({
   const set = (slot: number, url: string): void => {
     const next = Array.from({ length: slots }, (_, i) => shots[i] ?? "");
     next[slot] = url;
-    // Trailing empty slots are not stored
     while (next.length > 0 && next.at(-1) === "") {
       next.pop();
     }

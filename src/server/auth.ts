@@ -1,4 +1,3 @@
-// Accounts and sessions: opaque cookie sessions in Postgres, the admin email list and the CSRF guard for mutating endpoints.
 import { createHash, randomBytes } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import type { NextFunction, Request, Response } from "express";
@@ -13,7 +12,6 @@ export interface SessionUser {
   name: string;
   email: string;
   admin: boolean;
-  // Banned by an admin: still signs in and plays, but cannot create or change games
   banned: boolean;
   banReason: string;
 }
@@ -25,8 +23,6 @@ export function adminEmailsFromEnv(value: string | undefined): string[] {
     .filter((email) => email !== "");
 }
 
-// Finds or creates the user for an email (case-insensitive, so Google-era rows
-// match); an email on the admin list promotes, nothing here demotes.
 export async function upsertUser(
   pool: pg.Pool,
   email: string,
@@ -45,13 +41,11 @@ export async function upsertUser(
 export const hash = (token: string): string =>
   createHash("sha256").update(token).digest("hex");
 
-// Returns the cookie token; only its hash is stored
 export async function startSession(
   pool: pg.Pool,
   userId: number,
   now: Date,
 ): Promise<string> {
-  // Expired rows are dead weight; purge them on each login
   await pool.query("delete from sessions where expires_at <= $1", [now]);
   const token = randomBytes(32).toString("base64url");
   await pool.query(
@@ -61,7 +55,6 @@ export async function startSession(
   return token;
 }
 
-// The signed-in user, or null. A hit rolls the expiry and stamps last seen.
 export async function userForSession(
   pool: pg.Pool,
   token: string | undefined,
@@ -82,7 +75,6 @@ export async function userForSession(
   return rows[0] ?? null;
 }
 
-// One lookup per request (the rate limiter and the route share it): each lookup rolls the expiry
 const lookups = new WeakMap<Request, Promise<SessionUser | null>>();
 export function requestUser(
   pool: pg.Pool,
@@ -137,8 +129,6 @@ export function clearSessionCookie(res: Response, secure: boolean): void {
   });
 }
 
-// CSRF defence with SameSite=Lax: mutating requests must be JSON or raw bytes
-// (uploads); a cross-site form or simple request can be neither and any Origin must be this site.
 export function csrfGuard(
   req: Request,
   res: Response,
@@ -153,9 +143,7 @@ export function csrfGuard(
     let host: string | null = null;
     try {
       host = new URL(origin).host;
-    } catch {
-      // unparsable: mismatched below
-    }
+    } catch {}
     if (host === null || host !== req.headers.host) {
       res.status(403).json({ error: "forbidden_origin" });
       return;

@@ -1,6 +1,3 @@
-// A game's gallery banner (issue #89): its own cover, or else a collage of its entries' photos.
-
-// Two rows of four at most
 export const MAX_TILES = 8;
 
 export type Banner =
@@ -8,9 +5,6 @@ export type Banner =
   | { kind: "collage"; tiles: string[]; columns: number }
   | null;
 
-// photos: the viewer's visible (active) entries in roster order; blanks are skipped.
-// Up to four tiles share one row; more are trimmed to an even count over two full rows.
-// No cover and no photos is no banner.
 export function bannerOf(cover: string, photos: readonly string[]): Banner {
   if (cover !== "") {
     return { kind: "cover", url: cover };

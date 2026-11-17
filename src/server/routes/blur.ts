@@ -1,7 +1,3 @@
-// What a Blur or Sequence game shows of the answer before the day or round is over: a Blur
-// board (ADR 0019), the answer's image with only some squares clear, or a Sequence photo
-// (ADR 0020), one of those unlocked so far; also Blur and Sequence gallery banner tiles. All are
-// sent from the stored uploads, so their URLs stay secret.
 import { readFile } from "node:fs/promises";
 import type { Express, Request, Response } from "express";
 import type { GameKind } from "../../game/blur.ts";
@@ -35,7 +31,6 @@ export function blurRoutes(
 ): void {
   const render = blurRenderer(uploadsDir);
   const tile = tileRenderer(uploadsDir);
-  // How many squares are clear, or which photo, 1-9 from the URL, or 0
   const shownOf = (req: Request): number => {
     const raw = String(paramOf(req, "n"));
     return /^[1-9]$/.test(raw) ? Number(raw) : 0;
@@ -46,7 +41,6 @@ export function blurRoutes(
       fail(res, "not_found");
       return;
     }
-    // Overrides can change today's answer, so the browser never keeps one
     res.set("Cache-Control", "no-store");
     res.type("image/webp").send(webp);
   };
@@ -62,7 +56,6 @@ export function blurRoutes(
     );
   };
 
-  // An upload's bytes as stored, or null
   const stored = async (url: string): Promise<Buffer | null> => {
     const file = fileOf(uploadsDir, url);
     return file ? await readFile(file).catch(() => null) : null;
@@ -78,7 +71,6 @@ export function blurRoutes(
     );
   };
 
-  // Today's answer, or a past day's (`?day=N`)
   const dayRoute =
     (kind: GameKind, send: Send) =>
     async (req: Request, res: Response): Promise<void> => {
@@ -95,14 +87,12 @@ export function blurRoutes(
       if (!("refusal" in day)) {
         await send(req, res, day.game, day.answer);
       } else if (day.refusal === "no_such_day") {
-        // An image that does not exist, rather than a day
         fail(res, "not_found");
       } else {
         sendRefusal(res, day);
       }
     };
 
-  // A party round's secret entry
   const roundRoute =
     (kind: GameKind, send: Send) =>
     async (req: Request, res: Response): Promise<void> => {
@@ -127,15 +117,11 @@ export function blurRoutes(
       await send(req, res, game, answer);
     };
 
-  // n squares clear
   app.get("/api/games/:slug/blur/:n", dayRoute("blur", board));
   app.get("/api/parties/:code/blur/:round/:n", roundRoute("blur", board));
-  // Photo n of the sequence
   app.get("/api/games/:slug/shot/:n", dayRoute("sequence", shot));
   app.get("/api/parties/:code/shot/:round/:n", roundRoute("sequence", shot));
 
-  // Tile n of the gallery banner: the nth entry photo, by entry id, heavily blurred for a Blur
-  // game, a Sequence game's first photo as stored. Not a secret, so browsers may keep it a while.
   app.get("/api/games/:slug/tile/:n", async (req, res) => {
     const loaded = await loadGame(ctx, req, res);
     if (!loaded) {

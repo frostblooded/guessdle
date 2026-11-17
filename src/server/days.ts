@@ -1,5 +1,3 @@
-// The Past days list: every day from the game's start to today, with the
-// signed-in player's progress on each.
 import type pg from "pg";
 import { statusOf, type DayItem, type DayProgress } from "../game/days.ts";
 import { dateOfDay } from "../game/date.ts";
@@ -8,8 +6,6 @@ import { triesOf } from "./play-day.ts";
 
 type Q = Pick<pg.Pool, "query">;
 
-// Days `today` down to 0. Victory is derived as in user-game.ts: a guess of the
-// day's stored answer.
 export async function listDays(
   q: Q,
   game: GameRow,

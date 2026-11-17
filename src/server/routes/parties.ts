@@ -1,5 +1,3 @@
-// Party mode over HTTP (ADR 0016): open a party, read it, join it. Everything during play
-// goes over the party socket (party-hub.ts).
 import express from "express";
 import type { Express, Request, Response } from "express";
 import { playBlocker } from "../access.ts";
@@ -17,7 +15,6 @@ export function partyRoutes(
   const { pool, now, random } = ctx;
   const json = express.json({ limit: "1kb" });
 
-  // The party `:code` names, or a 404 sent and null
   const partyOf = async (req: Request, res: Response) => {
     res.set("Cache-Control", "no-store");
     const code = normalizeCode(String(paramOf(req, "code")));
@@ -28,7 +25,6 @@ export function partyRoutes(
     return party;
   };
 
-  // A signed-in player of the game hosts; drafts too, for their owner (who alone can load them)
   app.post("/api/games/:slug/parties", json, async (req, res) => {
     res.set("Cache-Control", "no-store");
     const user = await requestUser(pool, req, now());
@@ -46,7 +42,6 @@ export function partyRoutes(
       return;
     }
     const nickname = cleanNickname(bodyOf(req)["nickname"]);
-    // How every player picks a guess; typing unless the host chose selection
     const guessMode = bodyOf(req)["guessMode"] ?? "type";
     if (nickname === null || (guessMode !== "type" && guessMode !== "select")) {
       fail(res, "invalid");
@@ -68,7 +63,6 @@ export function partyRoutes(
     res.status(201).json(out);
   });
 
-  // What a visitor sees: the join screen while open, the results once ended
   app.get("/api/parties/:code", async (req, res) => {
     const party = await partyOf(req, res);
     if (party) {

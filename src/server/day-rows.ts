@@ -1,12 +1,9 @@
-// Every row a Day of play keeps per player, and the one place that forgets them: a signed-in
-// player's Game State (guesses, give-up, Free Hint) and each player's first try (results.ts).
 import type pg from "pg";
 
 type Q = Pick<pg.Pool, "query">;
 
 const STATE_TABLES = ["user_guesses", "user_give_ups", "user_hints"] as const;
 
-// A reset: the account's Game State for the day goes, its first try stays
 export async function forgetBoard(
   q: Q,
   gameId: number,
@@ -21,7 +18,6 @@ export async function forgetBoard(
   }
 }
 
-// The day's answer changed: everyone's Game State and first try go, so the day starts over
 export async function forgetDay(
   q: Q,
   gameId: number,

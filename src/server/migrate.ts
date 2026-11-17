@@ -3,10 +3,8 @@ import { join } from "node:path";
 import type pg from "pg";
 
 const MIGRATION = /^(\d+)_.+\.sql$/;
-const LOCK_KEY = 5_150_001; // arbitrary; serialises runners across API replicas
+const LOCK_KEY = 5_150_001;
 
-// Applies unapplied `<number>_name.sql` files in numeric order, one transaction
-// per file, and returns the names it applied.
 export async function migrate(pool: pg.Pool, dir: string): Promise<string[]> {
   const files = (await readdir(dir))
     .filter((f) => MIGRATION.test(f))

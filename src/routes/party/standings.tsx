@@ -1,4 +1,3 @@
-// A party view's scoreboard, the podium of an ended party and its finished rounds.
 import { TILE_COLORS } from "../../components/board.tsx";
 import { Badge } from "../../components/ui/badge.tsx";
 import { Button } from "../../components/ui/button.tsx";
@@ -15,7 +14,6 @@ import { cn } from "../../lib/utils.ts";
 
 const points = (n: number): string => `${n} ${n === 1 ? "point" : "points"}`;
 
-// Place, nickname, points and the live round's progress; the host gets Remove buttons
 export function Players({
   view,
   onRemove,
@@ -42,7 +40,6 @@ export function Players({
               data-player-id={player.id}
               className="party-player grid grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-2 [overflow-wrap:anywhere]"
             >
-              {/* No place before the first round has a result */}
               <span className="party-place row-span-2 font-bold text-muted-foreground">
                 {view.history.length > 0 ? ordinal(player.place) : ""}
               </span>
@@ -99,7 +96,6 @@ const STEP_ORDER: Record<number, string> = {
   3: "order-3 min-h-22",
 };
 
-// The top three of an ended party
 export function Podium({ view }: { view: PartyView }) {
   return (
     <div
@@ -133,7 +129,6 @@ export function Podium({ view }: { view: PartyView }) {
 const nameOf = (view: PartyView, id: number): string =>
   view.players.find((p) => p.id === id)?.nickname ?? "Removed player";
 
-// One finished round: its answer, then each player's place, points, guesses and solve time
 function Round({ view, round }: { view: PartyView; round: FinishedRound }) {
   return (
     <Card className="party-round mb-4 p-4 sm:p-5">

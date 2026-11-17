@@ -1,4 +1,3 @@
-// What a player's socket message does to a party (ADR 0016), under the party lock.
 import type pg from "pg";
 import { checkGuess, hintOffer } from "../game/board.ts";
 import { pickHint } from "../game/free-hint.ts";
@@ -25,7 +24,6 @@ const endRound = (q: Q, roundId: number, now: Date): Promise<unknown> =>
     [roundId, now],
   );
 
-// Applies one player's message under the party lock. Null when it changed the party.
 export async function act(
   pool: pg.Pool,
   party: PartyRow,
@@ -45,7 +43,6 @@ export async function act(
     }
     const latest = data.rounds.at(-1);
     const live = latest?.endedAt === null ? latest : undefined;
-    // Re-read after a change: does the live round end by itself now?
     const endIfAllDone = async (): Promise<void> => {
       const after = await loadData(tx, party);
       const round = after.rounds.at(-1)!;
@@ -54,7 +51,6 @@ export async function act(
       }
     };
     const quiz = data.game.kind === "quiz";
-    // The entry ids I guessed in a round, in order
     const mineIds = (round: RoundData): number[] =>
       round.guesses.filter((g) => g.playerId === me.id).map((g) => g.entryId);
     const refusal = await (async (): Promise<PartyRefusal | null> => {
@@ -97,7 +93,6 @@ export async function act(
           if (!live) {
             return "no_round";
           }
-          // A quiz round takes one answer, and only an answer
           if (quiz !== (msg.type === "answer")) {
             return "invalid";
           }
@@ -156,7 +151,6 @@ export async function act(
           }
           const active = data.roster.answerIds;
           const used = data.rounds.map((r) => r.answerId);
-          // A quiz plays its questions in order, each once
           const next = quiz
             ? active.find((id) => !used.includes(id))
             : drawAnswer(active, used, random);

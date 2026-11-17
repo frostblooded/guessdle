@@ -77,7 +77,6 @@ export function SettingsPage() {
   });
   const [failed, setFailed] = useState(false);
 
-  // Shows the change at once, keeps what the server stored, or puts the old value back
   const change = async (next: MailSettings): Promise<void> => {
     const before = settings.data;
     queryClient.setQueryData(KEY, next);

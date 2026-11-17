@@ -1,9 +1,7 @@
-// The guess input: a Downshift combobox over the roster's names, without the ones already guessed.
 import { useCombobox } from "downshift";
 import { Input } from "../../components/ui/input.tsx";
 import { cn } from "../../lib/utils.ts";
 
-// Names containing the typed text, any letter case (as autocomplete.js matched before)
 export function matchNames(names: readonly string[], query: string): string[] {
   const lower = query.trim().toLowerCase();
   return lower === ""
@@ -21,7 +19,6 @@ export function GuessBox({
   names: readonly string[];
   value: string;
   onChange: (value: string) => void;
-  // Called with the name to guess: the typed text on Enter, or the name picked from the list
   onSubmit: (name: string) => void;
   disabled: boolean;
 }) {
@@ -36,14 +33,11 @@ export function GuessBox({
   } = useCombobox({
     items,
     inputValue: value,
-    // Never "selected", so the same name can be picked again
     selectedItem: null,
     inputId: "new-guess-input",
     menuId: "guess-options",
     getItemId: (index) => `guess-option-${index}`,
     onSelectedItemChange: ({ selectedItem }) => {
-      // Picking a name (click, tap or Enter on a highlighted one) guesses it at once. It fills the
-      // box too, so a guess the server could not grade stays there to retry.
       if (selectedItem) {
         onChange(selectedItem);
         onSubmit(selectedItem);
@@ -62,10 +56,8 @@ export function GuessBox({
           autoComplete: "off",
           autoCapitalize: "off",
           spellCheck: false,
-          // Typing sets the text at once: Downshift reports changes after the render, which drops fast keystrokes
           onChange: (event) => onChange(event.currentTarget.value),
           onKeyDown: (event) => {
-            // Enter with nothing highlighted submits what is typed
             if (event.key === "Enter" && (!open || highlightedIndex < 0)) {
               event.preventDefault();
               onSubmit(value);

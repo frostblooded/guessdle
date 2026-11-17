@@ -8,17 +8,13 @@ import "@fontsource/courier-prime/400.css";
 import "@fontsource/courier-prime/700.css";
 import "./styles.css";
 
-// One-time cleanup of the old un-namespaced browser guesses (spec #66, story 73)
 let legacyWiped = false;
 try {
   legacyWiped = wipeLegacyState(localStorage);
-} catch {
-  // blocked storage has nothing to wipe
-}
+} catch {}
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    // Pages say themselves when data is stale (after an edit); no refetch on window focus
     queries: { retry: false, refetchOnWindowFocus: false },
   },
 });

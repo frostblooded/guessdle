@@ -1,6 +1,3 @@
-// How to play's Blur and Sequence practice rounds: name a secret pet from its photo, which
-// shows a little more after every wrong guess, before the tries run out. Graded in the browser
-// on the frozen pet game copy; the photo stands in for the owner's board.
 import { useState, type ReactNode } from "react";
 import { BlurView } from "../../components/blur-view.tsx";
 import { SequenceView } from "../../components/sequence-view.tsx";
@@ -30,12 +27,10 @@ function PictureRound({
 }: {
   tutorial: Tutorial;
   kind: string;
-  // Which pet with a photo is the first round's secret; each new round takes the next one
   start: number;
   tries: number;
   title: string;
   intro: ReactNode;
-  // What a wrong guess just earned, after "Not <name>."
   afterMiss: string;
   board: (board: Board) => ReactNode;
   outro: ReactNode;
@@ -104,7 +99,6 @@ function PictureRound({
 }
 
 const BLUR_TRIES = 5;
-// The order the squares clear in: the middle first, then the corners, then the edges
 const BLUR_ORDER = [4, 0, 8, 2, 6, 1, 7, 3, 5];
 
 export function BlurPractice({ tutorial }: { tutorial: Tutorial }) {
@@ -158,7 +152,6 @@ export function BlurPractice({ tutorial }: { tutorial: Tutorial }) {
   );
 }
 
-// Photo n's zoom: the first is a close-up, the last the whole photo
 const SEQUENCE_ZOOM = [3.2, 2.2, 1.5, 1];
 
 export function SequencePractice({ tutorial }: { tutorial: Tutorial }) {

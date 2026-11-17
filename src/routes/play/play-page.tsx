@@ -1,5 +1,3 @@
-// /g/:slug: play today's game; /g/:slug/day/:day: play or review a past day. Anonymous players keep
-// guesses in the browser, signed-in ones on the server.
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useState, type MouseEvent } from "react";
 import { Navigate, useParams } from "react-router";
@@ -36,7 +34,6 @@ import { QuizPlay } from "./quiz-play.tsx";
 import { StatsDialog } from "./stats-dialog.tsx";
 import { usePlayBoard } from "./use-play-board.ts";
 
-// `day`: a past day's Day Number from the address, or null for today
 function Game({ slug, day }: { slug: string; day: number | null }) {
   const { data: game, isPending } = useQuery({
     queryKey: gameKey(slug),
@@ -51,14 +48,11 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   const modes = useGuessMode();
 
   const playable = typeof game === "object" ? game : null;
-  // Why the game could not be loaded
   const gameFailure =
     typeof game === "string" && game !== "missing" ? game : null;
   const roster = playable?.entries ?? [];
   const tooSmall = playable !== null && roster.length < MIN_ENTRIES;
-  // Not playable for now: too few entries, or paused
   const closed = tooSmall || playable?.paused === true;
-  // A past day the game has; today's and later Day Numbers are handled below
   const past = playable !== null && day !== null && day < playable.today;
   const pastDay = past ? day : undefined;
   const {
@@ -92,7 +86,6 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
         : "Guessdle",
   );
 
-  // Sends a guess by entry id, or SKIP; a graded one clears the guess box
   async function submitId(id: number): Promise<void> {
     if (await session.submit(id)) {
       if (id !== SKIP) {
@@ -121,14 +114,12 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
   }
 
   if (playable && day !== null && !past) {
-    // Today's Day Number is the game's own page; a later one does not exist yet
     if (day === playable.today) {
       return <Navigate replace to={`/g/${encodeURIComponent(slug)}`} />;
     }
     return <NoSuchDay slug={slug} name={playable.name} />;
   }
 
-  // The game cannot be played on this page view: the reason shows as the notice
   const cannotPlay = gameFailure !== null || closed || blocked;
   const shownNotice =
     gameFailure !== null
@@ -164,7 +155,6 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
         }
         actions={
           <>
-            {/* Up here, well away from Guess, so a slightly-off tap cannot hit them */}
             <Button
               id="give-up-button"
               variant="outline"
@@ -269,7 +259,6 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
           opener={opener}
           past={past}
         />
-        {/* The hint goes once the answer is revealed */}
         {titles && !finished && (
           <FreeHintCard
             {...freeHint}
@@ -297,13 +286,11 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
 
 export function PlayPage() {
   const { slug = "", day: dayParam } = useParams();
-  // Anything but digits (NaN) or a day after today shows the no-such-day card
   const day =
     dayParam === undefined
       ? null
       : /^\d+$/.test(dayParam)
         ? Number(dayParam)
         : Number.NaN;
-  // A new game or day is a fresh board: no state carries over from the last one
   return <Game key={`${slug}/${dayParam ?? ""}`} slug={slug} day={day} />;
 }

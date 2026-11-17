@@ -1,5 +1,3 @@
-// Admin "All games" tab: every game of any status, searchable, with Delete, and Approve and Reject
-// on pending games.
 import {
   keepPreviousData,
   useQuery,
@@ -43,9 +41,7 @@ const REVIEW_FAILED =
 export function GamesPanel({ active }: { active: boolean }) {
   const client = useQueryClient();
   const [search, setSearch] = useState("");
-  // What the list shows: the search box, 250 ms after the last keystroke
   const query = useDebounced(search, 250);
-  // Refetched each time the tab opens (stale at once)
   const list = useQuery({
     queryKey: ["admin", "games", query],
     queryFn: () =>
@@ -55,9 +51,7 @@ export function GamesPanel({ active }: { active: boolean }) {
     enabled: active,
     placeholderData: keepPreviousData,
   });
-  // The last failed action's message, cleared by the next one that works
   const [failed, setFailed] = useState<string | null>(null);
-  // The status filter works on the loaded list; "" shows every status
   const [status, setStatus] = useState("");
   const games = (list.data?.games ?? []).filter(
     (game) => status === "" || game.status === status,

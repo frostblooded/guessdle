@@ -38,9 +38,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// More than three rows: the window scrolls
 export const Classic: Story = {};
-// A Blur or Sequence game: no pictures, names only
 export const NamesOnly: Story = {
   args: {
     entries: NAMES.map((name, i) => ({ id: i + 1, name, photo: "" })),

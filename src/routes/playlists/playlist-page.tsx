@@ -1,4 +1,3 @@
-// One playlist at /p/<id>: its games as gallery cards. Private ones open only for their owner.
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { GameCardItem, GameGrid } from "../../components/game-card.tsx";
@@ -13,7 +12,6 @@ import { playlistKey, type Playlist } from "../../lib/playlists.ts";
 import { useTitle } from "../../lib/use-title.ts";
 import { NotFoundPage } from "../not-found-page.tsx";
 
-// The playlist named by the route's `:id`, shared by its page and its editor
 export function usePlaylist() {
   const raw = useParams()["id"] ?? "";
   const id = /^\d{1,15}$/.test(raw) ? Number(raw) : 0;
@@ -27,7 +25,6 @@ export function usePlaylist() {
   };
 }
 
-// 404s draw the not-found page; anything else says the load failed
 export function PlaylistFailure({ error }: { error: Error }) {
   return error.message.endsWith("404") ? (
     <NotFoundPage />

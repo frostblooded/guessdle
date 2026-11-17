@@ -1,9 +1,6 @@
-// One tappable entry card, its picture and name: selection mode's list and How to play's pet
-// picker both use it, so the two always look the same.
 import type { ComponentProps } from "react";
 import { cn } from "../lib/utils.ts";
 
-// The cards' grid: 3 to a row on a phone, 5 on wider screens
 export const PICK_GRID = "grid grid-cols-3 gap-1.5 sm:grid-cols-5 sm:gap-2";
 
 export function PickCard({
@@ -16,10 +13,7 @@ export function PickCard({
 }: ComponentProps<"button"> & {
   name: string;
   photo: string;
-  // False for a list with no pictures at all (a Blur or Sequence game, whose pictures are the
-  // answers, and How to play's picture rounds): then the card shows the name alone
   pictures?: boolean;
-  // Crossed out: How to play's pets that no longer fit the clues
   struck?: boolean;
 }) {
   return (

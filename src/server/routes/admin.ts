@@ -1,4 +1,3 @@
-// Admin-only backup status and user management (spec #38).
 import express from "express";
 import type { Express, Request, Response } from "express";
 import { MAX_REASON } from "../../game/limits.ts";
@@ -73,7 +72,6 @@ export function adminRoutes(
       res.json({ games: await listAllGames(pool, search) });
     }),
   );
-  // Approve, reject (with a reason) or delete the game at :slug
   const gameRoute = (
     act: (game: GameRow, req: Request) => Promise<MoveResult | "invalid">,
   ) =>
@@ -89,7 +87,6 @@ export function adminRoutes(
         fail(res, out);
       }
     });
-  // What changed since the last approval (ADR 0022); null changes when never approved
   app.get(
     "/api/admin/games/:slug/changes",
     adminRoute(async ({ req, res }) => {
@@ -167,7 +164,6 @@ export function adminRoutes(
       }
     }),
   );
-  // Ban with a reason the player sees, or unban (DELETE), which restores everything
   const banRoute = (reasonOf: (req: Request) => string | null | undefined) =>
     adminRoute(async ({ req, res, actor }) => {
       const id = String(paramOf(req, "id"));

@@ -1,5 +1,3 @@
-// The Save button on gallery cards and Play: a dialog listing the player's playlists with a
-// checkbox each, and a way to start a new one with this game in it.
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bookmark, Plus } from "lucide-react";
 import { useState, type FormEvent } from "react";
@@ -85,7 +83,6 @@ function SaveMenuBody({ slug }: { slug: string }) {
 
   const toggle = async (id: number, saved: boolean): Promise<void> => {
     setBusy(id);
-    // The box shows the new state at once; the refetch below corrects it if the call failed
     queryClient.setQueryData<SaveMenu>(
       saveMenuKey(slug),
       (menu) =>
@@ -175,7 +172,6 @@ function SaveMenuBody({ slug }: { slug: string }) {
   );
 }
 
-// `compact` is the round icon button over a gallery card
 export function SaveButton({
   slug,
   name,

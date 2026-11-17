@@ -16,7 +16,6 @@ const meta = { component: AlertDialog } satisfies Meta<typeof AlertDialog>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Play's reset dialog
 const dialog = (
   <>
     <AlertDialogTrigger asChild>

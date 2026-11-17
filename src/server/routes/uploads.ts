@@ -1,4 +1,3 @@
-// Authenticated image upload (spec #66): raw bytes in, processed WebP URL out.
 import express from "express";
 import type { Express, NextFunction, Request, Response } from "express";
 import { requestUser } from "../auth.ts";
@@ -13,7 +12,6 @@ import {
 } from "../upload-store.ts";
 import { fail, queryOf, type AppContext } from "./context.ts";
 
-// Starting values, tune after launch (docs/deploy.md)
 export const DEFAULT_UPLOAD_LIMIT: RateLimit = { max: 60, windowMs: 3600_000 };
 
 export function uploadRoutes(
@@ -33,7 +31,6 @@ export function uploadRoutes(
       if (!user) {
         fail(res, "unauthorized");
       } else if (user.banned) {
-        // Uploads only go into games, which a banned player cannot change
         fail(res, "banned");
       } else {
         next();
@@ -42,7 +39,6 @@ export function uploadRoutes(
       next(err);
     }
   };
-  // A user already at the cap is refused before the body is read or re-encoded
   const quotaFull = async (
     req: Request,
     res: Response,
@@ -65,7 +61,6 @@ export function uploadRoutes(
     rateLimit(pool, now, limit),
     quotaFull,
     express.raw({ type: "application/octet-stream", limit: MAX_UPLOAD_BYTES }),
-    // A body over the cap fails in the parser; name it for the client
     (err: unknown, _req: Request, res: Response, next: NextFunction): void => {
       if ((err as { status?: unknown }).status === 413) {
         fail(res, "too_large");
@@ -79,16 +74,13 @@ export function uploadRoutes(
         fail(res, "invalid");
         return;
       }
-      // express.raw leaves {} when there is no body
       const body: unknown = req.body;
       try {
         const webp = await processImage(
           Buffer.isBuffer(body) ? body : Buffer.alloc(0),
           kind,
         );
-        // needUser ran, so the session lookup is cached and non-null
         const user = (await requestUser(pool, req, now()))!;
-        // The exact check: the pre-check above only stops users already full
         if ((await usedBytes(pool, user.id)) + webp.length > quotaBytes) {
           fail(res, "quota_exceeded");
           return;

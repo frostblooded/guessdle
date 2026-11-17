@@ -1,5 +1,3 @@
-// A signed-in player's Board for one day, stored in Postgres: the DayStore adapter behind
-// day-session.ts for accounts.
 import type pg from "pg";
 import type { HintPick } from "../game/free-hint.ts";
 import { SKIP } from "../game/game.ts";
@@ -14,7 +12,6 @@ import type { PlayDay } from "./play-day.ts";
 
 type Q = Pick<pg.Pool, "query">;
 
-// Who is playing which Day of play
 export interface GameContext extends PlayDay {
   userId: number;
 }
@@ -24,7 +21,6 @@ export function userStore(q: Q, { game, userId, date }: GameContext): DayStore {
   return {
     async read() {
       const guesses = await q.query<{ entry_id: number }>(
-        // A skip is stored with no entry (migration 011)
         `select coalesce(entry_id, ${SKIP})::int as entry_id from user_guesses
          where user_id = $1 and game_id = $2 and day = $3 order by seq`,
         key,
@@ -69,7 +65,6 @@ export function userStore(q: Q, { game, userId, date }: GameContext): DayStore {
       );
       return rowCount === 1;
     },
-    // Adopted guesses have no time: the solve clock falls back to the browser's
     async adopt(ids: readonly number[], gaveUp: boolean) {
       for (const id of ids) {
         await q.query(
@@ -82,7 +77,6 @@ export function userStore(q: Q, { game, userId, date }: GameContext): DayStore {
       }
     },
     reset: () => forgetBoard(q, game.id, date, userId),
-    // Whole seconds from the board's first stored guess to its last; null when a guess has no time
     async seconds() {
       const { rows } = await q.query<{ seconds: number | null }>(
         `select case when count(*) > 0 and count(guessed_at) = count(*)
@@ -95,7 +89,6 @@ export function userStore(q: Q, { game, userId, date }: GameContext): DayStore {
   };
 }
 
-// The account's Day session, reading straight from the pool (no lock)
 export const userSession = (
   q: Q,
   ctx: GameContext,
@@ -103,9 +96,6 @@ export const userSession = (
 ): DaySession =>
   daySession(q, ctx, `user:${ctx.userId}`, userStore(q, ctx), random);
 
-// Runs `action` on the account's Day session in a transaction holding the user's row lock,
-// so one player's concurrent requests are applied one at a time (and a merge's "no rows yet"
-// check and its inserts are one atomic step). A refusal rolls back.
 export async function changeGame<T extends object>(
   pool: pg.Pool,
   ctx: GameContext,

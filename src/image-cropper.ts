@@ -1,6 +1,3 @@
-// Browser side of cropping an upload (issue #82), with no page or framework in it: load a file,
-// mount Cropper.js in a host element, and turn the crop into a file for /api/uploads.
-// The editor wraps it in a dialog (src/components/crop-dialog.tsx); the caller revokes the image URL when done.
 import "cropperjs";
 import type { CropperImage, CropperSelection } from "cropperjs";
 import {
@@ -15,13 +12,11 @@ import {
 } from "./game/crop.ts";
 
 export interface MountedCropper {
-  // The cropped file; CropError("too_large") when no encoding fits the upload limit
   crop(): Promise<Blob>;
   zoom(step: number): void;
   destroy(): void;
 }
 
-// The file as a decoded image; CropError("undecodable") when it is not an image this browser reads
 export async function loadImage(file: Blob): Promise<HTMLImageElement> {
   const image = new Image();
   image.src = URL.createObjectURL(file);
@@ -34,8 +29,6 @@ export async function loadImage(file: Blob): Promise<HTMLImageElement> {
   return image;
 }
 
-// The image fills the canvas exactly and stays put; only the frame moves and zooms
-// (drag, wheel, pinch, corner handles or zoom()).
 const template = (aspect: number): string => `
   <cropper-canvas background>
     <cropper-image></cropper-image>
@@ -83,7 +76,6 @@ export function mountCropper(
   });
   return {
     async crop(): Promise<Blob> {
-      // On-screen frame to the image's own pixels, from where the image sits in the canvas
       const shown = cropperImage.getBoundingClientRect();
       const box = canvas.getBoundingClientRect();
       const a = shown.width / image.naturalWidth;
@@ -106,7 +98,6 @@ export function mountCropper(
           size.width,
           size.height,
         );
-      // WebP where the browser encodes it (the server stores WebP anyway), else JPEG
       const blob = await encodeUnderLimit([
         async () => {
           const webp = await toBlob(out, "image/webp", 0.9);

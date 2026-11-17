@@ -1,5 +1,3 @@
-// The viewer's own board in a live party round: the guess box, their graded rows (a Blur game's
-// image or a Sequence game's photos, and guessed names) and, once they solved it, gave up or ran out of tries, the answer.
 import { endingOf } from "../../game/board.ts";
 import { useState } from "react";
 import { Button } from "../../components/ui/button.tsx";
@@ -28,7 +26,6 @@ export function PartyRound({
   view: PartyView;
   round: LiveRound;
   mine: Board;
-  // False when the socket is down and the guess was not sent
   onGuess: (entryId: number) => boolean;
   onGiveUp: () => void;
   onHint: (kind: HintKind) => void;
@@ -42,7 +39,6 @@ export function PartyRound({
     lost: mine.lost,
   });
   const done = ending !== null;
-  // Selection mode's list, above the board
   const listing = modes.selecting && !done;
   const entries = view.game.entries;
   const newestFirst = [...mine.rows].reverse();
@@ -128,7 +124,6 @@ export function PartyRound({
           </div>
         </Card>
       )}
-      {/* The hint goes once the answer is revealed */}
       {titles && !done && (
         <FreeHintCard hint={mine.hint} hints={mine.hints} onTake={onHint} />
       )}

@@ -1,4 +1,3 @@
-// Game, attribute and entry data: the one seam between routes and the tables.
 import type pg from "pg";
 import type { AttributeValue } from "../game/correctness.ts";
 import { firstImage, type Entry, type GameAttribute } from "../game/game.ts";
@@ -26,13 +25,10 @@ export interface GameRow {
   ownerId: number | null;
   status: GameStatus;
   rejectReason: string;
-  // Day Number 0 ("YYYY-MM-DD")
   startDate: string;
   skipPeriod: number | null;
   kind: GameKind;
-  // Blur and Sequence games: the number of tries (a Sequence game's photos per entry)
   blurTries: number;
-  // Its owner is banned: hidden from all but the owner and admins
   ownerBanned: boolean;
 }
 
@@ -59,25 +55,17 @@ const gameWhere = async (
 export const findGame = (q: Q, slug: string): Promise<GameRow | null> =>
   gameWhere(q, "slug", slug);
 
-// A party's game, whatever its status (ADR 0016)
 export const findGameById = (q: Q, id: number): Promise<GameRow | null> =>
   gameWhere(q, "id", id);
 
 export interface Roster {
   attributes: GameAttribute[];
-  // Active entries, by id
   entries: Entry[];
-  // Every entry including soft-deleted ones, so past guesses still resolve
   all: Entry[];
-  // Active entries missing a value: while any are, the game is paused. A Sequence game counts
-  // its entries only while none of them may be the answer.
   incomplete: number;
-  // Active entries a day's answer is drawn from: all of them, but in a Sequence game only
-  // those with every photo
   answerIds: number[];
 }
 
-// A game's attributes and entries with their values
 export async function loadRoster(q: Q, game: GameRow): Promise<Roster> {
   const attributes = await listAttributes(q, game);
   const entries = await q.query<{
@@ -157,7 +145,6 @@ export interface MyGame {
   entryCount: number;
 }
 
-// A user's own games, newest first, whatever their status
 export async function listOwned(q: Q, userId: number): Promise<MyGame[]> {
   const { rows } = await q.query<MyGame>(
     `select g.slug, g.name, g.cover_url as cover, g.status, g.reject_reason as "rejectReason",
@@ -168,7 +155,6 @@ export async function listOwned(q: Q, userId: number): Promise<MyGame[]> {
   return rows;
 }
 
-// Resolves a name clash on a generated slug with -2, -3, ...; a typed slug that is taken is refused.
 // shortcut: one insert per candidate, fine until a name has hundreds of clashes
 export async function createGame(
   q: Q,
@@ -204,12 +190,9 @@ export interface GamePatch {
   description?: string;
   coverUrl?: string;
   skipPeriod?: number | null;
-  // Blur and Sequence games only
   blurTries?: number;
 }
 
-// The lifecycle edit kind of a patch: text, image or try count changes reset status, a skip
-// period alone does not
 export function patchKind(game: GameRow, patch: GamePatch): EditKind {
   const next = { ...game, ...patch };
   return next.name !== game.name ||
@@ -221,8 +204,6 @@ export function patchKind(game: GameRow, patch: GamePatch): EditKind {
       : "skip-period";
 }
 
-// Writes the patch (status is the lifecycle's job). Returns the cover URL the edit replaced,
-// for the caller to delete.
 export async function updateGame(
   q: Q,
   game: GameRow,

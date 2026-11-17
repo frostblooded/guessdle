@@ -1,6 +1,3 @@
-// The game status lifecycle (spec #66): which edits send a game back to pending, the guarded
-// moves (submit, unpublish, approve, reject), the delayed admin email on entering pending and the
-// owner's approval emails (owner-mail.ts).
 import type pg from "pg";
 import { playBlocker } from "./access.ts";
 import { saveSnapshot } from "./approval.ts";
@@ -15,7 +12,6 @@ type Q = Pick<pg.Pool, "query">;
 export type EditKind =
   "details" | "cover" | "attributes" | "entries" | "skip-period";
 
-// Which edit kinds send an approved or rejected game back to pending
 export const RESETS_STATUS: Record<EditKind, boolean> = {
   details: true,
   cover: true,
@@ -41,15 +37,12 @@ const MOVES: Record<Move, { from: GameStatus[]; to: GameStatus }> = {
   reject: { from: ["pending"], to: "rejected" },
 };
 
-// The status a move leads to, undefined when the game is not in a state it applies to
 export const moveTarget = (
   move: Move,
   status: GameStatus,
 ): GameStatus | undefined =>
   MOVES[move].from.includes(status) ? MOVES[move].to : undefined;
 
-// The owner email a status change sends: an admin's verdict, or an edit that took an
-// approved game out of the gallery. Submitting and unpublishing are the owner's own doing.
 export function ownerMailFor(
   move: Move | "edit",
   before: GameStatus,
@@ -71,12 +64,8 @@ export const enteredPending = (
   after: GameStatus,
 ): boolean => after === "pending" && before !== "pending";
 
-// How long a game waits in pending before the admins get an email about it
 export const ADMIN_MAIL_DELAY = "5 minutes";
 
-// Mails every admin about each game still pending past its admin_mail_at, once (the column is
-// cleared first). The due time lives in the database, so a restart never loses an email.
-// Never throws: a mail problem must not stop the next round.
 export async function mailDueAdmins(
   q: Q,
   mail: MailConfig,
@@ -108,7 +97,6 @@ export async function mailDueAdmins(
 
 export type MoveResult =
   "ok" | "invalid_state" | "too_few_entries" | "incomplete_entries";
-// What to mail the owner once the transaction commits
 interface Mails {
   owner: OwnerNotice | undefined;
 }
@@ -118,10 +106,7 @@ interface Settled {
   mails: Mails;
 }
 
-// Every status change goes through here, so none can forget the admin or owner email.
-// The admin email is only scheduled here (admin_mail_at); mailDueAdmins sends it.
 export function gameLifecycle(pool: pg.Pool, mail?: MailConfig) {
-  // Runs under the game lock; sets the new status and returns what to mail about
   const settle = async (
     tx: pg.PoolClient,
     game: GameRow,
@@ -154,8 +139,6 @@ export function gameLifecycle(pool: pg.Pool, mail?: MailConfig) {
   };
 
   return {
-    // Runs `work` (the data change) in the game's transaction; when `isEdit(result)`, applies
-    // the kind's status rule and schedules the admin email if that put the game into pending.
     async edit<T>(
       game: GameRow,
       kind: EditKind,
@@ -200,7 +183,6 @@ export function gameLifecycle(pool: pg.Pool, mail?: MailConfig) {
             return { result: "invalid_state", mails: NO_MAILS };
           }
           if (move === "submit") {
-            // The roster as of the lock, so a concurrent edit cannot slip past
             const blocker = playBlocker(await loadRoster(tx, game));
             if (blocker) {
               return {
@@ -215,7 +197,6 @@ export function gameLifecycle(pool: pg.Pool, mail?: MailConfig) {
           if (before === "approved") {
             await saveSnapshot(tx, game.id, true);
           }
-          // Submit keeps the last rejection reason; the others set it (cleared unless rejecting)
           const mails = await settle(
             tx,
             game,

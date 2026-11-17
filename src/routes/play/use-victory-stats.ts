@@ -1,4 +1,3 @@
-// The victory popup's state: the solve clock, and the day's stats fetched when it opens.
 import { useState, type RefObject } from "react";
 import type { Play } from "../../game/play.ts";
 import {
@@ -14,16 +13,11 @@ export interface VictoryStats {
   setOpen: (open: boolean) => void;
   stats: DayStats | null;
   failed: boolean;
-  // The board on screen: its guesses, and its time when the popup opened on the win itself
   thisTry: WinResult | null;
-  // Call on a fresh board's first guess
   startClock(): void;
-  // Records the win (the first one of the day counts) and opens the popup; `won`: called
-  // on the winning guess, not from See stats
   show(won?: boolean): Promise<void>;
 }
 
-// `day`: a past day's Day Number; today when absent
 export function useVictoryStats(
   slug: string,
   play: RefObject<Play | null>,
@@ -48,7 +42,6 @@ export function useVictoryStats(
       setFailed(false);
       const ids = play.current?.getUsedGuesses() ?? [];
       const time: number | null = play.current?.solveSeconds() ?? null;
-      // Only the win itself knows the time; See stats later would count the time since
       setThisTry((old) => ({
         guesses: ids.length,
         seconds: won ? time : old?.guesses === ids.length ? old.seconds : null,

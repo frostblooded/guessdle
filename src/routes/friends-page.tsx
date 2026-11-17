@@ -1,4 +1,3 @@
-// The Friends page: send a request by exact username or email, answer requests, remove friends.
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { EmptyState, PageHead } from "../components/page.tsx";
@@ -39,7 +38,6 @@ function Section({
   );
 }
 
-// One player per row with its buttons on the right
 function People({
   id,
   people,
@@ -114,7 +112,6 @@ export function FriendsPage() {
     setBusy(false);
   };
 
-  // Accept (PUT) or decline, cancel and remove (DELETE)
   const act = async (method: "PUT" | "DELETE", id: number): Promise<void> => {
     setMessage(null);
     const reply = await api(method, `/api/friends/${id}`);

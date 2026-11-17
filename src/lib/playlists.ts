@@ -1,5 +1,3 @@
-// Browser side of profiles and playlists: the shapes the API sends, their query keys, and
-// dropping the cached copies after a change.
 import type { QueryClient } from "@tanstack/react-query";
 import type { GameCard } from "../components/game-card.tsx";
 import { ME_KEY } from "./api.ts";
@@ -38,7 +36,6 @@ export const profileKey = (username: string) => ["profile", username] as const;
 export const playlistKey = (id: number) => ["playlist", id] as const;
 export const saveMenuKey = (slug: string) => ["save-menu", slug] as const;
 
-// After any playlist change every cached profile, playlist and Save menu may be out of date
 export async function forgetPlaylists(client: QueryClient): Promise<void> {
   await Promise.all(
     ["profile", "playlist", "save-menu"].map((key) =>
@@ -47,7 +44,6 @@ export async function forgetPlaylists(client: QueryClient): Promise<void> {
   );
 }
 
-// After picking a username: the header menu and the Save menus learn it
 export async function forgetUser(client: QueryClient): Promise<void> {
   await Promise.all([
     client.invalidateQueries({ queryKey: ME_KEY }),

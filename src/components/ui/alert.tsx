@@ -14,7 +14,6 @@ const alertVariants = cva("rounded-lg px-4 py-3 text-sm empty:hidden", {
   defaultVariants: { variant: "info" },
 });
 
-// A message box that takes no space while it has no text (`empty:hidden`)
 export function Alert({
   className,
   variant,

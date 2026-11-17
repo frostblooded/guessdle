@@ -1,21 +1,18 @@
-// Stored Daily Answers: one row per calendar date in the server time zone.
 import type pg from "pg";
 import type { GameRow } from "./games.ts";
 import { loadRoster, skipOf } from "./games.ts";
 import { dateOfDay } from "../game/date.ts";
 import { forgetDay } from "./day-rows.ts";
 
-const LOCK_KEY = 5_150_002; // arbitrary; serialises answer generation per game across API replicas
+const LOCK_KEY = 5_150_002;
 const DAY_MS = 86_400_000;
 
 const utcMs = (date: string): number => Date.parse(`${date}T00:00:00Z`);
 
-// Whole calendar days from the game's start date to `date` ("YYYY-MM-DD")
 export function dayNumber(date: string, start: string): number {
   return Math.round((utcMs(date) - utcMs(start)) / DAY_MS);
 }
 
-// The calendar date ("YYYY-MM-DD") it is right now in `timeZone`
 export function todayIn(now: Date, timeZone: string): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone,
@@ -25,8 +22,6 @@ export function todayIn(now: Date, timeZone: string): string {
   }).format(now);
 }
 
-// One day's answer: uniform over the roster minus the previous `skipPeriod`
-// answers (clamped so at least one entry stays allowed).
 export function drawAnswer<T>(
   ids: readonly T[],
   previous: readonly T[],
@@ -42,9 +37,6 @@ export function drawAnswer<T>(
   return allowed[Math.floor(random() * allowed.length)]!;
 }
 
-// A Sequence game's day (ADR 0020): the oldest entry never an answer before (lowest id) and
-// not scheduled later, else a draw as above among the entries not scheduled later (all of them
-// if every one is).
 export function drawSequenceAnswer(
   ids: readonly number[],
   used: ReadonlySet<number>,
@@ -63,13 +55,10 @@ export function drawSequenceAnswer(
 
 type Client = Pick<pg.PoolClient, "query">;
 
-// Takes the game's answer lock in `tx`, held until that transaction ends
 async function lockAnswers(tx: Client, game: GameRow): Promise<void> {
   await tx.query("select pg_advisory_xact_lock($1, $2)", [LOCK_KEY, game.id]);
 }
 
-// Runs `work` in a transaction holding the game's answer lock, so generation,
-// overrides and re-draws never interleave.
 async function locked<T>(
   pool: pg.Pool,
   game: GameRow,
@@ -90,15 +79,11 @@ async function locked<T>(
   }
 }
 
-// What a draw looks back on: the previous `skip period` answers (entry ids), oldest first, and
-// every entry ever an answer (`used`, Sequence games only)
 interface Past {
   previous: number[];
   used: Set<number>;
 }
 
-// The game's stored history (only days before `before` when given), and the Day Number of the
-// newest day, -1 if none.
 async function history(
   client: Client,
   game: GameRow,
@@ -126,8 +111,6 @@ async function history(
   };
 }
 
-// Draws the next answer after `past` and adds it there. `reserved`: entries a Sequence game
-// has scheduled on later days.
 function drawNext(
   game: GameRow,
   ids: readonly number[],
@@ -155,9 +138,6 @@ const record = (past: Past, entryId: number): void => {
   past.used.add(entryId);
 };
 
-// Generates every missing day up to Day Number `target`, in order, each avoiding the
-// previous stored answers (overrides included). The one generation path for
-// players and the answers peek.
 async function fillThrough(
   client: Client,
   game: GameRow,
@@ -178,7 +158,6 @@ async function fillThrough(
   }
 }
 
-// The entry stored for `date`, null when unstored
 async function storedEntry(
   client: Client,
   game: GameRow,
@@ -191,9 +170,6 @@ async function storedEntry(
   return rows[0]?.entry_id ?? null;
 }
 
-// After `date`'s answer changed from `before`: if players could have played it (it was
-// stored) and it is now another entry, everyone starts that day over. Its guesses,
-// give-ups, Free Hints and results go, and the revision tells browsers to drop their boards.
 async function restartIfChanged(
   client: Client,
   game: GameRow,
@@ -210,8 +186,6 @@ async function restartIfChanged(
   await forgetDay(client, game.id, date);
 }
 
-// Re-draws every non-override day from `fromDate` on, in order, over the stored
-// history before it; overrides stay and count as history.
 async function redrawFrom(
   client: Client,
   game: GameRow,
@@ -249,14 +223,9 @@ async function redrawFrom(
 
 export interface DayAnswer {
   entryId: number;
-  // Bumped each time the answer changed after the day was stored (migration 018)
   revision: number;
 }
 
-// The answer stored for `date`. If it is missing, first generates every
-// missing day up to it, in order, in one transaction under the game's advisory
-// lock, so concurrent first requests store one answer. Null only for a date
-// before the start.
 export async function ensureAnswer(
   pool: pg.Pool,
   game: GameRow,
@@ -287,12 +256,9 @@ export interface StoredDay {
   date: string;
   entryId: number;
   source: "generated" | "override";
-  // The previous `skip period` stored answers, oldest first
   previous: number[];
 }
 
-// Answers peek: stored days from..to (dates, inclusive), generating whatever is
-// missing up to `to` first.
 export async function peekDays(
   pool: pg.Pool,
   game: GameRow,
@@ -322,10 +288,6 @@ export async function peekDays(
   }));
 }
 
-// Overrides `date` (today or later; the caller checks) with `entryId`. An unstored
-// day fills the gap first. Later non-override days are re-drawn; in a Sequence game every one
-// after `today`, so no earlier day keeps the entry the owner scheduled. A changed answer
-// restarts the day for everyone.
 export function setOverride(
   pool: pg.Pool,
   game: GameRow,
@@ -357,8 +319,6 @@ export function setOverride(
   });
 }
 
-// Turns an override back into a generated answer; false when `date` is not an override.
-// A re-drawn answer that differs restarts the day for everyone.
 export function clearOverride(
   pool: pg.Pool,
   game: GameRow,
@@ -381,10 +341,6 @@ export function clearOverride(
   });
 }
 
-// After an entry is soft-deleted: overrides after today pointing at it are cleared and every
-// stored day after today that pointed at it is re-drawn over the `ids` that remain.
-// Today and the past keep their answer (players saw it; the soft-deleted row still resolves).
-// Runs in the deleting transaction `tx`, so the delete and the re-draw land together.
 export async function releaseEntry(
   tx: Client,
   game: GameRow,
@@ -413,9 +369,6 @@ export async function releaseEntry(
   }
 }
 
-// After the skip period changed: re-draws every stored generated day after `today`
-// under the game's new rule. Today and the past stay as players saw them. Runs in the editing
-// transaction `tx`.
 export async function redrawFuture(
   tx: Client,
   game: GameRow,
@@ -433,10 +386,6 @@ export async function redrawFuture(
   );
 }
 
-// After a Sequence game's entries or photo count changed (ADR 0020): overrides after `today`
-// whose entry can no longer be the answer are cleared, and every generated day after `today` is
-// re-drawn over the entries that may be the answer, so a newly complete entry comes up next.
-// Today and the past stay. Other kinds keep their schedule.
 export async function rescheduleFuture(
   tx: Client,
   game: GameRow,

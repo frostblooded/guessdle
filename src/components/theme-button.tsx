@@ -12,7 +12,6 @@ import { Button } from "./ui/button.tsx";
 
 const ICONS = { auto: Monitor, light: Sun, dark: Moon } as const;
 
-// Cycles auto, light, dark; the choice is stored and applied to <html> (ADR 0006)
 export function ThemeButton() {
   const [mode, setMode] = useState<ThemeMode>(() =>
     readThemeMode(localStorage),

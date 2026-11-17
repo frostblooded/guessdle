@@ -1,6 +1,3 @@
-// The practice game's guess input: every pet as a small tappable card. Pets already guessed are
-// disabled; pets the clues have ruled out are faded but still tappable. Picture rounds hide the
-// photos, which would give the secret away.
 import { PICK_GRID, PickCard } from "../../components/pick-card.tsx";
 import type { Entry } from "../../game/game.ts";
 import { cn } from "../../lib/utils.ts";
@@ -14,7 +11,6 @@ export function PetPicker({
 }: {
   entries: readonly Entry[];
   guessed: ReadonlySet<number>;
-  // Ids that still fit every clue; null fades nothing
   fitting: ReadonlySet<number> | null;
   onPick: (entry: Entry) => void;
   photos?: boolean;

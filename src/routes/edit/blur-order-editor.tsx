@@ -1,6 +1,3 @@
-// The editor's square order for one Blur game entry (ADR 0019): the entry's image split into the
-// 3x3 grid. Click the squares in the order players should see them clear; the first one is clear
-// from the start. Clicking a numbered square takes it out again.
 import { Button } from "../../components/ui/button.tsx";
 import { CELLS, GRID, toggleCell } from "../../game/blur.ts";
 import { cn } from "../../lib/utils.ts";
@@ -11,7 +8,6 @@ export function BlurOrderEditor({
   onChange,
 }: {
   src: string;
-  // The squares picked so far, first cleared first
   order: readonly number[];
   onChange: (order: number[]) => void;
 }) {

@@ -1,4 +1,3 @@
-// Entry editing (spec #66): add, change and soft-delete the entries of one game.
 import type pg from "pg";
 import { parseNumberValue } from "../game/number.ts";
 import { listAttributes } from "./attributes.ts";
@@ -9,17 +8,11 @@ import { KINDS } from "../game/kinds.ts";
 export interface EntryRow {
   id: number;
   name: string;
-  // Blur games only: the entry's image (a classic entry's pictures are Image values)
   photo: string;
-  // Optional text shown once the entry is revealed as the answer
   description: string;
-  // Attribute id to its items (Text has at most one; empty means no value)
   values: Record<string, string[]>;
-  // Blur games only: the order the grid's squares clear in, once picked
   blurOrder?: number[] | null;
-  // Quiz games only: the question's answer (its text is the name, its picture the photo)
   quiz?: QuizSpec | null;
-  // Sequence games only: the photos in order, "" for a slot not uploaded yet
   shots?: string[];
 }
 
@@ -64,15 +57,6 @@ export interface EntryInput {
   shots?: string[];
 }
 
-// Creates the entry (`id` undefined) or changes it. Every attribute but Image needs a value once
-// saved, from the input or already stored; Number values are stored as parseNumberValue gives
-// them, an Image value is one upload URL. A Blur game's entry instead needs its photo and a
-// complete square order, sent or stored; only Blur and Quiz entries have a photo. A Sequence entry needs
-// only its name: one missing photos just cannot be the answer. A Quiz question needs its answer
-// (quiz), sent or stored, may share its text with another and may have a photo.
-// Runs in the caller's game transaction (lifecycle.edit), which applies the status rule.
-// `replaced` lists the files the edit stopped using, for the caller to release. `answerOnly`: the
-// edit changed at most a Quiz question's right answer, so the status stays.
 export async function saveEntry(
   tx: pg.PoolClient,
   game: GameRow,
@@ -142,7 +126,6 @@ export async function saveEntry(
   if (!attrs.every((a) => a.type === "image" || filled(String(a.id)))) {
     return "missing_values";
   }
-  // Only the fields the game's kind stores
   const kind = KINDS[game.kind];
   if (
     (!kind.photo && input.photo !== undefined) ||
@@ -229,8 +212,6 @@ export async function saveEntry(
   };
 }
 
-// Soft delete: the entry leaves autocomplete and draws, past guesses and history still resolve.
-// Its pictures stay: history still shows them and the nightly sweep counts it as referenced.
 export async function deleteEntry(
   q: Pick<pg.Pool, "query">,
   game: GameRow,

@@ -1,5 +1,3 @@
-// An admin's popup of what changed in a game since it was last approved (ADR 0022), opened from
-// See changes next to Approve and Reject.
 import { useQuery } from "@tanstack/react-query";
 import type { Change, FieldChange } from "../game/approval-diff.ts";
 import { getJson } from "../lib/api.ts";
@@ -14,7 +12,6 @@ import {
 } from "./ui/dialog.tsx";
 
 interface Changes {
-  // When it was last approved; null when never
   since: string | null;
   changes: Change[] | null;
 }

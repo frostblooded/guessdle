@@ -1,5 +1,3 @@
-// Play's pieces for past days: the head's Past days link, an archive day's lede, and the cards
-// for a day the game does not have and for an unknown game.
 import { Link } from "react-router";
 import { MessageCard, PageHead } from "../../components/page.tsx";
 import { buttonVariants } from "../../components/ui/button.tsx";
@@ -7,7 +5,6 @@ import { dateOfDay } from "../../game/date.ts";
 import { dayLabel } from "../../game/days.ts";
 import { FAILURES } from "../../game/failures.ts";
 
-// The head's link to the Past days list
 export function PastDaysLink({ slug }: { slug: string }) {
   return (
     <Link
@@ -20,7 +17,6 @@ export function PastDaysLink({ slug }: { slug: string }) {
   );
 }
 
-// Under an archive day's title: which day it is, and the way back to today
 export function PastDayLede({
   slug,
   day,
@@ -44,7 +40,6 @@ export function PastDayLede({
   );
 }
 
-// A day after today, or not a day at all
 export function NoSuchDay({ slug, name }: { slug: string; name: string }) {
   return (
     <>
@@ -60,7 +55,6 @@ export function NoSuchDay({ slug, name }: { slug: string; name: string }) {
   );
 }
 
-// No game at this address (Play and the Past days list)
 export function GameNotFound() {
   return (
     <>

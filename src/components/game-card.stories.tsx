@@ -32,7 +32,6 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Plain: Story = {};
-// The gallery's Save button over the corner (drawn here without its dialog)
 export const WithSaveCorner: Story = {
   args: {
     corner: (

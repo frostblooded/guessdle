@@ -1,4 +1,3 @@
-// The sign-in page: one passwordless form that also creates accounts.
 import { useState, type FormEvent } from "react";
 import {
   focusOnMount,
@@ -22,7 +21,6 @@ import {
 import { rememberReturnTo, takeReturnTo } from "../return-to.ts";
 import { useTitle } from "../lib/use-title.ts";
 
-// Asks for a link; null when the mail was queued, otherwise the message to show
 async function send(
   address: string,
 ): Promise<{ text: string; invalid: boolean } | null> {
@@ -34,10 +32,8 @@ async function send(
     : { text: MESSAGES[result], invalid: result === "invalid" };
 }
 
-// Seconds until another link may be sent; counts down once a second from `sentAt`
 function useCooldown(sentAt: number | null): number {
   const now = useTicker(sentAt !== null, 1000);
-  // `now` may predate a fresh send until the first tick
   return sentAt === null ? 0 : secondsLeft(sentAt, Math.max(now, sentAt));
 }
 
@@ -119,7 +115,6 @@ function LoginForm() {
     null,
   );
   const [busy, setBusy] = useState(false);
-  // Back from the sent panel to fix the address: the field takes focus with its text selected
   const [changed, setChanged] = useState(false);
 
   const submit = async (event: FormEvent): Promise<void> => {
@@ -208,7 +203,6 @@ export function LoginPage() {
   useTitle("Sign in or sign up - Guessdle");
   const [params] = useSearchParams();
   const next = params.get("next");
-  // ?next= is where verify sends the user after sign-in (story 23); an older target is dropped
   useWhile(next, () => {
     takeReturnTo(localStorage);
     rememberReturnTo(localStorage, next);

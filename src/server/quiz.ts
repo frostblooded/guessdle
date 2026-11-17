@@ -1,5 +1,3 @@
-// Quiz games (ADR 0021): a quiz's questions, and each player's first score with the spread of
-// everyone's first scores.
 import type pg from "pg";
 import {
   questionOf,
@@ -20,18 +18,14 @@ export interface GradableQuestion {
   spec: QuizSpec;
 }
 
-// The active questions in the owner's order (oldest first), with their answers
 export const gradable = ({ entries }: Roster): GradableQuestion[] =>
   entries.flatMap(({ id, name, photo, quiz }) =>
     quiz ? [{ id, name, photo, spec: quiz }] : [],
   );
 
-// The active questions as players see them, without their answers
 export const quizQuestions = (roster: Roster): QuizQuestion[] =>
   gradable(roster).map((q) => questionOf(q, q.spec));
 
-// Keeps the player's first score only: a retake changes nothing. Then answers with the stats
-// over a quiz of `total` questions.
 export async function recordScore(
   q: Q,
   gameId: number,
@@ -47,7 +41,6 @@ export async function recordScore(
     [gameId, player, score, seconds, now],
   );
   const { rows } = await q.query<{ player: string; score: number }>(
-    // Accounts only, plus the caller's own row: guest tokens are unverified (see dayStats)
     `select player, score::float8 as score from quiz_results
      where game_id = $1 and (player = $2 or player like 'user:%')`,
     [gameId, player],

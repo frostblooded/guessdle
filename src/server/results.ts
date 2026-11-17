@@ -1,6 +1,3 @@
-// Each player's first attempt of the day per game, and the day's stats built from them.
-// Only a first attempt that ends in a win counts; a failed one (give-up or out of tries)
-// takes the player's row so a win after a reset never does.
 import type pg from "pg";
 import {
   isPlayerToken,
@@ -18,11 +15,9 @@ type Q = Pick<pg.Pool, "query">;
 export interface ResultKey {
   gameId: number;
   date: string;
-  // "user:<id>" or "anon:<token>"
   player: string;
 }
 
-// The account's player, or the browser's from a request body's token; null for neither
 export const playerOf = (
   userId: number | null,
   body: Record<string, unknown>,
@@ -33,7 +28,6 @@ export const playerOf = (
       ? `anon:${body["player"]}`
       : null;
 
-// Keeps the first attempt only: a replay after a reset changes nothing
 async function recordResult(
   q: Q,
   { gameId, date, player }: ResultKey,
@@ -45,8 +39,6 @@ async function recordResult(
   );
 }
 
-// Drops the guest result this browser recorded before its player signed in: once signed
-// in, only the account counts, so one person is never two players
 export async function dropGuestResult(
   q: Q,
   day: Pick<PlayDay, "game" | "date">,
@@ -58,7 +50,6 @@ export async function dropGuestResult(
   );
 }
 
-// A believable solve time in seconds, or null
 export const knownSeconds = (seconds: unknown): number | null =>
   Number.isInteger(seconds) &&
   (seconds as number) >= 0 &&
@@ -66,9 +57,6 @@ export const knownSeconds = (seconds: unknown): number | null =>
     ? (seconds as number)
     : null;
 
-// Records `player`'s first win of the day and answers with the day's stats. `ids` must be a
-// gradable list ending with the answer; `seconds` outside 0 to MAX_SECONDS is kept as unknown.
-// A replay after a reset changes nothing.
 export async function recordWin(
   q: Q,
   day: PlayDay,
@@ -88,8 +76,6 @@ export async function recordWin(
   return dayStats(q, key, day.day);
 }
 
-// A first attempt that ended without a win (a give-up, or a Blur or Sequence game's tries
-// used up); a later win that day does not count
 export async function recordFailure(
   q: Q,
   day: Pick<PlayDay, "game" | "date">,
@@ -107,9 +93,6 @@ export async function dayStats(
   { gameId, date, player }: ResultKey,
   day: number,
 ): Promise<DayStats> {
-  // Only accounts count for everyone: a guest token is whatever the browser sends, so guest
-  // results could be forged at will. A guest still sees their own row. A banned player's wins
-  // leave the stats while the ban lasts, except in their own view.
   const { rows } = await q.query<WinResult & { player: string; won: boolean }>(
     `select r.player, r.guesses, r.seconds, r.won from game_results r
      where r.game_id = $1 and r.day = $2 and (r.player = $3 or (r.player like 'user:%' and not exists (

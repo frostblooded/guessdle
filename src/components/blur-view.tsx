@@ -1,5 +1,3 @@
-// A Blur game's board (ADR 0019), shared by Play and party rounds: the answer's image in a
-// square frame with only the earned squares clear, and the whole image once it is over.
 import type { ReactNode } from "react";
 import { cn } from "../lib/utils.ts";
 import { Correctness } from "../game/correctness.ts";
@@ -14,15 +12,11 @@ export function BlurView({
   reveal,
   children,
 }: {
-  // The image with n squares clear
   boardUrl: (n: number) => string;
   tries: number;
-  // Wrong guesses so far
   wrong: number;
   finished: boolean;
-  // The whole image, once the day or round is over
   reveal?: string | undefined;
-  // Drawn over the image, such as How to play's covered squares
   children?: ReactNode;
 }) {
   const { shown, left } = blurProgress(wrong, tries, finished);
@@ -53,8 +47,6 @@ export function BlurView({
   );
 }
 
-// A Blur game's guesses, newest first: names only, green for the answer, red otherwise, grey
-// for a skip, each labelled with its guess number
 export function BlurGuesses({ rows }: { rows: readonly GradedAttribute[][] }) {
   return (
     <ol

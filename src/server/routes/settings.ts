@@ -1,4 +1,3 @@
-// The signed-in user's Settings page: the approval email switches.
 import express from "express";
 import type { Express } from "express";
 import { requestUser } from "../auth.ts";

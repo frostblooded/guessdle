@@ -1,5 +1,3 @@
-// How to play's practice game (pure): the frozen pet game copy it plays on, plain-words clues for a
-// graded row, and which pets still fit every clue so far.
 import { Correctness, type AttributeValue } from "./correctness.ts";
 import {
   boardColumns,
@@ -9,7 +7,6 @@ import {
   type GradedAttribute,
 } from "./game.ts";
 
-// GET /api/tutorial: the practice roster and its secret pet
 export interface Tutorial {
   attributes: GameAttribute[];
   entries: Entry[];
@@ -19,8 +16,6 @@ export interface Tutorial {
 const list = (value: AttributeValue): string =>
   Array.isArray(value) ? value.join(", ") : value;
 
-// One short sentence per colored cell (pictures never are), saying what the color means for
-// this guess
 export function explainRow(
   attributes: readonly GameAttribute[],
   row: readonly GradedAttribute[],
@@ -56,8 +51,6 @@ export function explainRow(
 const sameCell = (a: GradedAttribute, b: GradedAttribute): boolean =>
   a.correctness === b.correctness && a.hint === b.hint;
 
-// The pets that could still be the secret: had one of them been the answer, every guess so far
-// would have been colored exactly as it was
 export function stillFitting(
   attributes: readonly GameAttribute[],
   entries: readonly Entry[],

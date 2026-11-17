@@ -27,39 +27,24 @@ export interface AppDeps {
   pool: pg.Pool;
   now?: () => Date;
   random?: () => number;
-  // IANA zone whose midnight starts a new day
   timeZone?: string | undefined;
-  // SMTP mailer and public URL for sign-in links; without them sign-in answers 503
   mail?: MailConfig | undefined;
-  // Lowercase emails promoted to admin on sign-in
   adminEmails?: readonly string[];
-  // Mark the session cookie Secure (HTTPS deployments)
   secureCookies?: boolean;
-  // Mounts POST /api/test/login for e2e; only the test environment sets it
   testLogin?: boolean;
-  // Per-user (anonymous: per-IP) request budget per window
   limit?: RateLimit;
-  // Backups volume (read-only) holding status.json for the admin panel
   backupDir?: string | undefined;
-  // Folder the upload pipeline writes WebP images to (served at /uploads/)
   uploadsDir?: string | undefined;
-  // Per-user upload budget per window, and per-user stored bytes
   uploadLimit?: RateLimit;
   uploadQuotaBytes?: number;
-  // Per-user budget for creating and editing games per window
   writeLimit?: RateLimit;
-  // Folder holding index.html, the app shell served at /g/<slug>
   shellDir?: string;
 }
 
-// Each app's party socket hub, for attachPartySockets
 const hubs = new WeakMap<Express, PartyHub>();
 
-// Party sockets need the HTTP server's upgrade event, which Express never sees (ADR 0016).
-// Closing the server closes the hub.
 export function attachPartySockets(server: Server, app: Express): void {
   const hub = hubs.get(app)!;
-  // A throw from an upgrade listener would end the process (no Express error handling here)
   server.on("upgrade", (req, socket, head) => {
     try {
       hub.upgrade(req, socket, head);
@@ -71,7 +56,6 @@ export function attachPartySockets(server: Server, app: Express): void {
   server.on("close", hub.close);
 }
 
-// The API only; callers add static files (dev server) or sit behind nginx (prod)
 export function createApp({
   pool,
   now = (): Date => new Date(),
@@ -103,10 +87,8 @@ export function createApp({
   const app = express();
   const hub = createPartyHub(ctx);
   hubs.set(app, hub);
-  // One hop: nginx (or nothing in dev) sets X-Forwarded-For to the real client IP
   app.set("trust proxy", 1);
   const limiter = rateLimit(pool, now, limit);
-  // A party's phones often share one IP: its reads skip the per-IP budget (nginx has its own)
   app.use(
     "/api",
     (req, res, next) =>
@@ -143,7 +125,6 @@ export function createApp({
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "not_found" });
   });
-  // Body-parser failures (malformed JSON, over the size cap) carry a 4xx status
   const onError: ErrorRequestHandler = (err, _req, res, _next) => {
     const status: unknown = (err as { status?: unknown }).status;
     if (typeof status === "number" && status >= 400 && status < 500) {

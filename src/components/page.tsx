@@ -1,8 +1,6 @@
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "../lib/utils.ts";
 
-// The title block at the top of a page: h1, an optional lede and actions on the right.
-// `centered` is the big centred title of the original hand-made site, for the gallery and Play.
 export function PageHead({
   title,
   titleId,
@@ -46,7 +44,6 @@ export function PageHead({
   );
 }
 
-// Muted one-line placeholder while something loads or a list is empty
 export function EmptyState({ className, ...props }: ComponentProps<"p">) {
   return (
     <p
@@ -59,7 +56,6 @@ export function EmptyState({ className, ...props }: ComponentProps<"p">) {
   );
 }
 
-// A centered card for one message and a way on (404, sign-in gates, blocked editor)
 export function MessageCard({
   className,
   ...props

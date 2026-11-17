@@ -1,4 +1,3 @@
-// Admin Backups tab: how old the newest dump is, and anything wrong with backups.
 import { useState } from "react";
 import { useOnOpen } from "../../lib/effects.ts";
 import { api } from "../../manage-client.ts";

@@ -1,8 +1,3 @@
-// Editing a game as its owner or an admin. Each edit comes with everything it sets off: the
-// checks a route cannot make alone (an upload the editor may attach, a Blur game having no
-// attributes, a Sequence game's schedule), the game lock and status rule with its emails (lifecycle.ts), the Daily Answers
-// it changes (answers.ts), and the uploads it frees (upload-refs.ts). The data change and the
-// answer re-draw commit together. Routes parse the request and turn the outcome into a reply.
 import type pg from "pg";
 import {
   redrawFuture,
@@ -49,7 +44,6 @@ type AttributeResult =
   | Awaited<ReturnType<typeof saveAttributes>>
   | Awaited<ReturnType<typeof editAttributes>>;
 
-// The ids of the active entries that may be the answer, as of the game lock
 const answerIds = async (tx: pg.PoolClient, game: GameRow): Promise<number[]> =>
   (await loadRoster(tx, game)).answerIds;
 
@@ -58,7 +52,6 @@ export function gameEdits(ctx: EditContext, uploadsDir: string) {
   const lifecycle = gameLifecycle(pool, ctx.mail);
   const refs = uploadRefs(pool, uploadsDir);
   const today = (): string => todayIn(ctx.now(), ctx.timeZone);
-  // A new upload `url` the editor may put in place of `current`
   const mayAttach = (
     game: GameRow,
     editor: SessionUser,
@@ -68,8 +61,6 @@ export function gameEdits(ctx: EditContext, uploadsDir: string) {
     url === undefined || refs.mayAttach(url, current, editor.id, game.ownerId);
 
   return {
-    // One change, or the editor's whole list. Only a real change resets the status; a reorder
-    // does not. Only a classic game has attributes.
     async attributes(
       game: GameRow,
       edit: AttributeEdit | AttributeDraft[],
@@ -88,9 +79,6 @@ export function gameEdits(ctx: EditContext, uploadsDir: string) {
       );
     },
 
-    // Creates (no `id`) or changes an entry; replaced pictures are freed. A Sequence game's
-    // future days follow which entries may be the answer (ADR 0020). Changing only a Quiz
-    // question's right answer keeps the status.
     async saveEntry(
       game: GameRow,
       editor: SessionUser,
@@ -101,14 +89,10 @@ export function gameEdits(ctx: EditContext, uploadsDir: string) {
         game,
         "entries",
         async (tx) => {
-          // Checked under the game lock: an attribute retyped to Image between a check made
-          // before it and this write would let a URL that is not an upload through
           const current =
             id === undefined
               ? undefined
               : (await listEntries(tx, game)).find((e) => e.id === id);
-          // Every picture sent, the photo, each Image value and each Sequence shot, with what it
-          // replaces
           const images = (await listAttributes(tx, game))
             .filter(
               (a) => a.type === "image" && String(a.id) in (input.values ?? {}),
@@ -145,7 +129,6 @@ export function gameEdits(ctx: EditContext, uploadsDir: string) {
       return out;
     },
 
-    // Soft-deletes an entry and, in the same transaction, re-draws the later days it answered
     async deleteEntry(game: GameRow, id: number): Promise<"ok" | "not_found"> {
       const deleted = await lifecycle.edit(
         game,
@@ -169,9 +152,6 @@ export function gameEdits(ctx: EditContext, uploadsDir: string) {
       return deleted ? "ok" : "not_found";
     },
 
-    // Name, description, cover, tries and skip period. A changed skip period (or a Sequence
-    // game's photo count) re-draws the future days in the same transaction; a replaced cover is
-    // freed.
     async patch(
       game: GameRow,
       editor: SessionUser,
@@ -205,7 +185,6 @@ export function gameEdits(ctx: EditContext, uploadsDir: string) {
       return "ok";
     },
 
-    // Deletes the game and frees every upload only it used
     drop: (game: GameRow): Promise<void> => refs.dropGame(game),
 
     move: lifecycle.move,
