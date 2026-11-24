@@ -11,7 +11,12 @@ Arguments: a **list** (default: a Wikipedia list page, by title or URL) and **so
 ## Steps
 
 1. **Pick the list page.** If the argument names a topic rather than a page ("Pixar films"), find the matching "List of …" page on Wikipedia. Done when you hold one page title or URL that exists.
-2. **Gather.** From the repo root (it needs the repo's `jsdom` and `sharp`):
+2. **Gather.** Wikipedia throttles the shared address of cloud sessions hard, so where the run happens depends on the session:
+
+   - **Cloud session:** the maintainer runs it on their own machine. Post the command below for them to paste in their guessdle folder (after `git pull` and `npm ci`), with `--out gathered/<list-slug>.json` (`/gathered` is gitignored). Then take the file back: with the device linked, stage it with the remote-devices folder tools; otherwise ask them to upload it. Done when the file is in your container.
+   - **Local session:** run it yourself.
+
+   From the repo root (it needs the repo's `jsdom` and `sharp`):
 
    ```sh
    node .claude/skills/gather-game-data/scripts/gather.mjs --list "List of Pixar films" --out <scratchpad>/data.json
@@ -44,4 +49,4 @@ In the picker: tick categories (each shows how many pages have it, and a Text, L
 
 ## Cloud sessions
 
-The cloud environment needs `en.wikipedia.org` and `upload.wikimedia.org` allowed (also the `--wiki` language's host). Node's own `fetch` ignores the proxy, which is why the scripts call `curl`.
+A cloud session still needs `en.wikipedia.org` and `upload.wikimedia.org` allowed for `--refresh` and small lists. The scripts call `curl` because Node's own `fetch` ignores the cloud proxy; `curl` ships with Windows 10 and later, macOS and Linux.
