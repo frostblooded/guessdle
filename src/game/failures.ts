@@ -62,6 +62,18 @@ export const FAILURES = {
     "This game's status changed since you opened the page. Reload the page to see its current status.",
   ),
   attribute_exists: failure(409, "Another attribute already has that name."),
+  import_invalid: failure(
+    400,
+    "This is not a Guessdle import file, or it is broken. Read the list again and try again.",
+  ),
+  import_type_clash: failure(
+    409,
+    "The game already has an attribute with the same name as one in the file but a different type. Rename one of them and try again.",
+  ),
+  too_many_attributes: failure(
+    409,
+    "The import would give the game more attributes than allowed. Tick fewer categories in the picker or remove an attribute.",
+  ),
   entry_exists: failure(409, "Another entry already has that name."),
   slug_taken: failure(409, "That address is already taken. Pick another one."),
   self_deletion: failure(409, "You cannot delete your own account here."),

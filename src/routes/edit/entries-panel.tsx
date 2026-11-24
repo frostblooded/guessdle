@@ -1,6 +1,5 @@
 import { useOnOpen } from "../../lib/effects.ts";
 import { useRef, useState, type FormEvent } from "react";
-import { Plus } from "lucide-react";
 import { CELLS, type GameKind } from "../../game/blur.ts";
 import { FAILURES } from "../../game/failures.ts";
 import { Alert } from "../../components/ui/alert.tsx";
@@ -24,6 +23,7 @@ import { ImagePicker, ImageValue, usePhotoUpload } from "./image-value.tsx";
 import { BlurOrderEditor } from "./blur-order-editor.tsx";
 import { EntriesLede } from "./entries-lede.tsx";
 import { ShotsEditor } from "./shots-editor.tsx";
+import { EntriesToolbar } from "./entries-toolbar.tsx";
 
 interface Draft {
   editing: Entry | null;
@@ -57,8 +57,10 @@ export function EntriesPanel({
   kind,
   tries,
   onChange,
+  notice,
 }: {
   base: string;
+  notice: string;
   kind: GameKind;
   tries: number;
   initial: { attributes: Attribute[]; entries: Entry[] };
@@ -159,10 +161,12 @@ export function EntriesPanel({
     <div className="space-y-5">
       {dialog}
       <EntriesLede kind={kind} tries={tries} />
-      <Button id="entry-new" onClick={() => edit(null)}>
-        <Plus aria-hidden="true" />
-        New entry
-      </Button>
+      <EntriesToolbar
+        base={base}
+        kind={kind}
+        notice={notice}
+        onNew={() => edit(null)}
+      />
       {!open && (
         <Alert id="entry-error" variant="error" role="alert">
           {error}

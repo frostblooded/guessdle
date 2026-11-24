@@ -43,6 +43,10 @@ Every user-facing feature, by page, with the names to use for it (terms from `GL
 - **Answers tab**: the schedule of Daily Answers and owner overrides. Code: `src/routes/edit/answers-panel.tsx`, `src/routes/edit/override-dialog.tsx`. Tests: `tests/e2e/answers.spec.ts`.
 - **Questions tab**: Quiz questions, multiple choice or number. Code: `src/routes/edit/questions-panel.tsx`. Tests: `tests/e2e/quiz-game.spec.ts`.
 
+## `/g/:slug/import`
+
+- **Import from Wikipedia**: opened from the Entries tab's Import from Wikipedia button: paste a Wikipedia list link, the browser reads every linked page, then the owner ticks infobox categories (with coverage counts and a Text, List or Number type) and rows, can fix values and names and pick each picture's square, and imports straight into the game (pictures copied from Wikimedia, square-cropped; existing entries only get blanks filled). `?list=<link>` starts reading on open. Classic games only. Code: `src/routes/import/import-page.tsx`, `src/routes/import/picker.tsx`, `src/routes/import/category-cards.tsx`, `src/routes/import/rows-table.tsx`, `src/routes/import/crop-dialog.tsx`, `src/routes/import/wikipedia.ts`, `src/game/wiki-pick.ts`, `src/game/import-file.ts`, `src/server/import.ts`. Tests: `tests/wiki-pick.test.ts`, `tests/ui/wikipedia.test.tsx`, `tests/integration/import.test.ts`, `tests/e2e/wiki-import.spec.ts`.
+
 ## `/create`
 
 - **Create a game**: name and Game Kind, then the editor as a draft; guests sign in first. Code: `src/routes/create-page.tsx`. Tests: `tests/e2e/create-game.spec.ts`.

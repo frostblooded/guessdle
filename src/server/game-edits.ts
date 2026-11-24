@@ -30,6 +30,19 @@ import {
 import { gameLifecycle } from "./lifecycle.ts";
 import type { MailConfig } from "./mailer.ts";
 import { uploadRefs } from "./upload-refs.ts";
+import type { ImportFile } from "../game/import-file.ts";
+import {
+  entriesNeedingImages,
+  importEntries,
+  mapLimited,
+  squarePhoto,
+  type FetchImage,
+  type ImportOutcome,
+} from "./import.ts";
+import { storeWebp } from "./images.ts";
+import { recordUpload, usedBytes } from "./upload-store.ts";
+
+const IMPORT_FETCHES = 4;
 
 export interface EditContext {
   pool: pg.Pool;
@@ -183,6 +196,61 @@ export function gameEdits(ctx: EditContext, uploadsDir: string) {
       );
       await refs.release([replaced]);
       return "ok";
+    },
+
+    async importFile(
+      game: GameRow,
+      editor: SessionUser,
+      file: ImportFile,
+      fetchImage: FetchImage,
+      quotaBytes: number,
+    ): Promise<ImportOutcome | "invalid"> {
+      if (game.kind !== "classic") {
+        return "invalid";
+      }
+      const wanted = await entriesNeedingImages(pool, game, file);
+      let used = await usedBytes(pool, editor.id);
+      const stored = await mapLimited(wanted, IMPORT_FETCHES, async (name) => {
+        const entry = file.entries.find((e) => e.name === name)!;
+        try {
+          const webp = await squarePhoto(
+            await fetchImage(entry.image!),
+            entry.crop,
+          );
+          if (used + webp.length > quotaBytes) {
+            return null;
+          }
+          used += webp.length;
+          const url = await storeWebp(uploadsDir, webp);
+          await recordUpload(pool, editor.id, url, webp.length, ctx.now());
+          return [name, url] as const;
+        } catch {
+          return null;
+        }
+      });
+      const photos = new Map(stored.filter((s) => s !== null));
+      try {
+        const out = await lifecycle.edit(
+          game,
+          "entries",
+          async (tx) => {
+            const result = await importEntries(tx, game, file, photos);
+            if (typeof result !== "string") {
+              await rescheduleFuture(tx, game, today(), random);
+            }
+            return result;
+          },
+          (r) => typeof r !== "string" && r.added + r.filled > 0,
+        );
+        if (typeof out === "string") {
+          await refs.release(photos.values());
+          return out;
+        }
+        return { ...out, missingImages: wanted.length - photos.size };
+      } catch (err) {
+        await refs.release(photos.values());
+        throw err;
+      }
     },
 
     drop: (game: GameRow): Promise<void> => refs.dropGame(game),

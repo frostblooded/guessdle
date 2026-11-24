@@ -22,6 +22,9 @@ import {
 } from "../attributes.ts";
 import { createGame, listOwned } from "../games.ts";
 import { rateLimit, type RateLimit } from "../rate-limit.ts";
+import { parseImportFile } from "../../game/import-file.ts";
+import { fetchImportImage, type FetchImage } from "../import.ts";
+import { DEFAULT_UPLOAD_QUOTA_BYTES } from "../upload-store.ts";
 import { isGameKind, isImageGame } from "../../game/blur.ts";
 import {
   bodyOf,
@@ -38,10 +41,15 @@ export function manageRoutes(
   ctx: AppContext,
   uploadsDir: string,
   limit: RateLimit = DEFAULT_WRITE_LIMIT,
+  {
+    fetchImage = fetchImportImage,
+    quotaBytes = DEFAULT_UPLOAD_QUOTA_BYTES,
+  }: { fetchImage?: FetchImage; quotaBytes?: number | undefined } = {},
 ): void {
   const { pool, now } = ctx;
   const json = express.json({ limit: "10kb" });
   const bigJson = express.json({ limit: "64kb" });
+  const importJson = express.json({ limit: "2mb" });
   const writes = rateLimit(pool, now, limit);
   const edits = gameEdits(ctx, uploadsDir);
 
@@ -259,6 +267,31 @@ export function manageRoutes(
         return;
       }
       res.json(await listEntries(pool, game));
+    }),
+  );
+
+  app.post(
+    "/api/games/:slug/import",
+    writes,
+    importJson,
+    manageRoute(async ({ game, user }, req, res) => {
+      const file = parseImportFile(req.body);
+      if (!file) {
+        fail(res, "import_invalid");
+        return;
+      }
+      const out = await edits.importFile(
+        game,
+        user,
+        file,
+        fetchImage,
+        quotaBytes,
+      );
+      if (typeof out === "string") {
+        fail(res, out);
+        return;
+      }
+      res.json(out);
     }),
   );
 
