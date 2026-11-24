@@ -12,9 +12,9 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-const VERSION = "1.8.0";
+const VERSION = "1.7.4";
 const SHA256 =
-  "7e53aa636dac8a3cb0533f343115c0548e03fc0ce5edc7739becf58d3d0fb84f";
+  "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88";
 const jar = resolve("node_modules", ".cache", `tla2tools-${VERSION}.jar`);
 
 if (!existsSync(jar)) {
@@ -49,7 +49,6 @@ for (const cfg of readdirSync("tla")
       "tlc2.TLC",
       "-workers",
       "auto",
-      "-noGenerateSpecTE",
       "-metadir",
       join(tmpdir(), `tlc-${process.pid}-${cfg}`),
       "-config",
