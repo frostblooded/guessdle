@@ -306,6 +306,9 @@ function Editor({
           <TabsContent value="attributes" selected={tab} asChild>
             <Card id="panel-attributes" className="p-6">
               <AttributesPanel
+                key={attributes
+                  .map(({ id, name, type }) => `${id}:${name}:${type}`)
+                  .join("|")}
                 base={base}
                 attributes={attributes}
                 setAttributes={setAttributes}
@@ -329,6 +332,7 @@ function Editor({
                   kind={saved.kind}
                   tries={saved.blurTries}
                   onChange={refreshStatus}
+                  onAttributes={setAttributes}
                 />
               )}
             </Card>

@@ -22,6 +22,7 @@ import { playlistRoutes } from "./routes/playlists.ts";
 import { friendRoutes } from "./routes/friends.ts";
 import { settingsRoutes } from "./routes/settings.ts";
 import { tutorialRoutes } from "./routes/tutorial.ts";
+import { fetchImportImage, type FetchImage } from "./import.ts";
 
 export interface AppDeps {
   pool: pg.Pool;
@@ -39,6 +40,7 @@ export interface AppDeps {
   uploadQuotaBytes?: number;
   writeLimit?: RateLimit;
   shellDir?: string;
+  fetchImage?: FetchImage;
 }
 
 const hubs = new WeakMap<Express, PartyHub>();
@@ -72,6 +74,7 @@ export function createApp({
   uploadQuotaBytes,
   writeLimit,
   shellDir = ".",
+  fetchImage = fetchImportImage,
 }: AppDeps): Express {
   if (testLogin && process.env["NODE_ENV"] === "production") {
     throw new Error("The test login route cannot run in production");
@@ -111,7 +114,10 @@ export function createApp({
   adminRoutes(app, ctx, backupDir, uploadsDir);
   gameRoutes(app, ctx);
   quizRoutes(app, ctx);
-  manageRoutes(app, ctx, uploadsDir, writeLimit);
+  manageRoutes(app, ctx, uploadsDir, writeLimit, {
+    fetchImage,
+    quotaBytes: uploadQuotaBytes,
+  });
   uploadRoutes(app, ctx, uploadsDir, uploadLimit, uploadQuotaBytes);
   answersRoutes(app, ctx);
   partyRoutes(app, ctx, hub);

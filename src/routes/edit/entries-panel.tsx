@@ -1,6 +1,5 @@
 import { useOnOpen } from "../../lib/effects.ts";
 import { useRef, useState, type FormEvent } from "react";
-import { Plus } from "lucide-react";
 import { CELLS, type GameKind } from "../../game/blur.ts";
 import { FAILURES } from "../../game/failures.ts";
 import { Alert } from "../../components/ui/alert.tsx";
@@ -24,6 +23,7 @@ import { ImagePicker, ImageValue, usePhotoUpload } from "./image-value.tsx";
 import { BlurOrderEditor } from "./blur-order-editor.tsx";
 import { EntriesLede } from "./entries-lede.tsx";
 import { ShotsEditor } from "./shots-editor.tsx";
+import { EntriesToolbar } from "./entries-toolbar.tsx";
 
 interface Draft {
   editing: Entry | null;
@@ -57,8 +57,10 @@ export function EntriesPanel({
   kind,
   tries,
   onChange,
+  onAttributes,
 }: {
   base: string;
+  onAttributes: (attributes: Attribute[]) => void;
   kind: GameKind;
   tries: number;
   initial: { attributes: Attribute[]; entries: Entry[] };
@@ -75,25 +77,26 @@ export function EntriesPanel({
   const blur = kind === "blur";
   const sequence = kind === "sequence";
 
-  useOnOpen(active, () => {
-    void (async () => {
-      const [attrs, got] = await Promise.all([
-        api<Attribute[]>("GET", `${base}/attributes`),
-        api<Entry[]>("GET", `${base}/entries`),
-      ]);
-      if (attrs?.status !== 200 || got?.status !== 200) {
-        setError(errorText((attrs ?? got) as Reply | null));
-        return;
-      }
-      setError("");
-      setEntries(got.data);
-      if (JSON.stringify(built.current) !== JSON.stringify(attrs.data)) {
-        built.current = attrs.data;
-        setFormAttributes(attrs.data);
-        setDraft(draftOf(null));
-      }
-    })();
-  });
+  const reload = async (): Promise<void> => {
+    const [attrs, got] = await Promise.all([
+      api<Attribute[]>("GET", `${base}/attributes`),
+      api<Entry[]>("GET", `${base}/entries`),
+    ]);
+    if (attrs?.status !== 200 || got?.status !== 200) {
+      setError(errorText((attrs ?? got) as Reply | null));
+      return;
+    }
+    setError("");
+    setEntries(got.data);
+    if (JSON.stringify(built.current) !== JSON.stringify(attrs.data)) {
+      built.current = attrs.data;
+      setFormAttributes(attrs.data);
+      onAttributes(attrs.data);
+      setDraft(draftOf(null));
+    }
+  };
+
+  useOnOpen(active, () => void reload());
 
   const edit = (entry: Entry | null): void => {
     setError("");
@@ -159,10 +162,15 @@ export function EntriesPanel({
     <div className="space-y-5">
       {dialog}
       <EntriesLede kind={kind} tries={tries} />
-      <Button id="entry-new" onClick={() => edit(null)}>
-        <Plus aria-hidden="true" />
-        New entry
-      </Button>
+      <EntriesToolbar
+        base={base}
+        kind={kind}
+        onNew={() => edit(null)}
+        onImported={async () => {
+          await reload();
+          await onChange();
+        }}
+      />
       {!open && (
         <Alert id="entry-error" variant="error" role="alert">
           {error}

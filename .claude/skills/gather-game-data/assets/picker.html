@@ -1,0 +1,250 @@
+<title>Game Data Picker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap">
+<style>
+/* Layout: a header strip, a category panel, then the row table; a sticky footer holds the import summary. Guessdle's typewriter look. */
+:root {
+  --bg: #ffffff; --fg: #1e293b; --muted: #64748b; --line: #dbe2ea; --panel: #f4f7fa;
+  --head: #334155; --head-fg: #f8fafc; --accent: #2f7d4f; --accent-bg: #e3f2e8;
+  --warn: #9a5b0f; --warn-bg: #fbefdc; --dim: #f1f4f7;
+  --font: "Courier Prime", "Courier New", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121a1d; --fg: #e5ecef; --muted: #94a3ab; --line: #2a373d; --panel: #182327;
+  --head: #23323a; --head-fg: #e5ecef; --accent: #5cbf83; --accent-bg: #1b3326;
+  --warn: #e3a45a; --warn-bg: #33260f; --dim: #151e21; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121a1d; --fg: #e5ecef; --muted: #94a3ab; --line: #2a373d; --panel: #182327;
+  --head: #23323a; --head-fg: #e5ecef; --accent: #5cbf83; --accent-bg: #1b3326;
+  --warn: #e3a45a; --warn-bg: #33260f; --dim: #151e21; color-scheme: dark }
+.wrap > * { min-width: 0; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; }
+.wrap { max-width: 1200px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px 120px; display: grid; gap: 24px; }
+h1 { font-size: 30px; margin: 0; text-align: center; letter-spacing: .02em; }
+.meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 16px; color: var(--muted); font-size: 13px; }
+.meta b { color: var(--fg); }
+.cat.full:not(.on) { opacity: .55; cursor: default; }
+section h2 { font-size: 18px; margin: 0 0 4px; }
+section p.hint { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+.cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.cat { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); cursor: pointer; }
+.cat.on { border-color: var(--accent); background: var(--accent-bg); }
+.cat input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--accent); }
+.cat .nm { font-weight: 700; display: flex; justify-content: space-between; gap: 8px; }
+.cat .cov { font-weight: 400; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.cat .cov.part { color: var(--warn); }
+.cat .ex { grid-column: 2; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat select { grid-column: 2; justify-self: start; font: inherit; font-size: 13px; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-bottom: 10px; }
+.toolbar input[type=search] { flex: 1 1 200px; min-width: 0; font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+button { font: inherit; padding: 8px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 700; }
+button:disabled { opacity: .5; cursor: default; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tablebox { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th { background: var(--head); color: var(--head-fg); text-align: left; padding: 8px 10px; position: sticky; top: 0; white-space: nowrap; }
+td { padding: 8px 10px; border-top: 1px solid var(--line); vertical-align: top; }
+td.pick { width: 1%; } td.pick input { width: 20px; height: 20px; accent-color: var(--accent); }
+td.img { width: 1%; } td.img img, td.img .noimg { width: 48px; height: 70px; object-fit: cover; border-radius: 4px; display: block; }
+.noimg { background: var(--dim); border: 1px dashed var(--line); color: var(--muted); font-size: 10px; display: grid !important; place-items: center; text-align: center; }
+td.name { font-weight: 700; min-width: 140px; } td.name a { color: inherit; } td.name small { display: block; font-weight: 400; color: var(--muted); }
+td.val { min-width: 140px; max-width: 260px; }
+.chip { display: inline-block; background: var(--dim); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; margin: 0 4px 4px 0; }
+.num { font-weight: 700; } .raw { color: var(--muted); font-size: 12px; display: block; }
+.missing { color: var(--warn); font-style: italic; }
+tr.blocked td { background: var(--dim); color: var(--muted); }
+tr.picked td { background: var(--accent-bg); }
+.bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--head); color: var(--head-fg); padding-block: 12px calc(12px + env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.bar .in { max-width: 1200px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; }
+.bar .sum { font-size: 14px; } .bar .sum b { font-size: 16px; }
+.bar .acts { display: flex; gap: 10px; flex-wrap: wrap; }
+#out { width: 100%; min-height: 160px; font: 12px var(--font); background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; box-sizing: border-box; }
+@media (max-width: 600px) { h1 { font-size: 24px; } td.val { min-width: 110px; } }
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:10px">
+    <h1>Game Data Picker</h1>
+    <div class="meta" id="meta"></div>
+  </header>
+
+  <section>
+    <h2>Categories</h2>
+    <p class="hint">Fields found in the infobox cards of these pages, with how many pages have each. Tick the ones to import as attributes (up to 10; pictures go in their own Photo column). Rows missing a ticked field can't be imported, since Guessdle needs every value filled.</p>
+    <div class="cats" id="cats"></div>
+  </section>
+
+  <section>
+    <h2>Rows</h2>
+    <div class="toolbar">
+      <input type="search" id="q" placeholder="Filter by name" aria-label="Filter rows by name">
+      <button id="all" type="button">Tick all importable</button>
+      <button id="none" type="button">Untick all</button>
+    </div>
+    <div class="tablebox"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+  </section>
+
+  <section id="outbox" hidden>
+    <h2>Import file</h2>
+    <p class="hint">In Guessdle, open the game's editor, go to Entries, press Import entries and paste this.</p>
+    <textarea id="out" readonly aria-label="Import file contents"></textarea>
+  </section>
+</div>
+
+<div class="bar"><div class="in">
+  <div class="sum" id="sum"></div>
+  <div class="acts">
+    <button id="preview" type="button">Show import file</button>
+    <button id="copy" class="primary" type="button">Copy import file</button>
+  </div>
+</div></div>
+
+<script>
+const DATA = /*DATA*/null;
+const FORMAT = "guessdle-import/1";
+const LIMITS = { categories: 10, entryName: 60, value: 200, listItems: 20 };
+const TYPES = ["text", "list", "number"];
+const rows = DATA.rows;
+const n = rows.length;
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const asList = (v) => (Array.isArray(v) ? v : [v]);
+
+const SCALE = { thousand: 1e3, million: 1e6, billion: 1e9, trillion: 1e12 };
+function toNumber(raw) {
+  const text = String(raw).replace(/(\d),(?=\d{3}\b)/g, "$1");
+  const m = text.match(/-?\d+(\.\d+)?/);
+  if (!m) return null;
+  const word = text.slice(m.index + m[0].length).match(/^\s*(thousand|million|billion|trillion)\b/i);
+  const x = parseFloat(m[0]) * (word ? SCALE[word[1].toLowerCase()] : 1);
+  return Number.isFinite(x) ? +x.toPrecision(12) : null;
+}
+const fmt = (x) => (Math.abs(x) >= 1e6 ? `${(x / 1e6).toLocaleString()} million` : x.toLocaleString());
+
+const counts = {};
+for (const r of rows) for (const k in r.fields) counts[k] = (counts[k] || 0) + 1;
+const cats = Object.keys(counts).filter((k) => counts[k] / n >= 0.6).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
+function guess(k) {
+  const vals = rows.filter((r) => k in r.fields).map((r) => r.fields[k]);
+  if (vals.some(Array.isArray)) return "list";
+  if (vals.every((v) => /^[^\d]{0,3}-?\d/.test(v) && toNumber(v) !== null)) return "number";
+  return "text";
+}
+const state = { on: new Set(), type: {}, picked: new Set(), q: "" };
+for (const k of cats) state.type[k] = guess(k);
+const ticked = () => cats.filter((k) => state.on.has(k));
+const sample = (k) => asList(rows.find((r) => k in r.fields).fields[k]).join(", ");
+
+const valuesFor = (r, k) => {
+  const v = r.fields[k];
+  if (v === undefined) return null;
+  if (state.type[k] === "number") {
+    const x = toNumber(asList(v)[0]);
+    return x === null ? null : [String(x)];
+  }
+  return state.type[k] === "list" ? asList(v) : [asList(v).join(", ")];
+};
+const nameCount = {};
+for (const r of rows) nameCount[r.name.toLowerCase()] = (nameCount[r.name.toLowerCase()] || 0) + 1;
+
+function problems(r) {
+  const out = [];
+  if (r.name.length > LIMITS.entryName) out.push("name too long");
+  if (nameCount[r.name.toLowerCase()] > 1) out.push("same name as another row");
+  for (const k of ticked()) {
+    const vals = valuesFor(r, k);
+    if (!(k in r.fields)) out.push(`no ${k}`);
+    else if (vals === null) out.push(`no number in ${k}`);
+    else if (vals.length > LIMITS.listItems) out.push(`${k} has over ${LIMITS.listItems} items`);
+    else if (vals.some((x) => x.length > LIMITS.value)) out.push(`${k} too long`);
+  }
+  return out;
+}
+
+const $ = (id) => document.getElementById(id);
+$("meta").innerHTML = `<span>Source <b>${esc(DATA.source)}</b></span><span>List <b><a href="${esc(DATA.listUrl)}" target="_blank" rel="noopener" style="color:inherit">${esc(DATA.list)}</a></b></span><span><b>${n}</b> pages with an infobox</span><span>Read <b>${new Date(DATA.fetchedAt).toLocaleString()}</b></span>`;
+
+function renderCats() {
+  const full = state.on.size >= LIMITS.categories;
+  $("cats").innerHTML = "";
+  cats.forEach((k, i) => {
+    const on = state.on.has(k);
+    const el = document.createElement("label");
+    el.className = `cat${on ? " on" : ""}${full ? " full" : ""}`;
+    el.htmlFor = `cat-${i}`;
+    el.innerHTML = `<input type="checkbox" id="cat-${i}" ${on ? "checked" : ""} ${full && !on ? "disabled" : ""}>
+      <span class="nm">${esc(k)}<span class="cov ${counts[k] < n ? "part" : ""}">${counts[k]}/${n}</span></span>
+      <span class="ex" title="${esc(sample(k))}">e.g. ${esc(sample(k))}</span>
+      <select id="cat-${i}-type" aria-label="Type for ${esc(k)}">${TYPES.map((t) => `<option value="${t}" ${state.type[k] === t ? "selected" : ""}>${t[0].toUpperCase() + t.slice(1)}</option>`).join("")}</select>`;
+    el.querySelector("input").addEventListener("change", (e) => { e.target.checked ? state.on.add(k) : state.on.delete(k); renderAll(); });
+    el.querySelector("select").addEventListener("change", (e) => { state.type[k] = e.target.value; renderAll(); });
+    $("cats").appendChild(el);
+  });
+}
+
+function cell(r, k) {
+  if (!(k in r.fields)) return `<span class="missing">not on page</span>`;
+  const raw = asList(r.fields[k]);
+  const vals = valuesFor(r, k);
+  if (state.type[k] === "number") {
+    return vals === null ? `<span class="missing">no number in "${esc(raw.join(", "))}"</span>` : `<span class="num">${fmt(Number(vals[0]))}</span><span class="raw">${esc(raw.join(", "))}</span>`;
+  }
+  if (state.type[k] === "list") return vals.map((x) => `<span class="chip">${esc(x)}</span>`).join("");
+  return esc(vals[0]);
+}
+
+function renderTable() {
+  const ks = ticked();
+  $("thead").innerHTML = `<tr><th>Import</th><th>Picture</th><th>Name</th>${ks.map((k) => `<th>${esc(k)}</th>`).join("")}</tr>`;
+  const tb = $("tbody");
+  tb.innerHTML = "";
+  rows.forEach((r, i) => {
+    const bad = problems(r);
+    if (bad.length) state.picked.delete(i);
+    if (state.q && !r.name.toLowerCase().includes(state.q)) return;
+    const tr = document.createElement("tr");
+    tr.className = bad.length ? "blocked" : state.picked.has(i) ? "picked" : "";
+    tr.innerHTML = `<td class="pick"><input type="checkbox" id="row-${i}" aria-label="Import ${esc(r.name)}" ${state.picked.has(i) ? "checked" : ""} ${bad.length ? "disabled" : ""}></td>
+      <td class="img">${r.thumb ? `<img src="${r.thumb}" alt="">` : `<div class="noimg">${r.image ? "no preview" : "no picture"}</div>`}</td>
+      <td class="name"><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.name)}</a>${r.title !== r.name ? `<small>${esc(r.title)}</small>` : ""}${bad.length ? `<small class="missing">${esc(bad.join("; "))}</small>` : ""}</td>
+      ${ks.map((k) => `<td class="val">${cell(r, k)}</td>`).join("")}`;
+    tr.querySelector("input").addEventListener("change", (e) => { e.target.checked ? state.picked.add(i) : state.picked.delete(i); renderSum(); tr.className = e.target.checked ? "picked" : ""; });
+    tb.appendChild(tr);
+  });
+}
+
+function importFile() {
+  const ks = ticked();
+  return {
+    format: FORMAT,
+    source: DATA.listUrl,
+    attributes: ks.map((k) => ({ name: k, type: state.type[k] })),
+    entries: [...state.picked].sort((a, b) => a - b).map((i) => {
+      const r = rows[i];
+      return { name: r.name, image: r.image, values: Object.fromEntries(ks.map((k) => [k, valuesFor(r, k)])) };
+    }),
+  };
+}
+
+function renderSum() {
+  const importable = rows.filter((r) => !problems(r).length).length;
+  $("sum").innerHTML = `<b>${state.picked.size}</b> of ${importable} importable rows ticked · <b>${state.on.size}</b> categories`;
+  $("copy").disabled = $("preview").disabled = state.picked.size === 0;
+  if (!$("outbox").hidden) $("out").value = JSON.stringify(importFile(), null, 2);
+}
+
+function renderAll() { renderCats(); renderTable(); renderSum(); }
+
+$("q").addEventListener("input", (e) => { state.q = e.target.value.toLowerCase(); renderTable(); });
+$("all").addEventListener("click", () => { rows.forEach((r, i) => { if (!problems(r).length) state.picked.add(i); }); renderAll(); });
+$("none").addEventListener("click", () => { state.picked.clear(); renderAll(); });
+$("preview").addEventListener("click", () => { $("outbox").hidden = false; renderSum(); $("outbox").scrollIntoView({ behavior: "smooth" }); });
+$("copy").addEventListener("click", () => {
+  const text = JSON.stringify(importFile());
+  const shown = () => { $("outbox").hidden = false; renderSum(); $("out").focus(); $("out").select(); };
+  if (!navigator.clipboard) return shown();
+  navigator.clipboard.writeText(text).then(() => { $("copy").textContent = "Copied"; $("copy").addEventListener("blur", () => ($("copy").textContent = "Copy import file"), { once: true }); }, shown);
+});
+
+renderAll();
+</script>
