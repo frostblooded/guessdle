@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { SkipButton } from "../../components/skip-button.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import {
@@ -39,14 +39,26 @@ export function ModeSwitch({
   mode,
   onChange,
   label = "Guess by",
+  inline = false,
 }: {
   mode: GuessMode;
   onChange: (mode: GuessMode) => void;
   label?: string;
+  inline?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-      <span id="guess-mode-label">{label}</span>
+    <div
+      className={cn(
+        "flex items-center gap-2 text-sm text-muted-foreground",
+        !inline && "justify-center",
+      )}
+    >
+      <span
+        id="guess-mode-label"
+        className={cn(inline && "sr-only sm:not-sr-only")}
+      >
+        {label}
+      </span>
       <div
         id="guess-mode"
         role="group"
@@ -85,6 +97,7 @@ export function GuessForm({
   disabled = false,
   busy = false,
   hidden = false,
+  roundActions,
 }: {
   modes: GuessModeState;
   names: readonly string[];
@@ -95,11 +108,28 @@ export function GuessForm({
   disabled?: boolean;
   busy?: boolean;
   hidden?: boolean;
+  roundActions?: ReactNode;
 }) {
+  const modeSwitch = !hidden && !modes.fixed && (
+    <ModeSwitch
+      mode={modes.mode}
+      onChange={modes.setMode}
+      inline={roundActions !== undefined}
+    />
+  );
   return (
     <>
-      {!hidden && !modes.fixed && (
-        <ModeSwitch mode={modes.mode} onChange={modes.setMode} />
+      {roundActions === undefined ? (
+        modeSwitch
+      ) : (
+        <div
+          id="round-bar"
+          className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2"
+          hidden={hidden}
+        >
+          {modeSwitch}
+          <div className="-mr-2 ml-auto flex gap-1">{roundActions}</div>
+        </div>
       )}
       <div id="new-guess-row" className="guess-row flex gap-2" hidden={hidden}>
         {modes.mode === "type" ? (

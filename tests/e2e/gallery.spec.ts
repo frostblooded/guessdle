@@ -87,6 +87,30 @@ test("an admin gets an Edit link on the original game, a visitor does not", asyn
   );
 });
 
+test("Play puts Edit and Save as named icon buttons to the right of the other game actions", async ({
+  page,
+}) => {
+  await page.request.post("/api/test/login", {
+    data: {
+      email: `icons-${Date.now()}${Math.random().toString(36).slice(2, 6)}@example.test`,
+      admin: true,
+    },
+  });
+  await page.goto("/g/petdle");
+  await expect(page.locator("#loading-state")).toBeHidden();
+
+  const edit = page.getByRole("link", { name: "Edit game" });
+  const save = page.getByRole("button", { name: /^Save .+ to a playlist$/ });
+  await expect(edit).toHaveText("");
+  await expect(save).toHaveText("");
+  await expect(edit).toHaveAttribute("title", "Edit game");
+  const party = (await page.locator("#party-host-link").boundingBox())!;
+  const editBox = (await edit.boundingBox())!;
+  const saveBox = (await save.boundingBox())!;
+  expect(editBox.x).toBeGreaterThan(party.x + party.width);
+  expect(saveBox.x).toBeGreaterThan(editBox.x);
+});
+
 test("a gallery card shows the game's cover, a collage of entry photos without one, and nothing without either", async ({
   page,
 }) => {
