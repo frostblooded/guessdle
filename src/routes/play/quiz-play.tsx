@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
 import { Navigate } from "react-router";
-import { PageHead } from "../../components/page.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
@@ -17,7 +16,7 @@ import { FriendResults } from "../../components/friend-results.tsx";
 import { cn } from "../../lib/utils.ts";
 import { api, errorText } from "../../manage-client.ts";
 import type { PlayableGame } from "./load-game.ts";
-import { PlayActions, PlayStatus } from "./play-status.tsx";
+import { GameHead, PlayActions, PlayStatus } from "./play-status.tsx";
 import { BarChart } from "./stats-dialog.tsx";
 
 export const pointsWord = (n: number): string =>
@@ -220,9 +219,7 @@ export function QuizPlay({
 
   return (
     <>
-      <PageHead
-        centered
-        titleId="game-title"
+      <GameHead
         title={game.name}
         actions={
           <PlayActions

@@ -176,10 +176,12 @@ export function SaveButton({
   slug,
   name,
   compact = false,
+  iconOnly = false,
 }: {
   slug: string;
   name: string;
   compact?: boolean;
+  iconOnly?: boolean;
 }) {
   const { data: user, isPending } = useMe();
   const [open, setOpen] = useState(false);
@@ -188,13 +190,15 @@ export function SaveButton({
       <Button
         type="button"
         variant="outline"
-        size={compact ? "icon" : "sm"}
+        size={compact ? "icon" : iconOnly ? "icon-sm" : "sm"}
         className={cn(
           "save-button",
           compact && "size-9 rounded-full bg-card/90 shadow-sm",
         )}
-        aria-label={compact ? `Save ${name} to a playlist` : undefined}
-        title={compact ? "Save to a playlist" : undefined}
+        aria-label={
+          compact || iconOnly ? `Save ${name} to a playlist` : undefined
+        }
+        title={compact || iconOnly ? "Save to a playlist" : undefined}
         disabled={isPending}
         onClick={() => {
           if (user) {
@@ -205,7 +209,7 @@ export function SaveButton({
         }}
       >
         <Bookmark aria-hidden="true" />
-        {!compact && "Save"}
+        {!compact && !iconOnly && "Save"}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent id="save-dialog">

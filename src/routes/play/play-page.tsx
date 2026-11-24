@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
+import { Flag, RotateCcw } from "lucide-react";
 import { useRef, useState, type MouseEvent } from "react";
 import { Navigate, useParams } from "react-router";
-import { PageHead } from "../../components/page.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Card } from "../../components/ui/card.tsx";
@@ -26,7 +26,7 @@ import {
   PlayResults,
 } from "./play-results.tsx";
 import { gameStaleTime, loadGame } from "./load-game.ts";
-import { PlayActions, PlayStatus } from "./play-status.tsx";
+import { GameHead, PlayActions, PlayStatus } from "./play-status.tsx";
 import { ResetDialog } from "./reset-dialog.tsx";
 import { ResultBanner } from "./result-banner.tsx";
 import { SelectList } from "./select-list.tsx";
@@ -139,9 +139,7 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
 
   return (
     <>
-      <PageHead
-        centered
-        titleId="game-title"
+      <GameHead
         title={playable?.name ?? "Guess today's answer"}
         lede={
           playable &&
@@ -154,35 +152,13 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
           )
         }
         actions={
-          <>
-            <Button
-              id="give-up-button"
-              variant="outline"
-              size="sm"
-              hidden={finished}
-              disabled={cannotPlay || loading}
-              onClick={() => void session.giveUp()}
-            >
-              Give up
-            </Button>
-            <Button
-              id="reset-guesses-button"
-              variant="outline"
-              size="sm"
-              hidden={finished}
-              disabled={cannotPlay || rows.length === 0}
-              onClick={askReset}
-            >
-              Reset
-            </Button>
-            <PastDaysLink slug={slug} />
-            <PlayActions
-              slug={slug}
-              canHost={playable !== null && !closed}
-              canEdit={playable?.canEdit === true}
-              saveName={playable && !closed ? playable.name : undefined}
-            />
-          </>
+          <PlayActions
+            slug={slug}
+            pastDays={<PastDaysLink slug={slug} />}
+            canHost={playable !== null && !closed}
+            canEdit={playable?.canEdit === true}
+            saveName={playable && !closed ? playable.name : undefined}
+          />
         }
       />
       {playable && <PlayStatus slug={slug} view={playable} />}
@@ -218,6 +194,32 @@ function Game({ slug, day }: { slug: string; day: number | null }) {
             disabled={cannotPlay}
             busy={loading}
             hidden={finished}
+            roundActions={
+              <>
+                <Button
+                  id="give-up-button"
+                  variant="ghost"
+                  size="sm"
+                  className="bg-transparent px-2 text-muted-foreground"
+                  disabled={cannotPlay || loading}
+                  onClick={() => void session.giveUp()}
+                >
+                  <Flag aria-hidden="true" className="hidden sm:inline" />
+                  Give up
+                </Button>
+                <Button
+                  id="reset-guesses-button"
+                  variant="ghost"
+                  size="sm"
+                  className="bg-transparent px-2 text-muted-foreground"
+                  disabled={cannotPlay || rows.length === 0}
+                  onClick={askReset}
+                >
+                  <RotateCcw aria-hidden="true" className="hidden sm:inline" />
+                  Reset
+                </Button>
+              </>
+            }
           />
           <div
             className="game-actions flex flex-wrap justify-center gap-2"

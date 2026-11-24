@@ -265,6 +265,17 @@ test.describe("on a phone", () => {
       expect(box.y + box.height).toBeLessThan(guess.y);
     }
   });
+
+  test("Give up and Reset share the row of the Typing | Selecting switch", async ({
+    page,
+  }) => {
+    const toggle = (await page.locator("#guess-mode").boundingBox())!;
+    for (const id of ["#give-up-button", "#reset-guesses-button"]) {
+      const box = (await page.locator(id).boundingBox())!;
+      expect(box.x).toBeGreaterThan(toggle.x + toggle.width);
+      expect(box.y).toBeLessThan(toggle.y + toggle.height);
+    }
+  });
 });
 
 test("Play has no description under the title", async ({ page }) => {
