@@ -46,7 +46,29 @@ table { border-collapse: collapse; width: 100%; font-size: 13px; }
 th { background: var(--head); color: var(--head-fg); text-align: left; padding: 8px 10px; position: sticky; top: 0; white-space: nowrap; }
 td { padding: 8px 10px; border-top: 1px solid var(--line); vertical-align: top; }
 td.pick { width: 1%; } td.pick input { width: 20px; height: 20px; accent-color: var(--accent); }
-td.img { width: 1%; } td.img img, td.img .noimg { width: 48px; height: 70px; object-fit: cover; border-radius: 4px; display: block; }
+td.img { width: 1%; }
+.pic, .noimg { width: 64px; height: 64px; border-radius: 6px; display: block; }
+.pic { position: relative; padding: 0; border: 0; background-repeat: no-repeat; background-color: var(--dim); cursor: pointer; overflow: hidden; }
+.pic::after { content: ""; position: absolute; inset: 0; background: rgba(0, 0, 0, .45); opacity: 0; transition: opacity .15s; }
+.pic span { position: absolute; inset: auto 0 6px; z-index: 1; color: #fff; font-size: 12px; font-weight: 700; opacity: 0; transition: opacity .15s; }
+.pic:hover::after, .pic:focus-visible::after, .pic:hover span, .pic:focus-visible span { opacity: 1; }
+.cellbtn { all: unset; display: block; cursor: text; border-radius: 4px; padding: 2px 4px; margin: -2px -4px; }
+.cellbtn:hover { background: var(--dim); } .cellbtn:focus-visible { outline: 2px solid var(--accent); }
+.edited { display: inline-block; margin-top: 4px; font-size: 11px; color: var(--accent); }
+.edited button { all: unset; cursor: pointer; text-decoration: underline; margin-left: 6px; }
+.editor { display: grid; gap: 6px; min-width: 180px; }
+.editor textarea, .editor input { font: inherit; font-size: 13px; padding: 6px; border: 1px solid var(--accent); border-radius: 4px; background: var(--bg); color: var(--fg); width: 100%; box-sizing: border-box; }
+.editor .row { display: flex; gap: 6px; } .editor button { padding: 4px 10px; font-size: 13px; }
+.namebtn { all: unset; cursor: pointer; font-size: 11px; color: var(--muted); text-decoration: underline; margin-left: 8px; font-weight: 400; }
+[hidden] { display: none !important; }
+.modal { position: fixed; inset: 0; z-index: 20; background: rgba(0, 0, 0, .55); display: grid; place-items: center; padding: 16px; }
+.dialog { background: var(--bg); color: var(--fg); border-radius: 10px; padding: 20px; display: grid; gap: 14px; max-width: min(560px, 100%); max-height: 100%; overflow: auto; box-sizing: border-box; }
+.dialog h3 { margin: 0; font-size: 18px; }
+.stage { position: relative; justify-self: center; touch-action: none; user-select: none; line-height: 0; }
+.stage img { display: block; max-width: min(420px, 80vw); max-height: 55vh; }
+.box { position: absolute; box-shadow: 0 0 0 9999px rgba(0, 0, 0, .55); outline: 2px solid #fff; cursor: move; }
+.handle { position: absolute; right: -8px; bottom: -8px; width: 16px; height: 16px; background: #fff; border-radius: 50%; cursor: nwse-resize; }
+.dialog .acts { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
 .noimg { background: var(--dim); border: 1px dashed var(--line); color: var(--muted); font-size: 10px; display: grid !important; place-items: center; text-align: center; }
 td.name { font-weight: 700; min-width: 140px; } td.name a { color: inherit; } td.name small { display: block; font-weight: 400; color: var(--muted); }
 td.val { min-width: 140px; max-width: 260px; }
@@ -77,6 +99,7 @@ tr.picked td { background: var(--accent-bg); }
 
   <section>
     <h2>Rows</h2>
+    <p class="hint">Click a value or press rename to correct it; edited values are marked and can be undone. Hover a picture and click Edit to pick the square that gets imported.</p>
     <div class="toolbar">
       <input type="search" id="q" placeholder="Filter by name" aria-label="Filter rows by name">
       <button id="all" type="button">Tick all importable</button>
@@ -100,6 +123,19 @@ tr.picked td { background: var(--accent-bg); }
   </div>
 </div></div>
 
+<div class="modal" id="cropper" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="crop-title">
+    <h3 id="crop-title">Edit picture</h3>
+    <p class="hint" style="margin:0">Drag the square to move it and its corner to resize it. Only this square is imported, as the entry's photo.</p>
+    <div class="stage" id="stage"><img id="crop-img" alt=""><div class="box" id="box"><div class="handle" id="handle"></div></div></div>
+    <div class="acts">
+      <button id="crop-reset" type="button">Center</button>
+      <button id="crop-cancel" type="button">Cancel</button>
+      <button id="crop-save" class="primary" type="button">Use this square</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const DATA = /*DATA*/null;
 const FORMAT = "guessdle-import/1";
@@ -109,6 +145,7 @@ const rows = DATA.rows;
 const n = rows.length;
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const asList = (v) => (Array.isArray(v) ? v : [v]);
+const $ = (id) => document.getElementById(id);
 
 const SCALE = { thousand: 1e3, million: 1e6, billion: 1e9, trillion: 1e12 };
 function toNumber(raw) {
@@ -130,30 +167,43 @@ function guess(k) {
   if (vals.every((v) => /^[^\d]{0,3}-?\d/.test(v) && toNumber(v) !== null)) return "number";
   return "text";
 }
-const state = { on: new Set(), type: {}, picked: new Set(), q: "" };
+
+const state = { on: new Set(), type: {}, picked: new Set(), q: "", edits: {}, names: {}, crops: {}, editing: null };
 for (const k of cats) state.type[k] = guess(k);
 const ticked = () => cats.filter((k) => state.on.has(k));
 const sample = (k) => asList(rows.find((r) => k in r.fields).fields[k]).join(", ");
+const key = (i, k) => `${i}\u0000${k}`;
+const nameOf = (i) => state.names[i] ?? rows[i].name;
 
-const valuesFor = (r, k) => {
-  const v = r.fields[k];
-  if (v === undefined) return null;
+function centered([w, h]) {
+  return w >= h ? { left: (1 - h / w) / 2, top: 0, width: h / w, height: 1 } : { left: 0, top: (1 - w / h) / 2, width: 1, height: w / h };
+}
+const cropOf = (i) => state.crops[i] ?? (rows[i].thumbSize ? centered(rows[i].thumbSize) : null);
+
+function rawFor(i, k) {
+  const edit = state.edits[key(i, k)];
+  if (edit) return edit;
+  return k in rows[i].fields ? asList(rows[i].fields[k]) : null;
+}
+function valuesFor(i, k) {
+  const raw = rawFor(i, k);
+  if (raw === null) return null;
   if (state.type[k] === "number") {
-    const x = toNumber(asList(v)[0]);
+    const x = toNumber(raw[0] ?? "");
     return x === null ? null : [String(x)];
   }
-  return state.type[k] === "list" ? asList(v) : [asList(v).join(", ")];
-};
-const nameCount = {};
-for (const r of rows) nameCount[r.name.toLowerCase()] = (nameCount[r.name.toLowerCase()] || 0) + 1;
+  return state.type[k] === "list" ? raw : [raw.join(", ")];
+}
 
-function problems(r) {
+function problems(i) {
+  const name = nameOf(i).trim();
   const out = [];
-  if (r.name.length > LIMITS.entryName) out.push("name too long");
-  if (nameCount[r.name.toLowerCase()] > 1) out.push("same name as another row");
+  if (!name) out.push("no name");
+  if (name.length > LIMITS.entryName) out.push("name too long");
+  if (rows.some((_, j) => j !== i && nameOf(j).trim().toLowerCase() === name.toLowerCase())) out.push("same name as another row");
   for (const k of ticked()) {
-    const vals = valuesFor(r, k);
-    if (!(k in r.fields)) out.push(`no ${k}`);
+    const vals = valuesFor(i, k);
+    if (rawFor(i, k) === null) out.push(`no ${k}`);
     else if (vals === null) out.push(`no number in ${k}`);
     else if (vals.length > LIMITS.listItems) out.push(`${k} has over ${LIMITS.listItems} items`);
     else if (vals.some((x) => x.length > LIMITS.value)) out.push(`${k} too long`);
@@ -161,36 +211,65 @@ function problems(r) {
   return out;
 }
 
-const $ = (id) => document.getElementById(id);
 $("meta").innerHTML = `<span>Source <b>${esc(DATA.source)}</b></span><span>List <b><a href="${esc(DATA.listUrl)}" target="_blank" rel="noopener" style="color:inherit">${esc(DATA.list)}</a></b></span><span><b>${n}</b> pages with an infobox</span><span>Read <b>${new Date(DATA.fetchedAt).toLocaleString()}</b></span>`;
 
 function renderCats() {
   const full = state.on.size >= LIMITS.categories;
   $("cats").innerHTML = "";
-  cats.forEach((k, i) => {
+  cats.forEach((k, c) => {
     const on = state.on.has(k);
     const el = document.createElement("label");
     el.className = `cat${on ? " on" : ""}${full ? " full" : ""}`;
-    el.htmlFor = `cat-${i}`;
-    el.innerHTML = `<input type="checkbox" id="cat-${i}" ${on ? "checked" : ""} ${full && !on ? "disabled" : ""}>
+    el.htmlFor = `cat-${c}`;
+    el.innerHTML = `<input type="checkbox" id="cat-${c}" ${on ? "checked" : ""} ${full && !on ? "disabled" : ""}>
       <span class="nm">${esc(k)}<span class="cov ${counts[k] < n ? "part" : ""}">${counts[k]}/${n}</span></span>
       <span class="ex" title="${esc(sample(k))}">e.g. ${esc(sample(k))}</span>
-      <select id="cat-${i}-type" aria-label="Type for ${esc(k)}">${TYPES.map((t) => `<option value="${t}" ${state.type[k] === t ? "selected" : ""}>${t[0].toUpperCase() + t.slice(1)}</option>`).join("")}</select>`;
+      <select id="cat-${c}-type" aria-label="Type for ${esc(k)}">${TYPES.map((t) => `<option value="${t}" ${state.type[k] === t ? "selected" : ""}>${t[0].toUpperCase() + t.slice(1)}</option>`).join("")}</select>`;
     el.querySelector("input").addEventListener("change", (e) => { e.target.checked ? state.on.add(k) : state.on.delete(k); renderAll(); });
     el.querySelector("select").addEventListener("change", (e) => { state.type[k] = e.target.value; renderAll(); });
     $("cats").appendChild(el);
   });
 }
 
-function cell(r, k) {
-  if (!(k in r.fields)) return `<span class="missing">not on page</span>`;
-  const raw = asList(r.fields[k]);
-  const vals = valuesFor(r, k);
+function shown(i, k) {
+  const raw = rawFor(i, k);
+  if (raw === null) return `<span class="missing">not on page · add</span>`;
+  const vals = valuesFor(i, k);
   if (state.type[k] === "number") {
     return vals === null ? `<span class="missing">no number in "${esc(raw.join(", "))}"</span>` : `<span class="num">${fmt(Number(vals[0]))}</span><span class="raw">${esc(raw.join(", "))}</span>`;
   }
   if (state.type[k] === "list") return vals.map((x) => `<span class="chip">${esc(x)}</span>`).join("");
   return esc(vals[0]);
+}
+
+function editorHtml(value, multi) {
+  return `<div class="editor">${multi ? `<textarea rows="${Math.min(8, Math.max(3, value.split("\n").length))}">${esc(value)}</textarea>` : `<input value="${esc(value)}">`}
+    <div class="row"><button class="primary" data-act="save" type="button">Save</button><button data-act="cancel" type="button">Cancel</button></div></div>`;
+}
+
+function cellHtml(i, k) {
+  if (state.editing === key(i, k)) {
+    const raw = rawFor(i, k) ?? [];
+    return editorHtml(state.type[k] === "list" ? raw.join("\n") : raw.join(", "), state.type[k] === "list");
+  }
+  const edited = state.edits[key(i, k)] ? `<span class="edited">edited<button type="button" data-act="undo">undo</button></span>` : "";
+  return `<button class="cellbtn" type="button" data-act="edit" aria-label="Edit ${esc(k)} of ${esc(nameOf(i))}">${shown(i, k)}</button>${edited}`;
+}
+
+function pictureHtml(i) {
+  const r = rows[i];
+  const crop = cropOf(i);
+  if (!r.thumb || !crop) return `<div class="noimg">${r.image ? "no preview" : "no picture"}</div>`;
+  const size = `${100 / crop.width}% ${100 / crop.height}%`;
+  const pos = `${crop.width < 1 ? (crop.left / (1 - crop.width)) * 100 : 0}% ${crop.height < 1 ? (crop.top / (1 - crop.height)) * 100 : 0}%`;
+  return `<button class="pic" type="button" data-act="crop" aria-label="Edit picture of ${esc(nameOf(i))}" style="background-image:url('${r.thumb}');background-size:${size};background-position:${pos}"><span>Edit</span></button>`;
+}
+
+function nameHtml(i) {
+  const r = rows[i];
+  if (state.editing === key(i, "\u0001name")) return editorHtml(nameOf(i), false);
+  const bad = problems(i);
+  return `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(nameOf(i))}</a><button class="namebtn" type="button" data-act="rename">rename</button>${state.names[i] !== undefined ? `<small>Wikipedia: ${esc(r.title)}</small>` : r.title !== r.name ? `<small>${esc(r.title)}</small>` : ""}${bad.length ? `<small class="missing">${esc(bad.join("; "))}</small>` : ""}`;
 }
 
 function renderTable() {
@@ -199,19 +278,102 @@ function renderTable() {
   const tb = $("tbody");
   tb.innerHTML = "";
   rows.forEach((r, i) => {
-    const bad = problems(r);
+    const bad = problems(i);
     if (bad.length) state.picked.delete(i);
-    if (state.q && !r.name.toLowerCase().includes(state.q)) return;
+    if (state.q && !nameOf(i).toLowerCase().includes(state.q)) return;
     const tr = document.createElement("tr");
     tr.className = bad.length ? "blocked" : state.picked.has(i) ? "picked" : "";
-    tr.innerHTML = `<td class="pick"><input type="checkbox" id="row-${i}" aria-label="Import ${esc(r.name)}" ${state.picked.has(i) ? "checked" : ""} ${bad.length ? "disabled" : ""}></td>
-      <td class="img">${r.thumb ? `<img src="${r.thumb}" alt="">` : `<div class="noimg">${r.image ? "no preview" : "no picture"}</div>`}</td>
-      <td class="name"><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.name)}</a>${r.title !== r.name ? `<small>${esc(r.title)}</small>` : ""}${bad.length ? `<small class="missing">${esc(bad.join("; "))}</small>` : ""}</td>
-      ${ks.map((k) => `<td class="val">${cell(r, k)}</td>`).join("")}`;
-    tr.querySelector("input").addEventListener("change", (e) => { e.target.checked ? state.picked.add(i) : state.picked.delete(i); renderSum(); tr.className = e.target.checked ? "picked" : ""; });
+    tr.innerHTML = `<td class="pick"><input type="checkbox" id="row-${i}" aria-label="Import ${esc(nameOf(i))}" ${state.picked.has(i) ? "checked" : ""} ${bad.length ? "disabled" : ""}></td>
+      <td class="img">${pictureHtml(i)}</td>
+      <td class="name" data-k="\u0001name">${nameHtml(i)}</td>
+      ${ks.map((k) => `<td class="val" data-k="${esc(k)}">${cellHtml(i, k)}</td>`).join("")}`;
+    tr.querySelector("input[type=checkbox]").addEventListener("change", (e) => { e.target.checked ? state.picked.add(i) : state.picked.delete(i); tr.className = e.target.checked ? "picked" : ""; renderSum(); });
+    tr.addEventListener("click", (e) => act(i, e));
+    tr.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && state.editing) { state.editing = null; renderTable(); }
+      if (e.key === "Enter" && e.target.tagName === "INPUT" && e.target.type !== "checkbox") save(i, e.target.closest("td").dataset.k, e.target.value);
+    });
     tb.appendChild(tr);
   });
+  const open = tb.querySelector(".editor textarea, .editor input");
+  if (open) { open.focus(); open.select(); }
 }
+
+function save(i, k, text) {
+  if (k === "\u0001name") {
+    const name = text.trim();
+    if (name === rows[i].name) delete state.names[i]; else state.names[i] = name;
+  } else {
+    const items = (state.type[k] === "list" ? text.split("\n") : [text]).map((x) => x.trim()).filter(Boolean);
+    const original = k in rows[i].fields ? asList(rows[i].fields[k]) : null;
+    const same = original && JSON.stringify(state.type[k] === "list" ? original : [original.join(", ")]) === JSON.stringify(items);
+    if (items.length === 0 || same) delete state.edits[key(i, k)]; else state.edits[key(i, k)] = items;
+  }
+  state.editing = null;
+  renderTable();
+  renderSum();
+}
+
+function act(i, e) {
+  const btn = e.target.closest("[data-act]");
+  if (!btn) return;
+  const k = btn.closest("td").dataset.k;
+  const a = btn.dataset.act;
+  if (a === "edit") { state.editing = key(i, k); renderTable(); }
+  else if (a === "rename") { state.editing = key(i, "\u0001name"); renderTable(); }
+  else if (a === "undo") { delete state.edits[key(i, k)]; renderTable(); renderSum(); }
+  else if (a === "cancel") { state.editing = null; renderTable(); }
+  else if (a === "save") save(i, k, btn.closest(".editor").querySelector("textarea, input").value);
+  else if (a === "crop") openCropper(i);
+}
+
+const crop = { i: -1, box: null };
+function placeBox() {
+  const img = $("crop-img");
+  const b = crop.box;
+  Object.assign($("box").style, { left: `${b.left * img.clientWidth}px`, top: `${b.top * img.clientHeight}px`, width: `${b.width * img.clientWidth}px`, height: `${b.height * img.clientHeight}px` });
+}
+function openCropper(i) {
+  crop.i = i;
+  crop.box = { ...cropOf(i) };
+  $("crop-title").textContent = `Edit picture of ${nameOf(i)}`;
+  $("cropper").hidden = false;
+  const img = $("crop-img");
+  img.onload = placeBox;
+  img.src = rows[i].thumb;
+  if (img.complete) placeBox();
+  $("crop-save").focus();
+}
+function closeCropper() { $("cropper").hidden = true; }
+function startDrag(e, resize) {
+  e.preventDefault();
+  e.stopPropagation();
+  const img = $("crop-img");
+  const [W, H] = [img.clientWidth, img.clientHeight];
+  const start = { x: e.clientX, y: e.clientY, ...crop.box };
+  const move = (m) => {
+    const dx = (m.clientX - start.x) / W;
+    const dy = (m.clientY - start.y) / H;
+    if (resize) {
+      const side = Math.max(16, Math.min(start.width * W + Math.max(dx * W, dy * H), (1 - start.left) * W, (1 - start.top) * H));
+      crop.box = { ...crop.box, width: side / W, height: side / H };
+    } else {
+      crop.box = { ...crop.box, left: Math.min(Math.max(0, start.left + dx), 1 - start.width), top: Math.min(Math.max(0, start.top + dy), 1 - start.height) };
+    }
+    placeBox();
+  };
+  const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", up);
+}
+$("box").addEventListener("pointerdown", (e) => startDrag(e, false));
+$("handle").addEventListener("pointerdown", (e) => startDrag(e, true));
+$("crop-reset").addEventListener("click", () => { crop.box = centered(rows[crop.i].thumbSize); placeBox(); });
+$("crop-cancel").addEventListener("click", closeCropper);
+$("cropper").addEventListener("click", (e) => { if (e.target === $("cropper")) closeCropper(); });
+$("cropper").addEventListener("keydown", (e) => { if (e.key === "Escape") closeCropper(); });
+$("crop-save").addEventListener("click", () => { state.crops[crop.i] = crop.box; closeCropper(); renderTable(); });
+window.addEventListener("resize", () => { if (!$("cropper").hidden) placeBox(); });
 
 function importFile() {
   const ks = ticked();
@@ -221,14 +383,21 @@ function importFile() {
     attributes: ks.map((k) => ({ name: k, type: state.type[k] })),
     entries: [...state.picked].sort((a, b) => a - b).map((i) => {
       const r = rows[i];
-      return { name: r.name, image: r.image, values: Object.fromEntries(ks.map((k) => [k, valuesFor(r, k)])) };
+      const c = r.image ? cropOf(i) : null;
+      return {
+        name: nameOf(i).trim(),
+        image: r.image,
+        ...(c && { crop: { left: +c.left.toFixed(4), top: +c.top.toFixed(4), width: +c.width.toFixed(4), height: +c.height.toFixed(4) } }),
+        values: Object.fromEntries(ks.map((k) => [k, valuesFor(i, k)])),
+      };
     }),
   };
 }
 
 function renderSum() {
-  const importable = rows.filter((r) => !problems(r).length).length;
-  $("sum").innerHTML = `<b>${state.picked.size}</b> of ${importable} importable rows ticked · <b>${state.on.size}</b> categories`;
+  const importable = rows.filter((_, i) => !problems(i).length).length;
+  const edits = Object.keys(state.edits).length + Object.keys(state.names).length;
+  $("sum").innerHTML = `<b>${state.picked.size}</b> of ${importable} importable rows ticked · <b>${state.on.size}</b> categories${edits ? ` · ${edits} edited` : ""}`;
   $("copy").disabled = $("preview").disabled = state.picked.size === 0;
   if (!$("outbox").hidden) $("out").value = JSON.stringify(importFile(), null, 2);
 }
@@ -236,14 +405,14 @@ function renderSum() {
 function renderAll() { renderCats(); renderTable(); renderSum(); }
 
 $("q").addEventListener("input", (e) => { state.q = e.target.value.toLowerCase(); renderTable(); });
-$("all").addEventListener("click", () => { rows.forEach((r, i) => { if (!problems(r).length) state.picked.add(i); }); renderAll(); });
+$("all").addEventListener("click", () => { rows.forEach((_, i) => { if (!problems(i).length) state.picked.add(i); }); renderAll(); });
 $("none").addEventListener("click", () => { state.picked.clear(); renderAll(); });
 $("preview").addEventListener("click", () => { $("outbox").hidden = false; renderSum(); $("outbox").scrollIntoView({ behavior: "smooth" }); });
 $("copy").addEventListener("click", () => {
   const text = JSON.stringify(importFile());
-  const shown = () => { $("outbox").hidden = false; renderSum(); $("out").focus(); $("out").select(); };
-  if (!navigator.clipboard) return shown();
-  navigator.clipboard.writeText(text).then(() => { $("copy").textContent = "Copied"; $("copy").addEventListener("blur", () => ($("copy").textContent = "Copy import file"), { once: true }); }, shown);
+  const fallback = () => { $("outbox").hidden = false; renderSum(); $("out").focus(); $("out").select(); };
+  if (!navigator.clipboard) return fallback();
+  navigator.clipboard.writeText(text).then(() => { $("copy").textContent = "Copied"; $("copy").addEventListener("blur", () => ($("copy").textContent = "Copy import file"), { once: true }); }, fallback);
 });
 
 renderAll();

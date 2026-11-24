@@ -19,9 +19,17 @@ export interface ImportAttribute {
   type: ImportAttributeType;
 }
 
+export interface ImportCrop {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
 export interface ImportEntry {
   name: string;
   image: string | null;
+  crop: ImportCrop | null;
   values: Record<string, string[]>;
 }
 
@@ -99,6 +107,33 @@ function attributesOf(raw: unknown): ImportAttribute[] | undefined {
   return attributes;
 }
 
+const CROP_SLACK = 0.001;
+
+function cropOf(raw: unknown): ImportCrop | null | undefined {
+  if (raw === undefined || raw === null) {
+    return null;
+  }
+  if (!isRecord(raw)) {
+    return undefined;
+  }
+  const [left, top, width, height] = ["left", "top", "width", "height"].map(
+    (k) => raw[k],
+  );
+  const parts = [left, top, width, height];
+  if (!parts.every((v) => typeof v === "number" && Number.isFinite(v))) {
+    return undefined;
+  }
+  const crop = { left, top, width, height } as ImportCrop;
+  return crop.left >= 0 &&
+    crop.top >= 0 &&
+    crop.width > 0 &&
+    crop.height > 0 &&
+    crop.left + crop.width <= 1 + CROP_SLACK &&
+    crop.top + crop.height <= 1 + CROP_SLACK
+    ? crop
+    : undefined;
+}
+
 function entryOf(
   raw: unknown,
   attributes: ImportAttribute[],
@@ -109,8 +144,10 @@ function entryOf(
   const name = textIn(raw["name"], MAX_ENTRY_NAME);
   const image = raw["image"] ?? null;
   const values = raw["values"];
+  const crop = cropOf(raw["crop"]);
   if (
     name === undefined ||
+    crop === undefined ||
     !isRecord(values) ||
     (image !== null && (typeof image !== "string" || !isImportImage(image)))
   ) {
@@ -124,7 +161,7 @@ function entryOf(
     }
     parsed[attribute.name] = items;
   }
-  return { name, image, values: parsed };
+  return { name, image, crop: image === null ? null : crop, values: parsed };
 }
 
 export function parseImportFile(raw: unknown): ImportFile | undefined {

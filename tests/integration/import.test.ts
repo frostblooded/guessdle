@@ -94,6 +94,20 @@ describe("game import", () => {
         background: { r: 200, g: 60, b: 40 },
       },
     })
+      .composite([
+        {
+          input: {
+            create: {
+              width: 300,
+              height: 150,
+              channels: 3,
+              background: { r: 20, g: 40, b: 220 },
+            },
+          },
+          top: 0,
+          left: 0,
+        },
+      ])
       .png()
       .toBuffer();
     server = await new Promise<Server>((resolve) => {
@@ -209,6 +223,28 @@ describe("game import", () => {
     assert.deepEqual(third.body.unchanged, 1);
   });
 
+  it("crops the picture to the square picked in the picker", async () => {
+    const res = await request(
+      "POST",
+      I,
+      ann,
+      file([
+        {
+          ...toyStory,
+          crop: { left: 0.25, top: 0, width: 0.5, height: 1 / 3 },
+        },
+      ]),
+    );
+    assert.equal(res.status, 200);
+    const photo = (await attributes()).find((a: Body) => a.type === "image");
+    const toy = (await entries())[0];
+    const stored = join(dir, toy.values[String(photo.id)][0].slice(9));
+    const { width, height } = await sharp(stored).metadata();
+    assert.deepEqual([width, height], [150, 150]);
+    const { channels } = await sharp(stored).stats();
+    assert.ok(channels[2]!.mean > 150 && channels[0]!.mean < 80);
+  });
+
   it("imports an entry whose image fails and counts it as missing", async () => {
     const res = await request(
       "POST",
@@ -230,6 +266,9 @@ describe("game import", () => {
       { format: "other" },
       file([]),
       file([{ ...toyStory, image: "https://evil.example/x.jpg" }]),
+      file([
+        { ...toyStory, crop: { left: 0.6, top: 0, width: 0.5, height: 0.2 } },
+      ]),
       file([{ ...toyStory, values: { "Directed by": ["X"] } }]),
       file([
         { ...toyStory, values: { ...toyStory.values, "Running time": "long" } },

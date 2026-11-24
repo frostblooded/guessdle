@@ -211,9 +211,12 @@ export function gameEdits(ctx: EditContext, uploadsDir: string) {
       const wanted = await entriesNeedingImages(pool, game, file);
       let used = await usedBytes(pool, editor.id);
       const stored = await mapLimited(wanted, IMPORT_FETCHES, async (name) => {
-        const image = file.entries.find((e) => e.name === name)!.image!;
+        const entry = file.entries.find((e) => e.name === name)!;
         try {
-          const webp = await squarePhoto(await fetchImage(image));
+          const webp = await squarePhoto(
+            await fetchImage(entry.image!),
+            entry.crop,
+          );
           if (used + webp.length > quotaBytes) {
             return null;
           }

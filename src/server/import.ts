@@ -1,7 +1,7 @@
 import type pg from "pg";
 import sharp from "sharp";
 import { UPLOAD_SHAPES } from "../game/crop.ts";
-import type { ImportFile } from "../game/import-file.ts";
+import type { ImportCrop, ImportFile } from "../game/import-file.ts";
 import { MAX_ATTRIBUTES } from "../game/limits.ts";
 import { listAttributes } from "./attributes.ts";
 import type { GameRow } from "./games.ts";
@@ -21,12 +21,36 @@ export type ImportOutcome =
 
 export type FetchImage = (url: string) => Promise<Buffer>;
 
-export async function squarePhoto(input: Buffer): Promise<Buffer> {
+async function cropTo(image: Buffer, crop: ImportCrop): Promise<Buffer> {
+  const { width = 1, height = 1 } = await sharp(image).metadata();
+  const left = Math.min(width - 1, Math.round(crop.left * width));
+  const top = Math.min(height - 1, Math.round(crop.top * height));
+  return sharp(image)
+    .extract({
+      left,
+      top,
+      width: Math.max(
+        1,
+        Math.min(width - left, Math.round(crop.width * width)),
+      ),
+      height: Math.max(
+        1,
+        Math.min(height - top, Math.round(crop.height * height)),
+      ),
+    })
+    .toBuffer();
+}
+
+export async function squarePhoto(
+  input: Buffer,
+  crop: ImportCrop | null = null,
+): Promise<Buffer> {
   const webp = await processImage(input, "photo");
   try {
-    const { width = 1, height = 1 } = await sharp(webp).metadata();
+    const cropped = crop ? await cropTo(webp, crop) : webp;
+    const { width = 1, height = 1 } = await sharp(cropped).metadata();
     const side = Math.min(width, height, UPLOAD_SHAPES.photo.maxSide);
-    return await sharp(webp)
+    return await sharp(cropped)
       .resize(side, side, { fit: "cover", position: "attention" })
       .webp()
       .toBuffer();

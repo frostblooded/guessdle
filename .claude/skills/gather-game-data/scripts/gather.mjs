@@ -3,8 +3,9 @@
 // data.json for build.mjs. Every value is copied from the infobox as Wikipedia renders it.
 // Usage: node gather.mjs --list "List of Pixar films" [--wiki en] [--from tables|bullets]
 //        [--tables 1] [--limit 300] [--out data.json]
+//        node gather.mjs --refresh data.json   (downloads previews that failed last time)
 import { execFileSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { JSDOM } from "jsdom";
 import sharp from "sharp";
@@ -17,9 +18,10 @@ const { values: args } = parseArgs({
     tables: { type: "string", default: "all" },
     limit: { type: "string", default: "300" },
     out: { type: "string", default: "data.json" },
+    refresh: { type: "string" },
   },
 });
-if (!args.list) {
+if (!args.list && !args.refresh) {
   console.error('Usage: node gather.mjs --list "List of Pixar films"');
   process.exit(2);
 }
@@ -27,6 +29,7 @@ if (!args.list) {
 const UA = "GuessdleDataPicker/1.0 (https://github.com/frostblooded/guessdle)";
 const WIKI = `https://${args.wiki}.wikipedia.org`;
 const IMPORT_WIDTH = 500;
+const PREVIEW_WIDTH = 320;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const titleOf = (raw) =>
   decodeURIComponent(
@@ -164,14 +167,35 @@ async function pageImage(title, box) {
 async function previewOf(url) {
   const bytes = url && (await get(url, true));
   if (!bytes) {
-    return null;
+    return { thumb: null, thumbSize: null };
   }
   try {
-    const jpeg = await sharp(bytes).resize(96).jpeg({ quality: 70 }).toBuffer();
-    return `data:image/jpeg;base64,${jpeg.toString("base64")}`;
+    const { data, info } = await sharp(bytes)
+      .flatten({ background: "#ffffff" })
+      .resize(PREVIEW_WIDTH, PREVIEW_WIDTH, { fit: "inside" })
+      .jpeg({ quality: 72 })
+      .toBuffer({ resolveWithObject: true });
+    return {
+      thumb: `data:image/jpeg;base64,${data.toString("base64")}`,
+      thumbSize: [info.width, info.height],
+    };
   } catch {
-    return null;
+    return { thumb: null, thumbSize: null };
   }
+}
+
+if (args.refresh) {
+  const data = JSON.parse(readFileSync(args.refresh, "utf8"));
+  const stale = data.rows.filter((r) => r.preview && !r.thumbSize);
+  for (const row of stale) {
+    await sleep(500);
+    Object.assign(row, await previewOf(row.preview));
+    process.stderr.write(row.thumb ? "." : "x");
+  }
+  writeFileSync(args.refresh, JSON.stringify(data));
+  const left = data.rows.filter((r) => r.preview && !r.thumb).length;
+  console.error(`\nRefreshed ${stale.length} previews, ${left} still missing.`);
+  process.exit(left > 0 ? 1 : 0);
 }
 
 const listDoc = await page(titleOf(args.list));
@@ -214,7 +238,7 @@ for (const title of titles) {
     url: `${WIKI}/wiki/${encodeURIComponent(pageTitle.replace(/ /g, "_"))}`,
     image: image?.import ?? null,
     preview: image?.preview ?? null,
-    thumb: await previewOf(image?.preview),
+    ...(await previewOf(image?.preview)),
     fields,
   });
   process.stderr.write(".");
@@ -222,7 +246,7 @@ for (const title of titles) {
 
 for (const row of rows.filter((r) => r.preview && !r.thumb)) {
   await sleep(5000);
-  row.thumb = await previewOf(row.preview);
+  Object.assign(row, await previewOf(row.preview));
 }
 const unpictured = rows.filter((r) => r.preview && !r.thumb).map((r) => r.name);
 if (unpictured.length > 0) {

@@ -17,7 +17,7 @@ Arguments: a **list** (default: a Wikipedia list page, by title or URL) and **so
    node .claude/skills/gather-game-data/scripts/gather.mjs --list "List of Pixar films" --out <scratchpad>/data.json
    ```
 
-   Options: `--wiki de` for another language, `--from tables|bullets` (default: tables when the page has linked table rows, else bullet lists), `--tables 1,2` to read only those tables, `--limit 300`. It reads one page at a time and retries Wikipedia's rate limits, so 100 pages take a few minutes; run it in the background and post a progress line meanwhile. Each row's picture is the page's own Wikipedia page image (the REST summary's lead image; the infobox image only when the page has none), so it is the same picture Wikipedia shows for the page. Done when it prints the row count, most linked pages had an infobox (if most were skipped, the list linked the wrong things: rerun with `--from` or `--tables`), and it printed no "Picture previews still failing" line; if it did, rerun before publishing, because rate limits are the usual cause.
+   Options: `--wiki de` for another language, `--from tables|bullets` (default: tables when the page has linked table rows, else bullet lists), `--tables 1,2` to read only those tables, `--limit 300`. It reads one page at a time and retries Wikipedia's rate limits, so 100 pages take a few minutes; run it in the background and post a progress line meanwhile. Each row's picture is the page's own Wikipedia page image (the REST summary's lead image; the infobox image only when the page has none), so it is the same picture Wikipedia shows for the page. Done when it prints the row count, most linked pages had an infobox (if most were skipped, the list linked the wrong things: rerun with `--from` or `--tables`), and it printed no "Picture previews still failing" line; if it did, run `gather.mjs --refresh <scratchpad>/data.json` until it exits 0, because rate limits are the usual cause and every row needs its preview for the crop editor.
 3. **Build and publish.**
 
    ```sh
@@ -28,7 +28,7 @@ Arguments: a **list** (default: a Wikipedia list page, by title or URL) and **so
 
 ## What the maintainer does next
 
-In the picker: tick categories (each shows how many pages have it, and a Text, List or Number type to adjust), tick rows (unticked by default; rows missing a ticked value, over Guessdle's limits or sharing a name are blocked and say why), then **Copy import file**. In Guessdle: game editor, Entries tab, **Import entries**, paste. The server adds missing attributes and a Photo column, creates new entries, fills only blank values on entries that already exist, and copies each picture from `upload.wikimedia.org`, square-cropped. Classic games only. The file format is checked by `src/game/import-file.ts`.
+In the picker: tick categories (each shows how many pages have it, and a Text, List or Number type to adjust), tick rows (unticked by default; rows missing a ticked value, over Guessdle's limits or sharing a name are blocked and say why), correct any value or name by clicking it (edits are marked and can be undone), pick each picture's square with its Edit button (centred by default), then **Copy import file**. In Guessdle: game editor, Entries tab, **Import entries**, paste. The server adds missing attributes and a Photo column, creates new entries, fills only blank values on entries that already exist, and copies each picture from `upload.wikimedia.org`, cut to the square picked in the picker. Classic games only. The file format is checked by `src/game/import-file.ts`.
 
 ## Other sources
 
@@ -36,7 +36,7 @@ In the picker: tick categories (each shows how many pages have it, and a Text, L
 
 ```json
 { "source": "…", "list": "…", "listUrl": "https://…", "fetchedAt": "ISO time", "skipped": [],
-  "rows": [{ "name": "Toy Story", "title": "Toy Story", "url": "https://…", "image": "https://upload.wikimedia.org/…" , "thumb": "data:image/jpeg;base64,… or null",
+  "rows": [{ "name": "Toy Story", "title": "Toy Story", "url": "https://…", "image": "https://upload.wikimedia.org/…" , "preview": "https://…", "thumb": "data:image/jpeg;base64,… or null", "thumbSize": [320, 474],
              "fields": { "Directed by": "John Lasseter", "Starring": ["Tom Hanks", "Tim Allen"] } }] }
 ```
 
