@@ -17,7 +17,7 @@ Arguments: a **list** (default: a Wikipedia list page, by title or URL) and **so
    node .claude/skills/gather-game-data/scripts/gather.mjs --list "List of Pixar films" --out <scratchpad>/data.json
    ```
 
-   Options: `--wiki de` for another language, `--from tables|bullets` (default: tables when the page has linked table rows, else bullet lists), `--tables 1,2` to read only those tables, `--limit 300`. It reads one page at a time and retries Wikipedia's rate limits, so 100 pages take a few minutes; run it in the background and post a progress line meanwhile. Done when it prints the row count, and most linked pages had an infobox (if most were skipped, the list linked the wrong things: rerun with `--from` or `--tables`).
+   Options: `--wiki de` for another language, `--from tables|bullets` (default: tables when the page has linked table rows, else bullet lists), `--tables 1,2` to read only those tables, `--limit 300`. It reads one page at a time and retries Wikipedia's rate limits, so 100 pages take a few minutes; run it in the background and post a progress line meanwhile. Each row's picture is the page's own Wikipedia page image (the REST summary's lead image; the infobox image only when the page has none), so it is the same picture Wikipedia shows for the page. Done when it prints the row count, most linked pages had an infobox (if most were skipped, the list linked the wrong things: rerun with `--from` or `--tables`), and it printed no "Picture previews still failing" line; if it did, rerun before publishing, because rate limits are the usual cause.
 3. **Build and publish.**
 
    ```sh

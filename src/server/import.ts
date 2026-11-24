@@ -195,14 +195,24 @@ const IMPORT_USER_AGENT =
   "Guessdle/1.0 (https://github.com/frostblooded/guessdle)";
 const IMPORT_TIMEOUT_MS = 20_000;
 
+const IMPORT_TRIES = 4;
+const retryable = (status: number): boolean => status === 429 || status >= 500;
+const pause = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
 export const fetchImportImage: FetchImage = async (url) => {
-  const res = await fetch(url, {
-    headers: { "User-Agent": IMPORT_USER_AGENT },
-    redirect: "error",
-    signal: AbortSignal.timeout(IMPORT_TIMEOUT_MS),
-  });
-  if (!res.ok) {
-    throw new ImageError("unsupported");
+  for (let attempt = 1; ; attempt++) {
+    const res = await fetch(url, {
+      headers: { "User-Agent": IMPORT_USER_AGENT },
+      redirect: "error",
+      signal: AbortSignal.timeout(IMPORT_TIMEOUT_MS),
+    }).catch(() => null);
+    if (res?.ok) {
+      return Buffer.from(await res.arrayBuffer());
+    }
+    if ((res && !retryable(res.status)) || attempt === IMPORT_TRIES) {
+      throw new ImageError("unsupported");
+    }
+    await pause(1000 * 2 ** attempt);
   }
-  return Buffer.from(await res.arrayBuffer());
 };

@@ -125,16 +125,11 @@ function linksFrom(doc) {
   return [...new Set(titles.filter(Boolean))];
 }
 
-function imageOf(box) {
-  const img = box.querySelector("img");
-  if (!img) {
-    return null;
-  }
-  const src = ("https:" + img.getAttribute("src").split("?")[0]).replace(
+function imageUrls(raw, width) {
+  const src = (raw.startsWith("//") ? `https:${raw}` : raw).split("?")[0].replace(
     /^https:\/\/thumb\.wikimedia\.org\//,
     "https://upload.wikimedia.org/",
   );
-  const width = Number(img.getAttribute("data-file-width") ?? 0);
   const thumb = /^(.*)\/thumb\/(.+?)\/\d+px-[^/]+$/.exec(src);
   const original = thumb ? `${thumb[1]}/${thumb[2]}` : src;
   const file = original.slice(original.lastIndexOf("/") + 1);
@@ -147,6 +142,23 @@ function imageOf(box) {
         ? `${base}/${IMPORT_WIDTH}px-${file}`
         : original;
   return { preview: src, import: forImport };
+}
+
+async function pageImage(title, box) {
+  const summary = await get(
+    `${WIKI}/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/ /g, "_"))}`,
+  );
+  const lead = summary && JSON.parse(summary);
+  if (lead?.originalimage) {
+    return imageUrls(
+      lead.thumbnail?.source ?? lead.originalimage.source,
+      lead.originalimage.width,
+    );
+  }
+  const img = box.querySelector("img");
+  return img
+    ? imageUrls(img.getAttribute("src"), Number(img.getAttribute("data-file-width") ?? 0))
+    : null;
 }
 
 async function previewOf(url) {
@@ -195,18 +207,27 @@ for (const title of titles) {
     }
   }
   const pageTitle = clean(doc.querySelector("title")?.textContent ?? title);
-  const image = imageOf(box);
+  const image = await pageImage(pageTitle, box);
   rows.push({
     name: pageTitle.replace(/ \([^)]*\)$/, ""),
     title: pageTitle,
     url: `${WIKI}/wiki/${encodeURIComponent(pageTitle.replace(/ /g, "_"))}`,
     image: image?.import ?? null,
+    preview: image?.preview ?? null,
     thumb: await previewOf(image?.preview),
     fields,
   });
   process.stderr.write(".");
 }
 
+for (const row of rows.filter((r) => r.preview && !r.thumb)) {
+  await sleep(5000);
+  row.thumb = await previewOf(row.preview);
+}
+const unpictured = rows.filter((r) => r.preview && !r.thumb).map((r) => r.name);
+if (unpictured.length > 0) {
+  console.error(`Picture previews still failing for: ${unpictured.join(", ")}`);
+}
 const listTitle = titleOf(args.list);
 writeFileSync(
   args.out,
