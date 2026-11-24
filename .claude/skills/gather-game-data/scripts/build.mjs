@@ -1,22 +1,26 @@
 #!/usr/bin/env node
-// Fills the cached picker app (assets/picker.html) with one gather.mjs result.
-// Usage: node build.mjs data.json picker.html
+// Fills the cached picker app (assets/picker.html) with the list to read.
+// Usage: node build.mjs --list "List of Pixar films" [--wiki en] [--from auto|tables|<n>|bullets] --out picker.html
 import { readFileSync, writeFileSync } from "node:fs";
+import { parseArgs } from "node:util";
 
-const [dataPath, outPath] = process.argv.slice(2);
-if (!dataPath || !outPath) {
-  console.error("Usage: node build.mjs data.json picker.html");
+const { values } = parseArgs({
+  options: {
+    list: { type: "string" },
+    wiki: { type: "string", default: "en" },
+    from: { type: "string", default: "auto" },
+    out: { type: "string" },
+  },
+});
+if (!values.list || !values.out) {
+  console.error('Usage: node build.mjs --list "List of Pixar films" [--wiki en] [--from auto|tables|<n>|bullets] --out picker.html');
   process.exit(2);
 }
-const data = JSON.parse(readFileSync(dataPath, "utf8"));
-if (!Array.isArray(data.rows) || data.rows.length === 0) {
-  console.error(`${dataPath} has no rows; nothing to pick from.`);
-  process.exit(1);
-}
+const config = { list: values.list, wiki: values.wiki, from: values.from };
+const name = values.list.replace(/^List of /i, "").replace(/[<&]/g, "");
 const template = readFileSync(new URL("../assets/picker.html", import.meta.url), "utf8");
-const json = JSON.stringify(data).replace(/</g, "\\u003c");
 const html = template
-  .replace("<title>Game Data Picker</title>", `<title>${data.list.replace(/^List of /i, "").replace(/[<&]/g, "")} picker</title>`)
-  .replace("/*DATA*/null", () => json);
-writeFileSync(outPath, html);
-console.error(`Wrote ${outPath} (${data.rows.length} rows, ${(html.length / 1e6).toFixed(1)} MB)`);
+  .replace("<title>Game Data Picker</title>", `<title>${name} picker</title>`)
+  .replace('/*CONFIG*/ { list: "", wiki: "en", from: "auto" }', () => JSON.stringify(config).replace(/</g, "\\u003c"));
+writeFileSync(values.out, html);
+console.error(`Wrote ${values.out} for "${values.list}" on ${values.wiki}.wikipedia.org`);

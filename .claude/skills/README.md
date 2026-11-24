@@ -8,7 +8,7 @@ Matt Pocock's agent skills, copied unedited from [mattpocock/skills](https://git
 - `CLAUDE.md` wins where a skill disagrees with it.
 - Prettier skips this folder (`.prettierignore`) so the files stay byte-for-byte upstream.
 
-Also here: `see-ui`, our own skill for screenshots and videos of the app through `scripts/shot.mjs`, and `gather-game-data`, our own skill that builds a Game Data Picker page from a Wikipedia list for the Import entries popup (both written for this repo, edit them freely), and the `caveman*`, `ultracave`, `megacave` and `ponytail*` skills. They come from other authors and run with always-on hooks; their source, version and update steps are in `.claude/caveman/SOURCE.md` and `.claude/ponytail/SOURCE.md`.
+Also here: `see-ui`, our own skill for screenshots and videos of the app through `scripts/shot.mjs`, and `gather-game-data`, our own skill that writes a Game Data Picker app that reads a Wikipedia list in the maintainer's browser for the Import entries popup (both written for this repo, edit them freely), and the `caveman*`, `ultracave`, `megacave` and `ponytail*` skills. They come from other authors and run with always-on hooks; their source, version and update steps are in `.claude/caveman/SOURCE.md` and `.claude/ponytail/SOURCE.md`.
 
 ## Updating
 

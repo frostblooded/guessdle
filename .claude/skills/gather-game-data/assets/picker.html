@@ -1,5 +1,9 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Game Data Picker</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap">
 <style>
 /* Layout: a header strip, a category panel, then the row table; a sticky footer holds the import summary. Guessdle's typewriter look. */
@@ -83,13 +87,39 @@ tr.picked td { background: var(--accent-bg); }
 .bar .acts { display: flex; gap: 10px; flex-wrap: wrap; }
 #out { width: 100%; min-height: 160px; font: 12px var(--font); background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; box-sizing: border-box; }
 @media (max-width: 600px) { h1 { font-size: 24px; } td.val { min-width: 110px; } }
+.source { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 16px; display: grid; gap: 14px; }
+.source .fields { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 1fr) minmax(0, 2fr) auto; gap: 12px; align-items: end; }
+.source label { display: grid; gap: 4px; font-size: 13px; font-weight: 700; }
+.source input, .source select { font: inherit; font-weight: 400; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); min-width: 0; }
+.progress { display: grid; gap: 6px; font-size: 13px; }
+.track { height: 10px; border-radius: 5px; background: var(--dim); border: 1px solid var(--line); overflow: hidden; }
+.track div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+.progress .note { color: var(--muted); }
+body { margin: 0; }
+@media (max-width: 700px) { .source .fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .source .fields label:first-child { grid-column: 1 / -1; } }
 </style>
+</head>
+<body>
 
 <div class="wrap">
   <header style="display:grid;gap:10px">
     <h1>Game Data Picker</h1>
-    <div class="meta" id="meta"></div>
   </header>
+
+  <form class="source" id="source" aria-label="What to read">
+    <div class="fields">
+      <label for="src-list">Wikipedia list<input id="src-list" placeholder="List of Pixar films" required></label>
+      <label for="src-wiki">Language<input id="src-wiki" value="en"></label>
+      <label for="src-from">Rows from<select id="src-from"><option value="auto">Tables, else bullets</option><option value="tables">All tables</option><option value="1">Table 1</option><option value="bullets">Bullet lists</option></select></label>
+      <button class="primary" id="read" type="submit">Read Wikipedia</button>
+    </div>
+    <div class="progress" id="progress" role="status" hidden>
+      <span id="progress-text"></span>
+      <div class="track"><div id="bar"></div></div>
+      <span class="note" id="progress-note"></span>
+    </div>
+    <div class="meta" id="meta"></div>
+  </form>
 
   <section>
     <h2>Categories</h2>
@@ -137,16 +167,185 @@ tr.picked td { background: var(--accent-bg); }
 </div>
 
 <script>
-const DATA = /*DATA*/null;
+const CONFIG = /*CONFIG*/ { list: "", wiki: "en", from: "auto" };
 const FORMAT = "guessdle-import/1";
 const LIMITS = { categories: 10, entryName: 60, value: 200, listItems: 20 };
 const TYPES = ["text", "list", "number"];
-const rows = DATA.rows;
-const n = rows.length;
+const IMPORT_WIDTH = 500;
+const WORKERS = 4;
+const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const asList = (v) => (Array.isArray(v) ? v : [v]);
-const $ = (id) => document.getElementById(id);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const all = (el, sel) => [...el.querySelectorAll(sel)];
 
+const params = new URLSearchParams(location.search);
+$("src-list").value = params.get("list") ?? CONFIG.list;
+$("src-wiki").value = params.get("wiki") ?? CONFIG.wiki;
+$("src-from").value = params.get("from") ?? CONFIG.from;
+
+const DATA = { source: "Wikipedia", list: "", listUrl: "", fetchedAt: "", rows: [], skipped: [], failed: [] };
+let rows = DATA.rows;
+
+/* ---------- reading Wikipedia from this browser ---------- */
+const titleOf = (raw) =>
+  decodeURIComponent(raw.replace(/^https?:\/\/[^/]+\/wiki\//, "").replace(/^\.\//, "").split("#")[0].split("?")[0]).replace(/_/g, " ");
+const clean = (s) => s.replace(/\[(\d+|[a-z]|note \d+|citation needed|nb \d+)\]/gi, "").replace(/\s+/g, " ").trim();
+
+async function get(url, json) {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    try {
+      const res = await fetch(url, { headers: { "Api-User-Agent": "GuessdleDataPicker/1.0 (https://github.com/frostblooded/guessdle)" } });
+      if (res.ok) return json ? res.json() : res.text();
+      if (res.status === 404) return null;
+      if (res.status < 500 && res.status !== 429) return undefined;
+    } catch {}
+    await sleep(1000 * 2 ** attempt);
+  }
+  return undefined;
+}
+const restUrl = (wiki, kind, title) => `https://${wiki}.wikipedia.org/api/rest_v1/page/${kind}/${encodeURIComponent(title.replace(/ /g, "_"))}${kind === "html" ? "?redirect=true" : ""}`;
+const parseHtml = (html) => new DOMParser().parseFromString(html, "text/html");
+
+function valueOf(td) {
+  all(td, "sup, style, script, .reference, .mw-ref, .noprint, .sortkey, [style*='display:none'], [style*='display: none']").forEach((n) => n.remove());
+  const items = all(td, "li").map((li) => clean(li.textContent)).filter(Boolean);
+  if (items.length > 1) return items;
+  const lines = td.innerHTML.split(/<br\s*\/?>/i).map((h) => clean(parseHtml(h).body.textContent)).filter(Boolean);
+  return lines.length > 1 ? lines : clean(td.textContent);
+}
+
+function linksFrom(doc, from) {
+  const linkIn = (el) => all(el, "a[rel='mw:WikiLink']").map((a) => titleOf(a.getAttribute("href") ?? "")).find((t) => t && !t.includes(":"));
+  const tables = all(doc.body, "table.wikitable");
+  const fromTables = (picked) => picked.flatMap((t) => all(t, "tr").map((tr) => { const head = tr.querySelector("th[scope=row]"); return (head && linkIn(head)) || linkIn(tr); }));
+  const fromBullets = () => all(doc.body, "section > ul > li, section > div > ul > li, section > ol > li").filter((li) => !li.closest(".navbox, .reflist, .refbegin, .hatnote, .sidebar")).map(linkIn);
+  let titles;
+  if (from === "bullets") titles = fromBullets();
+  else if (/^\d+$/.test(from)) titles = fromTables(tables.slice(Number(from) - 1, Number(from)));
+  else if (from === "tables") titles = fromTables(tables);
+  else titles = fromTables(tables).some(Boolean) ? fromTables(tables) : fromBullets();
+  return [...new Set(titles.filter(Boolean))];
+}
+
+function imageUrls(raw, width) {
+  const src = (raw.startsWith("//") ? `https:${raw}` : raw).split("?")[0].replace(/^https:\/\/thumb\.wikimedia\.org\//, "https://upload.wikimedia.org/");
+  const thumb = /^(.*)\/thumb\/(.+?)\/\d+px-[^/]+$/.exec(src);
+  const original = thumb ? `${thumb[1]}/${thumb[2]}` : src;
+  const file = original.slice(original.lastIndexOf("/") + 1);
+  const base = thumb ? `${thumb[1]}/thumb/${thumb[2]}` : null;
+  const forImport = /\.svg$/i.test(file) ? base && `${base}/${IMPORT_WIDTH}px-${file}.png`
+    : !/\.(jpe?g|png|webp)$/i.test(file) ? null
+    : base && width > IMPORT_WIDTH ? `${base}/${IMPORT_WIDTH}px-${file}` : original;
+  return { preview: src, import: forImport };
+}
+
+async function readPage(wiki, title) {
+  const [html, summary] = await Promise.all([get(restUrl(wiki, "html", title)), get(restUrl(wiki, "summary", title), true)]);
+  if (html === undefined) return undefined;
+  const doc = html && parseHtml(html);
+  const box = doc?.querySelector("table.infobox");
+  if (!box) return null;
+  const fields = {};
+  for (const tr of all(box, "tr")) {
+    const th = tr.querySelector("th.infobox-label");
+    const td = tr.querySelector("td.infobox-data");
+    if (!th || !td) continue;
+    all(th, "br").forEach((br) => br.replaceWith(" "));
+    const label = clean(th.textContent);
+    if (label && !(label in fields)) {
+      const value = valueOf(td);
+      if (value.length > 0) fields[label] = value;
+    }
+  }
+  const pageTitle = clean(summary?.title ?? doc.querySelector("title")?.textContent ?? title);
+  let image = null;
+  let size = null;
+  if (summary?.originalimage) {
+    const t = summary.thumbnail ?? summary.originalimage;
+    image = imageUrls(t.source, summary.originalimage.width);
+    size = [t.width, t.height];
+  } else {
+    const img = box.querySelector("img");
+    if (img) {
+      image = imageUrls(img.getAttribute("src"), Number(img.getAttribute("data-file-width") ?? 0));
+      size = [Number(img.getAttribute("width")) || 1, Number(img.getAttribute("height")) || 1];
+    }
+  }
+  return {
+    name: pageTitle.replace(/ \([^)]*\)$/, ""),
+    title: pageTitle,
+    url: `https://${wiki}.wikipedia.org/wiki/${encodeURIComponent(pageTitle.replace(/ /g, "_"))}`,
+    image: image?.import ?? null,
+    thumb: image?.preview ?? null,
+    thumbSize: size,
+    fields,
+  };
+}
+
+let reading = false;
+async function readList() {
+  if (reading) return;
+  const wiki = $("src-wiki").value.trim() || "en";
+  const list = titleOf($("src-list").value.trim());
+  if (!list) return;
+  reading = true;
+  $("read").disabled = true;
+  $("read").textContent = "Reading…";
+  rows.length = 0;
+  Object.assign(state, { on: new Set(), type: {}, picked: new Set(), edits: {}, names: {}, crops: {}, editing: null });
+  DATA.skipped = [];
+  DATA.failed = [];
+  DATA.list = list;
+  DATA.listUrl = `https://${wiki}.wikipedia.org/wiki/${encodeURIComponent(list.replace(/ /g, "_"))}`;
+  DATA.fetchedAt = new Date().toISOString();
+  setProgress(0, 0, "Reading the list page…");
+  renderAll();
+  const html = await get(restUrl(wiki, "html", list));
+  if (!html) {
+    setProgress(0, 0, `Could not read "${list}" on ${wiki}.wikipedia.org. Check the name and press Read again.`);
+    reading = false;
+    $("read").disabled = false;
+    $("read").textContent = "Read Wikipedia";
+    return;
+  }
+  const titles = linksFrom(parseHtml(html), $("src-from").value);
+  let done = 0;
+  let next = 0;
+  let lastRender = 0;
+  const worker = async () => {
+    while (next < titles.length) {
+      const order = next++;
+      const title = titles[order];
+      const row = await readPage(wiki, title);
+      if (row) rows.push({ ...row, order });
+      else (row === null ? DATA.skipped : DATA.failed).push(title);
+      done++;
+      setProgress(done, titles.length);
+      if (Date.now() - lastRender > 400) { lastRender = Date.now(); renderAll(); }
+    }
+  };
+  await Promise.all(Array.from({ length: WORKERS }, worker));
+  setProgress(done, titles.length);
+  reading = false;
+  $("read").disabled = false;
+  $("read").textContent = "Read again";
+  renderAll();
+}
+
+function setProgress(done, total, text) {
+  $("progress").hidden = false;
+  $("bar").style.width = total ? `${(done / total) * 100}%` : "0%";
+  const few = (xs) => `${xs.slice(0, 5).join(", ")}${xs.length > 5 ? ", …" : ""}`;
+  const skipped = (DATA.skipped.length ? ` · ${DATA.skipped.length} without an infobox (${few(DATA.skipped)})` : "")
+    + (DATA.failed.length ? ` · ${DATA.failed.length} could not be read (${few(DATA.failed)}); press Read again later to retry` : "");
+  $("progress-text").innerHTML = text ? esc(text) : `<b>${done} of ${total}</b> pages read from your connection${esc(skipped)}`;
+  $("progress-note").textContent = total && done < total ? "Rows appear below as they arrive; you can start ticking now." : total ? "Done. Pictures load straight from Wikipedia." : "";
+}
+
+$("source").addEventListener("submit", (e) => { e.preventDefault(); readList(); });
+
+/* ---------- the picker ---------- */
 const SCALE = { thousand: 1e3, million: 1e6, billion: 1e9, trillion: 1e12 };
 function toNumber(raw) {
   const text = String(raw).replace(/(\d),(?=\d{3}\b)/g, "$1");
@@ -158,18 +357,22 @@ function toNumber(raw) {
 }
 const fmt = (x) => (Math.abs(x) >= 1e6 ? `${(x / 1e6).toLocaleString()} million` : x.toLocaleString());
 
-const counts = {};
-for (const r of rows) for (const k in r.fields) counts[k] = (counts[k] || 0) + 1;
-const cats = Object.keys(counts).filter((k) => counts[k] / n >= 0.6).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
+const state = { on: new Set(), type: {}, picked: new Set(), q: "", edits: {}, names: {}, crops: {}, editing: null };
+let counts = {};
+let cats = [];
 function guess(k) {
   const vals = rows.filter((r) => k in r.fields).map((r) => r.fields[k]);
   if (vals.some(Array.isArray)) return "list";
   if (vals.every((v) => /^[^\d]{0,3}-?\d/.test(v) && toNumber(v) !== null)) return "number";
   return "text";
 }
-
-const state = { on: new Set(), type: {}, picked: new Set(), q: "", edits: {}, names: {}, crops: {}, editing: null };
-for (const k of cats) state.type[k] = guess(k);
+function countCats() {
+  counts = {};
+  for (const r of rows) for (const k in r.fields) counts[k] = (counts[k] || 0) + 1;
+  cats = Object.keys(counts).filter((k) => counts[k] / rows.length >= 0.6 || state.on.has(k)).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
+  for (const k of cats) if (!state.on.has(k)) state.type[k] = guess(k);
+}
+const listOrder = () => rows.map((_, i) => i).sort((a, b) => rows[a].order - rows[b].order);
 const ticked = () => cats.filter((k) => state.on.has(k));
 const sample = (k) => asList(rows.find((r) => k in r.fields).fields[k]).join(", ");
 const key = (i, k) => `${i}\u0000${k}`;
@@ -211,18 +414,20 @@ function problems(i) {
   return out;
 }
 
-$("meta").innerHTML = `<span>Source <b>${esc(DATA.source)}</b></span><span>List <b><a href="${esc(DATA.listUrl)}" target="_blank" rel="noopener" style="color:inherit">${esc(DATA.list)}</a></b></span><span><b>${n}</b> pages with an infobox</span><span>Read <b>${new Date(DATA.fetchedAt).toLocaleString()}</b></span>`;
+function renderMeta() {
+  $("meta").innerHTML = DATA.list ? `<span>List <b><a href="${esc(DATA.listUrl)}" target="_blank" rel="noopener" style="color:inherit">${esc(DATA.list)}</a></b></span><span><b>${rows.length}</b> pages with an infobox</span>` : "";
+}
 
 function renderCats() {
   const full = state.on.size >= LIMITS.categories;
-  $("cats").innerHTML = "";
+  $("cats").innerHTML = rows.length ? "" : `<p class="hint">Categories appear once pages are read.</p>`;
   cats.forEach((k, c) => {
     const on = state.on.has(k);
     const el = document.createElement("label");
     el.className = `cat${on ? " on" : ""}${full ? " full" : ""}`;
     el.htmlFor = `cat-${c}`;
     el.innerHTML = `<input type="checkbox" id="cat-${c}" ${on ? "checked" : ""} ${full && !on ? "disabled" : ""}>
-      <span class="nm">${esc(k)}<span class="cov ${counts[k] < n ? "part" : ""}">${counts[k]}/${n}</span></span>
+      <span class="nm">${esc(k)}<span class="cov ${counts[k] < rows.length ? "part" : ""}">${counts[k]}/${rows.length}</span></span>
       <span class="ex" title="${esc(sample(k))}">e.g. ${esc(sample(k))}</span>
       <select id="cat-${c}-type" aria-label="Type for ${esc(k)}">${TYPES.map((t) => `<option value="${t}" ${state.type[k] === t ? "selected" : ""}>${t[0].toUpperCase() + t.slice(1)}</option>`).join("")}</select>`;
     el.querySelector("input").addEventListener("change", (e) => { e.target.checked ? state.on.add(k) : state.on.delete(k); renderAll(); });
@@ -259,10 +464,10 @@ function cellHtml(i, k) {
 function pictureHtml(i) {
   const r = rows[i];
   const crop = cropOf(i);
-  if (!r.thumb || !crop) return `<div class="noimg">${r.image ? "no preview" : "no picture"}</div>`;
+  if (!r.thumb || !crop) return `<div class="noimg">no picture</div>`;
   const size = `${100 / crop.width}% ${100 / crop.height}%`;
   const pos = `${crop.width < 1 ? (crop.left / (1 - crop.width)) * 100 : 0}% ${crop.height < 1 ? (crop.top / (1 - crop.height)) * 100 : 0}%`;
-  return `<button class="pic" type="button" data-act="crop" aria-label="Edit picture of ${esc(nameOf(i))}" style="background-image:url('${r.thumb}');background-size:${size};background-position:${pos}"><span>Edit</span></button>`;
+  return `<button class="pic" type="button" data-act="crop" aria-label="Edit picture of ${esc(nameOf(i))}" style="background-image:url('${esc(r.thumb)}');background-size:${size};background-position:${pos}"><span>Edit</span></button>`;
 }
 
 function nameHtml(i) {
@@ -277,7 +482,7 @@ function renderTable() {
   $("thead").innerHTML = `<tr><th>Import</th><th>Picture</th><th>Name</th>${ks.map((k) => `<th>${esc(k)}</th>`).join("")}</tr>`;
   const tb = $("tbody");
   tb.innerHTML = "";
-  rows.forEach((r, i) => {
+  listOrder().forEach((i) => {
     const bad = problems(i);
     if (bad.length) state.picked.delete(i);
     if (state.q && !nameOf(i).toLowerCase().includes(state.q)) return;
@@ -339,9 +544,13 @@ function openCropper(i) {
   $("crop-title").textContent = `Edit picture of ${nameOf(i)}`;
   $("cropper").hidden = false;
   const img = $("crop-img");
-  img.onload = placeBox;
+  img.onload = () => {
+    rows[i].thumbSize = [img.naturalWidth, img.naturalHeight];
+    if (!state.crops[i]) crop.box = centered(rows[i].thumbSize);
+    placeBox();
+  };
   img.src = rows[i].thumb;
-  if (img.complete) placeBox();
+  if (img.complete && img.naturalWidth) placeBox();
   $("crop-save").focus();
 }
 function closeCropper() { $("cropper").hidden = true; }
@@ -381,7 +590,7 @@ function importFile() {
     format: FORMAT,
     source: DATA.listUrl,
     attributes: ks.map((k) => ({ name: k, type: state.type[k] })),
-    entries: [...state.picked].sort((a, b) => a - b).map((i) => {
+    entries: listOrder().filter((i) => state.picked.has(i)).map((i) => {
       const r = rows[i];
       const c = r.image ? cropOf(i) : null;
       return {
@@ -402,7 +611,14 @@ function renderSum() {
   if (!$("outbox").hidden) $("out").value = JSON.stringify(importFile(), null, 2);
 }
 
-function renderAll() { renderCats(); renderTable(); renderSum(); }
+function renderAll() {
+  if (state.editing) return renderSum();
+  countCats();
+  renderMeta();
+  renderCats();
+  renderTable();
+  renderSum();
+}
 
 $("q").addEventListener("input", (e) => { state.q = e.target.value.toLowerCase(); renderTable(); });
 $("all").addEventListener("click", () => { rows.forEach((_, i) => { if (!problems(i).length) state.picked.add(i); }); renderAll(); });
@@ -416,4 +632,7 @@ $("copy").addEventListener("click", () => {
 });
 
 renderAll();
+if ($("src-list").value.trim()) readList();
 </script>
+</body>
+</html>
