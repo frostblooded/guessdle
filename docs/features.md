@@ -39,10 +39,13 @@ Every user-facing feature, by page, with the names to use for it (terms from `GL
 
 - **Editor**: Details, Entries, Attributes, Answers, Questions tabs and the status bar to submit for approval or unpublish. Code: `src/routes/edit/edit-page.tsx`, `src/routes/edit/status-bar.tsx`. Tests: `tests/e2e/approval.spec.ts`, `tests/e2e/review.spec.ts`.
 - **Entries tab**: add, edit and delete Entries in a popup, photos with the Crop dialog, Blur order, Sequence photos. Code: `src/routes/edit/entries-panel.tsx`, `src/components/crop-dialog.tsx`, `src/routes/edit/blur-order-editor.tsx`, `src/routes/edit/shots-editor.tsx`. Tests: `tests/e2e/entries.spec.ts`, `tests/e2e/crop.spec.ts`.
-- **Import entries**: the Entries tab's Import entries popup takes an import file copied from the Game Data Picker (`/gather-game-data` skill) and adds its attributes, entries and pictures (copied from Wikimedia, square-cropped); existing entries only get blanks filled. Classic games only. Code: `src/routes/edit/import-dialog.tsx`, `src/game/import-file.ts`, `src/server/import.ts`. Tests: `tests/integration/import.test.ts`, `tests/e2e/import.spec.ts`.
 - **Attributes tab**: add, reorder, retype and remove Attributes; saves only on Save. Code: `src/routes/edit/attributes-panel.tsx`. Tests: `tests/e2e/attributes.spec.ts`.
 - **Answers tab**: the schedule of Daily Answers and owner overrides. Code: `src/routes/edit/answers-panel.tsx`, `src/routes/edit/override-dialog.tsx`. Tests: `tests/e2e/answers.spec.ts`.
 - **Questions tab**: Quiz questions, multiple choice or number. Code: `src/routes/edit/questions-panel.tsx`. Tests: `tests/e2e/quiz-game.spec.ts`.
+
+## `/g/:slug/import`
+
+- **Import from Wikipedia**: opened from the Entries tab's Import from Wikipedia button: paste a Wikipedia list link, the browser reads every linked page, then the owner ticks infobox categories (with coverage counts and a Text, List or Number type) and rows, can fix values and names and pick each picture's square, and imports straight into the game (pictures copied from Wikimedia, square-cropped; existing entries only get blanks filled). `?list=<link>` starts reading on open. Classic games only. Code: `src/routes/import/import-page.tsx`, `src/routes/import/picker.tsx`, `src/routes/import/category-cards.tsx`, `src/routes/import/rows-table.tsx`, `src/routes/import/crop-dialog.tsx`, `src/routes/import/wikipedia.ts`, `src/game/wiki-pick.ts`, `src/game/import-file.ts`, `src/server/import.ts`. Tests: `tests/wiki-pick.test.ts`, `tests/ui/wikipedia.test.tsx`, `tests/integration/import.test.ts`, `tests/e2e/wiki-import.spec.ts`.
 
 ## `/create`
 

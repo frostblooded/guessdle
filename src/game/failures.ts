@@ -64,7 +64,7 @@ export const FAILURES = {
   attribute_exists: failure(409, "Another attribute already has that name."),
   import_invalid: failure(
     400,
-    "This is not a Guessdle import file, or it is broken. Copy a fresh one from the Game Data Picker and try again.",
+    "This is not a Guessdle import file, or it is broken. Read the list again and try again.",
   ),
   import_type_clash: failure(
     409,

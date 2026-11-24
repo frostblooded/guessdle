@@ -98,7 +98,9 @@ export function useDelayed(on: boolean): boolean {
 
 export const focusOnMount = (el: HTMLElement | null): void => el?.focus();
 
-export const selectOnMount = (el: HTMLInputElement | null): void => {
+export const selectOnMount = (
+  el: HTMLInputElement | HTMLTextAreaElement | null,
+): void => {
   el?.focus();
   el?.select();
 };

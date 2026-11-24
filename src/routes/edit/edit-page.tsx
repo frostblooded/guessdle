@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { useOnce, useWhile } from "../../lib/effects.ts";
-import { Link, useParams } from "react-router";
+import { Link, useLocation, useParams } from "react-router";
 import { EmptyState, MessageCard, PageHead } from "../../components/page.tsx";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button, buttonVariants } from "../../components/ui/button.tsx";
@@ -117,7 +117,11 @@ function Editor({
   const [fields, setFields] = useState(() => fieldsOf(initial.details));
   const [saved, setSaved] = useState(initial.details);
   const [attributes, setAttributes] = useState(initial.attributes);
-  const [tab, setTab] = useState("details");
+  const arrived = useLocation().state as {
+    tab?: string;
+    notice?: string;
+  } | null;
+  const [tab, setTab] = useState(arrived?.tab ?? "details");
   const [error, setError] = useState("");
   const [savedText, setSavedText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -306,9 +310,6 @@ function Editor({
           <TabsContent value="attributes" selected={tab} asChild>
             <Card id="panel-attributes" className="p-6">
               <AttributesPanel
-                key={attributes
-                  .map(({ id, name, type }) => `${id}:${name}:${type}`)
-                  .join("|")}
                 base={base}
                 attributes={attributes}
                 setAttributes={setAttributes}
@@ -332,7 +333,7 @@ function Editor({
                   kind={saved.kind}
                   tries={saved.blurTries}
                   onChange={refreshStatus}
-                  onAttributes={setAttributes}
+                  notice={arrived?.notice ?? ""}
                 />
               )}
             </Card>

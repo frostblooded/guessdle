@@ -1,29 +1,29 @@
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { BookOpen, Plus } from "lucide-react";
+import { Link } from "react-router";
 import { Alert } from "../../components/ui/alert.tsx";
-import { Button } from "../../components/ui/button.tsx";
+import { Button, buttonVariants } from "../../components/ui/button.tsx";
 import type { GameKind } from "../../game/blur.ts";
-import { ImportButton } from "./import-dialog.tsx";
 
 export function EntriesToolbar({
   base,
   kind,
+  notice,
   onNew,
-  onImported,
 }: {
   base: string;
   kind: GameKind;
+  notice: string;
   onNew: () => void;
-  onImported: () => Promise<void>;
 }) {
-  const [notice, setNotice] = useState("");
+  const [shown, setShown] = useState(notice);
   return (
     <>
       <div className="flex flex-wrap gap-2">
         <Button
           id="entry-new"
           onClick={() => {
-            setNotice("");
+            setShown("");
             onNew();
           }}
         >
@@ -31,17 +31,18 @@ export function EntriesToolbar({
           New entry
         </Button>
         {kind === "classic" && (
-          <ImportButton
-            base={base}
-            onImported={async (summary) => {
-              await onImported();
-              setNotice(summary);
-            }}
-          />
+          <Link
+            id="wiki-import-link"
+            className={buttonVariants({ variant: "outline" })}
+            to={`${base.replace(/^\/api\/games/, "/g")}/import`}
+          >
+            <BookOpen aria-hidden="true" />
+            Import from Wikipedia
+          </Link>
         )}
       </div>
       <Alert id="import-notice" variant="success" role="status">
-        {notice}
+        {shown}
       </Alert>
     </>
   );

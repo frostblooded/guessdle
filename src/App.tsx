@@ -3,6 +3,7 @@ import { Layout } from "./components/layout.tsx";
 import { AdminPage } from "./routes/admin/admin-page.tsx";
 import { CreatePage } from "./routes/create-page.tsx";
 import { EditPage } from "./routes/edit/edit-page.tsx";
+import { ImportPage } from "./routes/import/import-page.tsx";
 import { FriendsPage } from "./routes/friends-page.tsx";
 import { GalleryPage } from "./routes/gallery-page.tsx";
 import { HowToPlayPage } from "./routes/how-to-play-page.tsx";
@@ -45,6 +46,11 @@ export function App({ legacyWiped }: { legacyWiped: boolean }) {
           <Route caseSensitive path="/g/:slug" element={<PlayPage />} />
           <Route caseSensitive path="/g/:slug/edit" element={<EditPage />} />
           <Route caseSensitive path="/g/:slug/days" element={<DaysPage />} />
+          <Route
+            caseSensitive
+            path="/g/:slug/import"
+            element={<ImportPage />}
+          />
           <Route
             caseSensitive
             path="/g/:slug/day/:day"

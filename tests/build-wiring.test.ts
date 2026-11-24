@@ -99,11 +99,11 @@ describe("build output is wired through the pages and the deploy", () => {
     );
   });
 
-  it("nginx serves /g/<slug>/edit from the app shell", () => {
+  it("nginx serves /g/<slug>/edit and /g/<slug>/import from the app shell", () => {
     const conf: string = read("deploy/nginx.conf");
     assert.match(
       conf,
-      /location ~ \^\/g\/\[\^\/\]\+\/edit\$ \{[^}]*try_files \/index\.html =404;/,
+      /location ~ \^\/g\/\[\^\/\]\+\/\(edit\|import\)\$ \{[^}]*try_files \/index\.html =404;/,
     );
   });
 

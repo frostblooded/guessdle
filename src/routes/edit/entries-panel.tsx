@@ -57,10 +57,10 @@ export function EntriesPanel({
   kind,
   tries,
   onChange,
-  onAttributes,
+  notice,
 }: {
   base: string;
-  onAttributes: (attributes: Attribute[]) => void;
+  notice: string;
   kind: GameKind;
   tries: number;
   initial: { attributes: Attribute[]; entries: Entry[] };
@@ -77,26 +77,25 @@ export function EntriesPanel({
   const blur = kind === "blur";
   const sequence = kind === "sequence";
 
-  const reload = async (): Promise<void> => {
-    const [attrs, got] = await Promise.all([
-      api<Attribute[]>("GET", `${base}/attributes`),
-      api<Entry[]>("GET", `${base}/entries`),
-    ]);
-    if (attrs?.status !== 200 || got?.status !== 200) {
-      setError(errorText((attrs ?? got) as Reply | null));
-      return;
-    }
-    setError("");
-    setEntries(got.data);
-    if (JSON.stringify(built.current) !== JSON.stringify(attrs.data)) {
-      built.current = attrs.data;
-      setFormAttributes(attrs.data);
-      onAttributes(attrs.data);
-      setDraft(draftOf(null));
-    }
-  };
-
-  useOnOpen(active, () => void reload());
+  useOnOpen(active, () => {
+    void (async () => {
+      const [attrs, got] = await Promise.all([
+        api<Attribute[]>("GET", `${base}/attributes`),
+        api<Entry[]>("GET", `${base}/entries`),
+      ]);
+      if (attrs?.status !== 200 || got?.status !== 200) {
+        setError(errorText((attrs ?? got) as Reply | null));
+        return;
+      }
+      setError("");
+      setEntries(got.data);
+      if (JSON.stringify(built.current) !== JSON.stringify(attrs.data)) {
+        built.current = attrs.data;
+        setFormAttributes(attrs.data);
+        setDraft(draftOf(null));
+      }
+    })();
+  });
 
   const edit = (entry: Entry | null): void => {
     setError("");
@@ -165,11 +164,8 @@ export function EntriesPanel({
       <EntriesToolbar
         base={base}
         kind={kind}
+        notice={notice}
         onNew={() => edit(null)}
-        onImported={async () => {
-          await reload();
-          await onChange();
-        }}
       />
       {!open && (
         <Alert id="entry-error" variant="error" role="alert">
